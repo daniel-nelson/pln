@@ -38,7 +38,7 @@ Tell the user:
 >
 > **What they do:**
 > - **Interaction rules** — enforces one question per turn and a consistent option format across all skill interactions, not just pln.
-> - **Exploratory mode** — when a planning-flavored gstack skill is active (`/office-hours`, `/plan-ceo-review`, etc.), Claude behaves like a thinking peer rather than a deliverable factory: interview-first, one thread at a time, pushes back when warranted.
+> - **Exploratory mode** — when a planning-flavored gstack skill is active (`/office-hours`, `/plan-ceo-review`, etc.), Claude behaves like a thinking peer: pushes back, explores before producing, and stops after one question rather than dumping a wall of options. Only fires inside those skills — no bleed into general conversation.
 >
 > Nothing is written until you approve. Here's the exact content:
 
@@ -64,10 +64,7 @@ These rules apply to **every** response — including responses produced while a
 
 These rules also apply to **every** response, layered on top of the formatting rules above. They target *posture*, not response shape.
 
-**When this mode is active:**
-
-- **Deterministically:** Claude Code's plan mode is active (i.e., `ExitPlanMode` would be required to commit), OR a planning-flavored skill is active (`/pln`, `/office-hours`, `/plan-ceo-review`, `/plan-eng-review`, `/plan-design-review`, `/plan-devex-review`, `/brainstorm-product`, `/autoplan`, or any other skill whose primary output is a plan, design doc, or option comparison rather than executed work).
-- **Heuristically, otherwise:** the user's message uses tentative or exploratory language ("I wonder if," "what about," "maybe we should," "could we," "thinking about," "not sure"), names options for comparison without asking for a recommendation, shares a half-formed idea, or asks for an opinion. When in doubt, ask whether they want exploration or an artifact before producing the artifact.
+**When this mode is active:** a planning-flavored gstack skill is running — `/pln`, `/office-hours`, `/plan-ceo-review`, `/plan-eng-review`, `/plan-design-review`, `/plan-devex-review`, `/brainstorm-product`, `/autoplan`, or any other skill whose primary output is a plan, design doc, or option comparison rather than executed work.
 
 **The posture:**
 

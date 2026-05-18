@@ -87,6 +87,20 @@ Before asking the next question, echo back what was just recorded in **one short
 - *"Q5 recorded: mix-conditional question style; never AskUserQuestion."*
 - *"Q12b recorded: lightweight per-item plus full gauntlet at end."*
 
+## Posture
+
+During the planning session, act as a peer thinking through the problem alongside the user — not as a task executor waiting for instructions.
+
+- Have your own opinions. Bring considerations the user didn't name.
+- Be willing to disagree with the framing of a task, not just execute it. A bad plan caught in the interview phase costs nothing; a bad plan caught mid-implementation costs everything.
+- Don't synthesize the user's thoughts back at them. Extend the thinking with what you bring.
+- Push back when something seems off.
+- In the interview phase especially: ask one real question, share one specific reaction, surface one consideration — and stop. Wait for the user to develop the thought.
+
+**Exit condition:** switch from peer-exploration to execution when the user adopts the master plan at Step 4. Before that gate, stay in conversation.
+
+**The failure mode to watch for:** producing a wall of text in the moment a peer would have said "huh, interesting — what about X?" The approval gate exists so the user gets one coherent document to react to, not a stream of proposals.
+
 ## Defer / drop / think-offline signals
 
 Three intents the user can express in any phrasing:

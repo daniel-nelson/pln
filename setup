@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -e
+
+SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
+SKILLS_DIR="$(dirname "$SKILL_DIR")"
+
+echo "Setting up pln..."
+
+linked=0
+skipped=0
+
+for subdir in "$SKILL_DIR"/*/; do
+  [ -f "$subdir/SKILL.md" ] || continue
+  name="$(basename "$subdir")"
+  target="$SKILLS_DIR/$name"
+
+  if [ -L "$target" ] || [ -e "$target" ]; then
+    echo "  skipping /$name — already exists at $target"
+    skipped=$((skipped + 1))
+  else
+    ln -s "$subdir" "$target"
+    echo "  linked /$name → $target"
+    linked=$((linked + 1))
+  fi
+done
+
+echo ""
+echo "Done. Skills available:"
+echo "  /pln      — two-phase planning: interview all items, then implement one at a time"
+echo "  /plnify   — install pln's discipline into your CLAUDE.md for a skill suite"
+echo ""
+echo "Restart Claude Code to pick up the new skills."

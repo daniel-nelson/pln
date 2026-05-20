@@ -1,6 +1,6 @@
 # pln
 
-**Claude Code skill for human-paced planning — one question at a time — with a peer that pushes back.**
+**Human-paced planning — one question at a time — with a peer that pushes back.**
 
 Instead of dumping a complete plan and waiting for you to react, pln interviews you first: one question per item, all design decisions settled, master plan approved — then implements without stopping to ask more questions. During the interview phase it acts as a thinking peer, not a task executor: it'll push back on a bad approach before any code is written.
 

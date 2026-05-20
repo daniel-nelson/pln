@@ -1,6 +1,6 @@
 ---
 name: pln
-description: Personal multi-item planning workflow. Two distinct phases — first an interview that resolves every per-item question into a complete master plan, then (only after the master plan is approved as a whole) an implementation phase that walks the items one at a time. No interleaving: implementation never begins while questions are still open. Plans live at `./plans/<YYYY-MM-DD>-<slug>/PLAN.md` relative to the session CWD. Trigger explicitly via `/pln <task>`, or auto-engage when the user says things like "make a plan", "let's tackle this in steps", "work through these", or pastes a numbered list of items to address. Universal — works in any repo. NEVER use the AskUserQuestion tool.
+description: Human-paced planning — one question at a time — with a peer that pushes back. Two distinct phases — first an interview that resolves every per-item question into a complete master plan, then (only after the master plan is approved as a whole) an implementation phase that walks the items one at a time. No interleaving: implementation never begins while questions are still open. Plans live at `./plans/<YYYY-MM-DD>-<slug>/PLAN.md` relative to the session CWD. Trigger explicitly via `/pln <task>`, or auto-engage when the user says things like "make a plan", "let's tackle this in steps", "work through these", or pastes a numbered list of items to address. Universal — works in any repo. NEVER use the AskUserQuestion tool.
 ---
 
 # pln — personal planning workflow

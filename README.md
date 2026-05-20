@@ -47,7 +47,7 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 
 | Skill | How to invoke | Description |
 |-------|--------------|-------------|
-| `/pln` | `/pln <task>` or say "make a plan" | Two-phase planning: interview all items, then implement one at a time |
+| `/pln` | `/pln` or `/pln <details of what you want to plan>` | Two-phase planning: overview bullet list followed by detailed back and forth with a peer for each item; implementation only after the plan is written |
 | `/plnify` | `/plnify gstack` | One-time setup — adds pln's discipline to `~/.claude/CLAUDE.md` for gstack planning skills |
 
 ## How it works

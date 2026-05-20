@@ -14,32 +14,18 @@ Requires [Git](https://git-scm.com/).
 
 #### Claude Code
 
-**1. Install on your machine** — open Claude Code and paste:
+Open Claude Code and paste:
 
 ```
 Install pln: run `git clone https://github.com/daniel-nelson/pln.git ~/.claude/skills/pln && cd ~/.claude/skills/pln && ./setup`
 ```
 
-**2. Add to your project (optional):**
-
-```
-Add pln to this project: run `cp -Rf ~/.claude/skills/pln .claude/skills/pln && rm -rf .claude/skills/pln/.git && cd .claude/skills/pln && ./setup`
-```
-
-Real files get committed to your repo (not a submodule), so `git clone` just works for teammates. They just need to run `cd .claude/skills/pln && ./setup` once.
-
 #### Codex
 
-**1. Install on your machine** — open Codex and paste:
+Open Codex and paste:
 
 ```
 Install pln: run `git clone https://github.com/daniel-nelson/pln.git ~/.codex/skills/pln && cd ~/.codex/skills/pln && ./setup`
-```
-
-**2. Add to your project (optional):**
-
-```
-Add pln to this project: run `cp -Rf ~/.codex/skills/pln .codex/skills/pln && rm -rf .codex/skills/pln/.git && cd .codex/skills/pln && ./setup`
 ```
 
 ### Install via `npx skills`
@@ -52,7 +38,7 @@ It will prompt you for which agent to install to. For more details, see [vercel-
 
 ### What gets installed
 
-- `pln` skill in `~/.claude/skills/pln/` (or project-local at `.claude/skills/pln/`)
+- `pln` skill in `~/.claude/skills/pln/`
 - `/plnify` slash command (symlinked from `pln/plnify/`) for installing pln's discipline into gstack
 
 Everything lives inside your assistant's skills directory. Nothing touches your PATH or runs in the background.
@@ -75,39 +61,21 @@ The peer posture is built in: during the interview phase, pln will disagree with
 ## Upgrading
 
 ```bash
-# Claude Code — personal install
+# Claude Code
 cd ~/.claude/skills/pln && git fetch origin && git reset --hard origin/main && ./setup
 
-# Claude Code — project install
-rm -rf .claude/skills/pln
-cp -Rf ~/.claude/skills/pln .claude/skills/pln
-rm -rf .claude/skills/pln/.git
-cd .claude/skills/pln && ./setup
-
-# Codex — personal install
+# Codex
 cd ~/.codex/skills/pln && git fetch origin && git reset --hard origin/main && ./setup
-
-# Codex — project install
-rm -rf .codex/skills/pln
-cp -Rf ~/.codex/skills/pln .codex/skills/pln
-rm -rf .codex/skills/pln/.git
-cd .codex/skills/pln && ./setup
 ```
 
 ## Uninstalling
 
 ```bash
 # Claude Code
-rm -rf ~/.claude/skills/pln
-rm -f ~/.claude/skills/plnify
-rm -rf .claude/skills/pln
-rm -f .claude/skills/plnify
+rm -rf ~/.claude/skills/pln && rm -f ~/.claude/skills/plnify
 
 # Codex
-rm -rf ~/.codex/skills/pln
-rm -f ~/.codex/skills/plnify
-rm -rf .codex/skills/pln
-rm -f .codex/skills/plnify
+rm -rf ~/.codex/skills/pln && rm -f ~/.codex/skills/plnify
 ```
 
 If you ran `/plnify gstack`, the two sections it added to `~/.claude/CLAUDE.md` are not automatically removed — delete them manually if you no longer want them.

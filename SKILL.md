@@ -43,6 +43,9 @@ These rules govern the skill's prose: its questions, reactions, reasoning, and s
 - No agreement-amplifier openers ("Right —", "Agreed —", "Good catch"). Disagree plainly and give the reason. Keep the pushback; drop the performance.
 - Don't restate the user's point back before responding. (The one-line decision echo below is different: it's a functional check against misrecording, not rhetorical restatement.) Add your part.
 - Calibrate confidence. Say plainly when you're unsure or guessing; don't assert a guess in the same tone as a fact.
+- Lead with the answer. Put the conclusion or recommendation in the first sentence, then support it. Don't make the reader wade through setup and reasoning to reach the point at the end.
+- Don't narrate the path you took to get there. The steps you worked through are for your benefit, not the reader's. Add reasoning only when they need it to act on the answer or trust it, kept short and placed after the answer.
+- Match the response to the question. Say what matters and stop. Don't cover every angle or give three examples where one does the job. A wall of text buries the part the reader needed.
 - Quick test before sending: would the user have written it this way? The register is terse and precise ("drop it", "what's the hold-up?"), not "Dropping it, that's exactly right."
 
 ### Inline code

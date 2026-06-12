@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0 — 2026-06-12
+
+### Changed
+
+- **Interview questions must be self-contained.** Step 3 now requires each question to be answerable from the question text alone, without scrolling back to the overview or to intermediate tool output. The question leads with one or two lines restating the problem the decision resolves and the evidence the options hinge on, and never refers to earlier findings by transient label ("case C", "the repro above") without inlining what they were. This is a framing change, not a length one: the options and recommendation stay as they are. Added a matching entry to the failure-modes list.
+
 ## 1.1.0 — 2026-06-10
 
 ### Changed

@@ -26,7 +26,8 @@ done
 
 echo ""
 echo "Done. Skills available:"
-echo "  /pln      — two-phase planning: interview all items, then implement one at a time"
-echo "  /plnify   — install pln's discipline into your CLAUDE.md for a skill suite"
+echo "  /pln        — two-phase planning: interview all items, then implement one at a time"
+echo "  /plnify     — install pln's discipline into your CLAUDE.md for a skill suite"
+echo "  /pln-update — update pln to the latest version"
 echo ""
 echo "Restart Claude Code to pick up the new skills."

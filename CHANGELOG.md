@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0 — 2026-06-24
+
+### Added
+
+- **Self-updating with a prompt-first default.** pln now checks for a new release each time the skill loads, throttled by a local cache (60-minute when current, 12-hour while a newer version is pending) so it isn't a network hit every time. When a newer version exists, pln offers to upgrade and remembers your choice: upgrade once, always auto-upgrade silently, snooze with escalating backoff (24h → 48h → 1 week), or disable checks entirely. The default asks before doing anything; "always keep me up to date" opts into silent upgrades. The check piggybacks on skill invocation (no background process) and the prompt is plain assistant text, never the `AskUserQuestion` tool. State lives in `~/.pln/` (`config.yaml`, cache, snooze, and just-upgraded marker).
+- **`/pln-update` skill.** Run it anytime to update explicitly. It detects the install (git clone or vendored `npx skills` copy), upgrades in place (`git fetch` + `git reset --hard origin/main` + `./setup`, or re-clone for vendored), and summarizes what changed from the CHANGELOG. A developer symlink install is detected and left alone with a note to `git pull` in the source repo instead. Two helper scripts back this: `bin/pln-update-check` (the cached version check) and `bin/pln-config` (reads/writes `~/.pln/config.yaml`, portable across BSD and GNU).
+
 ## 1.3.0 — 2026-06-24
 
 ### Changed

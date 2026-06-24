@@ -1,6 +1,6 @@
 ---
 name: pln
-description: Human-paced planning — one question at a time — with a peer that pushes back. Two distinct phases — first an interview that resolves every per-item question into a complete master plan, then (only after the master plan is approved as a whole) an implementation phase that walks the items one at a time. No interleaving: implementation never begins while questions are still open. Plans live at `./plans/<YYYY-MM-DD>-<slug>/PLAN.md` relative to the session CWD. Trigger explicitly via `/pln <task>`, or auto-engage when the user says things like "make a plan", "let's tackle this in steps", "work through these", or pastes a numbered list of items to address. Universal — works in any repo. NEVER use the AskUserQuestion tool.
+description: Human-paced planning — one question at a time — with a peer that pushes back. Two distinct phases — first an interview that resolves every per-item question into a complete master plan, then (only after the master plan is approved as a whole) an implementation phase that walks the items one at a time. Implementation runs autonomously: a thin orchestrator spawns a fresh subagent per item, with `PLAN.md` as the durable source of truth, so the whole plan executes without per-item intervention. No interleaving: implementation never begins while questions are still open. Plans live at `./plans/<YYYY-MM-DD>-<slug>/PLAN.md` relative to the session CWD. Trigger explicitly via `/pln <task>`, or auto-engage when the user says things like "make a plan", "let's tackle this in steps", "work through these", or pastes a numbered list of items to address. Universal — works in any repo. NEVER use the AskUserQuestion tool.
 ---
 
 # pln — personal planning workflow
@@ -24,6 +24,8 @@ If the user gives a single small task, don't engage; just do the work. The skill
 - **Initial plan is always written before any work begins.** No matter how small the task, the user sees the proposed plan first.
 - **Interview before implementation, always.** All per-item questions are resolved in the interview phase (Step 3) and folded into the master plan. Implementation (Step 5) does not begin until the entire master plan has been shown and approved. Never propose-then-implement an item in isolation while later items still have open questions; that is the antipattern this rule prevents.
 - **Per-item commits use the `Co-Authored-By: Claude <model-id> <noreply@anthropic.com>` trailer.** Never `--amend`, never `--no-verify`. If a hook fails: fix the issue, re-stage, create a new commit.
+- **Implementation runs through subagents; the orchestrator never does an item's work inline.** In the implementation phase (Step 5) the main session is a thin orchestrator: it reads `PLAN.md`, spawns one subagent per item, checks the file was updated, and moves on. It does not read code or edit files itself. Doing the work inline defeats the fresh-context guarantee and fills the orchestrator's context across the run.
+- **A subagent commits only a complete, verified item — never partial work.** If a subagent stops mid-item (a blocker), it leaves its changes uncommitted and writes a handoff file; it never commits a half-done item. This keeps every commit a clean checkpoint and lets a fresh subagent resume from the uncommitted state.
 
 ## Style
 
@@ -124,14 +126,14 @@ During the planning session, act as a peer thinking through the problem with the
 
 Not every open choice is the user's to answer, and not every decision belongs in the plan. The interview's value is in the choices only the user can make; spending their attention on choices a capable implementer should own is the waste this section prevents. Route every open choice into one of three lanes using two checkable tests, not a gut feel about importance:
 
-- **Authority** — can you cite a concrete source that already decides this, by name? An existing pattern in the codebase, a documented convention, a framework idiom, a skill the project mandates (e.g. `psychic-skill` in a Dream/Psychic repo), or a decision already made earlier in this plan. "Matches the existing `AWS_*` vars in this file" cites a real authority; "felt cleaner" cites only yourself. Treat whatever authority is present in this context as the source; never hardcode a particular framework's conventions into the skill.
+- **Authority** — can you cite a concrete source that already decides this, by name? An existing pattern in the codebase, a documented convention, a framework idiom, a skill the project mandates, or a decision already made earlier in this plan. "Matches the existing `AWS_*` vars in this file" cites a real authority; "felt cleaner" cites only yourself. Treat whatever authority is present in this context as the source; never hardcode a particular framework's conventions into the skill.
 - **Reversibility of consequence** — can you name what would have to depend on the choice before it could change? A migration against populated rows, a deployed config, an external party who has acted on it (a regulator, another team, a vendor approval), or a later plan item built on top of it. Cheap-to-retype is not the test; a one-line string already sent for approval is irreversible. Reversibility decays as the plan proceeds: the same call deserves a quiet decision at item 9 and a surfaced question at item 1, because more is built on top of it.
 
 Routing:
 
 - **Ask** — the choice is unbacked and consequential: no authority decides it and something will depend on it. The deciding reason lives in the user's head: domain fact, taste, risk appetite, business context. This is the only lane that becomes a one-question-at-a-time interview question (Step 3).
 - **Decide-and-disclose** — the choice is cite-backed, or reversible. Make the call yourself. Record it with a one-line rationale that names its authority or its reversibility. Don't interrupt the user. These surface as the disclosed-decisions list at the gate (Step 4), phrased as overridable, not as commands.
-- **Defer** — you can't yet tell whether the choice will be depended on; it only becomes answerable in contact with the code. Don't raise it, and don't prescribe it in the plan. It surfaces during implementation, where the four mid-item-discovery thresholds (the same reversibility/dependency test applied in Step 5) decide whether it pauses execution.
+- **Defer** — you can't yet tell whether the choice will be depended on; it only becomes answerable in contact with the code. Don't raise it, and don't prescribe it in the plan. It surfaces during implementation, where the four blocker thresholds (the same reversibility/dependency test applied in Step 5) decide whether it triggers a hand-off.
 
 The tell that the filter is miscalibrated: the user answers an interview question with a bare letter, "sure", "your call", or "whatever's easiest." That indifference means the question was decide-and-disclose, not ask. Indifferent answers cluster on the choices an implementer should have owned.
 
@@ -160,7 +162,7 @@ Steps 1–7 run in order, top to bottom. The skill has two distinct conversation
 
 - **Interview phase** (Step 3) — questions only, no code changes, no commits. Walks every item end-to-end, captures decisions in the master plan.
 - **Master-plan approval gate** (Step 4) — show the complete master plan, get a single yes-to-the-whole.
-- **Implementation phase** (Step 5) — silent execution, one item at a time. No more discussion questions; only mid-item-discovery interruptions per the threshold rules.
+- **Implementation phase** (Step 5) — a thin orchestrator spawns a fresh subagent per item, sequentially, with `PLAN.md` as the spec. No more discussion questions; the only interruptions are a subagent handing off at a blocker threshold.
 
 Implementation never begins while items still have open per-item questions. If the user redirects mid-interview ("just go do item 1 now"), note gently that the rest of the interview comes first; the point of the two-phase split is to avoid the "answer Q1, implement, then ask Q2" antipattern.
 
@@ -170,10 +172,10 @@ Cross-cutting concerns (mid-item discovery, auto-mode behavior, spinoffs, contin
 
 Before producing the initial plan, do all of:
 
-1. Read `CLAUDE.md` and `AGENTS.md` at the project root and any nested ones the task touches. Surface any mandated rules (e.g., "invoke psychic-skill first") and persistent TODOs (e.g., a Matchmaker-scoping reminder) at the top of the eventual `PLAN.md`.
-2. Auto-invoke any skill the project explicitly mandates (e.g., `psychic-skill` for Dream/Psychic projects). Document the auto-invocation in the plan.
+1. Read `CLAUDE.md` and `AGENTS.md` at the project root and any nested ones the task touches. Surface any mandated rules (e.g., "invoke the project's required skill first") and persistent TODOs at the top of the eventual `PLAN.md`.
+2. Auto-invoke any skill the project explicitly mandates. Document the auto-invocation in the plan.
 3. Read relevant memories from `~/.claude/projects/<project>/memory/` to inform the initial plan.
-4. Detect Dream/Psychic context: `@rvoh/dream` or `@rvoh/psychic` in `package.json`, presence of a `psy` CLI, or `CLAUDE.md` requiring `psychic-skill`. Cache this; it gates the learning-capture cross-cutting concern below.
+4. Check `printenv RECORD_PSYCHIC_LEARNINGS`. If it is unset or empty, skip Dream/Psychic detection entirely — do not detect it, write to a `WHAT_I_LEARNED_ABOUT_PSYCHIC_*.md` file, or mention Dream/Psychic to the user anywhere in the session. Only when it is set: detect Dream/Psychic context (`@rvoh/dream` or `@rvoh/psychic` in `package.json`, presence of a `psy` CLI, or `CLAUDE.md` requiring `psychic-skill`) and cache the result; it gates the learning-capture cross-cutting concern below.
 5. Discover verification commands:
    1. Read `CLAUDE.md` / `AGENTS.md` for a completion rule or "before pushing" section.
    2. If silent there, inspect `package.json` / `Cargo.toml` / `pyproject.toml` scripts and pick conventional names like `build`, `lint`, `test`, `spec`.
@@ -202,7 +204,7 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 
 ## Pre-flight findings
 
-- Mandated rules: <e.g., "psychic-skill invoked per CLAUDE.md">
+- Mandated rules: <e.g., "required skill invoked per CLAUDE.md">
 - Persistent TODOs to surface: <e.g., "Matchmaker-scoping reminder">
 - Verification commands: `pnpm build:spec`, `pnpm lint`, `pnpm uspec`, `pnpm fspec`
 
@@ -235,7 +237,7 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 …
 ```
 
-Items in the dashboard are one-line summaries. Detail sections are stub-brief at this point; they fill in during the per-item loop with Decision, Commit, Open questions, Discoveries, Discussion as the conversation unfolds.
+Items in the dashboard are one-line summaries. Detail sections are stub-brief at this point; they fill in during the interview and the per-item loop with Decisions, Commit, Open questions, Discoveries, Dead ends, Artifacts as the work unfolds.
 
 After writing the skeleton, **stop**. Show the user the dashboard (not the whole file) and prompt: "Plan written to `<path>`. Continue?" If the user answers in the affirmative, begin the interview phase (Step 3).
 
@@ -276,23 +278,31 @@ Do not enter Step 5 without an explicit adoption signal.
 
 ### Step 5. Implementation phase
 
-Items execute one at a time, **without further design discussion**. The master plan is the spec. For each item, in order:
+Once the master plan is adopted, the main session becomes a **thin orchestrator**. It does not do item work itself. It walks the items in order, and for each one spawns a fresh subagent that executes that item in its own clean context, using `PLAN.md` as the spec. Items run sequentially, one subagent at a time, never in parallel: later items build on earlier commits, so the working tree has to be in its post-item-N state before item N+1 starts.
 
-1. Update item status to 🟦 in progress.
+This is the redesign's core. The orchestrator's whole job is: read state, spawn, check, repeat. By never reading code or editing files, its context stays light enough to carry the entire run, and every item gets the blank-slate context that a fresh session used to provide manually.
+
+**The orchestrator loop.** For each item that is pending (skip ⏸ deferred / 🚫 dropped):
+
+1. Update item status to 🟦 in progress in `PLAN.md`.
 2. State the action in one short sentence ("Implementing item N: <one-line>").
-3. Execute the steps recorded in the item's detail section.
-4. Run lightweight per-item verification (type-check + lint, no specs). If it fails: fix, re-stage, new commit (never amend).
-5. If the item produced code, commit with the co-author trailer. If the item was decision-only or doc-only, no commit; the plan file already records it.
-6. Update the item section: actual commit hash, any discoveries, status ✅ done (or ⏸ deferred / 🚫 dropped).
-7. Move to the next item.
+3. Spawn a subagent (general-purpose agent type) with the brief below.
+4. When it returns, check that item N's section in `PLAN.md` was updated and read the subagent's short summary. If it returned `BLOCKED:`, follow the blocker protocol (see Cross-cutting concerns). Otherwise confirm status is ✅ done.
+5. Move to the next item.
 
-The implementation phase is mostly silent. The only times to break silence:
+**The subagent brief.** The prompt handed to each subagent must make `PLAN.md` its entire spec and carry every per-item concern, because the orchestrator is no longer doing this work:
 
-- A mid-item-discovery threshold fires (see Cross-cutting concerns): pause, surface, get a decision, then continue. Update the master plan to reflect the decision before resuming.
-- An item's recorded step is wrong (e.g., a generator command doesn't exist): pause, propose the corrected step, get a one-line confirmation, update the plan, continue.
-- The user interrupts.
+1. Read `PLAN.md` in full at `<path>`. The top dashboard (pre-flight findings, mandated skills, verification commands) and item N's detail section are your spec.
+2. Follow any mandated skills noted in the pre-flight findings; you are a fresh context, so re-establish that yourself.
+3. Execute item N to its acceptance criteria. The plan records intent and the decisions other work depends on, not reversible mechanics — own those yourself, to the project's quality bar.
+4. Run lightweight verification (type-check + lint, no specs). If it fails: fix, re-stage. Commit only a complete, verified item, with the co-author trailer; never `--amend`, never `--no-verify`. A decision-only or doc-only item needs no commit; the plan file is the record.
+5. Before returning, update item N's section in `PLAN.md`: status ✅ done, commit hash, dead ends hit, artifacts produced, any discoveries.
+6. Capture memories the moment they surface, per the standard memory rules. (Include the Dream/Psychic learning-capture instruction here only when pre-flight detected both `RECORD_PSYCHIC_LEARNINGS` and Dream/Psychic context.)
+7. If you hit a blocker threshold (see Cross-cutting concerns), stop and follow the handoff protocol instead of improvising.
 
-If the user asks a new design question mid-implementation, treat it the same way: pause, decide, update the plan, resume. Don't quietly improvise.
+If a recorded step turns out wrong (e.g., a generator command doesn't exist) and the fix is reversible and within scope, the subagent corrects it inline and notes it in the item's Discoveries. If the correction crosses a blocker threshold, it stops and hands off.
+
+The orchestrator breaks silence to the user only when a subagent returns `BLOCKED:` (interactive default), or when the user interrupts. If the user asks a new design question mid-implementation, treat it as a blocker: pause, decide, update the plan, then resume by spawning the next subagent. Don't quietly improvise.
 
 ### Step 6. Deferred-item revisit
 
@@ -300,35 +310,44 @@ After the last item completes, before final verification: walk back through any 
 
 ### Step 7. End-of-task verification + wrap-up
 
-1. Run the full verification gauntlet once. Update the dashboard's Verification section with pass/fail per command. Full stdout/stderr stays in the terminal; do not persist to a file.
-2. If anything fails: it's now a new item. Don't paper over. Either fix-and-rerun, or spawn a spinoff if the failure is out-of-scope.
+1. Spawn a verification subagent to run the full gauntlet once and return pass/fail per command. Running it in a subagent keeps the large stdout/stderr out of the orchestrator's context; that output stays in the subagent and is not persisted to a file. The orchestrator writes the pass/fail summary to the dashboard's Verification section.
+2. If anything fails: it's now a new item. Don't paper over. Either spawn a subagent to fix-and-rerun, or spawn a spinoff if the failure is out-of-scope.
 3. Final message to the user: one or two sentences. What changed and what's next. Reference `PLAN.md`'s path.
 
 ## Cross-cutting concerns
 
 These apply throughout the per-item loop; they are not sequential steps.
 
-### Mid-item discovery
+### Mid-item discovery — the blocker protocol
 
-Pause and surface to the user when any of:
+A subagent can't ask the user anything; it runs in isolation and returns one final message. So the four discovery thresholds become a stop-and-hand-off protocol rather than a pause-and-ask.
+
+A subagent stops and hands off when any of:
 
 - The discovery requires a change **outside** the item's stated scope (different file, different layer, different system).
 - The discovery means the original plan **won't work as written** and a real choice has to be made.
 - The discovery has **irreversible consequences** (data migration, schema change, anything that touches shared infra).
 - The discovery reveals an assumption was wrong that **other items also depend on**.
 
-Otherwise, fix inline silently or with a one-line note in the item's section. No interruption.
+Recommending a spinoff (see Spinoffs) is one kind of hand-off. Otherwise, the subagent fixes inline — silently, or with a one-line note in the item's Discoveries. No hand-off.
+
+**The hand-off, on hitting a threshold.** The subagent does not roll back. It leaves its changes uncommitted in the working tree and writes a handoff file to the plan dir, `<timestamp>-item-<N>-<slug>.md`, containing what it did, which files it touched, the dead ends, and the self-contained blocking question (same self-containment discipline as interview questions — answerable without the subagent's context). It returns a message beginning `BLOCKED:` with the question and the handoff filename.
+
+**The orchestrator's response:**
+
+- **Interactive (default):** surface the question to the user as a one-question-at-a-time decision, same filter and format as Step 3. Record the answer in `PLAN.md`. Then spawn a fresh subagent and pass it the answer plus the handoff filename. That subagent reads item N's section, the handoff file, and the uncommitted diff (`git status` / `git diff`), resumes from where the first stopped, finishes, commits, updates `PLAN.md`, and deletes the handoff file. Because the blocker resolves before the next item starts, a dirty tree is fine.
+- **Auto (see below):** don't stop. The blocked subagent stashes its partial work under a labeled stash and records the stash ref in the handoff file, leaving a clean tree; the item is marked ⏸ blocked. The orchestrator continues with the next non-dependent item and presents all blocked items at the end-of-run review (Step 6). A blocked item that a later item depends on already trips the "assumption other items depend on" threshold, so dependent items defer rather than building on a half-done base. At the review, a fresh subagent pops the stash, applies the answer, and finishes.
 
 ### Auto-mode behavior
 
-Auto mode applies only to **Step 5 (implementation phase)**. It lets the implementer run items end-to-end without stopping between items.
+Auto mode applies only to **Step 5 (implementation phase)**. The orchestrator already runs items end-to-end without stopping between them; what auto mode adds is that it does not even stop for blockers — a `BLOCKED:` return is deferred (partial work stashed, item marked ⏸ blocked) and surfaced at the end-of-run review instead of interrupting the user.
 
 It does NOT bypass:
 
 - The Step 2 skeleton gate ("Continue?").
 - The Step 3 interview phase: every per-item question must still be asked and answered.
 - The Step 4 master-plan approval gate: explicit adoption is always required before implementation begins.
-- The four mid-item-discovery thresholds: those still pause execution.
+- The four blocker thresholds: a subagent still stops and hands off on any of them. Auto mode only changes whether the orchestrator surfaces the blocker now or defers it.
 
 ### Spinoffs
 
@@ -350,20 +369,21 @@ Spinoff file structure (in order):
 5. Verification — the repo-specific gauntlet for this work.
 6. Reminders — cross-cutting TODOs the agent should surface (e.g., persistent-TODO reminders from `CLAUDE.md`).
 
-After writing the spinoff, update the parent `PLAN.md`: mark the item ⏸ deferred and add a link in the Spinoffs section.
+A subagent does not create a spinoff itself. When it judges an item warrants one, it hands off (`BLOCKED:`) recommending the spinoff with its reasoning; the orchestrator writes the spinoff file and updates `PLAN.md`. After writing the spinoff, update the parent `PLAN.md`: mark the item ⏸ deferred and add a link in the Spinoffs section.
 
 ### Continuous learning + memory capture
 
-While running the per-item loop:
+This happens during item work, which now runs in subagents — so these instructions live in the subagent brief (Step 5), not in the orchestrator. The orchestrator captures memory only for things that surface in its own conversation (e.g., during the interview or at a blocker).
 
 - **Memory:** the moment something surfaces that fits an auto-memory category (user role, feedback, project fact, reference), write a new memory immediately to `~/.claude/projects/<project>/memory/` per the standard memory rules. Don't batch for end-of-task.
-- **Dream/Psychic learnings (conditional):** if pre-flight detected Dream/Psychic, the moment a learning surfaces that's not in `/psychic-skill`, append it to `<project-root>/WHAT_I_LEARNED_ABOUT_PSYCHIC_<YYYY-MM-DD>.md`. The filename is fixed, not parameterized by topic. Content scope is narrow: only learnings about Dream ORM and the Psychic web framework that are missing from `/psychic-skill`. The user is co-author of Dream/Psychic and uses this file to feed back to the skill maintainer. Outside Dream/Psychic projects, skip this entirely.
+- **Dream/Psychic learnings (gated):** active only when pre-flight saw both `RECORD_PSYCHIC_LEARNINGS` set and Dream/Psychic context. When active, the moment a learning surfaces that's not in `/psychic-skill`, append it to `<project-root>/WHAT_I_LEARNED_ABOUT_PSYCHIC_<YYYY-MM-DD>.md`. The filename is fixed, not parameterized by topic. Content scope is narrow: only learnings about Dream ORM and the Psychic web framework that are missing from `/psychic-skill`. The user is co-author of Dream/Psychic and uses this file to feed back to the skill maintainer. When the env var is unset, this entire concern is off and the orchestrator omits it from the subagent brief.
 
 ## Plan file conventions
 
 - Directory: `./plans/<YYYY-MM-DD>-<slug>/`. Path is relative to the session CWD (where Claude was launched), not the git root.
 - Main plan file is always `PLAN.md`.
 - Spinoff files use a meaningful slug, e.g., `item-7-first-date-restructure.md`.
+- Handoff files (written by a subagent at a blocker) use `<timestamp>-item-<N>-<slug>.md` in the plan dir. They are transient scratch: not committed, and deleted by the resuming subagent once the item completes. The durable record (the decision, the dead ends) folds into `PLAN.md`; the handoff file only bridges one blocked subagent to its replacement.
 - Verification output is **not** persisted; pass/fail summary in the dashboard is enough.
 
 ## Tracker contents in `PLAN.md`
@@ -383,7 +403,11 @@ Per-item detail sections carry:
 - Decisions — each a *what* + *why*, tagged with its authority or its reversibility, and flagged if low-confidence (the flag is what surfaces it for the user's eye in the Step 4 disclosed-decisions list). Recorded as overridable-when-reversible context, never as imperative steps.
 - Commit hash if any.
 - Discoveries (mid-item findings worth recording).
+- **Dead ends / don't repeat** — approaches tried that failed, and why. A re-run after a blocker, or a later item, reads these so it doesn't retry a known dead end.
+- **Artifacts** — files created or changed, with locations.
 - Open questions.
+
+Each item section must be self-contained: a blank-context subagent reading only the dashboard plus that one section must have everything it needs to execute the item. This is the same self-containment discipline applied to interview questions, now applied to item sections, because a subagent is exactly that blank-context reader.
 
 ## Failure modes to watch for
 
@@ -397,8 +421,13 @@ Per-item detail sections carry:
 - **Missing the `[recommended]` marker** — when there's a clear recommendation, mark it. The user relies on this signal.
 - **Forgetting to echo** — every recorded answer gets a one-line echo before the next question. The user catches misrecordings this way.
 - **Slipping into the intense, bold-and-em-dash voice** — see Conversational voice. In prose, plain paragraphs, claims stated once, importance argued rather than labeled. The functional formatting (options, recommended marker, status icons) is exempt; the prose around it is not.
-- **Plowing through auto mode** — auto mode is not license to skip the per-item gate or the four mid-item-discovery thresholds. Pause for any of the four conditions.
+- **Plowing through auto mode** — auto mode is not license to skip the per-item gate or the four blocker thresholds. A subagent still hands off on any of the four; auto mode only defers the orchestrator's surfacing of it.
+- **The orchestrator doing item work inline** — in Step 5 the orchestrator spawns subagents; it does not read code or edit files. If you catch the orchestrator implementing an item itself, stop. That fills its context and discards the fresh-context guarantee.
+- **A subagent committing partial work** — a subagent commits only a complete, verified item. At a blocker it leaves changes uncommitted (or stashed, in auto mode) and writes a handoff file; it never commits a half-done item.
+- **A subagent improvising past a threshold** — if a discovery crosses a blocker threshold, the subagent stops and hands off. It must not guess the user's decision or silently push work outside the item's scope.
+- **A non-self-contained item section** — if an item's detail section can't be executed by a blank-context subagent reading only the dashboard plus that section, it's underspecified. The subagent is exactly that reader; fix the section, don't rely on conversation history.
+- **Dropping a cross-cutting concern from the subagent brief** — memory capture, mandated-skill invocation, and (when gated on) Psychic learning-capture happen during item work, which now runs in subagents. If the brief omits them, they silently stop happening. The brief carries every per-item concern.
 - **Inventing a verification gauntlet** — if you didn't read `CLAUDE.md` / `AGENTS.md` and find the actual commands, ask the user. Don't run guessed commands.
-- **Forgetting the `WHAT_I_LEARNED_ABOUT_PSYCHIC_*.md` step in Dream/Psychic projects** — pre-flight should have detected the context; if so, the file write is built into the workflow.
+- **Forgetting the `WHAT_I_LEARNED_ABOUT_PSYCHIC_*.md` step when it's gated on** — only active when `RECORD_PSYCHIC_LEARNINGS` is set and pre-flight detected Dream/Psychic; when both hold, the file write is built into the subagent brief. When the env var is unset, the concern is off and Dream/Psychic is never mentioned.
 - **Persisting verification output to a file** — don't. Dashboard summary only.
 - **Using `<recommended>` (angle brackets) instead of `[recommended]` (square brackets)** — angle brackets get eaten by the renderer.

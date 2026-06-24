@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0 — 2026-06-24
+
+### Changed
+
+- **The implementation phase runs autonomously through per-item subagents.** Once the master plan is adopted, the main session becomes a thin orchestrator: it walks the items in order and spawns a fresh general-purpose subagent for each one, sequentially, with `PLAN.md` as the entire spec. The orchestrator never reads code or edits files itself, so its context stays light across the whole run and every item gets the blank-slate context a fresh session used to provide by hand. The subagent brief carries every per-item concern — mandated-skill invocation, lightweight verification, the commit, and memory capture — because the orchestrator is no longer doing that work. End-of-task verification also runs in a subagent so the gauntlet's stdout stays out of the orchestrator's context.
+- **Blocker protocol replaces the pause-and-ask thresholds.** A subagent can't ask the user anything, so the four mid-item-discovery thresholds become a stop-and-hand-off protocol. On hitting one, the subagent leaves its work uncommitted, writes a transient handoff file (`<timestamp>-item-<N>-<slug>.md`) describing what it did and the self-contained blocking question, and returns `BLOCKED:`. The orchestrator surfaces the question one-at-a-time, records the answer in `PLAN.md`, then spawns a fresh subagent that reads the handoff file and the uncommitted diff and resumes from where the first stopped — no work thrown away. A subagent commits only a complete, verified item, never partial work. Auto mode now means the orchestrator defers blockers (partial work stashed, item marked ⏸ blocked) to the end-of-run review instead of surfacing them immediately. Recommending a spinoff is one kind of hand-off; the orchestrator writes the spinoff file.
+- **Plan file format gains Dead ends and Artifacts, plus a self-containment requirement.** Per-item detail sections now record dead ends (approaches tried that failed, and why, so a re-run or a later item doesn't retry them) and artifacts (files created or changed). Each item section must be executable by a blank-context subagent reading only the dashboard plus that section — the same self-containment discipline already applied to interview questions, now applied to item sections because a subagent is exactly that reader.
+- **Dream/Psychic learning capture is gated behind `RECORD_PSYCHIC_LEARNINGS`.** pln is general-purpose, so by default it no longer detects Dream/Psychic, writes a `WHAT_I_LEARNED_ABOUT_PSYCHIC_*.md` file, or mentions Dream/Psychic anywhere. Pre-flight checks the env var; only when it is set does detection run and the learning-capture behavior activate. The incidental `psychic-skill` example in the always-on prose was made generic.
+
 ## 1.2.0 — 2026-06-12
 
 ### Changed

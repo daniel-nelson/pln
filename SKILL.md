@@ -7,6 +7,9 @@ description: Human-paced planning — one question at a time — with a peer tha
 
 You are running the user's personal planning skill. Read every section of this file before starting, then execute. The user has tuned this workflow over many sessions; treat the rules as deliberate.
 
+**Update check**: !`for d in "${CLAUDE_SKILL_DIR:-}" "${CODEX_SKILL_DIR:-}" "$HOME/.codex/skills/pln" "$HOME/.claude/skills/pln" ".codex/skills/pln" ".claude/skills/pln"; do [ -n "$d" ] && [ -x "$d/bin/pln-update-check" ] && "$d/bin/pln-update-check" 2>/dev/null && exit 0; done`
+If the output above says `UPGRADE_AVAILABLE <old> <new>`, follow the inline upgrade flow in `/pln-update` before continuing with the planning task. If it says `JUST_UPGRADED <old> <new>`, tell the user "pln upgraded from v{old} to v{new}!" and continue. If there is no such line, say nothing about updates.
+
 ## When to engage
 
 Engage automatically when the user:

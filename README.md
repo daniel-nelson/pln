@@ -40,6 +40,7 @@ It will prompt you for which agent to install to. For more details, see [vercel-
 
 - `pln` skill in `~/.claude/skills/pln/`
 - `/plnify` slash command (symlinked from `pln/plnify/`) for installing pln's discipline into gstack
+- `/pln-update` slash command (symlinked from `pln/pln-update/`) for updating pln
 
 Everything lives inside your assistant's skills directory. Nothing touches your PATH or runs in the background.
 
@@ -49,6 +50,7 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 |-------|--------------|-------------|
 | `/pln` | `/pln` or `/pln <details of what you want to plan>` | Two-phase planning: overview bullet list followed by detailed back and forth with a peer for each item; implementation only after the plan is written |
 | `/plnify` | `/plnify gstack` | One-time setup — adds pln's discipline to `~/.claude/CLAUDE.md` for gstack planning skills |
+| `/pln-update` | `/pln-update` | Update pln to the latest version (pln also offers this automatically when a new release appears) |
 
 ## How it works
 
@@ -59,6 +61,16 @@ The peer posture is built in: during the interview phase, pln will disagree with
 **`/plnify gstack`** is a one-time setup step for [gstack](https://github.com/daniel-nelson/gstack) users. It appends two sections to your `~/.claude/CLAUDE.md` — interaction rules and an exploratory-mode posture — that apply pln's discipline to gstack planning skills like `/office-hours`, `/plan-ceo-review`, and `/plan-eng-review`. It shows you exactly what will be written and asks for approval before touching anything. The rules only fire when a gstack planning skill is active; they don't affect general conversation.
 
 ## Upgrading
+
+pln checks for a new release each time it runs (throttled, no background process). When one is available it offers to upgrade and remembers your choice — upgrade once, always auto-upgrade silently, snooze, or turn checks off. You can also update explicitly anytime:
+
+```
+/pln-update
+```
+
+To opt into silent auto-upgrades without being asked, set `auto_upgrade: true` in `~/.pln/config.yaml` (or choose "always keep me up to date" when prompted). To stop update checks, set `update_check: false` there.
+
+If you prefer to do it by hand:
 
 ```bash
 # Claude Code
@@ -72,11 +84,13 @@ cd ~/.codex/skills/pln && git fetch origin && git reset --hard origin/main && ./
 
 ```bash
 # Claude Code
-rm -rf ~/.claude/skills/pln && rm -f ~/.claude/skills/plnify
+rm -rf ~/.claude/skills/pln && rm -f ~/.claude/skills/plnify ~/.claude/skills/pln-update
 
 # Codex
-rm -rf ~/.codex/skills/pln && rm -f ~/.codex/skills/plnify
+rm -rf ~/.codex/skills/pln && rm -f ~/.codex/skills/plnify ~/.codex/skills/pln-update
 ```
+
+To also remove update-check state: `rm -rf ~/.pln`.
 
 If you ran `/plnify gstack`, the two sections it added to `~/.claude/CLAUDE.md` are not automatically removed — delete them manually if you no longer want them.
 

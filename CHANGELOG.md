@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0 — 2026-06-24
+
+### Changed
+
+- **Clarified the Step 2 gate prompt.** Changed "Continue?" to "Ready to start the interview?" so the user knows the next step is the interview phase, not immediate execution.
+
 ## 1.4.0 — 2026-06-24
 
 ### Added

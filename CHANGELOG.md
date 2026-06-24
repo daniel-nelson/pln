@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.1 — 2026-06-24
+
+### Fixed
+
+- **Added `~/.agents/skills/pln` to the update-check and upgrade search paths.** Codex reads skills from `$HOME/.agents/skills/` per the official Codex docs, not `~/.codex/skills/`. The update-check preamble and `/pln-update` install detection now check `~/.agents/` first so pln correctly detects and upgrades itself when installed there.
+
 ## 1.5.0 — 2026-06-24
 
 ### Changed

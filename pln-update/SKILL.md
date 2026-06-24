@@ -19,7 +19,7 @@ This section is referenced by pln's main preamble when it detects `UPGRADE_AVAIL
 First, check whether auto-upgrade is enabled:
 ```bash
 _SKILL_DIR=""
-for d in "${CLAUDE_SKILL_DIR:-}" "${CODEX_SKILL_DIR:-}" "$HOME/.claude/skills/pln" "$HOME/.codex/skills/pln" ".claude/skills/pln" ".codex/skills/pln"; do
+for d in "${CLAUDE_SKILL_DIR:-}" "${CODEX_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" "$HOME/.codex/skills/pln" ".agents/skills/pln" ".claude/skills/pln" ".codex/skills/pln"; do
   [ -n "$d" ] && [ -x "$d/bin/pln-config" ] && _SKILL_DIR="$d" && break
 done
 _AUTO=""
@@ -76,18 +76,26 @@ Say "Update checks disabled. Run `/pln-update` anytime, or re-enable with `~/.pl
 ### Step 2: Detect install type
 
 ```bash
-if [ -d "$HOME/.claude/skills/pln/.git" ]; then
+if [ -d "$HOME/.agents/skills/pln/.git" ]; then
+  INSTALL_TYPE="global-git"; INSTALL_DIR="$HOME/.agents/skills/pln"
+elif [ -d "$HOME/.claude/skills/pln/.git" ]; then
   INSTALL_TYPE="global-git"; INSTALL_DIR="$HOME/.claude/skills/pln"
 elif [ -d "$HOME/.codex/skills/pln/.git" ]; then
   INSTALL_TYPE="global-git"; INSTALL_DIR="$HOME/.codex/skills/pln"
+elif [ -d ".agents/skills/pln/.git" ]; then
+  INSTALL_TYPE="local-git"; INSTALL_DIR=".agents/skills/pln"
 elif [ -d ".claude/skills/pln/.git" ]; then
   INSTALL_TYPE="local-git"; INSTALL_DIR=".claude/skills/pln"
 elif [ -d ".codex/skills/pln/.git" ]; then
   INSTALL_TYPE="local-git"; INSTALL_DIR=".codex/skills/pln"
+elif [ -d "$HOME/.agents/skills/pln" ]; then
+  INSTALL_TYPE="vendored-global"; INSTALL_DIR="$HOME/.agents/skills/pln"
 elif [ -d "$HOME/.claude/skills/pln" ]; then
   INSTALL_TYPE="vendored-global"; INSTALL_DIR="$HOME/.claude/skills/pln"
 elif [ -d "$HOME/.codex/skills/pln" ]; then
   INSTALL_TYPE="vendored-global"; INSTALL_DIR="$HOME/.codex/skills/pln"
+elif [ -d ".agents/skills/pln" ]; then
+  INSTALL_TYPE="vendored"; INSTALL_DIR=".agents/skills/pln"
 elif [ -d ".claude/skills/pln" ]; then
   INSTALL_TYPE="vendored"; INSTALL_DIR=".claude/skills/pln"
 elif [ -d ".codex/skills/pln" ]; then
@@ -163,7 +171,7 @@ When invoked directly as `/pln-update` (not from the preamble):
 2. Force a fresh check:
 ```bash
 UPDATE_CHECK_OUTPUT=""; UPDATE_CHECK_OK=false
-for d in "${CLAUDE_SKILL_DIR:-}" "${CODEX_SKILL_DIR:-}" "$HOME/.claude/skills/pln" "$HOME/.codex/skills/pln" ".claude/skills/pln" ".codex/skills/pln"; do
+for d in "${CLAUDE_SKILL_DIR:-}" "${CODEX_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" "$HOME/.codex/skills/pln" ".agents/skills/pln" ".claude/skills/pln" ".codex/skills/pln"; do
   if [ -n "$d" ] && [ -x "$d/bin/pln-update-check" ]; then
     UPDATE_CHECK_OUTPUT=$("$d/bin/pln-update-check" --force 2>/dev/null) && UPDATE_CHECK_OK=true
     break

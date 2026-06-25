@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.0 — 2026-06-25
+
+### Changed
+
+- **Exploration before prose in Step 3.** Added a rule requiring the agent to complete all code reading and exploration silently before writing any user-facing message. Findings, surprises, and conclusions all belong in the single final message after exploration is done — not scattered between tool calls. Also added a matching failure mode ("Writing prose between tool calls during exploration") to the failure modes list.
+
 ## 1.5.1 — 2026-06-24
 
 ### Fixed

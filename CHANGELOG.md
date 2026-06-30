@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.0 — 2026-06-30
+
+### Changed
+
+- **Per-item subagents now spawn through the Workflow tool instead of the Agent tool.** The implementation-phase orchestrator (Step 5) wraps each item's subagent call in a single-agent Workflow script rather than calling Agent directly. The subagent and its brief are unchanged; only the spawn mechanism changes. This makes the subagent's live tool calls visible by selecting its row in `/workflows` while it runs, with none of that activity landing in the orchestrator's context — previously, a backgrounded item's work was completely invisible until it returned. Verified by hand: confirmed `/workflows` updates live (token/tool counts) and that selecting a running agent's row surfaces a live Activity feed of its actual tool calls, not just a status counter. Because Workflow replies via a task-notification instead of a synchronous return, the orchestrator now waits for that notification before spawning the next item, preserving the existing one-item-at-a-time sequencing. The orchestrator also now tells the user once, before the first item spawns, that `/workflows` is where to watch live progress.
+
 ## 1.6.1 — 2026-06-30
 
 ### Fixed

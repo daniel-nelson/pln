@@ -289,12 +289,14 @@ Once the master plan is adopted, the main session becomes a **thin orchestrator*
 
 This is the redesign's core. The orchestrator's whole job is: read state, spawn, check, repeat. By never reading code or editing files, its context stays light enough to carry the entire run, and every item gets the blank-slate context that a fresh session used to provide manually.
 
+Before spawning the first item, tell the user once: implementation is starting, and they can watch each item's live subagent activity (its actual tool calls, as they happen) by opening `/workflows` and selecting the running item's row — that view costs the orchestrator's context nothing, so it's the way to watch without derailing the run.
+
 **The orchestrator loop.** For each item that is pending (skip ⏸ deferred / 🚫 dropped):
 
 1. Update item status to 🟦 in progress in `PLAN.md`.
 2. State the action in one short sentence ("Implementing item N: <one-line>").
-3. Spawn a subagent (general-purpose agent type) with the brief below.
-4. When it returns, check that item N's section in `PLAN.md` was updated and read the subagent's short summary. If it returned `BLOCKED:`, follow the blocker protocol (see Cross-cutting concerns). Otherwise confirm status is ✅ done.
+3. Spawn the item through the Workflow tool, not the Agent tool: a single-agent script whose only step calls `agent()` once, with the brief below as the prompt, `agentType: 'general-purpose'`, and a label identifying the item (e.g. `item-N`). The subagent and its brief are unchanged from before — only the spawn mechanism changes. Workflow runs in the background, so this is the skill's own explicit opt-in to using it. Because Workflow replies via a task-notification rather than a synchronous return, the orchestrator waits for that item's notification before moving on — it does not spawn item N+1 until item N's notification has arrived, preserving the same one-item-at-a-time sequencing as a direct call would have had.
+4. When the task-notification arrives, check that item N's section in `PLAN.md` was updated and read the subagent's short summary from the notification's result. If it returned `BLOCKED:`, follow the blocker protocol (see Cross-cutting concerns). Otherwise confirm status is ✅ done.
 5. Move to the next item.
 
 **The subagent brief.** The prompt handed to each subagent must make `PLAN.md` its entire spec and carry every per-item concern, because the orchestrator is no longer doing this work:

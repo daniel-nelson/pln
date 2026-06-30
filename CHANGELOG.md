@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.1 — 2026-06-30
+
+### Fixed
+
+- **Item-scoped drop/abandon no longer ends the whole interview.** A defer/drop/abandon signal given in answer to a question about one item now scopes to that item (mark it 🚫 dropped, continue to the next) instead of tearing down the entire interview. Added `abandon` and `forget it` to the recognized vocabulary, a scoping rule in the "Defer / drop / think-offline signals" section, and a matching failure mode. The interview ends only on an unambiguous whole-session signal; when scope is unclear, the skill asks one clarifying question rather than exiting.
+
 ## 1.6.0 — 2026-06-25
 
 ### Changed

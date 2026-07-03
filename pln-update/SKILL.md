@@ -73,82 +73,65 @@ Tell the user the snooze duration ("Next reminder in 24h", or 48h, or 1 week, by
 ```
 Say "Update checks disabled. Run `/pln-update` anytime, or re-enable with `~/.pln/bin/pln-config set update_check true`." Continue with the current task.
 
-### Step 2: Detect install type
+### Step 2: Reconcile every installed copy
+
+pln can be installed in more than one root at once (`~/.agents`, `~/.claude`,
+`~/.codex`, plus project-local `.agents`/`.claude`/`.codex`). The host may load a
+different copy than the one that sorts first, so the upgrade must bring **every**
+copy to the remote version, not just the first one found. `bin/pln-update-apply`
+does that in a single pass and prints per-copy results.
+
+Find a copy that ships the script (prefer the newest, since a stale copy may
+predate it), then run it:
 
 ```bash
-if [ -d "$HOME/.agents/skills/pln/.git" ]; then
-  INSTALL_TYPE="global-git"; INSTALL_DIR="$HOME/.agents/skills/pln"
-elif [ -d "$HOME/.claude/skills/pln/.git" ]; then
-  INSTALL_TYPE="global-git"; INSTALL_DIR="$HOME/.claude/skills/pln"
-elif [ -d "$HOME/.codex/skills/pln/.git" ]; then
-  INSTALL_TYPE="global-git"; INSTALL_DIR="$HOME/.codex/skills/pln"
-elif [ -d ".agents/skills/pln/.git" ]; then
-  INSTALL_TYPE="local-git"; INSTALL_DIR=".agents/skills/pln"
-elif [ -d ".claude/skills/pln/.git" ]; then
-  INSTALL_TYPE="local-git"; INSTALL_DIR=".claude/skills/pln"
-elif [ -d ".codex/skills/pln/.git" ]; then
-  INSTALL_TYPE="local-git"; INSTALL_DIR=".codex/skills/pln"
-elif [ -d "$HOME/.agents/skills/pln" ]; then
-  INSTALL_TYPE="vendored-global"; INSTALL_DIR="$HOME/.agents/skills/pln"
-elif [ -d "$HOME/.claude/skills/pln" ]; then
-  INSTALL_TYPE="vendored-global"; INSTALL_DIR="$HOME/.claude/skills/pln"
-elif [ -d "$HOME/.codex/skills/pln" ]; then
-  INSTALL_TYPE="vendored-global"; INSTALL_DIR="$HOME/.codex/skills/pln"
-elif [ -d ".agents/skills/pln" ]; then
-  INSTALL_TYPE="vendored"; INSTALL_DIR=".agents/skills/pln"
-elif [ -d ".claude/skills/pln" ]; then
-  INSTALL_TYPE="vendored"; INSTALL_DIR=".claude/skills/pln"
-elif [ -d ".codex/skills/pln" ]; then
-  INSTALL_TYPE="vendored"; INSTALL_DIR=".codex/skills/pln"
+APPLY=""
+for d in "${CLAUDE_SKILL_DIR:-}" "${CODEX_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" "$HOME/.codex/skills/pln" ".agents/skills/pln" ".claude/skills/pln" ".codex/skills/pln"; do
+  [ -n "$d" ] && [ -x "$d/bin/pln-update-apply" ] && APPLY="$d/bin/pln-update-apply" && break
+done
+if [ -n "$APPLY" ]; then
+  "$APPLY"
 else
-  echo "ERROR: pln not found"; exit 1
+  echo "NO_APPLY_SCRIPT"   # every copy predates the reconcile-all updater; use the fallback below
 fi
-echo "Install type: $INSTALL_TYPE at $INSTALL_DIR"
 ```
 
-If `INSTALL_DIR` is a symlink (a developer install pointing at a working clone), don't upgrade it — tell the user it's a dev symlink and they should `git pull` in the source repo instead. Detect with `[ -L "$INSTALL_DIR" ]`.
+**Optional preview:** run `"$APPLY" --plan` first to show the user what will
+change without mutating anything (lists each copy, its version, and whether it
+would upgrade). Skip the preview during an auto-upgrade.
 
-### Step 3: Save old version
+Read the script's output and relay it:
+
+- `REMOTE <version>` — the target version.
+- One `COPY <dir> <old> -> <new> <status>` line per copy. Statuses: `upgraded`,
+  `unchanged` (already current), `stashed` (upgraded, but local git changes were
+  stashed — tell the user to `git stash pop` in that dir), `dev-symlink-skipped`
+  (a developer install; leave it, they `git pull` the source clone), `failed`.
+- `SUMMARY <oldmin> -> <new> (<u> upgraded, <c> unchanged, <s> skipped, <f> failed)`.
+
+If any copy is `failed`, tell the user which one and that they can re-run
+`/pln-update`. The script writes the just-upgraded marker and clears the update
+cache itself when at least one copy was upgraded.
+
+**Fallback (only if `NO_APPLY_SCRIPT`):** every installed copy predates this
+updater, so reconcile the git copies inline:
 
 ```bash
-OLD_VERSION=$(cat "$INSTALL_DIR/VERSION" 2>/dev/null || echo "unknown")
+for d in "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" "$HOME/.codex/skills/pln" ".agents/skills/pln" ".claude/skills/pln" ".codex/skills/pln"; do
+  [ -d "$d/.git" ] || continue
+  [ -L "$d" ] && { echo "$d: dev symlink, skipped"; continue; }
+  OLD=$(cat "$d/VERSION" 2>/dev/null || echo unknown)
+  ( cd "$d" && git stash >/dev/null 2>&1; git fetch origin >/dev/null 2>&1 && git reset --hard origin/main >/dev/null 2>&1 && ./setup >/dev/null 2>&1 )
+  echo "$d: $OLD -> $(cat "$d/VERSION" 2>/dev/null || echo unknown)"
+done
+mkdir -p ~/.pln && rm -f ~/.pln/last-update-check ~/.pln/update-snoozed
 ```
 
-### Step 4: Upgrade
+### Step 3: Show what's new
 
-**For git installs** (global-git, local-git):
-```bash
-cd "$INSTALL_DIR"
-STASH_OUTPUT=$(git stash 2>&1)
-git fetch origin
-git reset --hard origin/main
-./setup
-```
-If `$STASH_OUTPUT` contains "Saved working directory", warn: "Local changes were stashed. Run `git stash pop` in $INSTALL_DIR to restore them."
-
-**For vendored installs** (vendored, vendored-global):
-```bash
-TMP_DIR=$(mktemp -d)
-git clone --depth 1 https://github.com/daniel-nelson/pln.git "$TMP_DIR/pln"
-mv "$INSTALL_DIR" "$INSTALL_DIR.bak"
-mv "$TMP_DIR/pln" "$INSTALL_DIR"
-cd "$INSTALL_DIR" && ./setup
-rm -rf "$INSTALL_DIR.bak" "$TMP_DIR"
-```
-If the clone or `./setup` fails, restore: `rm -rf "$INSTALL_DIR"; mv "$INSTALL_DIR.bak" "$INSTALL_DIR"` and tell the user to retry.
-
-### Step 5: Write marker + clear cache
-
-```bash
-mkdir -p ~/.pln
-echo "$OLD_VERSION" > ~/.pln/just-upgraded-from
-rm -f ~/.pln/last-update-check
-rm -f ~/.pln/update-snoozed
-```
-
-### Step 6: Show what's new
-
-Read `$INSTALL_DIR/CHANGELOG.md`. Summarize the entries between `{old}` and `{new}` as 3–6 bullets, user-facing changes only. Format:
+Read `CHANGELOG.md` from any upgraded copy (e.g. the `$APPLY` dir). Summarize the
+entries between `{old}` (the `SUMMARY` `oldmin`) and `{new}` as 3–6 bullets,
+user-facing changes only. Format:
 ```
 pln v{new} — upgraded from v{old}!
 
@@ -156,9 +139,10 @@ What's new:
 - ...
 ```
 
-### Step 7: Continue
+### Step 4: Continue
 
-The new files take effect on the next skill load (this session still has the old copy in context). Continue with whatever the user originally asked for.
+The new files take effect on the next skill load (this session still has the old
+copy in context). Continue with whatever the user originally asked for.
 
 ---
 
@@ -166,9 +150,7 @@ The new files take effect on the next skill load (this session still has the old
 
 When invoked directly as `/pln-update` (not from the preamble):
 
-1. Run Step 2 to find `INSTALL_DIR`. If it's a symlink, tell the user it's a dev install and stop (they should `git pull` in the source repo).
-
-2. Force a fresh check:
+1. Force a fresh check. The checker scans every installed copy and reports the lowest version, so this catches a stale copy in a root the host doesn't load first:
 ```bash
 UPDATE_CHECK_OUTPUT=""; UPDATE_CHECK_OK=false
 for d in "${CLAUDE_SKILL_DIR:-}" "${CODEX_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" "$HOME/.codex/skills/pln" ".agents/skills/pln" ".claude/skills/pln" ".codex/skills/pln"; do
@@ -180,14 +162,6 @@ done
 echo "UPDATE_CHECK_OK=$UPDATE_CHECK_OK"; echo "UPDATE_CHECK_OUTPUT=$UPDATE_CHECK_OUTPUT"
 ```
 
-3. If `UPGRADE_AVAILABLE <old> <new>` appears: run Steps 2–6.
+2. If `UPGRADE_AVAILABLE <old> <new>` appears: run the inline flow (Step 2 reconcile onward). The `--plan` preview is a good idea here so the user sees which copies are behind before anything changes.
 
-4. **If `UPDATE_CHECK_OK=false`** (script missing or sandbox-blocked): fall back to a direct compare. No output from the script does NOT mean "up to date" — always confirm against the remote.
-```bash
-INSTALLED_VERSION=$(cat "$INSTALL_DIR/VERSION" 2>/dev/null || echo "unknown")
-REMOTE_VERSION=$(curl -fsSL https://raw.githubusercontent.com/daniel-nelson/pln/main/VERSION 2>/dev/null | tr -d '[:space:]')
-echo "INSTALLED=$INSTALLED_VERSION REMOTE=$REMOTE_VERSION"
-```
-- Empty `REMOTE_VERSION`: "Could not reach GitHub to check for updates. Verify network access and try again." Stop.
-- Differs: treat as `UPGRADE_AVAILABLE` and run Steps 2–6.
-- Matches: tell the user "You're already on the latest version (v{version})."
+3. **If `UPDATE_CHECK_OK=false`** (script missing or sandbox-blocked): don't trust silence. Run the reconcile directly — `bin/pln-update-apply` fetches the remote version itself and is a no-op for copies already current, so it's safe to run even when the check couldn't confirm. Locate it as in Step 2 and run `"$APPLY" --plan` then `"$APPLY"`. If no copy ships the script either, use the Step 2 fallback loop.

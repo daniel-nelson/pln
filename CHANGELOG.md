@@ -1,6 +1,11 @@
 # Changelog
 
-## 1.7.0 — 2026-06-30
+## 1.8.0 — 2026-07-02
+
+### Fixed
+
+- **The update check now scans every installed copy instead of stopping at the first one.** pln can be installed in more than one root at once (`~/.agents`, `~/.claude`, `~/.codex`, plus project-local variants), and the host often loads a different copy than the one that sorts first. The old check ran the version check from the first directory it found and stopped there, so a current `~/.agents` copy could mask a stale `~/.claude` copy — the one Claude Code actually loads — and report "up to date" while the running skill was two versions behind. `bin/pln-update-check` now reads the VERSION of every installed copy and reports `UPGRADE_AVAILABLE` whenever any copy is behind remote, using the lowest version as the baseline. When a copy is behind, the check prints a second line listing each copy and marking the stale ones `(behind)`, which the preamble relays so you can see exactly which install is out of date.
+- **`/pln-update` now reconciles all installed copies, not just the first match.** The updater previously detected a single install directory and upgraded only that one, so it would "succeed" against an already-current copy and leave a stale sibling untouched — the same split that hid the staleness in the first place. A new `bin/pln-update-apply` helper upgrades every copy in one pass (git installs via fetch + reset, vendored installs via a single re-clone), skips developer symlinks, rolls back a failed vendored copy, and prints a per-copy summary. Run `pln-update-apply --plan` to preview which copies would change before touching anything.
 
 ### Changed
 

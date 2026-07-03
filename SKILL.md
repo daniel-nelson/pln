@@ -8,7 +8,7 @@ description: Human-paced planning — one question at a time — with a peer tha
 You are running the user's personal planning skill. Read every section of this file before starting, then execute. The user has tuned this workflow over many sessions; treat the rules as deliberate.
 
 **Update check**: !`for d in "${CLAUDE_SKILL_DIR:-}" "${CODEX_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" "$HOME/.codex/skills/pln" ".agents/skills/pln" ".claude/skills/pln" ".codex/skills/pln"; do [ -n "$d" ] && [ -x "$d/bin/pln-update-check" ] && "$d/bin/pln-update-check" 2>/dev/null && exit 0; done`
-If the output above says `UPGRADE_AVAILABLE <old> <new>`, follow the inline upgrade flow in `/pln-update` before continuing with the planning task. If it says `JUST_UPGRADED <old> <new>`, tell the user "pln upgraded from v{old} to v{new}!" and continue. If there is no such line, say nothing about updates.
+If the output above says `UPGRADE_AVAILABLE <old> <new>`, follow the inline upgrade flow in `/pln-update` before continuing with the planning task. The check scans every installed copy and reports the lowest version, so a second indented line may list each copy and mark the stale ones `(behind)`; relay that to the user so they can see which install is out of date. If it says `JUST_UPGRADED <old> <new>`, tell the user "pln upgraded from v{old} to v{new}!" and continue. If there is no such line, say nothing about updates.
 
 ## When to engage
 

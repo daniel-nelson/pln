@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.0 — 2026-07-06
+
+### Changed
+
+- **Interview questions must open with a plain-language summary of the item.** The self-containment rule already required restating the problem, but it was being read as "restate the technical approach," producing insider jargon and bare item-number references a reader with no memory of the plan couldn't follow. Step 3 now requires each question to lead with what the item is in observable-behavior terms — not a label, not the code-level approach — before the evidence and the question, and to never lean on a bare item number as the identifier.
+
 ## 1.10.0 — 2026-07-06
 
 ### Changed

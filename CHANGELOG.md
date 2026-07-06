@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.9.0 — 2026-07-06
+
+### Changed
+
+- **`.codex` is retired as an install location — Codex reads `.agents` now.** `bin/pln-update-check`, `bin/pln-update-apply`, the `SKILL.md` update-check one-liner, and every `/pln-update` root-detection loop no longer enumerate `~/.codex/skills/pln`, `.codex/skills/pln`, or the `CODEX_SKILL_DIR` override; they scan only the `~/.agents`/`~/.claude` (plus project-local `.agents`/`.claude`) roots. The README Codex install, manual-update, and uninstall commands now use `~/.agents/skills/pln`.
+
+### Added
+
+- **`bin/pln-update-apply` runs a one-time `.codex` → `.agents` consolidation pass before reconciling copies.** Any legacy `.codex` pln copy is moved into the matching `.agents` location when none exists there, or dropped when an `.agents` copy already does. Developer symlinks are never touched, the pass is idempotent (a no-op once `.codex` is gone), and `--plan` reports what would happen without mutating anything.
+
 ## 1.8.0 — 2026-07-02
 
 ### Fixed

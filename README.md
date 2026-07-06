@@ -25,7 +25,7 @@ Install pln: run `git clone https://github.com/daniel-nelson/pln.git ~/.claude/s
 Open Codex and paste:
 
 ```
-Install pln: run `git clone https://github.com/daniel-nelson/pln.git ~/.codex/skills/pln && cd ~/.codex/skills/pln && ./setup`
+Install pln: run `git clone https://github.com/daniel-nelson/pln.git ~/.agents/skills/pln && cd ~/.agents/skills/pln && ./setup`
 ```
 
 ### Install via `npx skills`
@@ -77,7 +77,7 @@ If you prefer to do it by hand:
 cd ~/.claude/skills/pln && git fetch origin && git reset --hard origin/main && ./setup
 
 # Codex
-cd ~/.codex/skills/pln && git fetch origin && git reset --hard origin/main && ./setup
+cd ~/.agents/skills/pln && git fetch origin && git reset --hard origin/main && ./setup
 ```
 
 ## Uninstalling
@@ -87,7 +87,7 @@ cd ~/.codex/skills/pln && git fetch origin && git reset --hard origin/main && ./
 rm -rf ~/.claude/skills/pln && rm -f ~/.claude/skills/plnify ~/.claude/skills/pln-update
 
 # Codex
-rm -rf ~/.codex/skills/pln && rm -f ~/.codex/skills/plnify ~/.codex/skills/pln-update
+rm -rf ~/.agents/skills/pln && rm -f ~/.agents/skills/plnify ~/.agents/skills/pln-update
 ```
 
 To also remove update-check state: `rm -rf ~/.pln`.

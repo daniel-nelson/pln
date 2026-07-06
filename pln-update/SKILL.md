@@ -19,7 +19,7 @@ This section is referenced by pln's main preamble when it detects `UPGRADE_AVAIL
 First, check whether auto-upgrade is enabled:
 ```bash
 _SKILL_DIR=""
-for d in "${CLAUDE_SKILL_DIR:-}" "${CODEX_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" "$HOME/.codex/skills/pln" ".agents/skills/pln" ".claude/skills/pln" ".codex/skills/pln"; do
+for d in "${CLAUDE_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" ".agents/skills/pln" ".claude/skills/pln"; do
   [ -n "$d" ] && [ -x "$d/bin/pln-config" ] && _SKILL_DIR="$d" && break
 done
 _AUTO=""
@@ -76,7 +76,7 @@ Say "Update checks disabled. Run `/pln-update` anytime, or re-enable with `~/.pl
 ### Step 2: Reconcile every installed copy
 
 pln can be installed in more than one root at once (`~/.agents`, `~/.claude`,
-`~/.codex`, plus project-local `.agents`/`.claude`/`.codex`). The host may load a
+plus project-local `.agents`/`.claude`). The host may load a
 different copy than the one that sorts first, so the upgrade must bring **every**
 copy to the remote version, not just the first one found. `bin/pln-update-apply`
 does that in a single pass and prints per-copy results.
@@ -86,7 +86,7 @@ predate it), then run it:
 
 ```bash
 APPLY=""
-for d in "${CLAUDE_SKILL_DIR:-}" "${CODEX_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" "$HOME/.codex/skills/pln" ".agents/skills/pln" ".claude/skills/pln" ".codex/skills/pln"; do
+for d in "${CLAUDE_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" ".agents/skills/pln" ".claude/skills/pln"; do
   [ -n "$d" ] && [ -x "$d/bin/pln-update-apply" ] && APPLY="$d/bin/pln-update-apply" && break
 done
 if [ -n "$APPLY" ]; then
@@ -117,7 +117,7 @@ cache itself when at least one copy was upgraded.
 updater, so reconcile the git copies inline:
 
 ```bash
-for d in "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" "$HOME/.codex/skills/pln" ".agents/skills/pln" ".claude/skills/pln" ".codex/skills/pln"; do
+for d in "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" ".agents/skills/pln" ".claude/skills/pln"; do
   [ -d "$d/.git" ] || continue
   [ -L "$d" ] && { echo "$d: dev symlink, skipped"; continue; }
   OLD=$(cat "$d/VERSION" 2>/dev/null || echo unknown)
@@ -153,7 +153,7 @@ When invoked directly as `/pln-update` (not from the preamble):
 1. Force a fresh check. The checker scans every installed copy and reports the lowest version, so this catches a stale copy in a root the host doesn't load first:
 ```bash
 UPDATE_CHECK_OUTPUT=""; UPDATE_CHECK_OK=false
-for d in "${CLAUDE_SKILL_DIR:-}" "${CODEX_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" "$HOME/.codex/skills/pln" ".agents/skills/pln" ".claude/skills/pln" ".codex/skills/pln"; do
+for d in "${CLAUDE_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" ".agents/skills/pln" ".claude/skills/pln"; do
   if [ -n "$d" ] && [ -x "$d/bin/pln-update-check" ]; then
     UPDATE_CHECK_OUTPUT=$("$d/bin/pln-update-check" --force 2>/dev/null) && UPDATE_CHECK_OK=true
     break

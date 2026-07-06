@@ -12,9 +12,9 @@
 #
 # This script scans EVERY installed copy of pln (not just its own directory) and
 # reports UPGRADE_AVAILABLE if ANY copy is behind remote. This is deliberate:
-# pln can be installed in several roots at once (~/.agents, ~/.claude, ~/.codex,
-# plus project-local variants) and the host may load a different copy than the
-# one that sorts first. A single copy scanned in isolation hid staleness before.
+# pln can be installed in several roots at once (~/.agents, ~/.claude, plus
+# project-local variants) and the host may load a different copy than the one
+# that sorts first. A single copy scanned in isolation hid staleness before.
 #
 # Env overrides (for testing):
 #   PLN_SKILL_DIR        — single-dir mode: scan ONLY this dir (also locates bin/)
@@ -57,13 +57,10 @@ list_install_dirs() {
   fi
   local candidates=(
     "${CLAUDE_SKILL_DIR:-}"
-    "${CODEX_SKILL_DIR:-}"
     "$HOME/.agents/skills/pln"
     "$HOME/.claude/skills/pln"
-    "$HOME/.codex/skills/pln"
     ".agents/skills/pln"
     ".claude/skills/pln"
-    ".codex/skills/pln"
   )
   local seen="" d rp
   for d in "${candidates[@]}"; do

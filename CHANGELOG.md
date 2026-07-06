@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.0 — 2026-07-06
+
+### Changed
+
+- **Three argument-legibility rules added to Conversational voice.** The existing voice rules handled register (bold, em-dashes, jargon) but not the clarity of reasoning. Three new rules fill the gap: (1) when an argument rests on evidence, state what each piece shows — don't leave relevance implicit; (2) one argumentative move per paragraph — split if a paragraph makes more than one step; (3) when referencing something established earlier by shorthand (H1, option B, etc.), restate it in one clause — the self-containment rule already applied to interview questions now applies to all explanatory prose.
+
 ## 1.9.0 — 2026-07-06
 
 ### Changed

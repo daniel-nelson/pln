@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.1 — 2026-07-07
+
+### Fixed
+
+- **The `SKILL.md` update-check preamble no longer gets hard-blocked under restricted permission settings.** The one-liner used a `for` loop over `${CLAUDE_SKILL_DIR:-}`/`$HOME`/quoted-variable expansions to hunt for an installed copy before running `pln-update-check`. Claude Code's static analyzer rejects any inline `!`` preamble command containing shell expansion outright — "Contains expansion" — before permission rules are even consulted, so no `settings.json` allow rule could unblock it; the skill failed to load at all in some environments. The preamble now calls `${CLAUDE_SKILL_DIR}/bin/pln-update-check` directly, a single literal-substitution token with no loop and no other expansion; `bin/pln-update-check` already scans every install location itself, so multi-copy detection is unchanged.
+
 ## 1.11.0 — 2026-07-06
 
 ### Changed

@@ -170,7 +170,7 @@ Steps 1–7 run in order, top to bottom. The skill has two distinct conversation
 
 - **Interview phase** (Step 3) — questions only, no code changes, no commits. Walks every item end-to-end, captures decisions in the master plan.
 - **Master-plan approval gate** (Step 4) — show the complete master plan, get a single yes-to-the-whole.
-- **Implementation phase** (Step 5) — a thin orchestrator spawns a fresh subagent per item, sequentially, with `PLAN.md` as the spec. No more discussion questions; the only interruptions are a subagent handing off at a blocker threshold.
+- **Implementation phase** (Step 5) — a thin orchestrator runs one Workflow script covering every item, sequentially, with `PLAN.md` as the spec. No more discussion questions; the only interruptions are a blocker threshold, which pauses and resumes the same run.
 
 Implementation never begins while items still have open per-item questions. If the user redirects mid-interview ("just go do item 1 now"), note gently that the rest of the interview comes first; the point of the two-phase split is to avoid the "answer Q1, implement, then ask Q2" antipattern.
 
@@ -288,19 +288,24 @@ Do not enter Step 5 without an explicit adoption signal.
 
 ### Step 5. Implementation phase
 
-Once the master plan is adopted, the main session becomes a **thin orchestrator**. It does not do item work itself. It walks the items in order, and for each one spawns a fresh subagent that executes that item in its own clean context, using `PLAN.md` as the spec. Items run sequentially, one subagent at a time, never in parallel: later items build on earlier commits, so the working tree has to be in its post-item-N state before item N+1 starts.
+Once the master plan is adopted, the main session becomes a **thin orchestrator**. It does not do item work itself, and it does not spawn subagents one at a time from its own loop. Instead it builds one Workflow script covering every pending item and invokes it once; the per-item loop lives inside that script, not in the orchestrator's own context. Within the script, items run sequentially — one `agent()` call per item, awaited in order, never in parallel: later items build on earlier commits, so the working tree has to be in its post-item-N state before item N+1 starts.
 
-This is the redesign's core. The orchestrator's whole job is: read state, spawn, check, repeat. By never reading code or editing files, its context stays light enough to carry the entire run, and every item gets the blank-slate context that a fresh session used to provide manually.
+This is the redesign's core. The orchestrator's whole job is: build the script, invoke it, wait for its notification, and — only on a blocker — ask the user and resume the same run. By never reading code or editing files, and by keeping the per-item loop inside the script instead of its own context, the orchestrator's context stays light enough to carry the entire run, and every item still gets the blank-slate context a fresh subagent call provides.
 
-Before spawning the first item, tell the user once: implementation is starting, and they can watch each item's live subagent activity (its actual tool calls, as they happen) by opening `/workflows` and selecting the running item's row — that view costs the orchestrator's context nothing, so it's the way to watch without derailing the run.
+Before invoking the script, tell the user once: implementation is starting, and they can watch each item's live subagent activity (its actual tool calls, as they happen) by opening `/workflows` and selecting the run's row, then the item's `agent()` call within it — that view costs the orchestrator's context nothing, so it's the way to watch without derailing the run.
 
-**The orchestrator loop.** For each item that is pending (skip ⏸ deferred / 🚫 dropped):
+**Building the run.** Before invoking anything:
 
-1. Update item status to 🟦 in progress in `PLAN.md`.
-2. State the action in one short sentence ("Implementing item N: <one-line>").
-3. Spawn the item through the Workflow tool, not the Agent tool: a single-agent script whose only step calls `agent()` once, with the brief below as the prompt, `agentType: 'general-purpose'`, and a label identifying the item (e.g. `item-N`). The subagent and its brief are unchanged from before — only the spawn mechanism changes. Workflow runs in the background, so this is the skill's own explicit opt-in to using it. Because Workflow replies via a task-notification rather than a synchronous return, the orchestrator waits for that item's notification before moving on — it does not spawn item N+1 until item N's notification has arrived, preserving the same one-item-at-a-time sequencing as a direct call would have had.
-4. When the task-notification arrives, check that item N's section in `PLAN.md` was updated and read the subagent's short summary from the notification's result. If it returned `BLOCKED:`, follow the blocker protocol (see Cross-cutting concerns). Otherwise confirm status is ✅ done.
-5. Move to the next item.
+1. Read `PLAN.md`'s dashboard and build the pending-item list fresh from its status column (skip ⏸ deferred / 🚫 dropped / ✅ done). This list is the source of truth for what still needs to run, not a count the orchestrator remembers from earlier in the conversation — a re-invocation after an interruption (a crashed session, a restarted host) rebuilds it from the file instead of guessing where it left off, so an already-✅-done item never gets spawned again.
+2. Construct one Workflow script for the whole pending list: for each item in order it marks the item 🟦 in progress in `PLAN.md`, calls `agent()` once with that item's subagent brief (below) as the prompt, `agentType: 'general-purpose'`, and a label identifying the item (e.g. `item-N`), then branches on the result. A normal (non-`BLOCKED:`) result marks the item ✅ done and the script proceeds to the next item. A `BLOCKED:` result is handled per the blocker protocol below: in interactive mode the script returns immediately with the blocking question; in auto mode the item is marked ⏸ blocked and the script continues to the next non-dependent item.
+3. Invoke the script through the Workflow tool. Workflow runs in the background and replies via a task-notification, so state the action in one short sentence ("Implementing items N–M") and wait for that notification rather than polling.
+
+**Handling the notification.** When it arrives:
+
+1. If the script's result carries a blocked item and question (interactive mode), follow the blocker protocol below: ask the user, record the answer in `PLAN.md`, then resume the same run — `Workflow({scriptPath, resumeFromRunId, args: {...}})` — with the answer folded into `args`. Every item's `agent()` call before the blocked one is unchanged and replays from cache instantly; the blocked item's call now carries the answer, so it doesn't hit the cache and reruns live from where it stopped; items after it then run for the first time in this same script execution.
+2. Otherwise, every pending item finished (✅ done, or ⏸ blocked/stashed for anything auto mode deferred) — move to Step 6.
+
+`args` arrives inside a Workflow script as a JSON string, not a parsed object, regardless of how it's passed to the tool. `JSON.parse` it before reading any field back out, or a resumed answer silently reads as `undefined`.
 
 **The subagent brief.** The prompt handed to each subagent must make `PLAN.md` its entire spec and carry every per-item concern, because the orchestrator is no longer doing this work:
 
@@ -319,6 +324,8 @@ The orchestrator breaks silence to the user only when a subagent returns `BLOCKE
 ### Step 6. Deferred-item revisit
 
 After the last item completes, before final verification: walk back through any items marked ⏸ deferred (and any deferred sub-questions). For each, ask the user: "Revisit now, push to a future session, or drop?"
+
+Items marked ⏸ blocked (auto mode) are different: each already has a concrete blocking question recorded in its handoff file. Ask that question directly, same one-question-at-a-time format as a live blocker, record the answer, and resume the run per the auto-mode blocker protocol above — don't fold it into the "revisit / push / drop" prompt used for deferred items.
 
 ### Step 7. End-of-task verification + wrap-up
 
@@ -347,8 +354,8 @@ Recommending a spinoff (see Spinoffs) is one kind of hand-off. Otherwise, the su
 
 **The orchestrator's response:**
 
-- **Interactive (default):** surface the question to the user as a one-question-at-a-time decision, same filter and format as Step 3. Record the answer in `PLAN.md`. Then spawn a fresh subagent and pass it the answer plus the handoff filename. That subagent reads item N's section, the handoff file, and the uncommitted diff (`git status` / `git diff`), resumes from where the first stopped, finishes, commits, updates `PLAN.md`, and deletes the handoff file. Because the blocker resolves before the next item starts, a dirty tree is fine.
-- **Auto (see below):** don't stop. The blocked subagent stashes its partial work under a labeled stash and records the stash ref in the handoff file, leaving a clean tree; the item is marked ⏸ blocked. The orchestrator continues with the next non-dependent item and presents all blocked items at the end-of-run review (Step 6). A blocked item that a later item depends on already trips the "assumption other items depend on" threshold, so dependent items defer rather than building on a half-done base. At the review, a fresh subagent pops the stash, applies the answer, and finishes.
+- **Interactive (default):** a running Workflow script has no channel back to the user mid-run — it can't pause in place and wait for a typed answer, only stop. So on a `BLOCKED:` result the script returns immediately with the item number and the question, rather than trying to spawn a follow-up call itself. The orchestrator surfaces the question to the user as a one-question-at-a-time decision, same filter and format as Step 3, and records the answer in `PLAN.md`. It then resumes the same run: `Workflow({scriptPath, resumeFromRunId, args: {...item N's answer, handoff filename...}})`. Every item's `agent()` call before the blocked one is unchanged and replays from cache instantly; the blocked item's call now includes the answer and handoff filename in its prompt, so it doesn't hit the cache — it reruns live, reads item N's section, the handoff file, and the uncommitted diff (`git status` / `git diff`), resumes from where the first attempt stopped, finishes, commits, updates `PLAN.md`, and deletes the handoff file. Items after it then run for the first time in this same execution. Because the blocker resolves before the next item starts, a dirty tree is fine.
+- **Auto (see below):** the script doesn't stop at all. The blocked subagent stashes its partial work under a labeled stash and records the stash ref in the handoff file, leaving a clean tree; the item is marked ⏸ blocked, and the script's own loop moves on to the next non-dependent item without returning. A blocked item that a later item depends on already trips the "assumption other items depend on" threshold, so dependent items defer rather than building on a half-done base. All blocked items surface together at the end-of-run review (Step 6); for each, the orchestrator gets the answer and resumes the same run the same way interactive mode does, letting that item's `agent()` call pop the stash, apply the answer, and finish.
 
 ### Auto-mode behavior
 
@@ -443,5 +450,7 @@ Each item section must be self-contained: a blank-context subagent reading only 
 - **Inventing a verification gauntlet** — if you didn't read `CLAUDE.md` / `AGENTS.md` and find the actual commands, ask the user. Don't run guessed commands.
 - **Forgetting the `WHAT_I_LEARNED_ABOUT_PSYCHIC_*.md` step when it's gated on** — only active when `RECORD_PSYCHIC_LEARNINGS` is set and pre-flight detected Dream/Psychic; when both hold, the file write is built into the subagent brief. When the env var is unset, the concern is off and Dream/Psychic is never mentioned.
 - **Persisting verification output to a file** — don't. Dashboard summary only.
+- **Trusting a remembered item cursor instead of `PLAN.md`'s status** — when building or resuming a run, the pending-item list comes from reading the dashboard fresh, not from what the orchestrator recalls doing earlier in the conversation. A stale cursor after a restart can re-spawn an item already marked ✅ done.
+- **Reading `args` as an object without parsing it first** — inside a Workflow script, `args` arrives as a JSON string regardless of how it was passed to the tool. Code that reads a field off it directly gets `undefined` silently; `JSON.parse(args)` first.
 - **Using `<recommended>` (angle brackets) instead of `[recommended]` (square brackets)** — angle brackets get eaten by the renderer.
 - **Treating an item-scoped drop/abandon as ending the whole session** — when "drop", "abandon", "forget it", or similar arrives in answer to a question about one item, it scopes to that item: mark it 🚫 dropped and move to the next. Tearing down the entire interview on a one-word reply discards every answer gathered so far and is expensive to re-establish. Only an unambiguous whole-session signal ends the interview; when unsure, ask one clarifying question instead of exiting.

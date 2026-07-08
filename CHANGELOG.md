@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.12.0 — 2026-07-08
+
+### Changed
+
+- **Step 5 now runs one Workflow script per implementation run instead of one Workflow invocation per item, in both interactive and auto mode.** Previously the orchestrator called Workflow once per item and waited for each item's notification before spawning the next; auto and interactive mode used the same mechanism but neither exploited Workflow's own resumability. Now the orchestrator builds a single script covering every pending item — the per-item loop lives inside the script, not in the orchestrator's own context — and invokes it once. On a blocker in interactive mode, the script returns immediately with the blocking question instead of trying to spawn a follow-up call itself (a running script has no channel back to the user mid-run); the orchestrator asks the user, records the answer, then resumes the same run via `resumeFromRunId` with the answer folded into `args`. Completed items replay from cache instantly since their `agent()` calls are unchanged; only the blocked item's call (now carrying the answer) and anything after it run live. Auto mode is unaffected in spirit — the script just doesn't stop on a blocker — but now shares the same one-script-per-run shape and gets the same resumability for free. Confirmed empirically: a script that deliberately returns early replays its completed prefix from cache on resume and continues past the return point, verified against the journal (no new `started` event for the already-completed step).
+- **Auto-mode ⏸ blocked items now resolve at Step 6 through the same resume mechanism as an interactive blocker**, rather than being folded into the "revisit / push / drop" prompt used for deferred items. Each blocked item already has a concrete question recorded in its handoff file; Step 6 asks it directly and resumes the run.
+- **The pending-item list for a run is now built fresh from `PLAN.md`'s status column, not carried as an in-memory cursor.** Guards against re-spawning an already-✅-done item if the orchestrator itself (not the Workflow run) gets re-invoked after an interruption.
+
+### Fixed
+
+- **`args` passed to a Workflow script arrives as a JSON string, not a parsed object.** Documented as a failure mode: any script logic that branches on an `args` field (as the new blocker-resume flow does) must `JSON.parse(args)` first, or the field reads as `undefined` silently. Discovered empirically while confirming the resumability behavior above.
+
 ## 1.11.1 — 2026-07-07
 
 ### Fixed

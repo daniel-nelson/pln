@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.0 — 2026-07-14
+
+### Added
+
+- **Notifications at the three moments pln needs you — an interview question, a blocker, or completion — over two independent, separately-toggleable channels, both default on.** An implementation run can take an hour while you context-switch away; this pulls you back exactly when needed, and only then (it is not progress reporting). The phone-push channel is the harness `PushNotification` tool, which self-suppresses when you're at the terminal and reaches your phone when you're away. The local-desktop channel is a new `bin/pln-notify-desktop` helper (macOS `osascript`, Linux `notify-send`, a no-op elsewhere) that covers the at-the-computer case the push channel's suppression removes. Firing both at every moment means you're covered whether you're present or away, so pln never has to guess your presence — the guessing is what made an earlier attempt unreliable. Setup lives in a top-of-file preamble that runs on every invocation (including "continue the plan"), not in Step 1 pre-flight, which a continue skips. Each notify call fires *before* the user-facing text, not after — firing after is what made a prior version silently drop the call. Toggle in `~/.pln/config.yaml`: `notify_push`, `notify_desktop`, and `notify_desktop_persist` (the last makes the desktop notification stay until dismissed instead of auto-vanishing; default off, since a persistent alert on every question is intrusive for the general audience).
+
 ## 1.12.0 — 2026-07-08
 
 ### Changed

@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# pln-notify-desktop — fire a local desktop notification (macOS or Linux).
+#
+# Usage:
+#   pln-notify-desktop "<message>"
+#
+# This is the local half of pln's notifications; the phone-push half is the
+# harness `PushNotification` tool, called by the model. This script self-gates,
+# so a call site can invoke it unconditionally — it decides whether to fire.
+#
+# Config keys (via pln-config, in ~/.pln/config.yaml):
+#   notify_desktop          — "false" disables desktop notifications. Default: on.
+#   notify_desktop_persist  — "true" makes the notification stay until dismissed
+#                             instead of auto-vanishing (macOS: a dialog that
+#                             waits for a click; Linux: critical urgency, which
+#                             standard daemons never auto-expire). Default: off —
+#                             a general-audience-safe banner (macOS) / normal
+#                             notification (Linux), with a sound on macOS.
+#
+# Always exits 0. A disabled channel, an unsupported platform, or a missing
+# notifier command is a silent no-op — never an error the caller has to handle.
+#
+# Env overrides (for testing):
+#   PLN_STATE_DIR — passed through to pln-config (override ~/.pln)
+set -euo pipefail
+
+MSG="${1:-}"
+[ -n "$MSG" ] || exit 0
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+CONFIG="$HERE/pln-config"
+
+get() { "$CONFIG" get "$1" 2>/dev/null || true; }
+
+# Default on; only an explicit "false" disables.
+[ "$(get notify_desktop)" = "false" ] && exit 0
+PERSIST="$(get notify_desktop_persist)"
+
+TITLE="pln"
+
+case "$(uname -s)" in
+  Darwin)
+    command -v osascript >/dev/null 2>&1 || exit 0
+    # Escape for an AppleScript string literal: backslash first, then quote.
+    esc=${MSG//\\/\\\\}
+    esc=${esc//\"/\\\"}
+    if [ "$PERSIST" = "true" ]; then
+      # A dialog stays on screen until dismissed. Backgrounded so it never
+      # blocks the caller; the 24h `giving up after` is only a safety valve so
+      # an ignored dialog can't leak an osascript process forever.
+      osascript \
+        -e "display dialog \"$esc\" with title \"$TITLE\" buttons {\"OK\"} default button 1 with icon note giving up after 86400" \
+        >/dev/null 2>&1 &
+    else
+      osascript \
+        -e "display notification \"$esc\" with title \"$TITLE\" sound name \"Glass\"" \
+        >/dev/null 2>&1 || true
+    fi
+    ;;
+  Linux)
+    command -v notify-send >/dev/null 2>&1 || exit 0
+    if [ "$PERSIST" = "true" ]; then
+      notify-send -u critical "$TITLE" "$MSG" >/dev/null 2>&1 || true
+    else
+      notify-send -u normal "$TITLE" "$MSG" >/dev/null 2>&1 || true
+    fi
+    ;;
+esac
+
+exit 0

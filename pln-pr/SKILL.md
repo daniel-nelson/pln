@@ -59,6 +59,14 @@ Determine the base branch (what a PR targets, or the repo default):
 
 Print the detected base. Fetch it: `git fetch origin <base>`. Substitute it for `<base>` everywhere below.
 
+### Step 0.5. Host guard — this skill needs Claude Code's orchestration tools
+
+`/pln-pr` runs its review army and fix pass on the harness's **Workflow** and **Agent** tools (parallel and sequential fresh-context subagents). Those are Claude Code primitives; a Codex host does not expose them, so a run there would stall partway through instead of failing cleanly. Before dispatching any review work, confirm they are available on this host. If the `Workflow` and `Agent` tools are not part of your toolset, print exactly this and stop — do not scope the diff, spawn a baseline, or start the review army:
+
+> This host can't run the /pln-pr review army (it needs Claude Code's Workflow/Agent tools). Review the branch manually, or run /pln-pr from Claude Code.
+
+On Claude Code these tools are present, so this guard is a no-op and you continue to Step 1. `/pln-pr` is Claude-Code-only in v1 by design; do not attempt to build a Codex-native review path here.
+
 ### Step 1. Locate the plan and scope the diff
 
 **Clean-tree guard (run first).** The review scopes `git diff "$DIFF_BASE"`, which includes uncommitted working-tree changes and silently omits untracked files. So before anything else, check the tree:

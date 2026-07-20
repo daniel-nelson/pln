@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# pln-routing-rule — add the /pln-pr routing rule to the agent's global instructions.
+#
+# When present, this rule tells the agent to route every "open/create/put up a PR"
+# request (including ones embedded in a larger instruction like "bump the version
+# and open the PR") through the /pln-pr skill instead of pushing and running
+# `gh pr create` directly. It exists because trigger phrasing alone doesn't
+# reliably route a compound imperative to the skill.
+#
+# Usage:
+#   pln-routing-rule --plan     — preview the change; never writes
+#   pln-routing-rule            — apply the change (idempotent)
+#
+# Prints one machine-readable line: RESULT: <result>
+#   already-present  — the rule is already installed; nothing to do
+#   plan:add         — (--plan only) the rule would be added
+#   added            — the rule was appended
+#   no-target        — no global instructions dir found; nothing written
+#
+# Target resolution (override with PLN_ROUTING_TARGET for testing):
+#   $HOME/.claude/CLAUDE.md   if $HOME/.claude exists   (Claude Code)
+#   $HOME/.agents/AGENTS.md   else if $HOME/.agents exists   (Codex)
+set -euo pipefail
+
+PLAN=0
+[ "${1:-}" = "--plan" ] && PLAN=1
+
+# Resolve the target global-instructions file.
+TARGET="${PLN_ROUTING_TARGET:-}"
+if [ -z "$TARGET" ]; then
+  if [ -d "$HOME/.claude" ]; then
+    TARGET="$HOME/.claude/CLAUDE.md"
+  elif [ -d "$HOME/.agents" ]; then
+    TARGET="$HOME/.agents/AGENTS.md"
+  fi
+fi
+
+if [ -z "$TARGET" ] || [ ! -d "$(dirname "$TARGET")" ]; then
+  echo "RESULT: no-target"
+  exit 0
+fi
+
+MARKER="<!-- pln-pr-routing -->"
+
+read -r -d '' BLOCK <<'EOF' || true
+<!-- pln-pr-routing -->
+## PR routing
+
+When the user asks to open, create, put up, or "ship" a pull request — including when the request is embedded in a larger instruction like "bump the version and open the PR" or "push this up" — route through the `/pln-pr` skill (invoke it via the Skill tool). Do not push and run `gh pr create` / `glab mr create` directly. `/pln-pr` runs a fresh-context review army, fixes what it finds, verifies once, and opens the PR. Honor an explicit "skip the review" if the user says so.
+<!-- /pln-pr-routing -->
+EOF
+
+if [ -f "$TARGET" ] && grep -qF "$MARKER" "$TARGET" 2>/dev/null; then
+  echo "RESULT: already-present"
+  exit 0
+fi
+
+if [ "$PLAN" = "1" ]; then
+  echo "Would append to: $TARGET"
+  echo "----"
+  printf '%s\n' "$BLOCK"
+  echo "----"
+  echo "RESULT: plan:add"
+  exit 0
+fi
+
+# Apply: append with a blank-line separator. Create the file if absent.
+if [ -f "$TARGET" ] && [ -s "$TARGET" ]; then
+  printf '\n%s\n' "$BLOCK" >> "$TARGET"
+else
+  printf '%s\n' "$BLOCK" >> "$TARGET"
+fi
+echo "RESULT: added"

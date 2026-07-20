@@ -127,6 +127,45 @@ done
 mkdir -p ~/.pln && rm -f ~/.pln/last-update-check ~/.pln/update-snoozed
 ```
 
+### Step 2.5: Offer the /pln-pr routing rule (optional, one-time)
+
+`/pln-pr` runs a review army before opening a PR, but a compound instruction like
+"bump the version and open the PR" can bypass it — the host executes the git steps
+literally instead of routing to the skill. A short rule in the user's global
+instructions fixes that. This is opt-in: offer it once, never write without a yes.
+
+Skip this step entirely if `routing_prompted` is already set (the offer was made
+at install or a prior upgrade):
+
+```bash
+ROUTING=""
+[ -n "$APPLY" ] && ROUTING="$(dirname "$APPLY")/pln-routing-rule"
+if [ -z "$ROUTING" ] || [ ! -x "$ROUTING" ]; then
+  for d in "${CLAUDE_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" ".agents/skills/pln" ".claude/skills/pln"; do
+    [ -n "$d" ] && [ -x "$d/bin/pln-routing-rule" ] && ROUTING="$d/bin/pln-routing-rule" && break
+  done
+fi
+_CFG=""
+[ -n "$ROUTING" ] && _CFG="$(dirname "$ROUTING")/pln-config"
+_PROMPTED="$([ -x "$_CFG" ] && "$_CFG" get routing_prompted 2>/dev/null || echo "")"
+if [ -z "$ROUTING" ] || [ ! -x "$ROUTING" ]; then
+  echo "NO_ROUTING_SCRIPT"   # this copy predates the helper; skip
+elif [ "$_PROMPTED" = "true" ]; then
+  echo "ROUTING_ALREADY_PROMPTED"   # offered before; skip
+else
+  "$ROUTING" --plan
+fi
+```
+
+Read the `RESULT` line from the `--plan` output:
+
+- `NO_ROUTING_SCRIPT`, `ROUTING_ALREADY_PROMPTED`, `already-present`, or
+  `no-target` — nothing to do; move on to Step 3 silently.
+- `plan:add` — the rule is not yet installed. **Ask the user** whether to add it
+  (show the previewed block). On yes: run `"$ROUTING"` and confirm `RESULT: added`.
+  Either way, record that the offer was made so it never repeats:
+  `"$_CFG" set routing_prompted true`.
+
 ### Step 3: Show what's new
 
 Read `CHANGELOG.md` from any upgraded copy (e.g. the `$APPLY` dir). Summarize the

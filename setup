@@ -33,28 +33,15 @@ echo "  /pln-update — update pln to the latest version"
 echo ""
 echo "Restart Claude Code to pick up the new skills."
 
-# Optional, opt-in: offer the /pln-pr routing rule (one-time). This does NOT
-# write anything — it prints an agent-directed offer + a preview, and the
-# installing agent conducts the ask. Gated so it's offered once.
-_PROMPTED="$("$SKILL_DIR/bin/pln-config" get routing_prompted 2>/dev/null || true)"
-if [ "$_PROMPTED" != "true" ]; then
-  _PLAN="$("$SKILL_DIR/bin/pln-routing-rule" --plan 2>/dev/null || true)"
-  case "$_PLAN" in
-    *"RESULT: plan:add"*)
-      echo ""
-      echo "=== OPTIONAL (agent: ask the user before doing anything) ==="
-      echo "/pln-pr works best when PR requests route through it. A compound"
-      echo "instruction like \"bump the version and open the PR\" can otherwise"
-      echo "bypass the review army. I can add a short routing rule to the user's"
-      echo "global instructions (preview below) so those requests route to /pln-pr."
-      echo ""
-      echo "$_PLAN"
-      echo ""
-      echo "AGENT: ask the user whether to add this rule."
-      echo "  - On YES: run  $SKILL_DIR/bin/pln-routing-rule"
-      echo "            then  $SKILL_DIR/bin/pln-config set routing_prompted true"
-      echo "  - On NO:  run  $SKILL_DIR/bin/pln-config set routing_prompted true"
-      echo "=== END OPTIONAL ==="
-      ;;
-  esac
-fi
+# Optional, opt-in: offer the /pln-pr routing rule (one-time). The helper owns
+# the gate + marker check and the offer text — setup just relays its output. It
+# does NOT write anything; on RESULT: offer it prints an agent-directed offer +
+# preview and the installing agent conducts the ask. On skip/no-target/
+# already-present it prints only a RESULT line, so nothing user-facing is shown.
+_OFFER="$("$SKILL_DIR/bin/pln-routing-rule" --offer 2>/dev/null || true)"
+case "$_OFFER" in
+  *"RESULT: offer"*)
+    echo ""
+    printf '%s\n' "$_OFFER"
+    ;;
+esac

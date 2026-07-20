@@ -134,8 +134,10 @@ mkdir -p ~/.pln && rm -f ~/.pln/last-update-check ~/.pln/update-snoozed
 literally instead of routing to the skill. A short rule in the user's global
 instructions fixes that. This is opt-in: offer it once, never write without a yes.
 
-Skip this step entirely if `routing_prompted` is already set (the offer was made
-at install or a prior upgrade):
+This is opt-in and one-time. The `pln-routing-rule --offer` helper owns the
+whole gate — it checks `routing_prompted`, whether the rule is already present,
+and whether a Claude Code global target exists, and only emits the offer when all
+three say go. Just locate the helper and relay its output:
 
 ```bash
 ROUTING=""
@@ -145,26 +147,21 @@ if [ -z "$ROUTING" ] || [ ! -x "$ROUTING" ]; then
     [ -n "$d" ] && [ -x "$d/bin/pln-routing-rule" ] && ROUTING="$d/bin/pln-routing-rule" && break
   done
 fi
-_CFG=""
-[ -n "$ROUTING" ] && _CFG="$(dirname "$ROUTING")/pln-config"
-_PROMPTED="$([ -x "$_CFG" ] && "$_CFG" get routing_prompted 2>/dev/null || echo "")"
 if [ -z "$ROUTING" ] || [ ! -x "$ROUTING" ]; then
   echo "NO_ROUTING_SCRIPT"   # this copy predates the helper; skip
-elif [ "$_PROMPTED" = "true" ]; then
-  echo "ROUTING_ALREADY_PROMPTED"   # offered before; skip
 else
-  "$ROUTING" --plan
+  "$ROUTING" --offer
 fi
 ```
 
-Read the `RESULT` line from the `--plan` output:
+Read the `RESULT` line from the `--offer` output:
 
-- `NO_ROUTING_SCRIPT`, `ROUTING_ALREADY_PROMPTED`, `already-present`, or
-  `no-target` — nothing to do; move on to Step 3 silently.
-- `plan:add` — the rule is not yet installed. **Ask the user** whether to add it
-  (show the previewed block). On yes: run `"$ROUTING"` and confirm `RESULT: added`.
-  Either way, record that the offer was made so it never repeats:
-  `"$_CFG" set routing_prompted true`.
+- `NO_ROUTING_SCRIPT` or `RESULT: skip` — nothing to do (offered before, already
+  present, or no Claude Code target); move on to Step 3 silently.
+- `RESULT: offer` — the emitted block is agent-directed and self-contained: it
+  includes the previewed rule and the exact `--apply` / `pln-config set
+  routing_prompted true` commands to run on yes vs. no. **Ask the user** whether
+  to add the rule (show the previewed block), then follow those instructions.
 
 ### Step 3: Show what's new
 

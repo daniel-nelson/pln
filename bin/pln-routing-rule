@@ -11,6 +11,7 @@
 #   pln-routing-rule --plan      — preview the change; never writes
 #   pln-routing-rule --apply     — apply the change (idempotent)
 #   pln-routing-rule --offer     — emit the one-time offer if not yet prompted
+#   pln-routing-rule --remove    — delete the routing block (idempotent)
 #
 # An explicit mode is required. Any other argument (including --help, a typo, or
 # no argument at all) prints usage and exits non-zero WITHOUT writing anything.
@@ -21,6 +22,8 @@
 #   added            — (--apply only) the rule was appended
 #   offer            — (--offer only) the offer was emitted
 #   skip             — (--offer only) already prompted / present / no target
+#   removed          — (--remove only) the routing block was deleted
+#   not-present      — (--remove only) no routing block found; nothing to do
 #   no-target        — no Claude Code global dir found; nothing written
 #
 # Target: $HOME/.claude/CLAUDE.md (the Claude Code global). If $HOME/.claude
@@ -31,13 +34,14 @@ set -euo pipefail
 
 MODE="${1:-}"
 case "$MODE" in
-  --plan|--apply|--offer) ;;
+  --plan|--apply|--offer|--remove) ;;
   *)
     cat >&2 <<'USAGE'
 Usage: pln-routing-rule <mode>
   --plan    preview the /pln-pr routing rule; never writes
   --apply   append the routing rule to the Claude Code global (idempotent)
   --offer   emit the one-time offer if not yet prompted
+  --remove  delete the routing rule from the Claude Code global (idempotent)
 An explicit mode is required; no other argument writes anything.
 USAGE
     exit 2
@@ -53,6 +57,7 @@ if [ -z "$TARGET" ]; then
 fi
 
 MARKER="<!-- pln-pr-routing -->"
+END_MARKER="<!-- /pln-pr-routing -->"
 
 read -r -d '' BLOCK <<'EOF' || true
 <!-- pln-pr-routing -->
@@ -108,6 +113,30 @@ if [ "$MODE" = "--offer" ]; then
   echo "  - On NO:  run  $SELF_DIR/pln-config set routing_prompted true"
   echo "=== END OPTIONAL ==="
   echo "RESULT: offer"
+  exit 0
+fi
+
+# --- --remove ----------------------------------------------------------------
+# Delete the marker-delimited routing block from the target. Idempotent: if the
+# block isn't present (including no target file), RESULT: not-present.
+if [ "$MODE" = "--remove" ]; then
+  if ! rule_present; then
+    echo "RESULT: not-present"
+    exit 0
+  fi
+  TMP="$(mktemp "${TMPDIR:-/tmp}/pln-routing.XXXXXX")"
+  # Delete the start-marker line through the end-marker line inclusive, and drop
+  # a single blank line immediately preceding the block (the append separator).
+  awk -v start="$MARKER" -v end="$END_MARKER" '
+    in_block { if (index($0, end)) in_block=0; next }
+    index($0, start) { in_block=1; pending=0; next }
+    /^$/ { pending=1; next }
+    { if (pending) { print ""; pending=0 } print }
+    END { if (pending) print "" }
+  ' "$TARGET" > "$TMP"
+  cat "$TMP" > "$TARGET"
+  rm -f "$TMP"
+  echo "RESULT: removed"
   exit 0
 fi
 

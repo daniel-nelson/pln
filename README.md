@@ -101,11 +101,13 @@ Each toggles independently in `~/.pln/config.yaml`:
 
 ```bash
 # Claude Code
-rm -rf ~/.claude/skills/pln && rm -f ~/.claude/skills/plnify ~/.claude/skills/pln-update
+rm -rf ~/.claude/skills/pln && rm -f ~/.claude/skills/plnify ~/.claude/skills/pln-update ~/.claude/skills/pln-pr
 
 # Codex
-rm -rf ~/.agents/skills/pln && rm -f ~/.agents/skills/plnify ~/.agents/skills/pln-update
+rm -rf ~/.agents/skills/pln && rm -f ~/.agents/skills/plnify ~/.agents/skills/pln-update ~/.agents/skills/pln-pr
 ```
+
+If you added the `/pln-pr` routing rule to your global instructions, strip it with `pln/bin/pln-routing-rule --remove` (idempotent — safe to run either way).
 
 To also remove update-check state: `rm -rf ~/.pln`.
 

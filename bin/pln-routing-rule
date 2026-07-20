@@ -8,36 +8,48 @@
 # reliably route a compound imperative to the skill.
 #
 # Usage:
-#   pln-routing-rule --plan     — preview the change; never writes
-#   pln-routing-rule            — apply the change (idempotent)
+#   pln-routing-rule --plan      — preview the change; never writes
+#   pln-routing-rule --apply     — apply the change (idempotent)
+#   pln-routing-rule --offer     — emit the one-time offer if not yet prompted
+#
+# An explicit mode is required. Any other argument (including --help, a typo, or
+# no argument at all) prints usage and exits non-zero WITHOUT writing anything.
 #
 # Prints one machine-readable line: RESULT: <result>
 #   already-present  — the rule is already installed; nothing to do
 #   plan:add         — (--plan only) the rule would be added
-#   added            — the rule was appended
-#   no-target        — no global instructions dir found; nothing written
+#   added            — (--apply only) the rule was appended
+#   offer            — (--offer only) the offer was emitted
+#   skip             — (--offer only) already prompted / present / no target
+#   no-target        — no Claude Code global dir found; nothing written
 #
-# Target resolution (override with PLN_ROUTING_TARGET for testing):
-#   $HOME/.claude/CLAUDE.md   if $HOME/.claude exists   (Claude Code)
-#   $HOME/.agents/AGENTS.md   else if $HOME/.agents exists   (Codex)
+# Target: $HOME/.claude/CLAUDE.md (the Claude Code global). If $HOME/.claude
+# does not exist (e.g. a Codex-only install), RESULT: no-target and nothing is
+# written — a Claude-only routing rule has no use there in v1.
+# Override the target with PLN_ROUTING_TARGET for testing.
 set -euo pipefail
 
-PLAN=0
-[ "${1:-}" = "--plan" ] && PLAN=1
+MODE="${1:-}"
+case "$MODE" in
+  --plan|--apply|--offer) ;;
+  *)
+    cat >&2 <<'USAGE'
+Usage: pln-routing-rule <mode>
+  --plan    preview the /pln-pr routing rule; never writes
+  --apply   append the routing rule to the Claude Code global (idempotent)
+  --offer   emit the one-time offer if not yet prompted
+An explicit mode is required; no other argument writes anything.
+USAGE
+    exit 2
+    ;;
+esac
 
-# Resolve the target global-instructions file.
+# Resolve the target global-instructions file (Claude Code only in v1).
 TARGET="${PLN_ROUTING_TARGET:-}"
 if [ -z "$TARGET" ]; then
   if [ -d "$HOME/.claude" ]; then
     TARGET="$HOME/.claude/CLAUDE.md"
-  elif [ -d "$HOME/.agents" ]; then
-    TARGET="$HOME/.agents/AGENTS.md"
   fi
-fi
-
-if [ -z "$TARGET" ] || [ ! -d "$(dirname "$TARGET")" ]; then
-  echo "RESULT: no-target"
-  exit 0
 fi
 
 MARKER="<!-- pln-pr-routing -->"
@@ -50,22 +62,79 @@ When the user asks to open, create, put up, or "ship" a pull request — includi
 <!-- /pln-pr-routing -->
 EOF
 
-if [ -f "$TARGET" ] && grep -qF "$MARKER" "$TARGET" 2>/dev/null; then
-  echo "RESULT: already-present"
-  exit 0
-fi
+# --- helpers -----------------------------------------------------------------
 
-if [ "$PLAN" = "1" ]; then
+# has_target: a writable Claude Code global location is resolvable.
+has_target() {
+  [ -n "$TARGET" ] && [ -d "$(dirname "$TARGET")" ]
+}
+
+# rule_present: the marker is already in the target file.
+rule_present() {
+  [ -f "$TARGET" ] && grep -qF "$MARKER" "$TARGET" 2>/dev/null
+}
+
+emit_plan() {
   echo "Would append to: $TARGET"
   echo "----"
   printf '%s\n' "$BLOCK"
   echo "----"
+}
+
+# --- --offer -----------------------------------------------------------------
+# Centralized offer + gate. setup and /pln-update relay this instead of
+# reimplementing the check. Emits the agent-directed offer block followed by the
+# --plan preview when the offer should fire; otherwise RESULT: skip.
+if [ "$MODE" = "--offer" ]; then
+  SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+  PROMPTED="$("$SELF_DIR/pln-config" get routing_prompted 2>/dev/null || true)"
+
+  if [ "$PROMPTED" = "true" ] || rule_present || ! has_target; then
+    echo "RESULT: skip"
+    exit 0
+  fi
+
+  echo "=== OPTIONAL (agent: ask the user before doing anything) ==="
+  echo "/pln-pr works best when PR requests route through it. A compound"
+  echo "instruction like \"bump the version and open the PR\" can otherwise"
+  echo "bypass the review army. I can add a short routing rule to the user's"
+  echo "global instructions (preview below) so those requests route to /pln-pr."
+  echo ""
+  emit_plan
+  echo ""
+  echo "AGENT: ask the user whether to add this rule."
+  echo "  - On YES: run  $SELF_DIR/pln-routing-rule --apply"
+  echo "            then  $SELF_DIR/pln-config set routing_prompted true"
+  echo "  - On NO:  run  $SELF_DIR/pln-config set routing_prompted true"
+  echo "=== END OPTIONAL ==="
+  echo "RESULT: offer"
+  exit 0
+fi
+
+# --- --plan / --apply --------------------------------------------------------
+
+if ! has_target; then
+  echo "RESULT: no-target"
+  exit 0
+fi
+
+if rule_present; then
+  echo "RESULT: already-present"
+  exit 0
+fi
+
+if [ "$MODE" = "--plan" ]; then
+  emit_plan
   echo "RESULT: plan:add"
   exit 0
 fi
 
-# Apply: append with a blank-line separator. Create the file if absent.
+# --apply: append with a blank-line separator. Create the file if absent.
 if [ -f "$TARGET" ] && [ -s "$TARGET" ]; then
+  # Ensure the file ends in a newline so the blank-line separator always holds.
+  if [ -n "$(tail -c 1 "$TARGET")" ]; then
+    printf '\n' >> "$TARGET"
+  fi
   printf '\n%s\n' "$BLOCK" >> "$TARGET"
 else
   printf '%s\n' "$BLOCK" >> "$TARGET"

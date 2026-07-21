@@ -39,6 +39,7 @@ It will prompt you for which agent to install to. For more details, see [vercel-
 ### What gets installed
 
 - `pln` skill in `~/.claude/skills/pln/`
+- `/pln-pr` slash command (symlinked from `pln/pln-pr/`) for reviewing a branch and opening a pull request
 - `/plnify` slash command (symlinked from `pln/plnify/`) for installing pln's discipline into gstack
 - `/pln-update` slash command (symlinked from `pln/pln-update/`) for updating pln
 
@@ -49,6 +50,7 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 | Skill | How to invoke | Description |
 |-------|--------------|-------------|
 | `/pln` | `/pln` or `/pln <details of what you want to plan>` | Two-phase planning: overview bullet list followed by detailed back and forth with a peer for each item; implementation only after the plan is written |
+| `/pln-pr` | `/pln-pr` or "put up a PR" | Review the current branch with a fresh-context review army, fix findings under one durable ledger, verify once, and open the pull request |
 | `/plnify` | `/plnify gstack` | One-time setup — adds pln's discipline to `~/.claude/CLAUDE.md` for gstack planning skills |
 | `/pln-update` | `/pln-update` | Update pln to the latest version (pln also offers this automatically when a new release appears) |
 
@@ -57,6 +59,8 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 **`/pln`** runs a complete interview phase before writing a single line of code. For each item it proposes an approach, asks one question at a time, and records every decision into a `PLAN.md`. Once you approve the master plan, the main session becomes a thin orchestrator and implements the whole plan autonomously: it spawns a fresh subagent for each item in turn, with `PLAN.md` as the spec, so the plan runs to completion without per-item intervention. If a subagent hits something the plan didn't settle, it hands off — leaving its work uncommitted with a handoff note — and the orchestrator surfaces a single question, records your answer, and resumes from where it stopped. Plans are saved to `./plans/<date>-<slug>/PLAN.md` relative to wherever you launched Claude.
 
 The peer posture is built in: during the interview phase, pln will disagree with your framing if it sees a problem, bring up considerations you didn't name, and stop after one question rather than overwhelming you with options. The goal is a plan *you* shaped, not one that was handed to you.
+
+**`/pln-pr`** is the ship half of a plan. After a `/pln` run (or on any branch ahead of its base), it reviews the diff, fixes what the review finds, verifies once, and opens the pull request. A review army of fresh-context subagents runs in parallel — six lenses (correctness, security, data, testing, maintainability, performance) plus an adversarial pass, and an optional Codex cross-model pass if you have it installed. Every finding has to quote the exact line that proves it, which keeps false positives out. Findings land in a durable `REVIEW.md` beside the plan, fixes run as subagents clustered by file so they never collide, decisions come to you one at a time, and the full test suite runs **once** at the end instead of after every fix — the loop that makes a naive review-and-fix pass thrash. It depends only on git, the harness tools, and optionally the GitHub/GitLab CLI and Codex; there's no external service and nothing to configure. So that a compound request like "bump the version and open the PR" still routes through the review instead of bypassing it, install offers a small opt-in routing rule for your global instructions — previewed, and written only if you say yes.
 
 **`/plnify gstack`** is a one-time setup step for [gstack](https://github.com/daniel-nelson/gstack) users. It appends two sections to your `~/.claude/CLAUDE.md` — interaction rules and an exploratory-mode posture — that apply pln's discipline to gstack planning skills like `/office-hours`, `/plan-ceo-review`, and `/plan-eng-review`. It shows you exactly what will be written and asks for approval before touching anything. The rules only fire when a gstack planning skill is active; they don't affect general conversation.
 
@@ -97,11 +101,13 @@ Each toggles independently in `~/.pln/config.yaml`:
 
 ```bash
 # Claude Code
-rm -rf ~/.claude/skills/pln && rm -f ~/.claude/skills/plnify ~/.claude/skills/pln-update
+rm -rf ~/.claude/skills/pln && rm -f ~/.claude/skills/plnify ~/.claude/skills/pln-update ~/.claude/skills/pln-pr
 
 # Codex
-rm -rf ~/.agents/skills/pln && rm -f ~/.agents/skills/plnify ~/.agents/skills/pln-update
+rm -rf ~/.agents/skills/pln && rm -f ~/.agents/skills/plnify ~/.agents/skills/pln-update ~/.agents/skills/pln-pr
 ```
+
+If you added the `/pln-pr` routing rule to your global instructions, strip it with `pln/bin/pln-routing-rule --remove` (idempotent — safe to run either way).
 
 To also remove update-check state: `rm -rf ~/.pln`.
 

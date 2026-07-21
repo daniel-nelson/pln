@@ -42,7 +42,8 @@
 #   --sandbox MODE   read-only | workspace-write (default: workspace-write).
 #                    Ignored when resuming: a resumed thread keeps its own.
 #   --timeout SECS   ceiling on a hung run (default 3600; 0 disables).
-#   --resume ID      continue thread ID instead of starting a new session.
+#   --resume ID      continue thread ID instead of starting a new session. An
+#                    empty ID is a usage error, never a silent fresh session.
 #   --model NAME     override the model for this spawn.
 #   --dry-run        print the command that would run and exit 0.
 #
@@ -65,6 +66,7 @@ CD_DIR=""
 SANDBOX="workspace-write"
 TIMEOUT_SECS="3600"
 RESUME_ID=""
+RESUME_GIVEN=0
 MODEL=""
 DRY_RUN=0
 ADD_DIRS=()
@@ -96,7 +98,7 @@ while [ $# -gt 0 ]; do
     --add-dir) ADD_DIRS+=("${2:-}"); shift 2 ;;
     --sandbox) SANDBOX="${2:-}"; shift 2 ;;
     --timeout) TIMEOUT_SECS="${2:-}"; shift 2 ;;
-    --resume) RESUME_ID="${2:-}"; shift 2 ;;
+    --resume) RESUME_ID="${2:-}"; RESUME_GIVEN=1; shift 2 ;;
     --model) MODEL="${2:-}"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h | --help) usage ;;
@@ -114,6 +116,15 @@ esac
 case "$TIMEOUT_SECS" in
   '' | *[!0-9]*) echo "pln-codex-agent: --timeout must be a whole number of seconds" >&2; exit 2 ;;
 esac
+# `--resume ""` — a caller passing a thread id it never captured. Silently
+# starting a fresh session there is the worst answer available: the resume brief
+# says "here is the answer, carry on", and an agent with no memory of the first
+# attempt would redo work that is already in the tree. Fail instead, so the
+# caller takes the fallback path deliberately (fresh agent, handoff file, diff).
+if [ "$RESUME_GIVEN" = "1" ] && [ -z "$RESUME_ID" ]; then
+  echo "pln-codex-agent: --resume was given an empty thread id — spawn a fresh agent instead." >&2
+  exit 2
+fi
 
 command -v codex >/dev/null 2>&1 || {
   echo "pln-codex-agent: the Codex CLI is not on PATH — cannot spawn an agent." >&2

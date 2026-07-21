@@ -24,8 +24,8 @@ EVENTS_FILE=/…/item-3.out.events
 How to read that:
 
 - **`STATUS=ok` and exit 0** — the agent ran and wrote a result. Read `RESULT_FILE`; that text is the agent's final message and the only thing that reaches your context.
-- **Any other status** (`empty`, `timeout`, `error`) exits 4 and means the run failed. Say so and stop the loop; do not treat it as an item that had nothing to do. `empty` is the one to watch: `codex exec` can exit 0 having written nothing, so a spawn that "succeeded" with no output is a failure wearing a success's clothes.
-- **`THREAD_ID`** is what makes a blocked item resumable. Keep it with the item.
+- **Any other status** (`empty`, `timeout`, `error`) exits 4 and means the run failed. Say so and stop the loop; do not treat it as an item that had nothing to do. `empty` is the one to watch: `codex exec` can exit 0 having written nothing, so a spawn that "succeeded" with no output is a failure wearing a success's clothes. The one exception is a failed `--resume`, which has a fallback rather than a dead end — see below.
+- **`THREAD_ID`** is what makes a blocked item resumable. Keep it with the item until the item is done; on a blocker it goes into the handoff file.
 - **`EVENTS_FILE`** is the agent's full reasoning trace. Never read it into your context — it exists for a post-mortem when a run fails.
 
 Options worth knowing:
@@ -39,6 +39,19 @@ Options worth knowing:
 
 **The spawned agent does not commit.** `.git` stays read-only even under `workspace-write`, so a nested agent physically cannot commit; `git commit` fails with `Unable to create '.git/index.lock'`. The agent writes files and returns; the orchestrator commits once the item is complete. The invariant that matters — no commit for a partial item — is unchanged; only who runs `git commit` moves.
 
-**Resuming after a blocker:** run the helper again with `--resume "$THREAD_ID"` and a brief carrying the answer and what to do with it. The resumed agent keeps everything it had already worked out, so finished work is not redone. A resumed thread also keeps the sandbox and working root it started with — `--sandbox`, `--cd` and `--add-dir` are ignored on resume, so there is nothing to re-specify. If no thread id was captured (a run killed early enough leaves no rollout file) or the resume fails, spawn a fresh agent instead and point it at the handoff file plus the uncommitted diff — that is what the blocked agent's handoff file exists for, so nothing is lost.
+**Resuming after a blocker.** Run the helper again with `--resume "$THREAD_ID"`, a brief carrying the user's answer, and a **new** `--out` path (`item-<N>.resume.out`); the helper truncates whatever `--out` it is given, so reusing the first path destroys the blocked agent's own result before you are done with it.
 
-If `{{SKILL_DIR}}` never resolved (the preamble printed `none`), the helper isn't installed. Fall back to the call it makes, keeping every guard: `env -u OPENAI_API_KEY timeout -k 10 3600 codex exec -C <root> -s workspace-write --json -o "$OUT" - < brief.md > "$EVENTS" 2>&1`, then read the thread id with `grep -m1 -o '"thread_id":"[^"]*"' "$EVENTS" | cut -d'"' -f4`, and treat an empty `$OUT` as a failure.
+```bash
+"{{SKILL_DIR}}/bin/pln-codex-agent" \
+  --resume "$THREAD_ID" \
+  --brief "$RUN/item-3.resume.brief.md" \
+  --out   "$RUN/item-3.resume.out"
+```
+
+The resume brief is short, because the thread still holds everything the first attempt worked out: the answer to the blocking question, what it means for the item, and an instruction to continue from where it stopped rather than restart. It does not re-explain the item. A resumed thread also keeps the sandbox and working root it started with — `--sandbox`, `--cd` and `--add-dir` are ignored on resume, so there is nothing to re-specify.
+
+**When the thread is gone.** Rollout files are written lazily at the first turn, so an agent killed early enough leaves nothing to resume; a resume of a missing thread comes back `STATUS=error`. Either way the fallback is the same, and it is not a failed run: spawn a **fresh** agent with a full brief that points it at the item's section, the handoff file, and the uncommitted diff (`git status` / `git diff`), and tell it to build on what is already in the tree rather than starting over. That is what the handoff file exists for. It costs the first attempt's reasoning, not its work.
+
+Never pass a thread id you did not capture. `--resume ""` is a usage error rather than a fresh session, deliberately: an agent with no memory of the first attempt, handed a brief that says "here is the answer, carry on", redoes work that is already in the tree. And never `resume --last`, which picks up whatever thread any Codex process on the machine touched most recently.
+
+If `{{SKILL_DIR}}` never resolved (the preamble printed `none`), the helper isn't installed. Fall back to the call it makes, keeping every guard: `env -u OPENAI_API_KEY timeout -k 10 3600 codex exec -C <root> -s workspace-write --json -o "$OUT" - < brief.md > "$EVENTS" 2>&1`, then read the thread id with `grep -m1 -o '"thread_id":"[^"]*"' "$EVENTS" | cut -d'"' -f4`, and treat an empty `$OUT` as a failure. Resuming that way is the same line with `resume <thread-id>` in place of `-C <root> -s workspace-write`, which `resume` rejects.

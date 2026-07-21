@@ -5,8 +5,9 @@
 # install, no network, and no credentials. What it pins down is the behavior
 # the orchestration loop depends on: a run that writes nothing is a failure and
 # not an empty result, the thread id is read out of the event stream, the brief
-# travels on stdin rather than argv, and `resume` is not handed the session
-# flags it doesn't accept.
+# travels on stdin rather than argv, `resume` is not handed the session flags it
+# doesn't accept, and a resume with no thread id is refused rather than quietly
+# started as a fresh session that would redo the blocked item's work.
 #
 # Prints OK and exits 0 on success; any failed assertion aborts with a message.
 #
@@ -128,6 +129,7 @@ guard "an empty brief" --brief "$WORK/blank.md" --out "$WORK/x.out"
 guard "an unknown sandbox" --brief "$BRIEF" --out "$WORK/x.out" --sandbox wide-open
 guard "a non-numeric timeout" --brief "$BRIEF" --out "$WORK/x.out" --timeout soon
 guard "an unknown argument" --brief "$BRIEF" --out "$WORK/x.out" --turbo
+guard "an empty --resume id" --brief "$BRIEF" --out "$WORK/x.out" --resume ""
 [ -e "$WORK/x.out" ] && fail "a usage error still created the output file"
 
 # --- no codex on PATH is a clear, distinct failure ---------------------------

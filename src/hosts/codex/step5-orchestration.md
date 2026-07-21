@@ -24,10 +24,10 @@ Then tell the user, in one short message: implementation is starting, it runs it
      --cd "$(git rev-parse --show-toplevel)"
    ```
 
-   Add `--add-dir "<plan dir>"` when the plan directory is not under that working root, or the agent cannot write its own `PLAN.md` update. Record the `THREAD_ID` it prints against the item; a blocker needs it.
+   Add `--add-dir "<plan dir>"` when the plan directory is not under that working root, or the agent cannot write its own `PLAN.md` update. Record the `THREAD_ID` it prints against the item; a blocker resumes that thread, and it is the only way to continue an item without redoing its work.
 5. If the helper exited non-zero, the run failed — timed out, errored, or wrote nothing. Report which, name `EVENTS_FILE` so the user can look, and stop the loop. An empty result is never "the agent found nothing to do".
 6. Otherwise read `$RUN/item-<N>.out`. That text is the agent's final message.
 7. On a normal (non-`BLOCKED:`) result: check `git status` shows the files the agent said it changed, then commit them **by name** — never `git add -A`, which would sweep in unrelated work — with the co-author trailer. The agent could not commit; `.git` is read-only to it. Mark the item ✅ done with the commit hash in `PLAN.md` and continue. An item that legitimately changed nothing (a decision-only or doc-only item) is marked done with no hash.
-8. On a `BLOCKED:` result: follow the blocker protocol below. Nothing is committed for a partial item.
+8. On a `BLOCKED:` result: follow the blocker protocol below, starting by writing the item's thread id into the handoff file the agent named. Nothing is committed for a partial item.
 
 When the list is exhausted, move to Step 6.

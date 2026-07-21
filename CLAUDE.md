@@ -12,8 +12,9 @@
 
 `SKILL.md` and `pln-pr/SKILL.md` are **build output**. What git tracks at those paths is a placeholder telling the reader to run `./setup`; `bin/pln-generate` overwrites them at install time with a build for the host it was installed under, so a model never reads instructions addressed to the other host.
 
-- Sources: `src/SKILL.core.md` and `src/pln-pr/SKILL.core.md` (host-neutral bodies), `src/hosts/<host>/*.md` (per-host fragments), `src/hosts/<host>/vars` (literal `{{KEY}}` substitutions).
+- Sources: `src/SKILL.core.md` and `src/pln-pr/SKILL.core.md` (host-neutral bodies), `src/hosts/<host>/*.md` (per-host fragments), `src/hosts/<host>/vars` (literal `{{KEY}}` substitutions), `src/shared/*.md` (fragments both hosts get verbatim, so a passage two skills share lives in one file).
 - Three directives, deliberately: `<!-- pln:include NAME -->`, `<!-- pln:only <host> -->` … `<!-- pln:endonly -->`, and `{{KEY}}`. If a change seems to need a fourth, that is a signal to move the passage into a fragment instead.
+- `pln:include NAME` reads `src/hosts/<host>/NAME.md` and falls back to `src/shared/NAME.md`; a host fragment of the same name wins. A fragment may not include another one, which is why the shared Style section is two files with the host `voice` fragment between them — the cores name all three in order.
 - Never commit a generated `SKILL.md`. If one shows as modified, you ran `./setup` in a working clone — `bin/pln-generate --clean` puts the placeholders back.
 - Preview a build without touching the tree: `bin/pln-generate --host codex --out-dir /tmp/out`.
 - Anything host-specific you add must exist for both hosts. Text that is true on only one belongs in a `pln:only` block, not in the core.

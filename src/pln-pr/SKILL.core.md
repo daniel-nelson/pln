@@ -41,7 +41,13 @@ If the branch has no commits ahead of base, say so and stop — there is nothing
 
 ## Interaction discipline
 
-This skill follows pln's discipline. Never call the `AskUserQuestion` tool. Surface at most one decision at a time, as plain prose, using the recommended-option format from the user's global config (`a) **[recommended] Label** — description`). Keep the voice plain and direct; lead with the point. When you record a user's answer, echo it back in one short line before moving on.
+This skill follows pln's discipline. Never call the `AskUserQuestion` tool. Surface at most one decision at a time, as plain prose. When you record a user's answer, echo it back in one short line before moving on. The Style section below is the same text `/pln` carries, generated from one shared source, and it governs every message this skill produces.
+
+<!-- pln:include style -->
+
+<!-- pln:include voice -->
+
+<!-- pln:include style-formatting -->
 
 ## Hard constraints (no exceptions)
 

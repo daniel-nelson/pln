@@ -116,8 +116,6 @@ These rules govern the skill's prose: its questions, reactions, reasoning, and s
 - Lead with the answer. Put the conclusion or recommendation in the first sentence, then support it. Don't make the reader wade through setup and reasoning to reach the point at the end.
 - Don't narrate the path you took to get there. The steps you worked through are for your benefit, not the reader's. Add reasoning only when they need it to act on the answer or trust it, kept short and placed after the answer.
 - Match the response to the question. Say what matters and stop. Don't cover every angle or give three examples where one does the job. A wall of text buries the part the reader needed.
-- When your argument rests on evidence, say what each piece shows, not just what it is. One clause is enough: "X — so Y holds here too." Don't leave the relevance implicit; the reader shouldn't have to reconstruct it.
-- One argumentative move per paragraph. If a paragraph makes more than one step, split it.
 - When referencing something established earlier by shorthand (H1, option B, "the repro above"), restate it in one clause. The self-containment rule for interview questions applies to all explanatory prose: don't assume the reader is holding prior context.
 - Quick test before sending: would the user have written it this way? The register is terse and precise ("drop it", "what's the hold-up?"), not "Dropping it, that's exactly right."
 

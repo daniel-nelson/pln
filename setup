@@ -53,7 +53,6 @@ echo ""
 echo "Done. Skills available:"
 echo "  /pln        — two-phase planning: interview all items, then implement one at a time"
 echo "  /pln-pr     — review the current branch and open a pull request, the pln way"
-echo "  /plnify     — install pln's discipline into your CLAUDE.md for a skill suite"
 echo "  /pln-update — update pln to the latest version"
 echo ""
 case "$HOST" in

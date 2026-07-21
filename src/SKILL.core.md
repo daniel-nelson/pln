@@ -139,6 +139,20 @@ Three things changed:
 - The verb came back out of the noun. "the failure is that they read as arguments" packs the verb into "failure"; "are written as arguments" says it straight. Nouns built out of verbs are where the invented phrases the jargon rule catches start.
 - The numbers went. They only show the problem is real, which the user already accepts. Numbers that decide between two answers stay.
 
+### Before you send
+
+Take each sentence out of the draft and read what is left. If no fact went out with it, leave it out.
+
+Two kinds fail this: a sentence that labels the sentence after it, and a sentence with the grammar of a claim and nothing in it.
+
+```
+That sharpens what the refund bug actually is.
+
+Two shapes, and they differ in a case that will happen.
+```
+
+Both look like they are doing work. Take either one out and nothing is missing. Naming a decision already made is different. There the name is the fact, and it is what keeps the user from scrolling up.
+
 ### Inline code
 
 Wrap file names and shell commands in backticks. e.g., `CLAUDE.md`, `package.json`, `pnpm build:spec`, `cargo test`. Never bare.

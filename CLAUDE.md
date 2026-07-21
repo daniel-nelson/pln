@@ -35,7 +35,7 @@ One open PR = one version. If scope grows mid-PR, bump the single version headin
 
 Run every script in `tests/` before opening a PR — each needs only bash and git, no network, no Codex install, and none of them writes to the working tree. Both must print `OK`:
 
-- `bash tests/generate.sh` — `bin/pln-generate`: the three directives, the generated-by banner, `--list`, `--clean`, every error path, and the property the host seam rests on — each host's build carries its own mechanics and none of the other's, checked against the real `src/` as well as fixtures.
+- `bash tests/generate.sh` — `bin/pln-generate`: the three directives, the generated-by banner, `--list`, `--clean`, every error path, and the two properties the host seam rests on — each host's build carries its own mechanics and none of the other's, and a `pln:include` resolves against `src/shared/` for a host that has no fragment of that name while a host fragment of the same name still wins (a missing name fails loudly, naming both folders). Checked against the real `src/` — where both skills must carry the whole Style section — as well as fixtures.
 - `bash tests/codex-agent.sh` — `bin/pln-codex-agent` against a fake `codex` on `PATH`: an empty result is a failure, the thread id comes out of the event stream, the brief travels on stdin, and `resume` is never handed the flags it rejects.
 
 Then install the skill locally, restart the agent, and exercise the changed behavior manually. For `/pln`: run a multi-item task end-to-end, through the Step 8 hand-off, and confirm it reaches `/pln-pr` instead of pushing and running `gh pr create` inline.

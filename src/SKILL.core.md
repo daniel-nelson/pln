@@ -95,9 +95,33 @@ Rename it, or leave the name and have the new code read `cancelled_at`?
 
 In all three:
 
-- The sentence naming the decision says what happens now and what should happen instead, in words someone who has never read the plan would use. Never a bare identifier in place of the thing itself — no item number, decision number, line number, or commit hash. The user is not looking at `PLAN.md`.
+- The sentence naming the decision says what happens now and what should happen instead, in words someone who has never read the plan would use.
 - Cut any paragraph whose only work is establishing that the problem is real. The user asked for this; they already believe there is a problem. Evidence that changes which answer wins stays, however long it runs. There is no word limit here, and holding information back is not the point.
 - Name a prior conclusion in a clause so the user never has to scroll up to answer. Don't re-derive the argument for it; naming it is the whole job.
+
+### Naming things the user reads
+
+Say what a thing is, not the handle that points at it. An item number, decision number, question number, line number or commit hash is an address into a file the user does not have open, so it never stands alone as the name for something. Pair it with the thing, as in "item 7, option descriptions", or leave it out.
+
+This holds for interview questions, echo lines, blocker questions and the Step 4 gate.
+
+### What each answer changes
+
+Anything the user has to act on — an interview question, a blocker, an item flagged at the Step 4 gate — says what changes with each answer it offers. For a yes-or-no question that means what yes does and what no does, both. A stranger should be able to answer it.
+
+A name you coined earlier is where this usually fails. "The refund-review split" reads to you as settled vocabulary and to the user as nothing at all, however carefully you defined it ten turns ago. Restate what it is every time you ask about it.
+
+Not:
+
+```
+Do you want to keep the refund-review split?
+```
+
+Instead:
+
+```
+Right now a cancellation marks the payment for a person to refund by hand. Say yes and that stays, and someone has to own the review queue. Say no and the cancel action issues the refund itself, with no human check before money moves.
+```
 
 ### Conversational voice
 
@@ -211,8 +235,8 @@ The visual distinction must be obvious at a glance. Don't mix styles within a si
 
 Before asking the next question, echo back what was just recorded in **one short line**. Lets the user catch a misrecorded answer immediately. The line carries the answer and nothing else: not why it was chosen, not what it changes, not a lead-in to the next question. Examples:
 
-- *"Q5 recorded: mix-conditional question style; never AskUserQuestion."*
-- *"Q12b recorded: lightweight per-item plus full gauntlet at end."*
+- *"Recorded: mix-conditional question style, and never AskUserQuestion."*
+- *"Recorded: lightweight checks per item, full gauntlet at the end."*
 
 ## Posture
 
@@ -395,10 +419,10 @@ When the interview is done, every item's section pins down the intent and the de
 
 ### Step 4. Master-plan approval gate
 
-Show the user the **complete master plan** as a single artifact:
+Show the user the master plan in one message, with enough in it to adopt on without opening the file:
 
 - Print the dashboard (status list).
-- Print each item's detail section, in order.
+- Print a digest of each item, in order: its title, what it does in a sentence or two, and any decision later items rest on. The detail sections stay in `PLAN.md` for the user to open; reprinting them here buries the disclosed decisions, which are the part that needs a reaction.
 - Print the **disclosed decisions**: the decide-and-disclose calls made during the interview. Number them globally (so the user can reply "3, 7, 8") but lay them out grouped under their parent item (e.g. "Item 4 → decisions 7–9"), so the unit the user scans is the item they already know, not a flat wall of forty. Each is one line with its cited rationale.
 - Self-triage the disclosed decisions; don't present them as equals. Lead with the handful you're least sure about: the ones closest to the ask/decide line, the ones whose authority is weakest or whose reversibility you're least certain of. Flag them for the user's eye ("worth a look: 3, 7"). The rest stand as a scannable, cited list the user can skim or ignore. The risk to avoid is a miscalibrated "all safe here" that buries a decision the user would have changed; when genuinely unsure, flag rather than bury.
 - End with one binary prompt: "Adopt this master plan as written, or reopen any decisions / change anything?"
@@ -610,30 +634,9 @@ Each item section must be self-contained: a blank-context subagent reading only 
 
 ## Failure modes to watch for
 
-- **Interleaving interview and implementation** — the antipattern this skill exists to prevent. If you catch yourself about to start implementing item N while item N+1 still has open questions, stop. The interview phase runs to completion before any implementation begins. The one exception is mid-item discovery during Step 5: surface, decide, update the plan, resume.
-- **Asking item-2 questions while implementing item-1** — same antipattern, different shape. If you're inside Step 5 and you find yourself about to ask a design question that wasn't in the master plan, stop. That question belonged in Step 3. Pause execution, surface it as a master-plan amendment, get the user's decision, update the plan, then resume.
-- **Bundling sub-questions** — if you catch yourself writing "...also..." or "Two sub-questions..." in a question, stop. Ask the first; wait; ask the next.
-- **Writing prose between tool calls during exploration** — if you emit a conclusion or a "confirmed: X" line mid-exploration and then continue reading code, the user has to scroll up to find it. All findings and conclusions belong in the single final message after exploration is complete. Stay silent during tool calls; write once at the end.
-- **Asking a question that only makes sense with the overview loaded** — referring back to "case C", "the repro", or a root cause established several messages ago without restating it inline. The user is answering one question at a time and shouldn't have to scroll up to reconstruct what the question is about. Restate the problem and the deciding evidence at the point of asking.
-- **Asking a decide-and-disclose question** — if a choice is cite-backed or reversible, you're interrupting the user for a decision you should make and disclose. The tell is an indifferent answer ("your call", "whatever's easiest"). Route it through the filter before it becomes an interview question.
-- **Over-specifying the plan** — pinning reversible mechanics the implementer should own. If an item's detail dictates internal structure or exact commands that nothing depends on, you've turned a goal into steps, the shape that defeats the point. Record intent and the decisions other work depends on; leave the rest.
-- **Burying a decision you're unsure about** — the Step 4 disclosed-decisions list is self-triaged. Presenting it as a flat equal wall, or burying a low-confidence call instead of flagging it, hands the user either overload or a silent wrong default. When in doubt, flag.
-- **Missing the `[recommended]` marker** — when there's a clear recommendation, mark it. The user relies on this signal.
-- **Forgetting to echo** — every recorded answer gets a one-line echo before the next question. The user catches misrecordings this way.
-- **Slipping into the intense, bold-and-em-dash voice** — see Conversational voice. In prose, plain paragraphs, claims stated once, importance argued rather than labeled. The functional formatting (options, recommended marker, status icons) is exempt; the prose around it is not.
-- **Plowing through auto mode** — auto mode is not license to skip the per-item gate or the four blocker thresholds. A subagent still hands off on any of the four; auto mode only defers the orchestrator's surfacing of it.
-- **The orchestrator doing item work inline** — in Step 5 the orchestrator spawns subagents; it does not read code or edit files. If you catch the orchestrator implementing an item itself, stop. That fills its context and discards the fresh-context guarantee.
-<!-- pln:only claude -->
-- **A subagent committing partial work** — a subagent commits only a complete, verified item. At a blocker it leaves changes uncommitted (or stashed, in auto mode) and writes a handoff file; it never commits a half-done item.
-<!-- pln:endonly -->
-<!-- pln:only codex -->
-- **Committing a partial item** — the orchestrator commits, and only for an item that came back complete and verified. At a blocker the work stays uncommitted (or stashed, in auto mode) behind a handoff file; nothing half-done is committed.
-<!-- pln:endonly -->
-- **A subagent improvising past a threshold** — if a discovery crosses a blocker threshold, the subagent stops and hands off. It must not guess the user's decision or silently push work outside the item's scope.
-- **A non-self-contained item section** — if an item's detail section can't be executed by a blank-context subagent reading only the dashboard plus that section, it's underspecified. The subagent is exactly that reader; fix the section, don't rely on conversation history.
+- **Asking an item-2 question while implementing item-1** — if you are inside Step 5 and about to ask a design question that wasn't in the master plan, stop. That question belonged in Step 3. Pause execution, surface it as a master-plan amendment, get the user's decision, update the plan, then resume.
 - **Dropping a cross-cutting concern from the subagent brief** — memory capture, mandated-skill invocation, and (when gated on) Psychic learning-capture happen during item work, which now runs in subagents. If the brief omits them, they silently stop happening. The brief carries every per-item concern.
 - **Inventing a verification gauntlet** — if you didn't read `CLAUDE.md` / `AGENTS.md` and find the actual commands, ask the user. Don't run guessed commands.
-- **Skipping a notification, or firing it after the text** — once the preamble confirms a channel is on, the three call sites (interview question, blocker, completion) aren't optional, and the call comes *before* the user-facing message, not after. Firing after is the wording that made an earlier version silently drop the call. A generic "pln needs you" is also a miss — name the actual item and question or outcome.
 <!-- pln:only claude -->
 - **`PushNotification` never loaded, so the call silently does nothing** — it is commonly a deferred tool; "call `PushNotification`" at a site does nothing unless the Notification setup preamble already ran `ToolSearch` (`select:PushNotification`). This fails with no error and nothing in the transcript. If a push is reported missing, first check the preamble ran and `notify_push` wasn't `false` — don't assume the tool misbehaved. (The desktop channel has no such trap: `pln-notify-desktop` is a plain script, always callable.)
 <!-- pln:endonly -->
@@ -641,14 +644,6 @@ Each item section must be self-contained: a blank-context subagent reading only 
 - **Calling the notifier by bare name, or through a variable a fresh shell doesn't have** — `pln-notify-desktop` is not on `PATH`, and `$_PLN_DIR` is resolved once in the preamble and gone by the next shell call. Every notify site runs the full path you resolved there. A bare `pln-notify-desktop` fails with `command not found`; `"$_PLN_DIR/bin/pln-notify-desktop"` in a later shell silently runs `/bin/pln-notify-desktop`, which doesn't exist either. Neither is visible to the user, who just doesn't get notified.
 <!-- pln:endonly -->
 - **Assuming Step 1 pre-flight runs on every invocation** — it only runs before writing a *new* plan skeleton. A "continue the plan" invocation or a reopened decision skips Step 1 entirely. Anything that must hold on every invocation regardless of new-vs-continuing — notification setup is the example — belongs in the top-of-file preamble, not inside Step 1.
-<!-- pln:only claude -->
-- **Checking `notify_desktop` yourself before calling the helper** — don't. `pln-notify-desktop` self-gates on the config and the platform; a redundant check just risks disagreeing with it. Call it unconditionally at each site. (Phone push is different: the model gates that one, via the preamble's `notify_push` read.)
-<!-- pln:endonly -->
-<!-- pln:only codex -->
-- **Checking `notify_desktop` yourself before calling the helper** — don't. `pln-notify-desktop` self-gates on the config and the platform; a redundant check just risks disagreeing with it. Call it unconditionally at each site, with no `pln-config get` probe in front of it.
-<!-- pln:endonly -->
-- **Forgetting the `WHAT_I_LEARNED_ABOUT_PSYCHIC_*.md` step when it's gated on** — only active when `RECORD_PSYCHIC_LEARNINGS` is set and pre-flight detected Dream/Psychic; when both hold, the file write is built into the subagent brief. When the env var is unset, the concern is off and Dream/Psychic is never mentioned.
-- **Persisting verification output to a file** — don't. Dashboard summary only.
 - **Trusting a remembered item cursor instead of `PLAN.md`'s status** — when building or resuming a run, the pending-item list comes from reading the dashboard fresh, not from what the orchestrator recalls doing earlier in the conversation. A stale cursor after a restart can re-spawn an item already marked ✅ done.
 <!-- pln:only claude -->
 - **Reading `args` as an object without parsing it first** — inside a Workflow script, `args` arrives as a JSON string regardless of how it was passed to the tool. Code that reads a field off it directly gets `undefined` silently; `JSON.parse(args)` first.
@@ -660,5 +655,3 @@ Each item section must be self-contained: a blank-context subagent reading only 
 - **Re-spawning a blocked item instead of resuming its thread** — a fresh agent knows nothing of the first attempt and starts the item over on top of the half-finished tree it left behind. Resume by thread id; a fresh agent is the fallback for when the resume genuinely fails, not the default. Losing the thread id is the same mistake one step earlier, which is why it goes into the handoff file the moment a `BLOCKED:` result arrives.
 - **Expecting the blocked agent to stash its own work** — it can't; `.git` is read-only to it, and `git stash` fails the same way `git commit` does. In auto mode the orchestrator stashes after reading the `BLOCKED:` result. If neither does it, the next item starts on a tree carrying half of the previous one.
 <!-- pln:endonly -->
-- **Using `<recommended>` (angle brackets) instead of `[recommended]` (square brackets)** — angle brackets get eaten by the renderer.
-- **Treating an item-scoped drop/abandon as ending the whole session** — when "drop", "abandon", "forget it", or similar arrives in answer to a question about one item, it scopes to that item: mark it 🚫 dropped and move to the next. Tearing down the entire interview on a one-word reply discards every answer gathered so far and is expensive to re-establish. Only an unambiguous whole-session signal ends the interview; when unsure, ask one clarifying question instead of exiting.

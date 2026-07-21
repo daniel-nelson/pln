@@ -121,6 +121,26 @@ These rules govern the skill's prose: its questions, reactions, reasoning, and s
 - When referencing something established earlier by shorthand (H1, option B, "the repro above"), restate it in one clause. The self-containment rule for interview questions applies to all explanatory prose: don't assume the reader is holding prior context.
 - Quick test before sending: would the user have written it this way? The register is terse and precise ("drop it", "what's the hold-up?"), not "Dropping it, that's exactly right."
 
+**The same sentence, written by the model and then rewritten by the user.**
+
+The model:
+
+```
+Item 7: option descriptions. Measured failure is that they read as arguments rather than labels — median 24 to 27 words, max 125, and the recommended option runs 1.6× longer than the alternatives because it carries the sales pitch.
+```
+
+The user:
+
+```
+Item 7: option descriptions are currently written as arguments rather than descriptions, which inflates their length.
+```
+
+Three things changed:
+
+- The label became a sentence. "Item 7: option descriptions." names a topic and stops, and "Measured failure is that…" parks the claim behind a frame. The rewrite makes the topic the subject and gives it a verb.
+- The verb came back out of the noun. "the failure is that they read as arguments" packs the verb into "failure"; "are written as arguments" says it straight. Nouns built out of verbs are where the invented phrases the jargon rule catches start.
+- The numbers went. They only show the problem is real, which the user already accepts. Numbers that decide between two answers stay.
+
 ### Inline code
 
 Wrap file names and shell commands in backticks. e.g., `CLAUDE.md`, `package.json`, `pnpm build:spec`, `cargo test`. Never bare.

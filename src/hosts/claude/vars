@@ -1,0 +1,8 @@
+# Literal substitutions for the claude host. KEY=value, one per line.
+# Values are inserted verbatim wherever {{KEY}} appears in a core file or a
+# fragment. No expressions, no escapes — keep them plain.
+SKILL_DIR=${CLAUDE_SKILL_DIR}
+HOST_NAME=Claude Code
+NOTIFY_CALL=call `PushNotification` and run `pln-notify-desktop`
+ORCH_TOOLS=the harness Agent/Workflow tools
+REVIEW_DISPATCH_SHORT=run as parallel fresh-context subagents

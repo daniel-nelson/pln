@@ -6,6 +6,31 @@ SKILLS_DIR="$(dirname "$SKILL_DIR")"
 
 echo "Setting up pln..."
 
+# ─── Build the host-specific skill files ─────────────────────
+# The skills say different things on Claude Code and on Codex, and the copy a
+# model reads must contain only its own host's mechanics. The host comes from
+# the install path (each host gets its own clone), so there is nothing to ask.
+HOST="$("$SKILL_DIR/bin/pln-host" "$SKILL_DIR")"
+"$SKILL_DIR/bin/pln-generate" "$HOST"
+
+# One clone cannot serve both hosts: a single generated file would be wrong for
+# one of them. This catches the case where a host's skills dir is a symlink to
+# the other's clone rather than a clone of its own.
+_seen=""
+for root in "$HOME/.claude/skills/pln" "$HOME/.agents/skills/pln" "$HOME/.codex/skills/pln"; do
+  [ -e "$root" ] || continue
+  rp="$(cd "$root" 2>/dev/null && pwd -P)" || continue
+  case ":$_seen:" in
+    *":$rp:"*)
+      echo ""
+      echo "  WARNING: more than one host install resolves to $rp."
+      echo "  The generated skill files can only match one host at a time — give each"
+      echo "  host its own clone instead of pointing one at the other."
+      ;;
+    *) _seen="$_seen:$rp" ;;
+  esac
+done
+
 linked=0
 skipped=0
 
@@ -31,7 +56,10 @@ echo "  /pln-pr     — review the current branch and open a pull request, the p
 echo "  /plnify     — install pln's discipline into your CLAUDE.md for a skill suite"
 echo "  /pln-update — update pln to the latest version"
 echo ""
-echo "Restart Claude Code to pick up the new skills."
+case "$HOST" in
+  codex) echo "Built for Codex. Restart Codex to pick up the new skills." ;;
+  *) echo "Built for Claude Code. Restart Claude Code to pick up the new skills." ;;
+esac
 
 # Optional, opt-in: offer the /pln-pr routing rule (one-time). The helper owns
 # the gate + marker check and the offer text — setup just relays its output. It

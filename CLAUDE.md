@@ -8,6 +8,16 @@
 - **Prefer capabilities every user already has:** the agent harness's own tools and standard OS commands. Reach for a third-party service only when it's optional and the user configures it themselves.
 - **Environment-specific behavior is opt-in and degrades gracefully.** Gate it behind a config key (the existing `notify` / `auto_upgrade` pattern), default to the universal behavior, and no-op cleanly when the dependency is absent — never error or block on something a general user doesn't have.
 
+## The skill files are generated — edit `src/`
+
+`SKILL.md` and `pln-pr/SKILL.md` are **build output**. What git tracks at those paths is a placeholder telling the reader to run `./setup`; `bin/pln-generate` overwrites them at install time with a build for the host it was installed under, so a model never reads instructions addressed to the other host.
+
+- Sources: `src/SKILL.core.md` and `src/pln-pr/SKILL.core.md` (host-neutral bodies), `src/hosts/<host>/*.md` (per-host fragments), `src/hosts/<host>/vars` (literal `{{KEY}}` substitutions).
+- Three directives, deliberately: `<!-- pln:include NAME -->`, `<!-- pln:only <host> -->` … `<!-- pln:endonly -->`, and `{{KEY}}`. If a change seems to need a fourth, that is a signal to move the passage into a fragment instead.
+- Never commit a generated `SKILL.md`. If one shows as modified, you ran `./setup` in a working clone — `bin/pln-generate --clean` puts the placeholders back.
+- Preview a build without touching the tree: `bin/pln-generate --host codex --out-dir /tmp/out`.
+- Anything host-specific you add must exist for both hosts. Text that is true on only one belongs in a `pln:only` block, not in the core.
+
 ## Releases
 
 Every PR that changes skill behavior must include both:

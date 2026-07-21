@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# pln-host — print which agent host this copy of pln is installed under.
+#
+# Output is exactly one word on stdout: `claude` or `codex`. Everything else
+# (warnings) goes to stderr, so callers can use the value directly:
+#
+#   HOST="$(bin/pln-host "$SKILL_DIR")"
+#
+# Detection order — install path first, because each host already gets its own
+# clone (~/.claude/skills/pln vs ~/.agents/skills/pln), so the path is the most
+# reliable signal available and needs no host cooperation:
+#
+#   1. $PLN_HOST, when set to a known host (escape hatch + how tests drive this)
+#   2. the install path: .claude → claude; .agents / .codex → codex
+#   3. environment left by the running host, when the path says nothing
+#   4. claude, with a warning on stderr
+#
+# Usage: pln-host [<install-dir>]   (default: this script's parent directory)
+set -euo pipefail
+
+DIR="${1:-}"
+if [ -z "$DIR" ]; then
+  DIR="$(cd "$(dirname "$0")/.." && pwd)"
+fi
+
+case "${PLN_HOST:-}" in
+  claude | codex)
+    printf '%s\n' "$PLN_HOST"
+    exit 0
+    ;;
+  "") ;;
+  *)
+    echo "pln-host: ignoring unknown PLN_HOST='$PLN_HOST'" >&2
+    ;;
+esac
+
+# Both the literal path and the resolved one: a dev install is a symlink whose
+# link path carries the host marker while its target (a working clone) does not.
+REAL="$(cd "$DIR" 2>/dev/null && pwd -P || true)"
+for p in "$DIR" "$REAL"; do
+  [ -n "$p" ] || continue
+  case "$p" in
+    */.claude | */.claude/*) printf 'claude\n'; exit 0 ;;
+    */.agents | */.agents/* | */.codex | */.codex/*) printf 'codex\n'; exit 0 ;;
+  esac
+done
+
+if [ -n "${CLAUDE_SKILL_DIR:-}" ] || [ -n "${CLAUDECODE:-}" ]; then
+  printf 'claude\n'
+  exit 0
+fi
+if [ -n "${CODEX_HOME:-}" ]; then
+  printf 'codex\n'
+  exit 0
+fi
+
+echo "pln-host: no host marker in '$DIR' — defaulting to claude (set PLN_HOST=codex to override)" >&2
+printf 'claude\n'

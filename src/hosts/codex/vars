@@ -1,0 +1,11 @@
+# Literal substitutions for the codex host. KEY=value, one per line.
+# Values are inserted verbatim wherever {{KEY}} appears in a core file or a
+# fragment. No expressions, no escapes — keep them plain.
+#
+# SKILL_DIR is the shell variable the preamble resolves once ($_PLN_DIR); Codex
+# has no equivalent of Claude Code's CLAUDE_SKILL_DIR.
+SKILL_DIR=$_PLN_DIR
+HOST_NAME=Codex
+NOTIFY_CALL=run `pln-notify-desktop`
+ORCH_TOOLS=`codex exec` subprocesses
+REVIEW_DISPATCH_SHORT=run as sequential fresh-context agents

@@ -24,13 +24,24 @@
 #   skip             — (--offer only) already prompted / present / no target
 #   removed          — (--remove only) the routing block was deleted
 #   not-present      — (--remove only) no routing block found; nothing to do
-#   no-target        — no Claude Code global dir found; nothing written
+#   no-target        — no global-instructions dir found; nothing written
 #
-# Target: $HOME/.claude/CLAUDE.md (the Claude Code global). If $HOME/.claude
-# does not exist (e.g. a Codex-only install), RESULT: no-target and nothing is
-# written — a Claude-only routing rule has no use there in v1.
-# Override the target with PLN_ROUTING_TARGET for testing.
+# Target and wording both follow the host this copy is installed under, derived
+# from the install path by bin/pln-host (each host gets its own clone):
+#
+#   claude → $HOME/.claude/CLAUDE.md      — routes via the Skill tool
+#   codex  → ${CODEX_HOME:-$HOME/.codex}/AGENTS.md — names the skill instead
+#
+# If the host's global dir does not exist, RESULT: no-target and nothing is
+# written. Override the target with PLN_ROUTING_TARGET and the host with
+# PLN_HOST for testing.
+#
+# The Codex block is deliberately terse: Codex inlines AGENTS.md in full on
+# every invocation (and truncates it at 32 KB), so this text is paid for on
+# every turn.
 set -euo pipefail
+
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 MODE="${1:-}"
 case "$MODE" in
@@ -39,26 +50,57 @@ case "$MODE" in
     cat >&2 <<'USAGE'
 Usage: pln-routing-rule <mode>
   --plan    preview the /pln-pr routing rule; never writes
-  --apply   append the routing rule to the Claude Code global (idempotent)
+  --apply   append the routing rule to the host's global instructions (idempotent)
   --offer   emit the one-time offer if not yet prompted
-  --remove  delete the routing rule from the Claude Code global (idempotent)
+  --remove  delete the routing rule from the host's global instructions (idempotent)
 An explicit mode is required; no other argument writes anything.
 USAGE
     exit 2
     ;;
 esac
 
-# Resolve the target global-instructions file (Claude Code only in v1).
+# Which host is this copy installed under? The install path answers it, so
+# there is nothing to ask and nothing for the host to cooperate on.
+HOST="$("$SELF_DIR/pln-host" 2>/dev/null || echo claude)"
+case "$HOST" in
+  claude | codex) ;;
+  *) HOST="claude" ;;
+esac
+
+# Resolve the target global-instructions file for that host.
 TARGET="${PLN_ROUTING_TARGET:-}"
 if [ -z "$TARGET" ]; then
-  if [ -d "$HOME/.claude" ]; then
-    TARGET="$HOME/.claude/CLAUDE.md"
-  fi
+  case "$HOST" in
+    codex)
+      # Codex reads $CODEX_HOME/AGENTS.md into every prompt (verified against
+      # `codex debug prompt-input`).
+      _CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+      if [ -d "$_CODEX_HOME" ]; then
+        TARGET="$_CODEX_HOME/AGENTS.md"
+      fi
+      ;;
+    *)
+      if [ -d "$HOME/.claude" ]; then
+        TARGET="$HOME/.claude/CLAUDE.md"
+      fi
+      ;;
+  esac
 fi
 
 MARKER="<!-- pln-pr-routing -->"
 END_MARKER="<!-- /pln-pr-routing -->"
 
+# The rule text is host-specific: Claude Code routes through the Skill tool,
+# Codex has no such tool and picks skills up by name.
+if [ "$HOST" = "codex" ]; then
+read -r -d '' BLOCK <<'EOF' || true
+<!-- pln-pr-routing -->
+## PR routing
+
+When the user asks to open, create, put up, or "ship" a pull request — including as one clause of a longer instruction like "bump the version and open the PR" — use the `pln-pr` skill rather than pushing and running `gh pr create` / `glab mr create` yourself. It reviews the branch, fixes what it finds, verifies once, then opens the PR. Honor an explicit "skip the review".
+<!-- /pln-pr-routing -->
+EOF
+else
 read -r -d '' BLOCK <<'EOF' || true
 <!-- pln-pr-routing -->
 ## PR routing
@@ -66,10 +108,11 @@ read -r -d '' BLOCK <<'EOF' || true
 When the user asks to open, create, put up, or "ship" a pull request — including when the request is embedded in a larger instruction like "bump the version and open the PR" or "push this up" — route through the `/pln-pr` skill (invoke it via the Skill tool). Do not push and run `gh pr create` / `glab mr create` directly. `/pln-pr` runs a fresh-context review army, fixes what it finds, verifies once, and opens the PR. Honor an explicit "skip the review" if the user says so.
 <!-- /pln-pr-routing -->
 EOF
+fi
 
 # --- helpers -----------------------------------------------------------------
 
-# has_target: a writable Claude Code global location is resolvable.
+# has_target: a writable global-instructions location is resolvable.
 has_target() {
   [ -n "$TARGET" ] && [ -d "$(dirname "$TARGET")" ]
 }
@@ -91,7 +134,6 @@ emit_plan() {
 # reimplementing the check. Emits the agent-directed offer block followed by the
 # --plan preview when the offer should fire; otherwise RESULT: skip.
 if [ "$MODE" = "--offer" ]; then
-  SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
   PROMPTED="$("$SELF_DIR/pln-config" get routing_prompted 2>/dev/null || true)"
 
   if [ "$PROMPTED" = "true" ] || rule_present || ! has_target; then

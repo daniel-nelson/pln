@@ -8,6 +8,16 @@
 - **Prefer capabilities every user already has:** the agent harness's own tools and standard OS commands. Reach for a third-party service only when it's optional and the user configures it themselves.
 - **Environment-specific behavior is opt-in and degrades gracefully.** Gate it behind a config key (the existing `notify` / `auto_upgrade` pattern), default to the universal behavior, and no-op cleanly when the dependency is absent — never error or block on something a general user doesn't have.
 
+## The skill files are generated — edit `src/`
+
+`SKILL.md` and `pln-pr/SKILL.md` are **build output**. What git tracks at those paths is a placeholder telling the reader to run `./setup`; `bin/pln-generate` overwrites them at install time with a build for the host it was installed under, so a model never reads instructions addressed to the other host.
+
+- Sources: `src/SKILL.core.md` and `src/pln-pr/SKILL.core.md` (host-neutral bodies), `src/hosts/<host>/*.md` (per-host fragments), `src/hosts/<host>/vars` (literal `{{KEY}}` substitutions).
+- Three directives, deliberately: `<!-- pln:include NAME -->`, `<!-- pln:only <host> -->` … `<!-- pln:endonly -->`, and `{{KEY}}`. If a change seems to need a fourth, that is a signal to move the passage into a fragment instead.
+- Never commit a generated `SKILL.md`. If one shows as modified, you ran `./setup` in a working clone — `bin/pln-generate --clean` puts the placeholders back.
+- Preview a build without touching the tree: `bin/pln-generate --host codex --out-dir /tmp/out`.
+- Anything host-specific you add must exist for both hosts. Text that is true on only one belongs in a `pln:only` block, not in the core.
+
 ## Releases
 
 Every PR that changes skill behavior must include both:
@@ -22,4 +32,12 @@ One open PR = one version. If scope grows mid-PR, bump the single version headin
 
 ## Testing
 
-Install the skill locally, restart Claude Code, and exercise the changed behavior manually before opening a PR. For `/pln`: run a multi-item task end-to-end. For `/plnify`: test against a CLAUDE.md that already has the sections (should bail) and one that doesn't (should write correctly). For `/pln-pr`: run `bash tests/routing-rule.sh` (must print `OK`) to check the `bin/pln-routing-rule` helper across all RESULT states, then manually exercise the install/offer path — trigger the offer via `setup` or `/pln-update` Step 2.5 and confirm it routes a PR request through the skill.
+Run every script in `tests/` before opening a PR — each needs only bash and git, no network, no Codex install, and none of them writes to the working tree. All three must print `OK`:
+
+- `bash tests/generate.sh` — `bin/pln-generate`: the three directives, the generated-by banner, `--list`, `--clean`, every error path, and the property the host seam rests on — each host's build carries its own mechanics and none of the other's, checked against the real `src/` as well as fixtures.
+- `bash tests/codex-agent.sh` — `bin/pln-codex-agent` against a fake `codex` on `PATH`: an empty result is a failure, the thread id comes out of the event stream, the brief travels on stdin, and `resume` is never handed the flags it rejects.
+- `bash tests/routing-rule.sh` — `bin/pln-routing-rule` across all RESULT states, plus per-host target resolution and wording.
+
+Then install the skill locally, restart the agent, and exercise the changed behavior manually. For `/pln`: run a multi-item task end-to-end. For `/plnify`: test against a CLAUDE.md that already has the sections (should bail) and one that doesn't (should write correctly). For `/pln-pr`: exercise the routing-rule install/offer path — trigger the offer via `setup` or `/pln-update` Step 2.5 and confirm it routes a PR request through the skill.
+
+A change under `src/` is not exercised until it is built. Preview both hosts with `bin/pln-generate --host claude --out-dir /tmp/pln-claude` and `--host codex --out-dir /tmp/pln-codex` and read the host you changed; `./setup` builds in place for the host you are installed under.

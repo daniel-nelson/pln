@@ -136,7 +136,8 @@ instructions fixes that. This is opt-in: offer it once, never write without a ye
 
 This is opt-in and one-time. The `pln-routing-rule --offer` helper owns the
 whole gate — it checks `routing_prompted`, whether the rule is already present,
-and whether a Claude Code global target exists, and only emits the offer when all
+and whether this host's global-instructions file exists (`~/.claude/CLAUDE.md` on
+Claude Code, `$CODEX_HOME/AGENTS.md` on Codex), and only emits the offer when all
 three say go. Just locate the helper and relay its output:
 
 ```bash
@@ -157,7 +158,8 @@ fi
 Read the `RESULT` line from the `--offer` output:
 
 - `NO_ROUTING_SCRIPT` or `RESULT: skip` — nothing to do (offered before, already
-  present, or no Claude Code target); move on to Step 3 silently.
+  present, or no global-instructions target on this host); move on to Step 3
+  silently.
 - `RESULT: offer` — the emitted block is agent-directed and self-contained: it
   includes the previewed rule and the exact `--apply` / `pln-config set
   routing_prompted true` commands to run on yes vs. no. **Ask the user** whether

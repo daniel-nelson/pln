@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+# pln-codex-agent — spawn one fresh-context Codex agent and hand back its result.
+#
+# Codex has no harness-run script to hold pln's per-item loop, so on that host
+# the orchestrator drives the loop itself and spawns one `codex exec` per item.
+# Every one of those spawns needs the same handful of guards, and each of them
+# exists because its absence fails *silently*:
+#
+#   - stdin is always redirected. A non-TTY `codex exec` with a dangling stdin
+#     can wait forever (openai/codex#20919, #27019). The prompt arrives on
+#     stdin here, which both feeds the agent and guarantees an EOF.
+#   - the run is wrapped in a timeout. There is no built-in one. `timeout`
+#     without `--foreground` puts the child in its own process group, so the
+#     signal reaches the whole tree rather than just the parent.
+#   - the result is the output file, never the exit code. An exec can exit 0
+#     having written nothing at all (openai/codex#19945); an empty file is a
+#     failure, not an agent that found nothing to do.
+#   - OPENAI_API_KEY is unset for the child. A stray key silently overrides the
+#     CLI's OAuth session and the call dies with a misleading 401
+#     (openai/codex#15151).
+#   - the thread id is read out of the event stream, so a blocked item can be
+#     resumed by id. `resume --last` races with any other Codex process.
+#   - stdout/stderr go to a file. The event stream is the agent's reasoning
+#     trace, and keeping it out of the caller's context is the point of
+#     spawning an agent in the first place.
+#
+# Putting them in a script rather than in prose is deliberate: an orchestrator
+# that has to remember six guards per spawn will eventually forget one, and
+# every one of them fails quietly when forgotten.
+#
+# Usage:
+#   pln-codex-agent --brief <file> --out <file> [options]
+#
+#   --brief FILE     the agent's entire prompt. Read from the file, never from
+#                    argv, so a brief with quotes/backticks/$ needs no escaping.
+#   --out FILE       where the agent's final message is written.
+#   --events FILE    JSONL event log (default: <out>.events).
+#   --cd DIR         the agent's working root (default: the git top level, else
+#                    the current directory). Ignored when resuming.
+#   --add-dir DIR    an extra writable directory, repeatable — e.g. a plan dir
+#                    outside the repo. Ignored when resuming.
+#   --sandbox MODE   read-only | workspace-write (default: workspace-write).
+#                    Ignored when resuming: a resumed thread keeps its own.
+#   --timeout SECS   ceiling on a hung run (default 3600; 0 disables).
+#   --resume ID      continue thread ID instead of starting a new session. An
+#                    empty ID is a usage error, never a silent fresh session.
+#   --model NAME     override the model for this spawn.
+#   --dry-run        print the command that would run and exit 0.
+#
+# Prints exactly four KEY=VALUE lines on stdout and nothing else:
+#
+#   STATUS=ok|empty|timeout|error
+#   THREAD_ID=<id, or empty if the run never got that far>
+#   RESULT_FILE=<path>
+#   EVENTS_FILE=<path>
+#
+# Exit codes: 0 the agent ran and wrote a result · 2 usage error · 3 the Codex
+# CLI is not installed · 4 the run failed (timed out, exited non-zero, or wrote
+# an empty result).
+set -uo pipefail
+
+BRIEF=""
+OUT=""
+EVENTS=""
+CD_DIR=""
+SANDBOX="workspace-write"
+TIMEOUT_SECS="3600"
+RESUME_ID=""
+RESUME_GIVEN=0
+MODEL=""
+DRY_RUN=0
+ADD_DIRS=()
+
+usage() {
+  cat >&2 <<'USAGE'
+Usage: pln-codex-agent --brief <file> --out <file> [options]
+
+  --brief FILE     the agent's entire prompt (required)
+  --out FILE       where its final message is written (required)
+  --events FILE    JSONL event log (default: <out>.events)
+  --cd DIR         working root (default: git top level, else PWD)
+  --add-dir DIR    extra writable directory (repeatable)
+  --sandbox MODE   read-only | workspace-write (default: workspace-write)
+  --timeout SECS   ceiling on a hung run (default 3600; 0 disables)
+  --resume ID      continue an existing thread instead of starting one
+  --model NAME     model override
+  --dry-run        print the command and exit
+USAGE
+  exit 2
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --brief) BRIEF="${2:-}"; shift 2 ;;
+    --out) OUT="${2:-}"; shift 2 ;;
+    --events) EVENTS="${2:-}"; shift 2 ;;
+    --cd) CD_DIR="${2:-}"; shift 2 ;;
+    --add-dir) ADD_DIRS+=("${2:-}"); shift 2 ;;
+    --sandbox) SANDBOX="${2:-}"; shift 2 ;;
+    --timeout) TIMEOUT_SECS="${2:-}"; shift 2 ;;
+    --resume) RESUME_ID="${2:-}"; RESUME_GIVEN=1; shift 2 ;;
+    --model) MODEL="${2:-}"; shift 2 ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    -h | --help) usage ;;
+    *) echo "pln-codex-agent: unknown argument '$1'" >&2; usage ;;
+  esac
+done
+
+[ -n "$BRIEF" ] && [ -n "$OUT" ] || usage
+[ -f "$BRIEF" ] || { echo "pln-codex-agent: no brief file at '$BRIEF'" >&2; exit 2; }
+[ -s "$BRIEF" ] || { echo "pln-codex-agent: brief file '$BRIEF' is empty" >&2; exit 2; }
+case "$SANDBOX" in
+  read-only | workspace-write) ;;
+  *) echo "pln-codex-agent: --sandbox must be read-only or workspace-write" >&2; exit 2 ;;
+esac
+case "$TIMEOUT_SECS" in
+  '' | *[!0-9]*) echo "pln-codex-agent: --timeout must be a whole number of seconds" >&2; exit 2 ;;
+esac
+# `--resume ""` — a caller passing a thread id it never captured. Silently
+# starting a fresh session there is the worst answer available: the resume brief
+# says "here is the answer, carry on", and an agent with no memory of the first
+# attempt would redo work that is already in the tree. Fail instead, so the
+# caller takes the fallback path deliberately (fresh agent, handoff file, diff).
+if [ "$RESUME_GIVEN" = "1" ] && [ -z "$RESUME_ID" ]; then
+  echo "pln-codex-agent: --resume was given an empty thread id — spawn a fresh agent instead." >&2
+  exit 2
+fi
+
+command -v codex >/dev/null 2>&1 || {
+  echo "pln-codex-agent: the Codex CLI is not on PATH — cannot spawn an agent." >&2
+  exit 3
+}
+
+[ -n "$EVENTS" ] || EVENTS="$OUT.events"
+for f in "$OUT" "$EVENTS"; do
+  d="$(dirname "$f")"
+  [ -d "$d" ] || mkdir -p "$d" || { echo "pln-codex-agent: cannot create '$d'" >&2; exit 2; }
+done
+# A stale result from a previous spawn must never be mistaken for this one's.
+: > "$OUT" || { echo "pln-codex-agent: cannot write '$OUT'" >&2; exit 2; }
+: > "$EVENTS" || { echo "pln-codex-agent: cannot write '$EVENTS'" >&2; exit 2; }
+
+if [ -z "$CD_DIR" ]; then
+  CD_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+fi
+
+# macOS ships no timeout(1); coreutils installs it as gtimeout. Without either,
+# run unwrapped rather than refusing to run — a missing optional tool must not
+# be the thing that stops a plan. The caller is told so it can watch the run.
+TIMEOUT_CMD=()
+if [ "$TIMEOUT_SECS" != "0" ]; then
+  if command -v timeout >/dev/null 2>&1; then
+    TIMEOUT_CMD=(timeout -k 10 "$TIMEOUT_SECS")
+  elif command -v gtimeout >/dev/null 2>&1; then
+    TIMEOUT_CMD=(gtimeout -k 10 "$TIMEOUT_SECS")
+  else
+    echo "pln-codex-agent: no timeout(1) or gtimeout(1) on PATH — running without a time ceiling." >&2
+  fi
+fi
+
+# `codex exec resume` takes none of the session-shaping flags: no --sandbox, no
+# -C, no --add-dir. A resumed thread keeps the settings it started with.
+CMD=(env -u OPENAI_API_KEY "${TIMEOUT_CMD[@]}" codex exec)
+if [ -n "$RESUME_ID" ]; then
+  CMD+=(resume "$RESUME_ID")
+else
+  CMD+=(-C "$CD_DIR" -s "$SANDBOX")
+  for d in ${ADD_DIRS+"${ADD_DIRS[@]}"}; do
+    [ -n "$d" ] && CMD+=(--add-dir "$d")
+  done
+fi
+[ -n "$MODEL" ] && CMD+=(-m "$MODEL")
+# `-` is the prompt: read it from stdin. Keeps arbitrary text out of argv.
+CMD+=(--json -o "$OUT" -)
+
+if [ "$DRY_RUN" = "1" ]; then
+  printf '%q ' "${CMD[@]}" >&2
+  printf '< %q > %q 2>&1\n' "$BRIEF" "$EVENTS" >&2
+  echo "STATUS=ok"
+  echo "THREAD_ID="
+  echo "RESULT_FILE=$OUT"
+  echo "EVENTS_FILE=$EVENTS"
+  exit 0
+fi
+
+rc=0
+"${CMD[@]}" < "$BRIEF" > "$EVENTS" 2>&1 || rc=$?
+
+# First thread.started event wins. Never `resume --last`, which races with any
+# other Codex process on the machine.
+THREAD_ID="$(grep -m1 -o '"thread_id":"[^"]*"' "$EVENTS" 2>/dev/null | cut -d'"' -f4 || true)"
+
+STATUS="ok"
+EXIT=0
+if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+  STATUS="timeout"
+  EXIT=4
+  echo "pln-codex-agent: the agent hit the ${TIMEOUT_SECS}s ceiling and was killed." >&2
+elif [ "$rc" -ne 0 ]; then
+  STATUS="error"
+  EXIT=4
+  echo "pln-codex-agent: codex exited $rc — see $EVENTS." >&2
+elif [ ! -s "$OUT" ]; then
+  # Exit 0 with nothing written. Reporting this as success is the failure mode
+  # that looks most like "the agent had nothing to do".
+  STATUS="empty"
+  EXIT=4
+  echo "pln-codex-agent: codex exited 0 but wrote no result — treat as a failed run, not an empty one." >&2
+fi
+
+echo "STATUS=$STATUS"
+echo "THREAD_ID=$THREAD_ID"
+echo "RESULT_FILE=$OUT"
+echo "EVENTS_FILE=$EVENTS"
+exit "$EXIT"

@@ -181,6 +181,10 @@ while IFS= read -r dir; do
 
   status=""
   if $is_git; then
+    # The skill files are generated at install time, so every install has them
+    # modified against HEAD. Put them back first, or the stash below fires on
+    # every single upgrade and reports the user's copy as "stashed".
+    [ -x "$dir/bin/pln-generate" ] && "$dir/bin/pln-generate" --clean >/dev/null 2>&1
     stash_out="$(git -C "$dir" stash 2>&1)"
     if git -C "$dir" fetch origin >/dev/null 2>&1 &&
        git -C "$dir" reset --hard origin/main >/dev/null 2>&1; then

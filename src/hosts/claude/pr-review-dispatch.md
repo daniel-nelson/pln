@@ -1,0 +1,1 @@
+Otherwise dispatch the full army as **one Workflow script** that runs all reviewers in parallel (`parallel()` over the briefs), each a fresh `general-purpose` subagent with the findings schema below. Six lenses plus one adversarial generalist:

@@ -347,7 +347,7 @@ Do not enter Step 5 without an explicit adoption signal.
 5. Before returning, update item N's section in `PLAN.md`: status ✅ done, commit hash, dead ends hit, artifacts produced, any discoveries.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-5. Before returning, update item N's section in `PLAN.md`: status ✅ done, dead ends hit, artifacts produced, any discoveries. Leave the commit hash out — the orchestrator commits and fills it in.
+5. Before returning, update item N's section in `PLAN.md`: status ✅ done, dead ends hit, artifacts produced, any discoveries. Leave the commit hash out — the orchestrator commits and fills it in. Then keep the final message itself to a few lines: what changed, which files should be committed, and anything the next item needs. That message is the only thing that reaches the orchestrator; everything else you have to say belongs in `PLAN.md`.
 <!-- pln:endonly -->
 6. Capture memories the moment they surface, per the standard memory rules. (Include the Dream/Psychic learning-capture instruction here only when pre-flight detected both `RECORD_PSYCHIC_LEARNINGS` and Dream/Psychic context.)
 7. If you hit a blocker threshold (see Cross-cutting concerns), stop and follow the handoff protocol instead of improvising.
@@ -551,7 +551,9 @@ Each item section must be self-contained: a blank-context subagent reading only 
 - **Reading `args` as an object without parsing it first** — inside a Workflow script, `args` arrives as a JSON string regardless of how it was passed to the tool. Code that reads a field off it directly gets `undefined` silently; `JSON.parse(args)` first.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-- **Treating a spawned agent's exit code as the result** — a `codex exec` call can exit 0 having written nothing. The result is the output file's contents, and an empty one is a failure, not a silent success. See Spawning a fresh-context agent for the checks every spawn needs.
+- **Treating an empty spawn result as an item with nothing to do** — a `codex exec` call can exit 0 having written nothing at all. The result is the output file's contents; when it is empty the run failed, and the loop stops rather than marking the item done. `pln-codex-agent` reports that case as `STATUS=empty` and exits non-zero precisely so it can't be read as success — see Spawning a fresh-context agent.
+- **Putting the brief on the command line** — a subagent brief is a page of markdown with backticks, quotes and `$` in it. Write it to a file and pass `--brief`; hand-escaping it into an argument is how a spawn ends up running a silently truncated prompt.
+- **Reading the events file into the orchestrator's context** — that file is the agent's whole reasoning trace, and keeping it out of your context is the reason for spawning an agent at all. Read the result file. Open the events file only for a post-mortem on a failed run.
 <!-- pln:endonly -->
 - **Using `<recommended>` (angle brackets) instead of `[recommended]` (square brackets)** — angle brackets get eaten by the renderer.
 - **Treating an item-scoped drop/abandon as ending the whole session** — when "drop", "abandon", "forget it", or similar arrives in answer to a question about one item, it scopes to that item: mark it 🚫 dropped and move to the next. Tearing down the entire interview on a one-word reply discards every answer gathered so far and is expensive to re-establish. Only an unambiguous whole-session signal ends the interview; when unsure, ask one clarifying question instead of exiting.

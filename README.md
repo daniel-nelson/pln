@@ -86,14 +86,14 @@ cd ~/.agents/skills/pln && git fetch origin && git reset --hard origin/main && .
 
 ## Notifications
 
-An implementation run can take a while, and you'll often step away from it. pln notifies you at the three moments it needs you back — an interview question is waiting, a subagent is blocked on a decision, or the plan finished — over two independent channels, both on by default:
+An implementation run can take a while, and you'll often step away from it. pln notifies you at the three moments it needs you back — an interview question is waiting, a subagent is blocked on a decision, or the plan finished — over these channels, all on by default:
 
-- **Phone push** — through your agent's own notification (no account or third-party service). Reaches your phone when you're away and stays quiet when you're watching the terminal.
-- **Local desktop notification** — a native macOS or Linux notification, so you're notified when you're at the computer, where the phone push stays silent.
+- **Phone push** (Claude Code only) — through your agent's own notification (no account or third-party service). Reaches your phone when you're away and stays quiet when you're watching the terminal. Codex has no equivalent a skill can fire at a chosen moment — its `notify` hook is user-configured and fires on turn completion — so on Codex the desktop notification is the whole story.
+- **Local desktop notification** — a native macOS or Linux notification, so you're notified when you're at the computer, where the phone push stays silent. Works on both hosts.
 
 Each toggles independently in `~/.pln/config.yaml`:
 
-- `notify_push: false` — turn off the phone push.
+- `notify_push: false` — turn off the phone push. Claude Code only; ignored on Codex.
 - `notify_desktop: false` — turn off the local desktop notification.
 - `notify_desktop_persist: true` — make the desktop notification stay on screen until you dismiss it, instead of vanishing on its own (handy if you tend to miss auto-disappearing banners).
 

@@ -4,9 +4,10 @@
 # Usage:
 #   pln-notify-desktop "<message>"
 #
-# This is the local half of pln's notifications; the phone-push half is the
-# harness `PushNotification` tool, called by the model. This script self-gates,
-# so a call site can invoke it unconditionally — it decides whether to fire.
+# This is the local half of pln's notifications, and the only half that exists
+# on every host: the phone-push half is Claude Code's `PushNotification` tool,
+# which Codex has no ad-hoc equivalent of. This script self-gates, so a call
+# site can invoke it unconditionally — it decides whether to fire.
 #
 # Config keys (via pln-config, in ~/.pln/config.yaml):
 #   notify_desktop          — "false" disables desktop notifications. Default: on.

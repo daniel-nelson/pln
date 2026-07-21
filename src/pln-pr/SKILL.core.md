@@ -280,7 +280,7 @@ Detect whether a PR already exists for this branch and **update instead of recre
 
 Clean up: `rm -f "$BODY_FILE"`.
 
-Fire completion notifications first (push + desktop), summarizing the outcome (e.g. "pln-pr: PR open, 12 findings fixed, gauntlet green"). Then give the user the PR URL and a one-line summary. Mention `REVIEW.md`'s path.
+Fire completion notifications first ({{NOTIFY_CALL}}), summarizing the outcome (e.g. "pln-pr: PR open, 12 findings fixed, gauntlet green"). Then give the user the PR URL and a one-line summary. Mention `REVIEW.md`'s path.
 
 <!-- pln:only claude -->
 Optionally offer to watch CI (`gh pr checks --watch` via a background command or the Monitor tool) — only if the user wants it; don't start it unprompted.

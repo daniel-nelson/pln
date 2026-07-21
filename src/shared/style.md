@@ -48,6 +48,22 @@ In all three:
 - Cut any paragraph whose only work is establishing that the problem is real. The user asked for this; they already believe there is a problem. Evidence that changes which answer wins stays, however long it runs. There is no word limit here, and holding information back is not the point.
 - Name a prior conclusion in a clause so the user never has to scroll up to answer. Don't re-derive the argument for it; naming it is the whole job.
 
+### Ending a message
+
+The three shapes above are the interview's messages. Every other message the skill sends — a progress note while it works, a report that an item is done, a wrap-up — ends with a single closing line, or with none:
+
+- `DECIDE:` — one question, on one line.
+- `DO:` — one action, on one line.
+- `HEADS-UP:` — one line, and only for something the user would regret not knowing.
+
+One closing line at most, and none when nothing is needed.
+
+Above it goes a work-completed line: one to three lines saying what was done. Skip it when nothing was done.
+
+An option, binary or finding message takes none of this. It is already the ask, and a closing label on top would be a second name for the same thing.
+
+The work-completed line does not summarize the diff. It says what was done and stops: no walking the changes, no listing files the commit already lists.
+
 ### Naming things the user reads
 
 Say what a thing is, not the handle that points at it. An item number, decision number, question number, line number or commit hash is an address into a file the user does not have open, so it never stands alone as the name for something. Pair it with the thing, as in "item 7, option descriptions", or leave it out.

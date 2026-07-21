@@ -10,8 +10,9 @@
 # Two halves:
 #
 #   1. Fixtures. A throwaway repo with its own src/ tree exercises the three
-#      directives, the generated-by banner, nested targets, --list, --clean, and
-#      every error path, without depending on the real skill text.
+#      directives, the src/shared/ fallback for an include, the generated-by
+#      banner, nested targets, --list, --clean, and every error path, without
+#      depending on the real skill text.
 #   2. The real sources. Both hosts are generated into temp dirs and grepped for
 #      the other host's mechanics, for leftover directives, and for the
 #      placeholder text that means nothing was built.
@@ -50,6 +51,13 @@ new_repo "$R"
 printf 'Claude greeting fragment.\nIt calls {{TOOL}}.\n' > "$R/src/hosts/claude/greeting.md"
 printf 'Codex greeting fragment.\nIt calls {{TOOL}}.\n' > "$R/src/hosts/codex/greeting.md"
 
+# src/shared/ holds a fragment whose text is the same on both hosts, so a
+# passage two skills share lives in one file. A same-named host fragment wins:
+# `greeting` below exists in both places and only the host copy may appear.
+mkdir -p "$R/src/shared"
+printf 'Shared farewell fragment.\nIt also calls {{TOOL}}.\n' > "$R/src/shared/farewell.md"
+printf 'Shared greeting fragment — must never win.\n' > "$R/src/shared/greeting.md"
+
 cat > "$R/src/SKILL.core.md" <<'CORE'
 ---
 name: fixture
@@ -58,6 +66,8 @@ name: fixture
 # Fixture skill
 
 <!-- pln:include greeting -->
+
+<!-- pln:include farewell -->
 
 <!-- pln:only claude -->
 Claude-only body: spawn the item agent with the Workflow tool.
@@ -91,6 +101,9 @@ has "$f" 'It calls Workflow.' "{{TOOL}} was not substituted inside a fragment"
 has "$f" 'Claude-only body' "claude build lost its pln:only block"
 has "$f" 'Shared tail' "claude build lost the shared body"
 has "$f" 'an ampersand that stays & literal' "a & in a vars value was mangled"
+has "$f" 'Shared farewell fragment.' "the shared fragment did not resolve for claude"
+has "$f" 'It also calls Workflow.' "{{TOOL}} was not substituted inside a shared fragment"
+hasnt "$f" 'must never win' "a shared fragment beat the claude fragment of the same name"
 hasnt "$f" 'Codex greeting fragment.' "the codex fragment leaked into the claude build"
 hasnt "$f" 'Codex-only body' "the codex pln:only block leaked into the claude build"
 hasnt "$f" 'pln-codex-agent' "codex mechanics leaked into the claude build"
@@ -103,6 +116,9 @@ has "$f" 'Codex greeting fragment.' "codex build lost its fragment"
 has "$f" 'It calls codex exec.' "{{TOOL}} was not substituted for codex"
 has "$f" 'Codex-only body' "codex build lost its pln:only block"
 has "$f" 'Shared tail' "codex build lost the shared body"
+has "$f" 'Shared farewell fragment.' "the shared fragment did not resolve for codex"
+has "$f" 'It also calls codex exec.' "{{TOOL}} was not substituted inside a shared fragment"
+hasnt "$f" 'must never win' "a shared fragment beat the codex fragment of the same name"
 hasnt "$f" 'Claude greeting fragment.' "the claude fragment leaked into the codex build"
 hasnt "$f" 'Claude-only body' "the claude pln:only block leaked into the codex build"
 hasnt "$f" 'Workflow' "claude mechanics leaked into the codex build"
@@ -156,6 +172,18 @@ name: x
 CORE
 )"
 expect_fail "$d" "an include of a fragment that does not exist" --host codex --out-dir "$d"
+
+# A name absent from both folders fails loudly, and the message names both, so
+# the reader knows the shared fallback was tried too.
+err="$("$d/bin/pln-generate" --host codex --out-dir "$d" 2>&1 >/dev/null || true)"
+case "$err" in
+  *"src/hosts/codex"*) ;;
+  *) fail "the missing-fragment error does not name the host folder: $err" ;;
+esac
+case "$err" in
+  *"src/shared"*) ;;
+  *) fail "the missing-fragment error does not name the shared folder: $err" ;;
+esac
 
 d="$(bad_repo unclosed <<'CORE'
 ---
@@ -290,6 +318,16 @@ done <<< "$targets"
 # checks above would pass on an empty file.
 has "$real_c/SKILL.md" 'Workflow' "the claude build has no Workflow mechanics"
 has "$real_x/SKILL.md" 'pln-codex-agent' "the codex build has no Codex agent mechanics"
+
+# The Style section is one shared source read by both skills. Every build of
+# both targets carries it whole, host voice fragment included — a rule added to
+# it must never reach one skill and not the other.
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" '## Style' "$f carries no Style section"
+  has "$f" '### Message shape' "$f lost the shared message shapes"
+  has "$f" '### Conversational voice' "$f lost the host voice fragment inside Style"
+  has "$f" '### Echoing recorded decisions' "$f lost the shared formatting rules"
+done
 
 # ─── and nothing above touched the working tree ───────────────────────────────
 if [ -d "$REPO_DIR/.git" ]; then

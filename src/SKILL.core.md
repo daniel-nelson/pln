@@ -66,7 +66,7 @@ Cancelling a booking leaves the guest's payment alone, so every refund is issued
 
 a) **[recommended] Refund on cancel** — the cancel action issues the refund and marks the payment refunded.
 b) **Flag for review** — the cancel action marks the payment for a person to refund.
-c) **Leave it** — cancelling touches the booking only; refunds stay a separate action.
+c) **Leave it** — the cancel action touches the booking only, and refunds stay a separate step.
 
 The payment provider's refund call is idempotent, so (a) is safe to retry, but the money is gone once it fires. (b) keeps a person in the loop and needs a review queue nobody owns yet.
 ```
@@ -108,7 +108,7 @@ These rules govern the skill's prose: its questions, reactions, reasoning, and s
 - Don't label importance; give the reason instead. Drop "load-bearing", "the crux", "crucial", "exactly right", "the whole ballgame", "here's the thing". State why something matters in a plain clause.
 - Don't pre-label your own point or question as significant ("it's a real fork", "the genuinely interesting question", "this is the important one", "a real tension"), and don't announce the speech act before performing it ("the question I'd put on this is", "here's my question"). Just make the point or ask the question and let it stand. This is the same importance-labeling tic as the rule above, applied to your own move; a blocklist won't catch the variants, so watch for the pattern.
 - Cut evaluative adverbs that praise the outcome ("cleanly", "elegantly", "nicely", "neatly", "seamlessly", "perfectly"). State what happened and stop: "That settles the session lifecycle", not "...cleanly". Adverbs that carry real meaning ("only", "roughly", "never") are fine; the target is self-congratulatory manner.
-- Skip jargon and strained metaphors; use the plain word. "load-bearing", "the rule that would bite", "moves the needle", "table stakes", "the real lever", "first-class" dress a plain idea in tech-bro costume. Say "important", "what everything depends on", "the rule that would work". Test: would you use the word talking to a friend who isn't an engineer? If not, replace it. A word list won't keep up; watch for the reach-for-a-metaphor reflex.
+- Skip jargon and strained metaphors; use the plain word. "load-bearing", "the rule that would bite", "moves the needle", "table stakes", "the real lever", "first-class" dress a plain idea in tech-bro costume. Say "important", "what everything depends on", "the rule that would work". A multi-word noun phrase you assembled yourself to be precise counts as jargon too: "assertive grammar and no payload", "a significance claim". Test: would you use the word or phrase talking to a friend who isn't an engineer? If not, replace it. A word list won't keep up; watch for the reach-for-a-metaphor reflex.
 - State a claim once. Don't restate it louder, and don't frame it as "not just X, it's Y". Make the positive claim directly.
 - No agreement-amplifier openers ("Right —", "Agreed —", "Good catch"). Disagree plainly and give the reason. Keep the pushback; drop the performance.
 - Don't restate the user's point back before responding. (The one-line decision echo below is different: it's a functional check against misrecording, not rhetorical restatement.) Add your part.
@@ -178,8 +178,10 @@ When does verification run?
 
 a) **Lightweight per-item, full at end** — type-check / lint after each item, specs only at task completion.
 b) **Full only at end** — no per-item checks, single gauntlet at task end.
-c) **Full only at end + on-demand mid-stream** — same as (b) plus user can request "run the gauntlet now" any time.
+c) **Full at end, plus on demand** — no per-item checks, single gauntlet at task end, runnable any time on request.
 ```
+
+Every description answers the same questions in the same order. Above, that is what happens per item and then what happens at the end. Parallel shape, not parallel length: say the shortest true thing about each option and don't pad one to match another.
 
 ### Recommended option marker
 
@@ -191,6 +193,8 @@ b) **Lightweight per-item, full at end** — type-check / lint after each item, 
 ```
 
 Exactly one space after `a)`, `b)`, `c)`. The `[recommended] ` prefix lives inside the bold span. Never break alignment by varying the post-paren whitespace.
+
+The recommended option's description says what that option does, like every other option, and gets no extra words for being recommended. Nothing after the list restates which one you picked.
 
 ### Binary "adopt as written / change?" questions
 
@@ -206,7 +210,7 @@ The visual distinction must be obvious at a glance. Don't mix styles within a si
 
 ### Echoing recorded decisions
 
-Before asking the next question, echo back what was just recorded in **one short line**. Lets the user catch a misrecorded answer immediately. Examples:
+Before asking the next question, echo back what was just recorded in **one short line**. Lets the user catch a misrecorded answer immediately. The line carries the answer and nothing else: not why it was chosen, not what it changes, not a lead-in to the next question. Examples:
 
 - *"Q5 recorded: mix-conditional question style; never AskUserQuestion."*
 - *"Q12b recorded: lightweight per-item plus full gauntlet at end."*

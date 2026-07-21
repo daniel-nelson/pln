@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.17.0 — 2026-07-21
+
+### Removed
+
+- **`/plnify` is gone.** Its only job was to copy pln's interaction rules into a user's global `~/.claude/CLAUDE.md`, so sessions that weren't running `/pln` would pick them up — the one thing pln did that a session without pln loaded could see. Writing to a user's global instructions is an antipattern for a shipped skill, and the sessions it was for are ones the user said they don't care about. pln now writes nothing outside its own directory, `~/.pln/config.yaml`, and the `plans/` folder in your own repo. Removing it does not undo a past run: if you ever ran `/plnify gstack`, open `~/.claude/CLAUDE.md` and delete the sections it appended — `## Interaction rules (override active skills)`, `## Exploratory mode (override active skills)`, and `## Plain voice (override active skills)`.
+- **The opt-in PR-routing rule is gone**, along with the helper that installed it (`bin/pln-routing-rule`), the one-time offer in `setup` and in `/pln-update`, and `tests/routing-rule.sh`. Same reason: it was the other thing pln wrote into your global instructions. If you accepted the offer under 1.14.0–1.16.0, it left a marked block behind that stays until you remove it — delete the lines from `<!-- pln-pr-routing -->` through `<!-- /pln-pr-routing -->` inclusive, in `~/.claude/CLAUDE.md` on Claude Code or `$CODEX_HOME/AGENTS.md` on Codex. The `routing_prompted` marker in `~/.pln/config.yaml` is now vestigial and harmless.
+
+### Changed
+
+- **`/pln` hands off to `/pln-pr` at the end of its own workflow.** The routing the deleted global rule used to buy now lives where it works for the sessions you actually run. A new final step treats shipping as invoking `/pln-pr`, so a PR ask anywhere in the run — including one folded into a larger instruction like "bump the version and open the PR" — routes through the review army instead of a bare `git push` and `gh pr create`. It asks once, at the end of the run, before shipping; it is skipped when nothing is ahead of the base branch or when you already said where the run ends, and it still honors an explicit "skip the review". Claude Code invokes the skill through the Skill tool; Codex reads `pln-pr/SKILL.md` by name.
+- **`/pln` and `/pln-pr` share one Style section.** Both skills now read the same style rules from a single source (`bin/pln-generate` gained a `src/shared/` fallback for `pln:include`), so a rule added once reaches both. This also retires a reference in `/pln-pr` to "the recommended-option format from the user's global config" — a pointer that dangled the moment the global file was empty and that removing `/plnify` would have broken for good.
+
+### Added
+
+- **Two Style rules for how a message ends, now shared by both skills.** Every message that isn't one of the three interview shapes closes with at most one line — `DECIDE:` (one question), `DO:` (one action), or `HEADS-UP:` (something you would regret not knowing) — or nothing at all. A brief work-completed line sits above it, says what was done and stops, and is skipped when nothing was done. On Claude Code a further rule holds or drops a fact that has no bearing on what you do next. All three come from sections the user had written for their own global instructions before pln existed; folding them into the skill is part of what let the global file go away.
+
 ## 1.16.0 — 2026-07-21
 
 ### Changed

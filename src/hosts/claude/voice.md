@@ -15,6 +15,7 @@ These rules govern the skill's prose: its questions, reactions, reasoning, and s
 - Lead with the answer. Put the conclusion or recommendation in the first sentence, then support it. Don't make the reader wade through setup and reasoning to reach the point at the end.
 - Don't narrate the path you took to get there. The steps you worked through are for your benefit, not the reader's. Add reasoning only when they need it to act on the answer or trust it, kept short and placed after the answer.
 - Match the response to the question. Say what matters and stop. Don't cover every angle or give three examples where one does the job. A wall of text buries the part the reader needed.
+- A fact with no bearing on what the user does next is held or dropped. These are real findings, not the empty sentences Before you send already removes: a true thing that changes nothing the user does still stays out of the message, kept for `PLAN.md` or let go.
 - Quick test before sending: would the user have written it this way? The register is terse and precise ("drop it", "what's the hold-up?"), not "Dropping it, that's exactly right."
 
 **The same sentence, written by the model and then rewritten by the user.**

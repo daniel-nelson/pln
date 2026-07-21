@@ -49,157 +49,11 @@ If the user gives a single small task, don't engage; just do the work. The skill
 - **When notifications are on, fire them before writing the user-facing text, not after.** At each of the three notify moments (interview question, blocker, completion), {{NOTIFY_CALL}} (it self-gates) in the same turn, before producing the message the user reads. This is not a "when convenient" aside: asking the model to fire a notification *after* it has already written the text is the exact wording that made an earlier version fail — the trailing tool call gets dropped mid-turn. Fire first, then write.
 <!-- pln:endonly -->
 
-## Style
-
-All rules in this section apply to every message the skill produces.
-
-### Message shape
-
-Every question you put to the user, and every reaction or finding you report, takes one of three shapes. The first line says what the message is, so the user knows from that line alone what it wants from them. Whichever shape, the message has to be answerable by someone with no memory of the conversation.
-
-**Option message** — echo line, one sentence naming what is being decided, the options, then the evidence.
-
-```
-Recorded: soft-delete on cancel, no cascade.
-
-Cancelling a booking leaves the guest's payment alone, so every refund is issued by hand. What should cancelling do to the payment?
-
-a) **[recommended] Refund on cancel** — the cancel action issues the refund and marks the payment refunded.
-b) **Flag for review** — the cancel action marks the payment for a person to refund.
-c) **Leave it** — the cancel action touches the booking only, and refunds stay a separate step.
-
-The payment provider's refund call is idempotent, so (a) is safe to retry, but the money is gone once it fires. (b) keeps a person in the loop and needs a review queue nobody owns yet.
-```
-
-**Binary message** — echo line, one sentence naming what is being decided, the question in plain prose, then the evidence.
-
-```
-Recorded: refund on cancel.
-
-The cancel action will issue the refund itself, with no review step in between.
-
-Adopt that as written, or change it?
-
-It gives up the human check before money moves. Every other route needed a review queue, and nothing in this plan creates one.
-```
-
-**Reaction or finding** — one sentence stating the finding, then the evidence, then the question if there is one.
-
-```
-Cancelling already writes a `cancelled_at` timestamp, so the soft-delete we settled on is a rename rather than a new column.
-
-The column is nullable and indexed, and three queries filter on it being null.
-
-Rename it, or leave the name and have the new code read `cancelled_at`?
-```
-
-In all three:
-
-- The sentence naming the decision says what happens now and what should happen instead, in words someone who has never read the plan would use.
-- Cut any paragraph whose only work is establishing that the problem is real. The user asked for this; they already believe there is a problem. Evidence that changes which answer wins stays, however long it runs. There is no word limit here, and holding information back is not the point.
-- Name a prior conclusion in a clause so the user never has to scroll up to answer. Don't re-derive the argument for it; naming it is the whole job.
-
-### Naming things the user reads
-
-Say what a thing is, not the handle that points at it. An item number, decision number, question number, line number or commit hash is an address into a file the user does not have open, so it never stands alone as the name for something. Pair it with the thing, as in "item 7, option descriptions", or leave it out.
-
-This holds for interview questions, echo lines, blocker questions and the Step 4 gate.
-
-### What each answer changes
-
-Anything the user has to act on — an interview question, a blocker, an item flagged at the Step 4 gate — says what changes with each answer it offers. For a yes-or-no question that means what yes does and what no does, both. A stranger should be able to answer it.
-
-A name you coined earlier is where this usually fails. "The refund-review split" reads to you as settled vocabulary and to the user as nothing at all, however carefully you defined it ten turns ago. Restate what it is every time you ask about it.
-
-Not:
-
-```
-Do you want to keep the refund-review split?
-```
-
-Instead:
-
-```
-Right now a cancellation marks the payment for a person to refund by hand. Say yes and that stays, and someone has to own the review queue. Say no and the cancel action issues the refund itself, with no human check before money moves.
-```
+<!-- pln:include style -->
 
 <!-- pln:include voice -->
 
-### Before you send
-
-Take each sentence out of the draft and read what is left. If no fact went out with it, leave it out.
-
-Two kinds fail this: a sentence that labels the sentence after it, and a sentence with the grammar of a claim and nothing in it.
-
-```
-That sharpens what the refund bug actually is.
-
-Two shapes, and they differ in a case that will happen.
-```
-
-Both look like they are doing work. Take either one out and nothing is missing. Naming a decision already made is different. There the name is the fact, and it is what keeps the user from scrolling up.
-
-### Inline code
-
-Wrap file names and shell commands in backticks. e.g., `CLAUDE.md`, `package.json`, `pnpm build:spec`, `cargo test`. Never bare.
-
-### Sequences (proposed processes / ordered steps)
-
-Numbered with `1.`, single sentence each, no bold. Use this style whenever you're showing the user a process you intend to follow, not when you want them to choose.
-
-```
-The skill discovers verification commands by:
-
-1. Read `CLAUDE.md` / `AGENTS.md` for a completion rule.
-2. Inspect `package.json` / `Cargo.toml` / `pyproject.toml` scripts and pick conventional names like `build`, `lint`, `test`.
-3. If still ambiguous, ask the user once and save the answer to memory keyed by repo.
-```
-
-### Discrete option choices
-
-Lowercase letter + close-paren + single space + bolded label + em-dash + short description. Use this style whenever the user must pick one of N alternatives.
-
-```
-When does verification run?
-
-a) **Lightweight per-item, full at end** — type-check / lint after each item, specs only at task completion.
-b) **Full only at end** — no per-item checks, single gauntlet at task end.
-c) **Full at end, plus on demand** — no per-item checks, single gauntlet at task end, runnable any time on request.
-```
-
-Every description answers the same questions in the same order. Above, that is what happens per item and then what happens at the end. Parallel shape, not parallel length: say the shortest true thing about each option and don't pad one to match another.
-
-### Recommended option marker
-
-When one option is the assistant's recommendation, prefix its bolded label with `[recommended] ` (square brackets, single trailing space, **inside** the bold span). Square brackets, not angle brackets: angle brackets get treated as HTML by the host's markdown renderer and disappear, leaving an orphan space and breaking column alignment.
-
-```
-a) **[recommended] Full only at end** — no per-item checks, single gauntlet at task end.
-b) **Lightweight per-item, full at end** — type-check / lint after each item, specs only at task completion.
-```
-
-Exactly one space after `a)`, `b)`, `c)`. The `[recommended] ` prefix lives inside the bold span. Never break alignment by varying the post-paren whitespace.
-
-The recommended option's description says what that option does, like every other option, and gets no extra words for being recommended. Nothing after the list restates which one you picked.
-
-### Binary "adopt as written / change?" questions
-
-Plain prose, no letters. e.g., "Adopt this as written, or change it?"
-
-### Bullets vs. numbers — visual distinction
-
-- **Hyphen bullets** = "here's a flat list" (definitions, criteria, conditions). Not for choices.
-- **`1.` numbered** = "here's a sequence I propose" (ordered process).
-- **`a) **Bold** —`** = "pick one of these" (options).
-
-The visual distinction must be obvious at a glance. Don't mix styles within a single list.
-
-### Echoing recorded decisions
-
-Before asking the next question, echo back what was just recorded in **one short line**. Lets the user catch a misrecorded answer immediately. The line carries the answer and nothing else: not why it was chosen, not what it changes, not a lead-in to the next question. Examples:
-
-- *"Recorded: mix-conditional question style, and never AskUserQuestion."*
-- *"Recorded: lightweight checks per item, full gauntlet at the end."*
+<!-- pln:include style-formatting -->
 
 ## Posture
 
@@ -266,7 +120,7 @@ How to spawn one on this host:
 
 ## The workflow (sequential steps)
 
-Steps 1–7 run in order, top to bottom. The skill has two distinct conversational phases separated by an explicit approval gate:
+Steps 1–8 run in order, top to bottom. The skill has two distinct conversational phases separated by an explicit approval gate:
 
 - **Interview phase** (Step 3) — questions only, no code changes, no commits. Walks every item end-to-end, captures decisions in the master plan.
 - **Master-plan approval gate** (Step 4) — show the complete master plan, get a single yes-to-the-whole.
@@ -443,6 +297,23 @@ Items marked ⏸ blocked (auto mode) are different: each already has a concrete 
 2. If anything fails: it's now a new item. Don't paper over. Either spawn an agent to fix-and-rerun, or spawn a spinoff if the failure is out-of-scope.
 3. If notifications are on, fire them first (see Notifications): {{NOTIFY_CALL}}, summarizing the outcome (e.g. "pln: plan done, 8/8 items, gauntlet passed").
 4. Final message to the user: one or two sentences. What changed and what's next. Reference `PLAN.md`'s path.
+
+### Step 8. Ship — hand off to `/pln-pr`
+
+A finished plan is not a shipped one, and shipping is `/pln-pr`'s job: it reviews the branch with fresh-context reviewers, fixes what they find, verifies once, and opens the pull request. Pushing and running `gh pr create` from here instead skips all of it.
+
+Ask once, at the end of the Step 7 wrap-up message rather than in a message of its own: open the PR now, or stop here? Skip the ask entirely when there is nothing to put up — no commits ahead of the base branch — or when the user has already said where this run ends.
+
+On yes, hand off:
+
+<!-- pln:only claude -->
+Invoke `/pln-pr` with the `Skill` tool. Its steps then arrive verbatim at the moment they are used, instead of being recalled from a description read an hour of implementation ago — which is why it is a separate skill rather than a section of this file.
+<!-- pln:endonly -->
+<!-- pln:only codex -->
+This host has no tool that invokes a skill, so load it yourself: read `{{SKILL_DIR}}/pln-pr/SKILL.md` in full and follow it. Its steps then arrive verbatim at the moment they are used, instead of being recalled from a description read an hour of implementation ago — which is why it is a separate skill rather than a section of this file.
+<!-- pln:endonly -->
+
+This holds for a PR ask anywhere in the session, not only at the end. "Put up a PR", "ship it", and PR asks carried inside a longer instruction — "bump the version and open the PR", "push this up" — all route through `/pln-pr`. The one exception is an explicit "skip the review", which you honor.
 
 ## Cross-cutting concerns
 

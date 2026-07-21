@@ -1,0 +1,2 @@
+**Host note.** This copy of `/pln-pr` was generated for Claude Code, so every reviewer, fix agent and verification run below is a `Workflow` / `Agent` call (see Spawning a fresh-context agent). Those tools are part of this host — there is nothing to check before starting, so continue to Step 1. If they are somehow absent from your toolset, the install was built for a different host: say so in one line and point the user at `./setup` in the pln directory one level up, rather than working around it.
+

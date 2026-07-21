@@ -8,4 +8,4 @@ SKILL_DIR=$_PLN_DIR
 HOST_NAME=Codex
 NOTIFY_CALL=run `pln-notify-desktop`
 ORCH_TOOLS=`codex exec` subprocesses
-REVIEW_DISPATCH_SHORT=run as sequential fresh-context agents
+REVIEW_ARMY_SHORT=A native `codex review` pass, the lenses a general review underweights, and an adversarial pass run as sequential fresh-context agents

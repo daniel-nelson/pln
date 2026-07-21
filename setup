@@ -53,23 +53,9 @@ echo ""
 echo "Done. Skills available:"
 echo "  /pln        — two-phase planning: interview all items, then implement one at a time"
 echo "  /pln-pr     — review the current branch and open a pull request, the pln way"
-echo "  /plnify     — install pln's discipline into your CLAUDE.md for a skill suite"
 echo "  /pln-update — update pln to the latest version"
 echo ""
 case "$HOST" in
   codex) echo "Built for Codex. Restart Codex to pick up the new skills." ;;
   *) echo "Built for Claude Code. Restart Claude Code to pick up the new skills." ;;
-esac
-
-# Optional, opt-in: offer the /pln-pr routing rule (one-time). The helper owns
-# the gate + marker check and the offer text — setup just relays its output. It
-# does NOT write anything; on RESULT: offer it prints an agent-directed offer +
-# preview and the installing agent conducts the ask. On skip/no-target/
-# already-present it prints only a RESULT line, so nothing user-facing is shown.
-_OFFER="$("$SKILL_DIR/bin/pln-routing-rule" --offer 2>/dev/null || true)"
-case "$_OFFER" in
-  *"RESULT: offer"*)
-    echo ""
-    printf '%s\n' "$_OFFER"
-    ;;
 esac

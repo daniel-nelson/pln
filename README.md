@@ -4,8 +4,6 @@
 
 Instead of dumping a complete plan and waiting for you to react, pln interviews you first: one question per item, all design decisions settled, master plan approved — then implements without stopping to ask more questions. During the interview phase it acts as a thinking peer, not a task executor: it'll push back on a bad approach before any code is written.
 
-Ships with **`/plnify gstack`** to extend pln's discipline to [gstack](https://github.com/daniel-nelson/gstack) planning skills.
-
 ## Install
 
 ### Install via your agent
@@ -44,7 +42,6 @@ Then run `./setup` in the directory it installed to. `npx skills` copies files; 
 
 - `pln` skill in `~/.claude/skills/pln/` (Claude Code) or `~/.agents/skills/pln/` (Codex)
 - `/pln-pr` slash command (symlinked from `pln/pln-pr/`) for reviewing a branch and opening a pull request
-- `/plnify` slash command (symlinked from `pln/plnify/`) for installing pln's discipline into gstack
 - `/pln-update` slash command (symlinked from `pln/pln-update/`) for updating pln
 
 `./setup` also builds the skill files for the host it was installed under, working the host out from the install path. Claude Code and Codex drive agents differently, so each build carries only its own host's mechanics rather than a page of "if you are on the other host, ignore this". That is the one reason the clone alone isn't enough: without `./setup` the skill files are placeholders that say so. If you cloned somewhere the path doesn't name a host, run `PLN_HOST=codex ./setup` (or `PLN_HOST=claude ./setup`).
@@ -57,7 +54,6 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 |-------|--------------|-------------|
 | `/pln` | `/pln` or `/pln <details of what you want to plan>` | Two-phase planning: overview bullet list followed by detailed back and forth with a peer for each item; implementation only after the plan is written |
 | `/pln-pr` | `/pln-pr` or "put up a PR" | Review the current branch with a fresh-context review army, fix findings under one durable ledger, verify once, and open the pull request |
-| `/plnify` | `/plnify gstack` | One-time setup — adds pln's discipline to `~/.claude/CLAUDE.md` for gstack planning skills |
 | `/pln-update` | `/pln-update` | Update pln to the latest version (pln also offers this automatically when a new release appears) |
 
 ## How it works
@@ -66,9 +62,7 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 
 The peer posture is built in: during the interview phase, pln will disagree with your framing if it sees a problem, bring up considerations you didn't name, and stop after one question rather than overwhelming you with options. The goal is a plan *you* shaped, not one that was handed to you.
 
-**`/pln-pr`** is the ship half of a plan. After a `/pln` run (or on any branch ahead of its base), it reviews the diff, fixes what the review finds, verifies once, and opens the pull request. A review army of fresh-context agents covers six lenses (correctness, security, data, testing, maintainability, performance) plus an adversarial pass. On Claude Code they all run in parallel, plus an optional Codex cross-model pass if you have it installed; on Codex the army is `codex review` for the broad ground followed by the lenses it underweights, one at a time (see [Hosts](#hosts)). Every finding has to quote the exact line that proves it, which keeps false positives out. Findings land in a durable `REVIEW.md` beside the plan, fixes run as agents clustered by file so they never collide, decisions come to you one at a time, and the full test suite runs **once** at the end instead of after every fix — the loop that makes a naive review-and-fix pass thrash. It depends only on git, your agent's own tools, and optionally the GitHub/GitLab CLI; there's no external service and nothing to configure. So that a compound request like "bump the version and open the PR" still routes through the review instead of bypassing it, install offers a small opt-in routing rule for your global instructions — previewed, and written only if you say yes.
-
-**`/plnify gstack`** is a one-time setup step for [gstack](https://github.com/daniel-nelson/gstack) users, and the one piece of the suite that is Claude Code only — gstack is a Claude Code skill suite. It appends two sections to your `~/.claude/CLAUDE.md` — interaction rules and an exploratory-mode posture — that apply pln's discipline to gstack planning skills like `/office-hours`, `/plan-ceo-review`, and `/plan-eng-review`. It shows you exactly what will be written and asks for approval before touching anything. The rules only fire when a gstack planning skill is active; they don't affect general conversation.
+**`/pln-pr`** is the ship half of a plan. After a `/pln` run (or on any branch ahead of its base), it reviews the diff, fixes what the review finds, verifies once, and opens the pull request. A review army of fresh-context agents covers six lenses (correctness, security, data, testing, maintainability, performance) plus an adversarial pass. On Claude Code they all run in parallel, plus an optional Codex cross-model pass if you have it installed; on Codex the army is `codex review` for the broad ground followed by the lenses it underweights, one at a time (see [Hosts](#hosts)). Every finding has to quote the exact line that proves it, which keeps false positives out. Findings land in a durable `REVIEW.md` beside the plan, fixes run as agents clustered by file so they never collide, decisions come to you one at a time, and the full test suite runs **once** at the end instead of after every fix — the loop that makes a naive review-and-fix pass thrash. It depends only on git, your agent's own tools, and optionally the GitHub/GitLab CLI; there's no external service and nothing to configure. A `/pln` run hands off to it once the plan's gauntlet is green — it asks first, and stops there if you say no — so shipping is the last step of the same flow rather than a separate thing you have to remember to ask for.
 
 ## Hosts
 
@@ -84,7 +78,6 @@ The plan is the same on both hosts, and so is the `PLAN.md` and the review ledge
 | Who commits | the item agent | the orchestrator — a sandboxed Codex agent has `.git` read-only |
 | `/pln-pr` review army | seven reviewers in parallel, plus an optional Codex cross-model pass | `codex review`, then a subset of lenses one at a time |
 | Notifications | phone push + desktop | desktop |
-| `/plnify gstack` | yes | gstack is a Claude Code skill suite |
 
 Two of those need a sentence. Codex reviewers run one at a time because concurrent `codex` processes race on the shared OAuth token file; that costs wall-clock and buys correctness. And a Codex agent runs sandboxed with `.git` read-only, so it writes files and reports back while the session that spawned it does the committing. The invariant is the same on both hosts: no partial item is ever committed.
 
@@ -123,29 +116,17 @@ Each toggles independently in `~/.pln/config.yaml`:
 
 ## Uninstalling
 
-If you added the `/pln-pr` routing rule to your global instructions, strip it first, while the helper is still on disk — it removes the block from whichever file it wrote to (`~/.claude/CLAUDE.md` on Claude Code, `$CODEX_HOME/AGENTS.md` on Codex):
+pln never edits your global instructions or anything else outside its own install and `~/.pln`, so uninstalling is deleting those:
 
 ```bash
 # Claude Code
-~/.claude/skills/pln/bin/pln-routing-rule --remove
+rm -rf ~/.claude/skills/pln && rm -f ~/.claude/skills/pln-update ~/.claude/skills/pln-pr
 
 # Codex
-~/.agents/skills/pln/bin/pln-routing-rule --remove
-```
-
-It's idempotent, so it's safe to run whether or not you ever added the rule. Then remove the skill:
-
-```bash
-# Claude Code
-rm -rf ~/.claude/skills/pln && rm -f ~/.claude/skills/plnify ~/.claude/skills/pln-update ~/.claude/skills/pln-pr
-
-# Codex
-rm -rf ~/.agents/skills/pln && rm -f ~/.agents/skills/plnify ~/.agents/skills/pln-update ~/.agents/skills/pln-pr
+rm -rf ~/.agents/skills/pln && rm -f ~/.agents/skills/pln-update ~/.agents/skills/pln-pr
 ```
 
 To also remove update-check state: `rm -rf ~/.pln`.
-
-If you ran `/plnify gstack`, the two sections it added to `~/.claude/CLAUDE.md` are not automatically removed — delete them manually if you no longer want them.
 
 ## License
 

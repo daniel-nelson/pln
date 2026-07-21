@@ -53,6 +53,52 @@ If the user gives a single small task, don't engage; just do the work. The skill
 
 All rules in this section apply to every message the skill produces.
 
+### Message shape
+
+Every question you put to the user, and every reaction or finding you report, takes one of three shapes. The first line says what the message is, so the user knows from that line alone what it wants from them. Whichever shape, the message has to be answerable by someone with no memory of the conversation.
+
+**Option message** — echo line, one sentence naming what is being decided, the options, then the evidence.
+
+```
+Recorded: soft-delete on cancel, no cascade.
+
+Cancelling a booking leaves the guest's payment alone, so every refund is issued by hand. What should cancelling do to the payment?
+
+a) **[recommended] Refund on cancel** — the cancel action issues the refund and marks the payment refunded.
+b) **Flag for review** — the cancel action marks the payment for a person to refund.
+c) **Leave it** — cancelling touches the booking only; refunds stay a separate action.
+
+The payment provider's refund call is idempotent, so (a) is safe to retry, but the money is gone once it fires. (b) keeps a person in the loop and needs a review queue nobody owns yet.
+```
+
+**Binary message** — echo line, one sentence naming what is being decided, the question in plain prose, then the evidence.
+
+```
+Recorded: refund on cancel.
+
+The cancel action will issue the refund itself, with no review step in between.
+
+Adopt that as written, or change it?
+
+It gives up the human check before money moves. Every other route needed a review queue, and nothing in this plan creates one.
+```
+
+**Reaction or finding** — one sentence stating the finding, then the evidence, then the question if there is one.
+
+```
+Cancelling already writes a `cancelled_at` timestamp, so the soft-delete we settled on is a rename rather than a new column.
+
+The column is nullable and indexed, and three queries filter on it being null.
+
+Rename it, or leave the name and have the new code read `cancelled_at`?
+```
+
+In all three:
+
+- The sentence naming the decision says what happens now and what should happen instead, in words someone who has never read the plan would use. Never a bare identifier in place of the thing itself — no item number, decision number, line number, or commit hash. The user is not looking at `PLAN.md`.
+- Cut any paragraph whose only work is establishing that the problem is real. The user asked for this; they already believe there is a problem. Evidence that changes which answer wins stays, however long it runs. There is no word limit here, and holding information back is not the point.
+- Name a prior conclusion in a clause so the user never has to scroll up to answer. Don't re-derive the argument for it; naming it is the whole job.
+
 ### Conversational voice
 
 These rules govern the skill's prose: its questions, reactions, reasoning, and summaries. They exist because Claude's default register reads as intense and over-confident, which is the most common complaint about the voice. The structural formatting in the subsections below (option labels, the `[recommended]` marker, numbered sequences, status icons, the one-line decision echo) is functional and exempt; these rules shape the prose around it. Write like a calm colleague, not a pitch.
@@ -295,12 +341,14 @@ After writing the skeleton, **stop**. Show the user the dashboard (not the whole
 
 This is a **questions-only** phase. No file edits to the project, no migrations, no commits, no code changes. Only `PLAN.md` is written to (to record decisions as they come in).
 
-**Exploration before prose.** For each item, complete all code reading and exploration before writing any user-facing message. While exploring, emit no prose between tool calls — findings, surprises, and conclusions all belong in the final message after all exploration is done. The user should see one coherent response per item: approach summary + question, never a running commentary with tool calls in between.
+**Exploration before prose.** For each item, complete all code reading and exploration before writing any user-facing message. While exploring, emit no prose between tool calls — findings, surprises, and conclusions all belong in the final message after all exploration is done. The user should see one coherent response per item, never a running commentary with tool calls in between.
 
 Walk every item, in order, gathering what the implementer needs to do the work without doing something the user would veto: intent, constraints, and the decisions only the user can make. Not a prescription of reversible mechanics. For each item:
 
 1. Read enough surrounding code to propose a concrete approach (file paths, model/serializer changes, controller surface, front-end consumers, spec updates). Reading is fine; editing is not.
-2. State the proposed approach in 1–6 short bullets. Run every open choice through the filter (see "What reaches the user"). Surface only ask-lane choices (unbacked and consequential) as a) / b) / c) options. Make cite-backed or reversible choices yourself and record them as disclosed decisions; leave not-yet-knowable ones to surface in implementation. Don't manufacture an interview question for a choice an implementer should own. Each question must be self-contained: a reader with no memory of the overview or the intermediate tool output should be able to answer it from the question text alone. Open with a plain-language summary of what this item is: the observable behavior at stake, written for a reader who has never read the plan and doesn't know the code. Not a label ("the Past-Stays tab wiring") and not the code-level approach ("wire the `onOpen` prop"); say what happens now and what should. For example: "In the Past Stays tab, clicking a booking does nothing; in the Upcoming tab it opens that booking's detail panel. We want that panel to open from Past Stays too." Then the evidence the options turn on, then the question. Don't lean on a bare item number as the identifier; it points into `PLAN.md`, which the user isn't looking at. Never refer to earlier findings by transient label ("case C", "the repro above") without inlining the one-sentence version of what they were. This is about framing, not length: add the missing context, not a re-dump of the overview.
+2. Propose a concrete approach, and run every open choice in it through the filter (see "What reaches the user"). Surface only ask-lane choices — unbacked and consequential — as a) / b) / c) options. Make the cite-backed and reversible calls yourself and record them as disclosed decisions. Leave the not-yet-knowable ones to surface in implementation. Don't manufacture an interview question for a choice an implementer should own.
+
+   Put the message in one of the shapes under Message shape. The sentence naming the decision says what happens now and what should happen instead: "In the Past Stays tab, clicking a booking does nothing; in the Upcoming tab it opens that booking's detail panel. We want that panel to open from Past Stays too." Not a label ("the Past-Stays tab wiring"), and not the code-level approach ("wire the `onOpen` prop"). Where the approach itself needs stating, it goes where the evidence goes, in no more than six short bullets.
 3. If notifications are on, fire them first (see Notifications): {{NOTIFY_CALL}}, each naming the item and the gist of the question (e.g. "pln: item 4 — which auth provider?"). Then ask **one** ask-lane question at a time. Wait for the answer. Echo the recorded answer in one short line. Move to the next question.
 4. Update the item's detail section in `PLAN.md` after each answered question, so the file becomes the durable record and nothing is lost if context compacts.
 5. When the item's ask-lane questions are answered, write the item's detail section: intent, constraints, acceptance criteria, the decisions other work depends on, and the disclosed decisions (each tagged with its authority or reversibility, and flagged if low-confidence). Don't write a step-by-step of reversible mechanics; see "One filter, two surfaces."

@@ -35,7 +35,7 @@ If `PLN_DIR` is `none`, the helpers aren't found: skip the config-gated notifica
 
 Engage when the user types `/pln-pr`, or asks to put up / open / create / make a PR or "ship it", on a branch that has commits ahead of its base. Most often this comes right after a `/pln` run completed its own gauntlet; it also works standalone on any feature branch.
 
-**The trigger holds even when the PR ask is one clause of a bigger instruction.** "Bump the version and open the PR", "commit and push this up", "and then open the PR" all route here — the review army is the point, and it must not be skipped just because the request was phrased as a sequence of git steps. The one exception: if the user explicitly says to skip review (e.g. "just push and open the PR, no review"), honor that and do the bare push + PR. A global routing rule (installed by `setup` or `/pln-update`, opt-in) reinforces this for hosts that tend to execute compound imperatives literally.
+**The trigger holds even when the PR ask is one clause of a bigger instruction.** "Bump the version and open the PR", "commit and push this up", "and then open the PR" all route here — the review army is the point, and it must not be skipped just because the request was phrased as a sequence of git steps. The one exception: if the user explicitly says to skip review (e.g. "just push and open the PR, no review"), honor that and do the bare push + PR.
 
 If the branch has no commits ahead of base, say so and stop — there is nothing to put up.
 

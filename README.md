@@ -62,7 +62,7 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 
 The peer posture is built in: during the interview phase, pln will disagree with your framing if it sees a problem, bring up considerations you didn't name, and stop after one question rather than overwhelming you with options. The goal is a plan *you* shaped, not one that was handed to you.
 
-**`/pln-pr`** is the ship half of a plan. After a `/pln` run (or on any branch ahead of its base), it reviews the diff, fixes what the review finds, verifies once, and opens the pull request. A review army of fresh-context agents covers six lenses (correctness, security, data, testing, maintainability, performance) plus an adversarial pass. On Claude Code they all run in parallel, plus an optional Codex cross-model pass if you have it installed; on Codex the army is `codex review` for the broad ground followed by the lenses it underweights, one at a time (see [Hosts](#hosts)). Every finding has to quote the exact line that proves it, which keeps false positives out. Findings land in a durable `REVIEW.md` beside the plan, fixes run as agents clustered by file so they never collide, decisions come to you one at a time, and the full test suite runs **once** at the end instead of after every fix — the loop that makes a naive review-and-fix pass thrash. It depends only on git, your agent's own tools, and optionally the GitHub/GitLab CLI; there's no external service and nothing to configure. So that a compound request like "bump the version and open the PR" still routes through the review instead of bypassing it, install offers a small opt-in routing rule for your global instructions — previewed, and written only if you say yes.
+**`/pln-pr`** is the ship half of a plan. After a `/pln` run (or on any branch ahead of its base), it reviews the diff, fixes what the review finds, verifies once, and opens the pull request. A review army of fresh-context agents covers six lenses (correctness, security, data, testing, maintainability, performance) plus an adversarial pass. On Claude Code they all run in parallel, plus an optional Codex cross-model pass if you have it installed; on Codex the army is `codex review` for the broad ground followed by the lenses it underweights, one at a time (see [Hosts](#hosts)). Every finding has to quote the exact line that proves it, which keeps false positives out. Findings land in a durable `REVIEW.md` beside the plan, fixes run as agents clustered by file so they never collide, decisions come to you one at a time, and the full test suite runs **once** at the end instead of after every fix — the loop that makes a naive review-and-fix pass thrash. It depends only on git, your agent's own tools, and optionally the GitHub/GitLab CLI; there's no external service and nothing to configure. A `/pln` run hands off to it once the plan's gauntlet is green — it asks first, and stops there if you say no — so shipping is the last step of the same flow rather than a separate thing you have to remember to ask for.
 
 ## Hosts
 
@@ -116,17 +116,7 @@ Each toggles independently in `~/.pln/config.yaml`:
 
 ## Uninstalling
 
-If you added the `/pln-pr` routing rule to your global instructions, strip it first, while the helper is still on disk — it removes the block from whichever file it wrote to (`~/.claude/CLAUDE.md` on Claude Code, `$CODEX_HOME/AGENTS.md` on Codex):
-
-```bash
-# Claude Code
-~/.claude/skills/pln/bin/pln-routing-rule --remove
-
-# Codex
-~/.agents/skills/pln/bin/pln-routing-rule --remove
-```
-
-It's idempotent, so it's safe to run whether or not you ever added the rule. Then remove the skill:
+pln never edits your global instructions or anything else outside its own install and `~/.pln`, so uninstalling is deleting those:
 
 ```bash
 # Claude Code

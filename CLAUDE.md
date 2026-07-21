@@ -32,12 +32,11 @@ One open PR = one version. If scope grows mid-PR, bump the single version headin
 
 ## Testing
 
-Run every script in `tests/` before opening a PR — each needs only bash and git, no network, no Codex install, and none of them writes to the working tree. All three must print `OK`:
+Run every script in `tests/` before opening a PR — each needs only bash and git, no network, no Codex install, and none of them writes to the working tree. Both must print `OK`:
 
 - `bash tests/generate.sh` — `bin/pln-generate`: the three directives, the generated-by banner, `--list`, `--clean`, every error path, and the property the host seam rests on — each host's build carries its own mechanics and none of the other's, checked against the real `src/` as well as fixtures.
 - `bash tests/codex-agent.sh` — `bin/pln-codex-agent` against a fake `codex` on `PATH`: an empty result is a failure, the thread id comes out of the event stream, the brief travels on stdin, and `resume` is never handed the flags it rejects.
-- `bash tests/routing-rule.sh` — `bin/pln-routing-rule` across all RESULT states, plus per-host target resolution and wording.
 
-Then install the skill locally, restart the agent, and exercise the changed behavior manually. For `/pln`: run a multi-item task end-to-end. For `/pln-pr`: exercise the routing-rule install/offer path — trigger the offer via `setup` or `/pln-update` Step 2.5 and confirm it routes a PR request through the skill.
+Then install the skill locally, restart the agent, and exercise the changed behavior manually. For `/pln`: run a multi-item task end-to-end, through the Step 8 hand-off, and confirm it reaches `/pln-pr` instead of pushing and running `gh pr create` inline.
 
 A change under `src/` is not exercised until it is built. Preview both hosts with `bin/pln-generate --host claude --out-dir /tmp/pln-claude` and `--host codex --out-dir /tmp/pln-codex` and read the host you changed; `./setup` builds in place for the host you are installed under.

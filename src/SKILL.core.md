@@ -266,7 +266,7 @@ How to spawn one on this host:
 
 ## The workflow (sequential steps)
 
-Steps 1–7 run in order, top to bottom. The skill has two distinct conversational phases separated by an explicit approval gate:
+Steps 1–8 run in order, top to bottom. The skill has two distinct conversational phases separated by an explicit approval gate:
 
 - **Interview phase** (Step 3) — questions only, no code changes, no commits. Walks every item end-to-end, captures decisions in the master plan.
 - **Master-plan approval gate** (Step 4) — show the complete master plan, get a single yes-to-the-whole.
@@ -443,6 +443,23 @@ Items marked ⏸ blocked (auto mode) are different: each already has a concrete 
 2. If anything fails: it's now a new item. Don't paper over. Either spawn an agent to fix-and-rerun, or spawn a spinoff if the failure is out-of-scope.
 3. If notifications are on, fire them first (see Notifications): {{NOTIFY_CALL}}, summarizing the outcome (e.g. "pln: plan done, 8/8 items, gauntlet passed").
 4. Final message to the user: one or two sentences. What changed and what's next. Reference `PLAN.md`'s path.
+
+### Step 8. Ship — hand off to `/pln-pr`
+
+A finished plan is not a shipped one, and shipping is `/pln-pr`'s job: it reviews the branch with fresh-context reviewers, fixes what they find, verifies once, and opens the pull request. Pushing and running `gh pr create` from here instead skips all of it.
+
+Ask once, at the end of the Step 7 wrap-up message rather than in a message of its own: open the PR now, or stop here? Skip the ask entirely when there is nothing to put up — no commits ahead of the base branch — or when the user has already said where this run ends.
+
+On yes, hand off:
+
+<!-- pln:only claude -->
+Invoke `/pln-pr` with the `Skill` tool. Its steps then arrive verbatim at the moment they are used, instead of being recalled from a description read an hour of implementation ago — which is why it is a separate skill rather than a section of this file.
+<!-- pln:endonly -->
+<!-- pln:only codex -->
+This host has no tool that invokes a skill, so load it yourself: read `{{SKILL_DIR}}/pln-pr/SKILL.md` in full and follow it. Its steps then arrive verbatim at the moment they are used, instead of being recalled from a description read an hour of implementation ago — which is why it is a separate skill rather than a section of this file.
+<!-- pln:endonly -->
+
+This holds for a PR ask anywhere in the session, not only at the end. "Put up a PR", "ship it", and PR asks carried inside a longer instruction — "bump the version and open the PR", "push this up" — all route through `/pln-pr`. The one exception is an explicit "skip the review", which you honor.
 
 ## Cross-cutting concerns
 

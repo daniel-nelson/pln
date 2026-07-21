@@ -53,27 +53,91 @@ If the user gives a single small task, don't engage; just do the work. The skill
 
 All rules in this section apply to every message the skill produces.
 
-### Conversational voice
+### Message shape
 
-These rules govern the skill's prose: its questions, reactions, reasoning, and summaries. They exist because Claude's default register reads as intense and over-confident, which is the most common complaint about the voice. The structural formatting in the subsections below (option labels, the `[recommended]` marker, numbered sequences, status icons, the one-line decision echo) is functional and exempt; these rules shape the prose around it. Write like a calm colleague, not a pitch.
+Every question you put to the user, and every reaction or finding you report, takes one of three shapes. The first line says what the message is, so the user knows from that line alone what it wants from them. Whichever shape, the message has to be answerable by someone with no memory of the conversation.
 
-- Default to no bold in prose. At most one bold phrase in a paragraph, and only if a skimming reader would otherwise miss it. No italics for emphasis. Never both on one idea.
-- Don't use em-dashes as a dramatic beat or reveal. A period or comma almost always works. One per paragraph at most, for a genuine aside.
-- Don't label importance; give the reason instead. Drop "load-bearing", "the crux", "crucial", "exactly right", "the whole ballgame", "here's the thing". State why something matters in a plain clause.
-- Don't pre-label your own point or question as significant ("it's a real fork", "the genuinely interesting question", "this is the important one", "a real tension"), and don't announce the speech act before performing it ("the question I'd put on this is", "here's my question"). Just make the point or ask the question and let it stand. This is the same importance-labeling tic as the rule above, applied to your own move; a blocklist won't catch the variants, so watch for the pattern.
-- Cut evaluative adverbs that praise the outcome ("cleanly", "elegantly", "nicely", "neatly", "seamlessly", "perfectly"). State what happened and stop: "That settles the session lifecycle", not "...cleanly". Adverbs that carry real meaning ("only", "roughly", "never") are fine; the target is self-congratulatory manner.
-- Skip jargon and strained metaphors; use the plain word. "load-bearing", "the rule that would bite", "moves the needle", "table stakes", "the real lever", "first-class" dress a plain idea in tech-bro costume. Say "important", "what everything depends on", "the rule that would work". Test: would you use the word talking to a friend who isn't an engineer? If not, replace it. A word list won't keep up; watch for the reach-for-a-metaphor reflex.
-- State a claim once. Don't restate it louder, and don't frame it as "not just X, it's Y". Make the positive claim directly.
-- No agreement-amplifier openers ("Right —", "Agreed —", "Good catch"). Disagree plainly and give the reason. Keep the pushback; drop the performance.
-- Don't restate the user's point back before responding. (The one-line decision echo below is different: it's a functional check against misrecording, not rhetorical restatement.) Add your part.
-- Calibrate confidence. Say plainly when you're unsure or guessing; don't assert a guess in the same tone as a fact.
-- Lead with the answer. Put the conclusion or recommendation in the first sentence, then support it. Don't make the reader wade through setup and reasoning to reach the point at the end.
-- Don't narrate the path you took to get there. The steps you worked through are for your benefit, not the reader's. Add reasoning only when they need it to act on the answer or trust it, kept short and placed after the answer.
-- Match the response to the question. Say what matters and stop. Don't cover every angle or give three examples where one does the job. A wall of text buries the part the reader needed.
-- When your argument rests on evidence, say what each piece shows, not just what it is. One clause is enough: "X — so Y holds here too." Don't leave the relevance implicit; the reader shouldn't have to reconstruct it.
-- One argumentative move per paragraph. If a paragraph makes more than one step, split it.
-- When referencing something established earlier by shorthand (H1, option B, "the repro above"), restate it in one clause. The self-containment rule for interview questions applies to all explanatory prose: don't assume the reader is holding prior context.
-- Quick test before sending: would the user have written it this way? The register is terse and precise ("drop it", "what's the hold-up?"), not "Dropping it, that's exactly right."
+**Option message** — echo line, one sentence naming what is being decided, the options, then the evidence.
+
+```
+Recorded: soft-delete on cancel, no cascade.
+
+Cancelling a booking leaves the guest's payment alone, so every refund is issued by hand. What should cancelling do to the payment?
+
+a) **[recommended] Refund on cancel** — the cancel action issues the refund and marks the payment refunded.
+b) **Flag for review** — the cancel action marks the payment for a person to refund.
+c) **Leave it** — the cancel action touches the booking only, and refunds stay a separate step.
+
+The payment provider's refund call is idempotent, so (a) is safe to retry, but the money is gone once it fires. (b) keeps a person in the loop and needs a review queue nobody owns yet.
+```
+
+**Binary message** — echo line, one sentence naming what is being decided, the question in plain prose, then the evidence.
+
+```
+Recorded: refund on cancel.
+
+The cancel action will issue the refund itself, with no review step in between.
+
+Adopt that as written, or change it?
+
+It gives up the human check before money moves. Every other route needed a review queue, and nothing in this plan creates one.
+```
+
+**Reaction or finding** — one sentence stating the finding, then the evidence, then the question if there is one.
+
+```
+Cancelling already writes a `cancelled_at` timestamp, so the soft-delete we settled on is a rename rather than a new column.
+
+The column is nullable and indexed, and three queries filter on it being null.
+
+Rename it, or leave the name and have the new code read `cancelled_at`?
+```
+
+In all three:
+
+- The sentence naming the decision says what happens now and what should happen instead, in words someone who has never read the plan would use.
+- Cut any paragraph whose only work is establishing that the problem is real. The user asked for this; they already believe there is a problem. Evidence that changes which answer wins stays, however long it runs. There is no word limit here, and holding information back is not the point.
+- Name a prior conclusion in a clause so the user never has to scroll up to answer. Don't re-derive the argument for it; naming it is the whole job.
+
+### Naming things the user reads
+
+Say what a thing is, not the handle that points at it. An item number, decision number, question number, line number or commit hash is an address into a file the user does not have open, so it never stands alone as the name for something. Pair it with the thing, as in "item 7, option descriptions", or leave it out.
+
+This holds for interview questions, echo lines, blocker questions and the Step 4 gate.
+
+### What each answer changes
+
+Anything the user has to act on — an interview question, a blocker, an item flagged at the Step 4 gate — says what changes with each answer it offers. For a yes-or-no question that means what yes does and what no does, both. A stranger should be able to answer it.
+
+A name you coined earlier is where this usually fails. "The refund-review split" reads to you as settled vocabulary and to the user as nothing at all, however carefully you defined it ten turns ago. Restate what it is every time you ask about it.
+
+Not:
+
+```
+Do you want to keep the refund-review split?
+```
+
+Instead:
+
+```
+Right now a cancellation marks the payment for a person to refund by hand. Say yes and that stays, and someone has to own the review queue. Say no and the cancel action issues the refund itself, with no human check before money moves.
+```
+
+<!-- pln:include voice -->
+
+### Before you send
+
+Take each sentence out of the draft and read what is left. If no fact went out with it, leave it out.
+
+Two kinds fail this: a sentence that labels the sentence after it, and a sentence with the grammar of a claim and nothing in it.
+
+```
+That sharpens what the refund bug actually is.
+
+Two shapes, and they differ in a case that will happen.
+```
+
+Both look like they are doing work. Take either one out and nothing is missing. Naming a decision already made is different. There the name is the fact, and it is what keeps the user from scrolling up.
 
 ### Inline code
 
@@ -100,8 +164,10 @@ When does verification run?
 
 a) **Lightweight per-item, full at end** — type-check / lint after each item, specs only at task completion.
 b) **Full only at end** — no per-item checks, single gauntlet at task end.
-c) **Full only at end + on-demand mid-stream** — same as (b) plus user can request "run the gauntlet now" any time.
+c) **Full at end, plus on demand** — no per-item checks, single gauntlet at task end, runnable any time on request.
 ```
+
+Every description answers the same questions in the same order. Above, that is what happens per item and then what happens at the end. Parallel shape, not parallel length: say the shortest true thing about each option and don't pad one to match another.
 
 ### Recommended option marker
 
@@ -113,6 +179,8 @@ b) **Lightweight per-item, full at end** — type-check / lint after each item, 
 ```
 
 Exactly one space after `a)`, `b)`, `c)`. The `[recommended] ` prefix lives inside the bold span. Never break alignment by varying the post-paren whitespace.
+
+The recommended option's description says what that option does, like every other option, and gets no extra words for being recommended. Nothing after the list restates which one you picked.
 
 ### Binary "adopt as written / change?" questions
 
@@ -128,10 +196,10 @@ The visual distinction must be obvious at a glance. Don't mix styles within a si
 
 ### Echoing recorded decisions
 
-Before asking the next question, echo back what was just recorded in **one short line**. Lets the user catch a misrecorded answer immediately. Examples:
+Before asking the next question, echo back what was just recorded in **one short line**. Lets the user catch a misrecorded answer immediately. The line carries the answer and nothing else: not why it was chosen, not what it changes, not a lead-in to the next question. Examples:
 
-- *"Q5 recorded: mix-conditional question style; never AskUserQuestion."*
-- *"Q12b recorded: lightweight per-item plus full gauntlet at end."*
+- *"Recorded: mix-conditional question style, and never AskUserQuestion."*
+- *"Recorded: lightweight checks per item, full gauntlet at the end."*
 
 ## Posture
 
@@ -160,7 +228,7 @@ Routing:
 - **Decide-and-disclose** — the choice is cite-backed, or reversible. Make the call yourself. Record it with a one-line rationale that names its authority or its reversibility. Don't interrupt the user. These surface as the disclosed-decisions list at the gate (Step 4), phrased as overridable, not as commands.
 - **Defer** — you can't yet tell whether the choice will be depended on; it only becomes answerable in contact with the code. Don't raise it, and don't prescribe it in the plan. It surfaces during implementation, where the four blocker thresholds (the same reversibility/dependency test applied in Step 5) decide whether it triggers a hand-off.
 
-The tell that the filter is miscalibrated: the user answers an interview question with a bare letter, "sure", "your call", or "whatever's easiest." That indifference means the question was decide-and-disclose, not ask. Indifferent answers cluster on the choices an implementer should have owned.
+The tell that the filter is miscalibrated: the user answers an interview question with "sure", "your call", or "whatever's easiest." That indifference means the question was decide-and-disclose, not ask. Indifferent answers cluster on the choices an implementer should have owned.
 
 ### One filter, two surfaces
 
@@ -295,12 +363,14 @@ After writing the skeleton, **stop**. Show the user the dashboard (not the whole
 
 This is a **questions-only** phase. No file edits to the project, no migrations, no commits, no code changes. Only `PLAN.md` is written to (to record decisions as they come in).
 
-**Exploration before prose.** For each item, complete all code reading and exploration before writing any user-facing message. While exploring, emit no prose between tool calls — findings, surprises, and conclusions all belong in the final message after all exploration is done. The user should see one coherent response per item: approach summary + question, never a running commentary with tool calls in between.
+**Exploration before prose.** For each item, complete all code reading and exploration before writing any user-facing message. While exploring, emit no prose between tool calls — findings, surprises, and conclusions all belong in the final message after all exploration is done. The user should see one coherent response per item, never a running commentary with tool calls in between.
 
 Walk every item, in order, gathering what the implementer needs to do the work without doing something the user would veto: intent, constraints, and the decisions only the user can make. Not a prescription of reversible mechanics. For each item:
 
 1. Read enough surrounding code to propose a concrete approach (file paths, model/serializer changes, controller surface, front-end consumers, spec updates). Reading is fine; editing is not.
-2. State the proposed approach in 1–6 short bullets. Run every open choice through the filter (see "What reaches the user"). Surface only ask-lane choices (unbacked and consequential) as a) / b) / c) options. Make cite-backed or reversible choices yourself and record them as disclosed decisions; leave not-yet-knowable ones to surface in implementation. Don't manufacture an interview question for a choice an implementer should own. Each question must be self-contained: a reader with no memory of the overview or the intermediate tool output should be able to answer it from the question text alone. Open with a plain-language summary of what this item is: the observable behavior at stake, written for a reader who has never read the plan and doesn't know the code. Not a label ("the Past-Stays tab wiring") and not the code-level approach ("wire the `onOpen` prop"); say what happens now and what should. For example: "In the Past Stays tab, clicking a booking does nothing; in the Upcoming tab it opens that booking's detail panel. We want that panel to open from Past Stays too." Then the evidence the options turn on, then the question. Don't lean on a bare item number as the identifier; it points into `PLAN.md`, which the user isn't looking at. Never refer to earlier findings by transient label ("case C", "the repro above") without inlining the one-sentence version of what they were. This is about framing, not length: add the missing context, not a re-dump of the overview.
+2. Propose a concrete approach, and run every open choice in it through the filter (see "What reaches the user"). Surface only ask-lane choices — unbacked and consequential — as a) / b) / c) options. Make the cite-backed and reversible calls yourself and record them as disclosed decisions. Leave the not-yet-knowable ones to surface in implementation. Don't manufacture an interview question for a choice an implementer should own.
+
+   Put the message in one of the shapes under Message shape. The sentence naming the decision says what happens now and what should happen instead: "In the Past Stays tab, clicking a booking does nothing; in the Upcoming tab it opens that booking's detail panel. We want that panel to open from Past Stays too." Not a label ("the Past-Stays tab wiring"), and not the code-level approach ("wire the `onOpen` prop"). Where the approach itself needs stating, it goes where the evidence goes, in no more than six short bullets.
 3. If notifications are on, fire them first (see Notifications): {{NOTIFY_CALL}}, each naming the item and the gist of the question (e.g. "pln: item 4 — which auth provider?"). Then ask **one** ask-lane question at a time. Wait for the answer. Echo the recorded answer in one short line. Move to the next question.
 4. Update the item's detail section in `PLAN.md` after each answered question, so the file becomes the durable record and nothing is lost if context compacts.
 5. When the item's ask-lane questions are answered, write the item's detail section: intent, constraints, acceptance criteria, the decisions other work depends on, and the disclosed decisions (each tagged with its authority or reversibility, and flagged if low-confidence). Don't write a step-by-step of reversible mechanics; see "One filter, two surfaces."
@@ -312,10 +382,10 @@ When the interview is done, every item's section pins down the intent and the de
 
 ### Step 4. Master-plan approval gate
 
-Show the user the **complete master plan** as a single artifact:
+Show the user the master plan in one message, with enough in it to adopt on without opening the file:
 
 - Print the dashboard (status list).
-- Print each item's detail section, in order.
+- Print a digest of each item, in order: its title, what it does in a sentence or two, and any decision later items rest on. The detail sections stay in `PLAN.md` for the user to open; reprinting them here buries the disclosed decisions, which are the part that needs a reaction.
 - Print the **disclosed decisions**: the decide-and-disclose calls made during the interview. Number them globally (so the user can reply "3, 7, 8") but lay them out grouped under their parent item (e.g. "Item 4 → decisions 7–9"), so the unit the user scans is the item they already know, not a flat wall of forty. Each is one line with its cited rationale.
 - Self-triage the disclosed decisions; don't present them as equals. Lead with the handful you're least sure about: the ones closest to the ask/decide line, the ones whose authority is weakest or whose reversibility you're least certain of. Flag them for the user's eye ("worth a look: 3, 7"). The rest stand as a scannable, cited list the user can skim or ignore. The risk to avoid is a miscalibrated "all safe here" that buries a decision the user would have changed; when genuinely unsure, flag rather than bury.
 - End with one binary prompt: "Adopt this master plan as written, or reopen any decisions / change anything?"
@@ -527,30 +597,9 @@ Each item section must be self-contained: a blank-context subagent reading only 
 
 ## Failure modes to watch for
 
-- **Interleaving interview and implementation** — the antipattern this skill exists to prevent. If you catch yourself about to start implementing item N while item N+1 still has open questions, stop. The interview phase runs to completion before any implementation begins. The one exception is mid-item discovery during Step 5: surface, decide, update the plan, resume.
-- **Asking item-2 questions while implementing item-1** — same antipattern, different shape. If you're inside Step 5 and you find yourself about to ask a design question that wasn't in the master plan, stop. That question belonged in Step 3. Pause execution, surface it as a master-plan amendment, get the user's decision, update the plan, then resume.
-- **Bundling sub-questions** — if you catch yourself writing "...also..." or "Two sub-questions..." in a question, stop. Ask the first; wait; ask the next.
-- **Writing prose between tool calls during exploration** — if you emit a conclusion or a "confirmed: X" line mid-exploration and then continue reading code, the user has to scroll up to find it. All findings and conclusions belong in the single final message after exploration is complete. Stay silent during tool calls; write once at the end.
-- **Asking a question that only makes sense with the overview loaded** — referring back to "case C", "the repro", or a root cause established several messages ago without restating it inline. The user is answering one question at a time and shouldn't have to scroll up to reconstruct what the question is about. Restate the problem and the deciding evidence at the point of asking.
-- **Asking a decide-and-disclose question** — if a choice is cite-backed or reversible, you're interrupting the user for a decision you should make and disclose. The tell is an indifferent answer (a bare letter, "your call", "whatever's easiest"). Route it through the filter before it becomes an interview question.
-- **Over-specifying the plan** — pinning reversible mechanics the implementer should own. If an item's detail dictates internal structure or exact commands that nothing depends on, you've turned a goal into steps, the shape that defeats the point. Record intent and the decisions other work depends on; leave the rest.
-- **Burying a decision you're unsure about** — the Step 4 disclosed-decisions list is self-triaged. Presenting it as a flat equal wall, or burying a low-confidence call instead of flagging it, hands the user either overload or a silent wrong default. When in doubt, flag.
-- **Missing the `[recommended]` marker** — when there's a clear recommendation, mark it. The user relies on this signal.
-- **Forgetting to echo** — every recorded answer gets a one-line echo before the next question. The user catches misrecordings this way.
-- **Slipping into the intense, bold-and-em-dash voice** — see Conversational voice. In prose, plain paragraphs, claims stated once, importance argued rather than labeled. The functional formatting (options, recommended marker, status icons) is exempt; the prose around it is not.
-- **Plowing through auto mode** — auto mode is not license to skip the per-item gate or the four blocker thresholds. A subagent still hands off on any of the four; auto mode only defers the orchestrator's surfacing of it.
-- **The orchestrator doing item work inline** — in Step 5 the orchestrator spawns subagents; it does not read code or edit files. If you catch the orchestrator implementing an item itself, stop. That fills its context and discards the fresh-context guarantee.
-<!-- pln:only claude -->
-- **A subagent committing partial work** — a subagent commits only a complete, verified item. At a blocker it leaves changes uncommitted (or stashed, in auto mode) and writes a handoff file; it never commits a half-done item.
-<!-- pln:endonly -->
-<!-- pln:only codex -->
-- **Committing a partial item** — the orchestrator commits, and only for an item that came back complete and verified. At a blocker the work stays uncommitted (or stashed, in auto mode) behind a handoff file; nothing half-done is committed.
-<!-- pln:endonly -->
-- **A subagent improvising past a threshold** — if a discovery crosses a blocker threshold, the subagent stops and hands off. It must not guess the user's decision or silently push work outside the item's scope.
-- **A non-self-contained item section** — if an item's detail section can't be executed by a blank-context subagent reading only the dashboard plus that section, it's underspecified. The subagent is exactly that reader; fix the section, don't rely on conversation history.
+- **Asking an item-2 question while implementing item-1** — if you are inside Step 5 and about to ask a design question that wasn't in the master plan, stop. That question belonged in Step 3. Pause execution, surface it as a master-plan amendment, get the user's decision, update the plan, then resume.
 - **Dropping a cross-cutting concern from the subagent brief** — memory capture, mandated-skill invocation, and (when gated on) Psychic learning-capture happen during item work, which now runs in subagents. If the brief omits them, they silently stop happening. The brief carries every per-item concern.
 - **Inventing a verification gauntlet** — if you didn't read `CLAUDE.md` / `AGENTS.md` and find the actual commands, ask the user. Don't run guessed commands.
-- **Skipping a notification, or firing it after the text** — once the preamble confirms a channel is on, the three call sites (interview question, blocker, completion) aren't optional, and the call comes *before* the user-facing message, not after. Firing after is the wording that made an earlier version silently drop the call. A generic "pln needs you" is also a miss — name the actual item and question or outcome.
 <!-- pln:only claude -->
 - **`PushNotification` never loaded, so the call silently does nothing** — it is commonly a deferred tool; "call `PushNotification`" at a site does nothing unless the Notification setup preamble already ran `ToolSearch` (`select:PushNotification`). This fails with no error and nothing in the transcript. If a push is reported missing, first check the preamble ran and `notify_push` wasn't `false` — don't assume the tool misbehaved. (The desktop channel has no such trap: `pln-notify-desktop` is a plain script, always callable.)
 <!-- pln:endonly -->
@@ -558,14 +607,6 @@ Each item section must be self-contained: a blank-context subagent reading only 
 - **Calling the notifier by bare name, or through a variable a fresh shell doesn't have** — `pln-notify-desktop` is not on `PATH`, and `$_PLN_DIR` is resolved once in the preamble and gone by the next shell call. Every notify site runs the full path you resolved there. A bare `pln-notify-desktop` fails with `command not found`; `"$_PLN_DIR/bin/pln-notify-desktop"` in a later shell silently runs `/bin/pln-notify-desktop`, which doesn't exist either. Neither is visible to the user, who just doesn't get notified.
 <!-- pln:endonly -->
 - **Assuming Step 1 pre-flight runs on every invocation** — it only runs before writing a *new* plan skeleton. A "continue the plan" invocation or a reopened decision skips Step 1 entirely. Anything that must hold on every invocation regardless of new-vs-continuing — notification setup is the example — belongs in the top-of-file preamble, not inside Step 1.
-<!-- pln:only claude -->
-- **Checking `notify_desktop` yourself before calling the helper** — don't. `pln-notify-desktop` self-gates on the config and the platform; a redundant check just risks disagreeing with it. Call it unconditionally at each site. (Phone push is different: the model gates that one, via the preamble's `notify_push` read.)
-<!-- pln:endonly -->
-<!-- pln:only codex -->
-- **Checking `notify_desktop` yourself before calling the helper** — don't. `pln-notify-desktop` self-gates on the config and the platform; a redundant check just risks disagreeing with it. Call it unconditionally at each site, with no `pln-config get` probe in front of it.
-<!-- pln:endonly -->
-- **Forgetting the `WHAT_I_LEARNED_ABOUT_PSYCHIC_*.md` step when it's gated on** — only active when `RECORD_PSYCHIC_LEARNINGS` is set and pre-flight detected Dream/Psychic; when both hold, the file write is built into the subagent brief. When the env var is unset, the concern is off and Dream/Psychic is never mentioned.
-- **Persisting verification output to a file** — don't. Dashboard summary only.
 - **Trusting a remembered item cursor instead of `PLAN.md`'s status** — when building or resuming a run, the pending-item list comes from reading the dashboard fresh, not from what the orchestrator recalls doing earlier in the conversation. A stale cursor after a restart can re-spawn an item already marked ✅ done.
 <!-- pln:only claude -->
 - **Reading `args` as an object without parsing it first** — inside a Workflow script, `args` arrives as a JSON string regardless of how it was passed to the tool. Code that reads a field off it directly gets `undefined` silently; `JSON.parse(args)` first.
@@ -577,5 +618,3 @@ Each item section must be self-contained: a blank-context subagent reading only 
 - **Re-spawning a blocked item instead of resuming its thread** — a fresh agent knows nothing of the first attempt and starts the item over on top of the half-finished tree it left behind. Resume by thread id; a fresh agent is the fallback for when the resume genuinely fails, not the default. Losing the thread id is the same mistake one step earlier, which is why it goes into the handoff file the moment a `BLOCKED:` result arrives.
 - **Expecting the blocked agent to stash its own work** — it can't; `.git` is read-only to it, and `git stash` fails the same way `git commit` does. In auto mode the orchestrator stashes after reading the `BLOCKED:` result. If neither does it, the next item starts on a tree carrying half of the previous one.
 <!-- pln:endonly -->
-- **Using `<recommended>` (angle brackets) instead of `[recommended]` (square brackets)** — angle brackets get eaten by the renderer.
-- **Treating an item-scoped drop/abandon as ending the whole session** — when "drop", "abandon", "forget it", or similar arrives in answer to a question about one item, it scopes to that item: mark it 🚫 dropped and move to the next. Tearing down the entire interview on a one-word reply discards every answer gathered so far and is expensive to re-establish. Only an unambiguous whole-session signal ends the interview; when unsure, ask one clarifying question instead of exiting.

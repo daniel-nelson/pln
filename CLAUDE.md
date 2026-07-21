@@ -31,6 +31,10 @@ Every PR that changes skill behavior must include both:
 
 One open PR = one version. If scope grows mid-PR, bump the single version heading rather than creating a new entry. Merging to `main` is the publish event — do not create CHANGELOG entries for branches that never merge.
 
+## Opening PRs — this repo skips `/pln-pr`
+
+Always skip `/pln-pr` in this repository. This is the repo that ships `/pln-pr`, and its own changes are verified by the `tests/` gauntlet plus a manual install, not by pointing the review army at the source that defines it. So when `/pln` reaches its Step 8 ship hand-off, or when you are asked to open, create, put up, or "ship" a PR here, treat it as an explicit skip-the-review: commit, push, and open the PR directly with `gh pr create`. Do not invoke `/pln-pr`.
+
 ## Testing
 
 Run every script in `tests/` before opening a PR — each needs only bash and git, no network, no Codex install, and none of them writes to the working tree. Both must print `OK`:

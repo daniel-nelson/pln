@@ -28,6 +28,8 @@ Open Codex and paste:
 Install pln: run `git clone https://github.com/daniel-nelson/pln.git ~/.agents/skills/pln && cd ~/.agents/skills/pln && ./setup`
 ```
 
+Codex loads skills from both `~/.agents/skills/` and `~/.codex/skills/`. `~/.agents/skills/pln` is the path to use — it is the one Codex documents, and it is where `/pln-update` looks.
+
 ### Install via `npx skills`
 
 ```bash
@@ -36,12 +38,16 @@ npx skills add daniel-nelson/pln
 
 It will prompt you for which agent to install to. For more details, see [vercel-labs/skills](https://github.com/vercel-labs/skills).
 
+Then run `./setup` in the directory it installed to. `npx skills` copies files; it doesn't run a repo's install script, and pln's `setup` is what builds the skill files for your host (see below). Running it twice is harmless, so run it either way if you're unsure.
+
 ### What gets installed
 
-- `pln` skill in `~/.claude/skills/pln/`
+- `pln` skill in `~/.claude/skills/pln/` (Claude Code) or `~/.agents/skills/pln/` (Codex)
 - `/pln-pr` slash command (symlinked from `pln/pln-pr/`) for reviewing a branch and opening a pull request
 - `/plnify` slash command (symlinked from `pln/plnify/`) for installing pln's discipline into gstack
 - `/pln-update` slash command (symlinked from `pln/pln-update/`) for updating pln
+
+`./setup` also builds the skill files for the host it was installed under, working the host out from the install path. Claude Code and Codex drive agents differently, so each build carries only its own host's mechanics rather than a page of "if you are on the other host, ignore this". That is the one reason the clone alone isn't enough: without `./setup` the skill files are placeholders that say so. If you cloned somewhere the path doesn't name a host, run `PLN_HOST=codex ./setup` (or `PLN_HOST=claude ./setup`).
 
 Everything lives inside your assistant's skills directory. Nothing touches your PATH or runs in the background.
 
@@ -56,13 +62,31 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 
 ## How it works
 
-**`/pln`** runs a complete interview phase before writing a single line of code. For each item it proposes an approach, asks one question at a time, and records every decision into a `PLAN.md`. Once you approve the master plan, the main session becomes a thin orchestrator and implements the whole plan autonomously: it spawns a fresh subagent for each item in turn, with `PLAN.md` as the spec, so the plan runs to completion without per-item intervention. If a subagent hits something the plan didn't settle, it hands off — leaving its work uncommitted with a handoff note — and the orchestrator surfaces a single question, records your answer, and resumes from where it stopped. Plans are saved to `./plans/<date>-<slug>/PLAN.md` relative to wherever you launched Claude.
+**`/pln`** runs a complete interview phase before writing a single line of code. For each item it proposes an approach, asks one question at a time, and records every decision into a `PLAN.md`. Once you approve the master plan, the main session becomes a thin orchestrator and implements the whole plan autonomously: it spawns a fresh subagent for each item in turn, with `PLAN.md` as the spec, so the plan runs to completion without per-item intervention. If a subagent hits something the plan didn't settle, it hands off — leaving its work uncommitted with a handoff note — and the orchestrator surfaces a single question, records your answer, and resumes from where it stopped. Plans are saved to `./plans/<date>-<slug>/PLAN.md` relative to wherever you launched your agent.
 
 The peer posture is built in: during the interview phase, pln will disagree with your framing if it sees a problem, bring up considerations you didn't name, and stop after one question rather than overwhelming you with options. The goal is a plan *you* shaped, not one that was handed to you.
 
-**`/pln-pr`** is the ship half of a plan. After a `/pln` run (or on any branch ahead of its base), it reviews the diff, fixes what the review finds, verifies once, and opens the pull request. A review army of fresh-context subagents runs in parallel — six lenses (correctness, security, data, testing, maintainability, performance) plus an adversarial pass, and an optional Codex cross-model pass if you have it installed. Every finding has to quote the exact line that proves it, which keeps false positives out. Findings land in a durable `REVIEW.md` beside the plan, fixes run as subagents clustered by file so they never collide, decisions come to you one at a time, and the full test suite runs **once** at the end instead of after every fix — the loop that makes a naive review-and-fix pass thrash. It depends only on git, the harness tools, and optionally the GitHub/GitLab CLI and Codex; there's no external service and nothing to configure. So that a compound request like "bump the version and open the PR" still routes through the review instead of bypassing it, install offers a small opt-in routing rule for your global instructions — previewed, and written only if you say yes.
+**`/pln-pr`** is the ship half of a plan. After a `/pln` run (or on any branch ahead of its base), it reviews the diff, fixes what the review finds, verifies once, and opens the pull request. A review army of fresh-context agents covers six lenses (correctness, security, data, testing, maintainability, performance) plus an adversarial pass. On Claude Code they all run in parallel, plus an optional Codex cross-model pass if you have it installed; on Codex the army is `codex review` for the broad ground followed by the lenses it underweights, one at a time (see [Hosts](#hosts)). Every finding has to quote the exact line that proves it, which keeps false positives out. Findings land in a durable `REVIEW.md` beside the plan, fixes run as agents clustered by file so they never collide, decisions come to you one at a time, and the full test suite runs **once** at the end instead of after every fix — the loop that makes a naive review-and-fix pass thrash. It depends only on git, your agent's own tools, and optionally the GitHub/GitLab CLI; there's no external service and nothing to configure. So that a compound request like "bump the version and open the PR" still routes through the review instead of bypassing it, install offers a small opt-in routing rule for your global instructions — previewed, and written only if you say yes.
 
-**`/plnify gstack`** is a one-time setup step for [gstack](https://github.com/daniel-nelson/gstack) users. It appends two sections to your `~/.claude/CLAUDE.md` — interaction rules and an exploratory-mode posture — that apply pln's discipline to gstack planning skills like `/office-hours`, `/plan-ceo-review`, and `/plan-eng-review`. It shows you exactly what will be written and asks for approval before touching anything. The rules only fire when a gstack planning skill is active; they don't affect general conversation.
+**`/plnify gstack`** is a one-time setup step for [gstack](https://github.com/daniel-nelson/gstack) users, and the one piece of the suite that is Claude Code only — gstack is a Claude Code skill suite. It appends two sections to your `~/.claude/CLAUDE.md` — interaction rules and an exploratory-mode posture — that apply pln's discipline to gstack planning skills like `/office-hours`, `/plan-ceo-review`, and `/plan-eng-review`. It shows you exactly what will be written and asks for approval before touching anything. The rules only fire when a gstack planning skill is active; they don't affect general conversation.
+
+## Hosts
+
+pln runs on **Claude Code** and **Codex**. `./setup` works out which from the install path and builds the skill files for it, so what your agent reads is the mechanics of the host it is actually on.
+
+The plan is the same on both hosts, and so is the `PLAN.md` and the review ledger. What changes is the machinery underneath:
+
+| | Claude Code | Codex |
+|---|---|---|
+| Fresh-context agents | the harness `Workflow` / `Agent` tools | `codex exec`, one process per agent |
+| `/pln` implementation loop | one Workflow script drives every item | the orchestrator drives the loop from the shell |
+| Resuming a blocked item | `resumeFromRunId` | `codex exec resume <thread-id>` |
+| Who commits | the item agent | the orchestrator — a sandboxed Codex agent has `.git` read-only |
+| `/pln-pr` review army | seven reviewers in parallel, plus an optional Codex cross-model pass | `codex review`, then a subset of lenses one at a time |
+| Notifications | phone push + desktop | desktop |
+| `/plnify gstack` | yes | gstack is a Claude Code skill suite |
+
+Two of those need a sentence. Codex reviewers run one at a time because concurrent `codex` processes race on the shared OAuth token file; that costs wall-clock and buys correctness. And a Codex agent runs sandboxed with `.git` read-only, so it writes files and reports back while the session that spawned it does the committing. The invariant is the same on both hosts: no partial item is ever committed.
 
 ## Upgrading
 
@@ -99,6 +123,18 @@ Each toggles independently in `~/.pln/config.yaml`:
 
 ## Uninstalling
 
+If you added the `/pln-pr` routing rule to your global instructions, strip it first, while the helper is still on disk — it removes the block from whichever file it wrote to (`~/.claude/CLAUDE.md` on Claude Code, `$CODEX_HOME/AGENTS.md` on Codex):
+
+```bash
+# Claude Code
+~/.claude/skills/pln/bin/pln-routing-rule --remove
+
+# Codex
+~/.agents/skills/pln/bin/pln-routing-rule --remove
+```
+
+It's idempotent, so it's safe to run whether or not you ever added the rule. Then remove the skill:
+
 ```bash
 # Claude Code
 rm -rf ~/.claude/skills/pln && rm -f ~/.claude/skills/plnify ~/.claude/skills/pln-update ~/.claude/skills/pln-pr
@@ -106,8 +142,6 @@ rm -rf ~/.claude/skills/pln && rm -f ~/.claude/skills/plnify ~/.claude/skills/pl
 # Codex
 rm -rf ~/.agents/skills/pln && rm -f ~/.agents/skills/plnify ~/.agents/skills/pln-update ~/.agents/skills/pln-pr
 ```
-
-If you added the `/pln-pr` routing rule to your global instructions, strip it with `pln/bin/pln-routing-rule --remove` (idempotent — safe to run either way).
 
 To also remove update-check state: `rm -rf ~/.pln`.
 

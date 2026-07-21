@@ -22,4 +22,4 @@ One open PR = one version. If scope grows mid-PR, bump the single version headin
 
 ## Testing
 
-Install the skill locally, restart Claude Code, and exercise the changed behavior manually before opening a PR. For `/pln`: run a multi-item task end-to-end. For `/plnify`: test against a CLAUDE.md that already has the sections (should bail) and one that doesn't (should write correctly).
+Install the skill locally, restart Claude Code, and exercise the changed behavior manually before opening a PR. For `/pln`: run a multi-item task end-to-end. For `/plnify`: test against a CLAUDE.md that already has the sections (should bail) and one that doesn't (should write correctly). For `/pln-pr`: run `bash tests/routing-rule.sh` (must print `OK`) to check the `bin/pln-routing-rule` helper across all RESULT states, then manually exercise the install/offer path — trigger the offer via `setup` or `/pln-update` Step 2.5 and confirm it routes a PR request through the skill.

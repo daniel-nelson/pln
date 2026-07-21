@@ -127,6 +127,42 @@ done
 mkdir -p ~/.pln && rm -f ~/.pln/last-update-check ~/.pln/update-snoozed
 ```
 
+### Step 2.5: Offer the /pln-pr routing rule (optional, one-time)
+
+`/pln-pr` runs a review army before opening a PR, but a compound instruction like
+"bump the version and open the PR" can bypass it — the host executes the git steps
+literally instead of routing to the skill. A short rule in the user's global
+instructions fixes that. This is opt-in: offer it once, never write without a yes.
+
+This is opt-in and one-time. The `pln-routing-rule --offer` helper owns the
+whole gate — it checks `routing_prompted`, whether the rule is already present,
+and whether a Claude Code global target exists, and only emits the offer when all
+three say go. Just locate the helper and relay its output:
+
+```bash
+ROUTING=""
+[ -n "$APPLY" ] && ROUTING="$(dirname "$APPLY")/pln-routing-rule"
+if [ -z "$ROUTING" ] || [ ! -x "$ROUTING" ]; then
+  for d in "${CLAUDE_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" ".agents/skills/pln" ".claude/skills/pln"; do
+    [ -n "$d" ] && [ -x "$d/bin/pln-routing-rule" ] && ROUTING="$d/bin/pln-routing-rule" && break
+  done
+fi
+if [ -z "$ROUTING" ] || [ ! -x "$ROUTING" ]; then
+  echo "NO_ROUTING_SCRIPT"   # this copy predates the helper; skip
+else
+  "$ROUTING" --offer
+fi
+```
+
+Read the `RESULT` line from the `--offer` output:
+
+- `NO_ROUTING_SCRIPT` or `RESULT: skip` — nothing to do (offered before, already
+  present, or no Claude Code target); move on to Step 3 silently.
+- `RESULT: offer` — the emitted block is agent-directed and self-contained: it
+  includes the previewed rule and the exact `--apply` / `pln-config set
+  routing_prompted true` commands to run on yes vs. no. **Ask the user** whether
+  to add the rule (show the previewed block), then follow those instructions.
+
 ### Step 3: Show what's new
 
 Read `CHANGELOG.md` from any upgraded copy (e.g. the `$APPLY` dir). Summarize the

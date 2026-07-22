@@ -124,6 +124,28 @@ Some of this skill's work is worth putting to a **peer**: a model other than the
 
 <!-- pln:include peer-consult -->
 
+## The plan review switch
+
+Before the approval gate, the finished plan itself goes under review (Step 3.5): a reader that never saw the interview argues with the plan and checks its claims against the files it names. It is on by default, and exactly two things turn it off — a standing preference in config, and an instruction in the session. Nothing else does. **The size of the plan never does:** a two-item plan and a twelve-item plan get the same review. There is no small-plan shortcut, because the reviewer's cost is reading the plan and checking its claims, which already scales with the plan, and because the short plan is regularly the dangerous one — two items that change how every future run behaves are worth more scrutiny than nine items of one-line edits.
+
+**The standing preference** is `plan_review` in `~/.pln/config.yaml`, read once where the review would start:
+
+```bash
+{{SKILL_DIR}}/bin/pln-config get plan_review
+```
+
+`false` or `no` means off, for every plan in every repository. Anything else — including absent, which is what an install that has never been told otherwise reads — means on. Off is a clean no-op rather than a degraded run: no brief is assembled, no peer is selected, no consent question is raised, and Step 4 is exactly the gate it would have been without the step. Don't announce the skip; a line explaining what didn't happen is noise on every plan of a user who already opted out. `{{SKILL_DIR}}/bin/pln-config set plan_review false` turns it off, `true` back on.
+
+**A spoken instruction wins over the key, for that run only**, in both directions — "skip the review" where the key is on, "review this one" where it is off — and never writes to config. Config is the standing preference; a sentence is about this plan. Honor it whenever it arrives before the gate, including mid-interview, and don't literal-match: infer the intent from natural phrasing, the way the defer / drop / think-offline signals are inferred.
+
+The review has three parts that can be switched off separately, and an instruction naming one leaves the others running:
+
+- **The whole step** — "skip the review", "no review this time", "straight to the gate". Step 3.5 doesn't run.
+- **The peer** — "skip the cross-model pass", "don't send it anywhere", "keep it local". The review still runs, on a fresh same-model agent, exactly as if no peer had been available. Treat it as a `peer_consent` of `false` for that run: nothing is sent, no consent question is raised, and the result says which rung ran as always.
+- **Applying anything** — "just tell me, don't change the plan", "flag everything". The review runs and every finding reaches the gate flagged; nothing is written into `PLAN.md`.
+
+An instruction broader than any one of those (a bare "skip it") is the whole step. When it is genuinely ambiguous which part is meant, ask one short question instead of guessing — guessing wrong either sends a plan the user meant to keep on the machine, or throws away a review they wanted.
+
 ## The workflow (sequential steps)
 
 Steps 1–8 run in order, top to bottom. The skill has two distinct conversational phases separated by an explicit approval gate:

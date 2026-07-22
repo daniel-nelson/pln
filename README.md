@@ -82,9 +82,23 @@ The plan is the same on both hosts, and so is the `PLAN.md` and the review ledge
 
 Two of those need a sentence. Codex reviewers run one at a time because concurrent `codex` processes race on the shared OAuth token file; that costs wall-clock and buys correctness. And a Codex agent runs sandboxed with `.git` read-only, so it writes files and reports back while the session that spawned it does the committing. The invariant is the same on both hosts: no partial item is ever committed.
 
+## The plan review
+
+Before you're asked to adopt a master plan, the plan itself goes under review: a reader that never saw the interview goes through it cold, argues with it, and checks its factual claims against the files it names. Plain mistakes are corrected in the plan; anything that turns on your taste or your call arrives at the approval gate flagged, numbered alongside everything else you can reopen there. Where you have a second agent CLI it's a different model doing the reading (see [Second opinions](#second-opinions)); where you don't, it's a fresh agent of the same one.
+
+It runs on every plan — there's no shortcut for a short one, because a two-item plan that changes how everything afterwards behaves is often the riskier one. Two ways to switch it off:
+
+- **For good**, in `~/.pln/config.yaml`:
+
+  ```bash
+  ~/.claude/skills/pln/bin/pln-config set plan_review false
+  ```
+
+- **For one plan**, by saying so before the gate: "skip the review". You can switch off just part of it, too — "skip the cross-model pass" keeps the review but keeps the plan on your machine, and "flag everything" runs it without letting it change the plan. Saying so never changes the config setting, and it works in the other direction as well: "review this one" on a machine where the key is off.
+
 ## Second opinions
 
-Where a second model is worth more than another run of the same one — `/pln-pr`'s cross-model pass — pln reaches for an agent CLI that isn't the one running your session, in this order:
+Where a second model is worth more than another run of the same one — the plan review above, `/pln-pr`'s cross-model pass — pln reaches for an agent CLI that isn't the one running your session, in this order:
 
 1. **A command you named.** `peer_command` in `~/.pln/config.yaml` is your whole invocation, so it can be a tool pln has never heard of. The contract is a pipe: it reads its prompt on stdin and writes its answer on stdout.
 

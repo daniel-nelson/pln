@@ -1,0 +1,299 @@
+#!/usr/bin/env bash
+# pln-peer — pick the agent that gives pln's second opinion, and run it.
+#
+# One ladder, used everywhere in the suite (the plan review before /pln's
+# approval gate, /pln-pr's cross-model pass), so no skill carries probe logic of
+# its own and no host is a special case of the other. Three rungs, in order:
+#
+#   1. a command the user named in config (`peer_command`). It is their whole
+#      invocation, so this rung covers any tool pln has never heard of.
+#   2. a known agent CLI on PATH, skipping whichever one is hosting this
+#      session. Running under Codex this reaches for Claude; running under
+#      Claude it reaches for Codex.
+#   3. nothing. The caller spawns a fresh same-model agent through its own
+#      harness instead — which is not a consolation prize. The review always
+#      runs; the rung only says who ran it.
+#
+# Only rungs whose invocation has actually been reproduced ship as probes:
+# `claude` and `codex`. A probe that finds a command and calls it wrong is worse
+# than finding nothing, so every other tool arrives through rung 1, where the
+# user supplies the invocation.
+#
+# Being on PATH is not being usable, so a probe also asks whether the CLI is
+# authenticated, under its own short timeout. An unauthenticated peer falls
+# through to the next rung rather than failing the run.
+#
+# Rungs 1 and 2 send the brief to another vendor's CLI: it leaves the machine
+# and it may spend the user's quota.
+#
+# Usage:
+#   pln-peer --brief <file> --out <file> [options]
+#   pln-peer --which                     report the selection, run nothing
+#
+#   --brief FILE     the peer's entire prompt (required unless --which).
+#   --out FILE       where the peer's answer is written (required unless
+#                    --which).
+#   --log FILE       the peer's stderr / event trace (default: <out>.log).
+#   --cd DIR         the peer's working root (default: the git top level, else
+#                    the current directory).
+#   --add-dir DIR    an extra readable directory, repeatable — e.g. a plan dir
+#                    outside the repo.
+#   --timeout SECS   ceiling on a hung run (default 1800; 0 disables).
+#   --model NAME     model override, where the peer takes one. Ignored on rung
+#                    1: a configured command is complete as written.
+#   --host NAME      override host detection (claude|codex). Mostly for tests.
+#   --dry-run        report the selection and print the command, run nothing.
+#
+# The rung-1 contract, which is also what a user configuring `peer_command` is
+# promising: the command reads its prompt on stdin and writes its answer to
+# stdout. Nothing else is assumed about it.
+#
+#   pln-config set peer_command "gemini -p"
+#
+# Prints exactly five KEY=VALUE lines on stdout and nothing else:
+#
+#   RUNG=1|2|3
+#   PEER=<the command that ran, or 'none' on rung 3>
+#   STATUS=ok|empty|timeout|error|none
+#   RESULT_FILE=<path, empty on rung 3>
+#   LOG_FILE=<path, empty on rung 3>
+#
+# Exit codes: 0 a peer ran and wrote a result · 2 usage error · 3 no peer is
+# available, so the caller falls back to a fresh same-model agent (rung 3) ·
+# 4 a peer was selected, ran, and failed.
+set -uo pipefail
+
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+BRIEF=""
+OUT=""
+LOG=""
+CD_DIR=""
+TIMEOUT_SECS="1800"
+MODEL=""
+HOST=""
+WHICH=0
+DRY_RUN=0
+ADD_DIRS=()
+
+usage() {
+  cat >&2 <<'USAGE'
+Usage: pln-peer --brief <file> --out <file> [options]
+       pln-peer --which
+
+  --brief FILE     the peer's entire prompt (required unless --which)
+  --out FILE       where its answer is written (required unless --which)
+  --log FILE       the peer's stderr / event trace (default: <out>.log)
+  --cd DIR         working root (default: git top level, else PWD)
+  --add-dir DIR    extra readable directory (repeatable)
+  --timeout SECS   ceiling on a hung run (default 1800; 0 disables)
+  --model NAME     model override where the peer takes one
+  --host NAME      override host detection (claude|codex)
+  --which          report the selection and exit without running anything
+  --dry-run        report the selection and print the command, run nothing
+USAGE
+  exit 2
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --brief) BRIEF="${2:-}"; shift 2 ;;
+    --out) OUT="${2:-}"; shift 2 ;;
+    --log) LOG="${2:-}"; shift 2 ;;
+    --cd) CD_DIR="${2:-}"; shift 2 ;;
+    --add-dir) ADD_DIRS+=("${2:-}"); shift 2 ;;
+    --timeout) TIMEOUT_SECS="${2:-}"; shift 2 ;;
+    --model) MODEL="${2:-}"; shift 2 ;;
+    --host) HOST="${2:-}"; shift 2 ;;
+    --which) WHICH=1; shift ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    -h | --help) usage ;;
+    *) echo "pln-peer: unknown argument '$1'" >&2; usage ;;
+  esac
+done
+
+if [ "$WHICH" = "0" ]; then
+  [ -n "$BRIEF" ] && [ -n "$OUT" ] || usage
+  [ -f "$BRIEF" ] || { echo "pln-peer: no brief file at '$BRIEF'" >&2; exit 2; }
+  [ -s "$BRIEF" ] || { echo "pln-peer: brief file '$BRIEF' is empty" >&2; exit 2; }
+fi
+case "$TIMEOUT_SECS" in
+  '' | *[!0-9]*) echo "pln-peer: --timeout must be a whole number of seconds" >&2; exit 2 ;;
+esac
+case "$HOST" in
+  '' | claude | codex) ;;
+  *) echo "pln-peer: --host must be claude or codex" >&2; exit 2 ;;
+esac
+
+report() { # report <rung> <peer> <status> <result-file> <log-file>
+  echo "RUNG=$1"
+  echo "PEER=$2"
+  echo "STATUS=$3"
+  echo "RESULT_FILE=$4"
+  echo "LOG_FILE=$5"
+}
+
+# Same fallback the agent helpers use: coreutils installs timeout(1) as
+# gtimeout on macOS, and neither being present must not stop a run.
+timeout_cmd() { # timeout_cmd <secs> — prints the wrapper, or nothing
+  [ "$1" = "0" ] && return 0
+  if command -v timeout >/dev/null 2>&1; then
+    printf 'timeout\n-k\n10\n%s\n' "$1"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    printf 'gtimeout\n-k\n10\n%s\n' "$1"
+  fi
+}
+PROBE_WRAP=()
+while IFS= read -r w; do [ -n "$w" ] && PROBE_WRAP+=("$w"); done < <(timeout_cmd 20)
+
+# ── rung 1: the user's own invocation ────────────────────────────────────────
+PEER_COMMAND=""
+if [ -x "$SELF_DIR/pln-config" ]; then
+  PEER_COMMAND="$("$SELF_DIR/pln-config" get peer_command 2>/dev/null || true)"
+fi
+
+# ── rung 2: a known CLI on PATH that is not the one hosting this session ─────
+if [ -z "$PEER_COMMAND" ] && [ -z "$HOST" ] && [ -x "$SELF_DIR/pln-host" ]; then
+  HOST="$("$SELF_DIR/pln-host" 2>/dev/null || true)"
+fi
+
+authenticated() { # authenticated <claude|codex>
+  case "$1" in
+    claude)
+      # `claude auth status` prints JSON and exits 0 when signed in. Both halves
+      # matter: a future build that reports "not logged in" on exit 0 must not
+      # read as usable.
+      local out
+      out="$("${PROBE_WRAP[@]+"${PROBE_WRAP[@]}"}" claude auth status 2>/dev/null < /dev/null)" || return 1
+      case "$out" in
+        *'"loggedIn": false'* | *'"loggedIn":false'*) return 1 ;;
+      esac
+      [ -n "$out" ] || return 1
+      ;;
+    codex)
+      "${PROBE_WRAP[@]+"${PROBE_WRAP[@]}"}" codex login status >/dev/null 2>&1 < /dev/null || return 1
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+PEER=""
+if [ -z "$PEER_COMMAND" ]; then
+  # The order only decides between two peers that are both installed and not
+  # hosting the session, which two known agents can never be; it is here so
+  # adding a third stays a one-line change.
+  for candidate in claude codex; do
+    [ "$candidate" = "$HOST" ] && continue
+    command -v "$candidate" >/dev/null 2>&1 || continue
+    authenticated "$candidate" || continue
+    PEER="$candidate"
+    break
+  done
+fi
+
+# ── rung 3: nobody. The caller's own harness runs the review ─────────────────
+if [ -z "$PEER_COMMAND" ] && [ -z "$PEER" ]; then
+  report 3 none none "" ""
+  exit 3
+fi
+
+RUNG=2
+PEER_LABEL="$PEER"
+if [ -n "$PEER_COMMAND" ]; then
+  RUNG=1
+  # The label is what a user sees at the gate ("reviewed by gemini"), so take
+  # the command's own name rather than the whole line.
+  set -- $PEER_COMMAND
+  PEER_LABEL="$(basename "${1:-peer_command}")"
+fi
+
+if [ "$WHICH" = "1" ]; then
+  report "$RUNG" "$PEER_LABEL" none "" ""
+  exit 0
+fi
+
+[ -n "$LOG" ] || LOG="$OUT.log"
+if [ -z "$CD_DIR" ]; then
+  CD_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+fi
+
+ADD_ARGS=()
+for d in ${ADD_DIRS+"${ADD_DIRS[@]}"}; do
+  [ -n "$d" ] && ADD_ARGS+=(--add-dir "$d")
+done
+
+# ── run it ───────────────────────────────────────────────────────────────────
+if [ "$RUNG" = "1" ]; then
+  for f in "$OUT" "$LOG"; do
+    d="$(dirname "$f")"
+    [ -d "$d" ] || mkdir -p "$d" || { echo "pln-peer: cannot create '$d'" >&2; exit 2; }
+  done
+  : > "$OUT" || { echo "pln-peer: cannot write '$OUT'" >&2; exit 2; }
+  : > "$LOG" || { echo "pln-peer: cannot write '$LOG'" >&2; exit 2; }
+
+  RUN_WRAP=()
+  while IFS= read -r w; do [ -n "$w" ] && RUN_WRAP+=("$w"); done < <(timeout_cmd "$TIMEOUT_SECS")
+
+  if [ "$DRY_RUN" = "1" ]; then
+    printf 'cd %q && ' "$CD_DIR" >&2
+    printf '%q ' "${RUN_WRAP[@]+"${RUN_WRAP[@]}"}" >&2
+    printf 'sh -c %q < %q > %q 2> %q\n' "$PEER_COMMAND" "$BRIEF" "$OUT" "$LOG" >&2
+    report 1 "$PEER_LABEL" ok "$OUT" "$LOG"
+    exit 0
+  fi
+
+  rc=0
+  ( cd "$CD_DIR" && "${RUN_WRAP[@]+"${RUN_WRAP[@]}"}" sh -c "$PEER_COMMAND" ) \
+    < "$BRIEF" > "$OUT" 2> "$LOG" || rc=$?
+
+  STATUS="ok"
+  EXIT=0
+  if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+    STATUS="timeout"; EXIT=4
+    echo "pln-peer: the configured peer hit the ${TIMEOUT_SECS}s ceiling and was killed." >&2
+  elif [ "$rc" -ne 0 ]; then
+    STATUS="error"; EXIT=4
+    echo "pln-peer: the configured peer exited $rc — see $LOG." >&2
+  elif [ ! -s "$OUT" ]; then
+    STATUS="empty"; EXIT=4
+    echo "pln-peer: the configured peer exited 0 but wrote no answer — treat as a failed run." >&2
+  fi
+  report 1 "$PEER_LABEL" "$STATUS" "$OUT" "$LOG"
+  exit "$EXIT"
+fi
+
+# Rung 2 goes through the helper that owns that CLI's guards, so this script
+# never reproduces an invocation a second time.
+HELPER_ARGS=(--brief "$BRIEF" --out "$OUT" --cd "$CD_DIR" --timeout "$TIMEOUT_SECS")
+[ "$DRY_RUN" = "1" ] && HELPER_ARGS+=(--dry-run)
+case "$PEER" in
+  claude)
+    HELPER="$SELF_DIR/pln-claude-agent"
+    HELPER_ARGS+=(--log "$LOG")
+    [ -n "$MODEL" ] && HELPER_ARGS+=(--model "$MODEL")
+    ;;
+  codex)
+    HELPER="$SELF_DIR/pln-codex-agent"
+    # A peer only reads; the events file is that helper's log.
+    HELPER_ARGS+=(--events "$LOG" --sandbox read-only)
+    [ -n "$MODEL" ] && HELPER_ARGS+=(--model "$MODEL")
+    ;;
+esac
+HELPER_ARGS+=(${ADD_ARGS[@]+"${ADD_ARGS[@]}"})
+
+[ -x "$HELPER" ] || {
+  echo "pln-peer: $PEER is available but $(basename "$HELPER") is missing from $SELF_DIR — falling back." >&2
+  report 3 none none "" ""
+  exit 3
+}
+
+rc=0
+helper_out="$("$HELPER" "${HELPER_ARGS[@]}")" || rc=$?
+STATUS="$(printf '%s\n' "$helper_out" | sed -n 's/^STATUS=//p' | tail -1)"
+[ -n "$STATUS" ] || STATUS="error"
+# A helper that cannot run at all (CLI vanished between the probe and the call)
+# is a fallback, not a failed review.
+[ "$rc" -eq 3 ] && { report 3 none none "" ""; exit 3; }
+report 2 "$PEER" "$STATUS" "$OUT" "$LOG"
+[ "$rc" -eq 0 ] || exit 4
+exit 0

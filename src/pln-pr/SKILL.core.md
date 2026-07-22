@@ -52,10 +52,10 @@ This skill follows pln's discipline. Never call the `AskUserQuestion` tool. Surf
 ## Hard constraints (no exceptions)
 
 <!-- pln:only claude -->
-- **No dependency on any external service or the gstack ecosystem.** git, `gh`/`glab` (optional), the harness Agent/Workflow tools, and optionally `codex` are the only tools. If a tool is absent, degrade gracefully and continue.
+- **No dependency on any external service or the gstack ecosystem.** git, `gh`/`glab` (optional), the harness Agent/Workflow tools, and optionally a peer agent CLI (`codex`, or whatever `peer_command` names) are the only tools. If a tool is absent, degrade gracefully and continue.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-- **No dependency on any external service or the gstack ecosystem.** git, `gh`/`glab` (optional), and the `codex` CLI itself are the only tools. If a tool is absent, degrade gracefully and continue.
+- **No dependency on any external service or the gstack ecosystem.** git, `gh`/`glab` (optional), the `codex` CLI itself, and optionally a peer agent CLI (`claude`, or whatever `peer_command` names) are the only tools. If a tool is absent, degrade gracefully and continue.
 <!-- pln:endonly -->
 - **Never re-run the full gauntlet after a fix cycle.** At most two full-suite runs happen in a flow: an *optional* pre-review baseline (Step 2, skipped whenever a green baseline already exists) and the *mandatory* post-fix run (Step 7, on the final tree). Fixes accumulate between them; the gauntlet never runs per fix cycle. This is the whole reason this skill exists instead of a re-run loop.
 - **Reviewers run in fresh context.** Every reviewer and fix agent is a blank-slate agent. The orchestrator does not read code or apply fixes itself.
@@ -69,6 +69,12 @@ Every reviewer, fix pass, and verification run below is a **fresh-context agent*
 How to spawn one on this host:
 
 <!-- pln:include spawn-agent -->
+
+## Consulting a peer model
+
+Every reviewer this skill spawns is the same model as the orchestrator spawning it. The cross-model pass in Step 3 is the one that isn't, and it goes through the same picker `/pln` uses — neither skill carries its own probe, and neither host is a special case of the other. Below, `$PLN_BIN` stands for `$_PLN_DIR/bin`, the directory the preamble resolved — substitute the real path, since each shell call starts fresh and the variable does not persist.
+
+<!-- pln:include peer-consult -->
 
 ## The workflow (sequential steps)
 
@@ -133,7 +139,7 @@ If anything fails, the branch is not shippable as-is. Surface the failures in on
 the **security** and **correctness** lenses (below) plus the adversarial pass, and the cross-model pass if available — then go to Step 4.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-the `codex review` pass, the **security** lens (below), and the adversarial pass — then go to Step 4.
+the `codex review` pass, the **security** lens (below), and the adversarial pass, plus the cross-model pass if a peer is available — then go to Step 4.
 <!-- pln:endonly -->
 Never drop to adversarial-only: a tiny diff can still be the highest-risk change (an auth check, a config flag, a credential path), and a checklist lens is what catches those.
 <!-- pln:only claude -->
@@ -176,6 +182,10 @@ Plus the **adversarial pass** — a generalist with no checklist, prompted to br
 
 <!-- pln:include pr-review-invoke -->
 
+**The cross-model pass.** One more adversarial pass, from a model that is not the one running the lenses above, through the picker in Consulting a peer model. Its brief is the adversarial prompt plus the diff itself — `git diff "$DIFF_BASE"` written into the brief file, since the peer may have no way to read the repository — and it ends: "Be adversarial. No compliments. End with one line: `Recommendation: <action> because <one-line reason naming the most exploitable finding>`." Translate what comes back into the findings schema, `file:line` and quoted code included, and fold it into the merged set below.
+
+`RUNG=3` (no peer available) is where this pass **skips**, with a one-line note — a same-model rerun of an army that is already this model buys wall-clock and no independence. A peer that ran and failed skips the same way. Either way, say which in one line, and carry the result into the reviewer count in Step 3.1.
+
 ### Step 3.1. Merge, gate, and write the ledger
 
 **Fail closed first.** Before merging anything, confirm the review actually ran. Require **at least one successful reviewer**:
@@ -183,15 +193,15 @@ Plus the **adversarial pass** — a generalist with no checklist, prompted to br
 a lens or adversarial agent that completed, or a completed cross-model pass.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-a lens or adversarial agent that completed, or a `codex review` pass that came back with a summary.
+a lens or adversarial agent that completed, a `codex review` pass that came back with a summary, or a completed cross-model pass.
 <!-- pln:endonly -->
 If none succeeded, you have no coverage, not a clean bill of health. Do not write an empty `REVIEW.md` and do not proceed to the PR. Stop, say plainly that the review could not run, and let the user retry or review manually. An empty *merged findings* set is only "clean" when it comes from reviewers that ran and found nothing.
 
 <!-- pln:only claude -->
-Collect every reviewer's findings (plus Codex's, translated into the same shape).
+Collect every reviewer's findings, plus the cross-model pass's, translated into the same shape.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-Collect every reviewer's findings, plus stage 1's, translated into the same shape.
+Collect every reviewer's findings, plus stage 1's and the cross-model pass's, translated into the same shape.
 <!-- pln:endonly -->
 
 - **Deduplicate** by `file:line`. When two or more lenses report the same location, keep the highest-confidence one, tag it "confirmed by {lenses}", and raise its confidence by 1 (cap 10).

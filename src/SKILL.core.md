@@ -118,6 +118,12 @@ How to spawn one on this host:
 
 <!-- pln:include spawn-agent -->
 
+## Consulting a peer model
+
+Some of this skill's work is worth putting to a **peer**: a model other than the one running this session, asked to check what that model produced. A fresh agent on this host is a fresh context; a peer is a fresh context *and* a different set of blind spots. Below, `$PLN_BIN` stands for `{{SKILL_DIR}}/bin` — substitute the real path when you run it.
+
+<!-- pln:include peer-consult -->
+
 ## The workflow (sequential steps)
 
 Steps 1–8 run in order, top to bottom. The skill has two distinct conversational phases separated by an explicit approval gate:

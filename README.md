@@ -62,7 +62,7 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 
 The peer posture is built in: during the interview phase, pln will disagree with your framing if it sees a problem, bring up considerations you didn't name, and stop after one question rather than overwhelming you with options. The goal is a plan *you* shaped, not one that was handed to you.
 
-**`/pln-pr`** is the ship half of a plan. After a `/pln` run (or on any branch ahead of its base), it reviews the diff, fixes what the review finds, verifies once, and opens the pull request. A review army of fresh-context agents covers six lenses (correctness, security, data, testing, maintainability, performance) plus an adversarial pass. On Claude Code they all run in parallel, plus an optional Codex cross-model pass if you have it installed; on Codex the army is `codex review` for the broad ground followed by the lenses it underweights, one at a time (see [Hosts](#hosts)). Every finding has to quote the exact line that proves it, which keeps false positives out. Findings land in a durable `REVIEW.md` beside the plan, fixes run as agents clustered by file so they never collide, decisions come to you one at a time, and the full test suite runs **once** at the end instead of after every fix — the loop that makes a naive review-and-fix pass thrash. It depends only on git, your agent's own tools, and optionally the GitHub/GitLab CLI; there's no external service and nothing to configure. A `/pln` run hands off to it once the plan's gauntlet is green — it asks first, and stops there if you say no — so shipping is the last step of the same flow rather than a separate thing you have to remember to ask for.
+**`/pln-pr`** is the ship half of a plan. After a `/pln` run (or on any branch ahead of its base), it reviews the diff, fixes what the review finds, verifies once, and opens the pull request. A review army of fresh-context agents covers six lenses (correctness, security, data, testing, maintainability, performance) plus an adversarial pass. On Claude Code they all run in parallel; on Codex the army is `codex review` for the broad ground followed by the lenses it underweights, one at a time (see [Hosts](#hosts)). Either way there is one more pass from a *different* model, whenever you have a second agent CLI on your machine (see [Second opinions](#second-opinions)). Every finding has to quote the exact line that proves it, which keeps false positives out. Findings land in a durable `REVIEW.md` beside the plan, fixes run as agents clustered by file so they never collide, decisions come to you one at a time, and the full test suite runs **once** at the end instead of after every fix — the loop that makes a naive review-and-fix pass thrash. It depends only on git, your agent's own tools, and optionally the GitHub/GitLab CLI; there's no external service and nothing to configure. A `/pln` run hands off to it once the plan's gauntlet is green — it asks first, and stops there if you say no — so shipping is the last step of the same flow rather than a separate thing you have to remember to ask for.
 
 ## Hosts
 
@@ -76,10 +76,26 @@ The plan is the same on both hosts, and so is the `PLAN.md` and the review ledge
 | `/pln` implementation loop | one Workflow script drives every item | the orchestrator drives the loop from the shell |
 | Resuming a blocked item | `resumeFromRunId` | `codex exec resume <thread-id>` |
 | Who commits | the item agent | the orchestrator — a sandboxed Codex agent has `.git` read-only |
-| `/pln-pr` review army | seven reviewers in parallel, plus an optional Codex cross-model pass | `codex review`, then a subset of lenses one at a time |
+| `/pln-pr` review army | seven reviewers in parallel | `codex review`, then a subset of lenses one at a time |
+| Cross-model pass | reaches for `codex`, or whatever `peer_command` names | reaches for `claude`, or whatever `peer_command` names |
 | Notifications | phone push + desktop | desktop |
 
 Two of those need a sentence. Codex reviewers run one at a time because concurrent `codex` processes race on the shared OAuth token file; that costs wall-clock and buys correctness. And a Codex agent runs sandboxed with `.git` read-only, so it writes files and reports back while the session that spawned it does the committing. The invariant is the same on both hosts: no partial item is ever committed.
+
+## Second opinions
+
+Where a second model is worth more than another run of the same one — `/pln-pr`'s cross-model pass — pln reaches for an agent CLI that isn't the one running your session, in this order:
+
+1. **A command you named.** `peer_command` in `~/.pln/config.yaml` is your whole invocation, so it can be a tool pln has never heard of. The contract is a pipe: it reads its prompt on stdin and writes its answer on stdout.
+
+   ```bash
+   ~/.claude/skills/pln/bin/pln-config set peer_command "gemini -p"
+   ```
+
+2. **A known CLI on your `PATH`** — `claude` or `codex`, whichever isn't hosting the session, and only when it is signed in. Under Codex it asks Claude; under Claude it asks Codex. Probes ship only for CLIs whose invocation pln has actually reproduced; anything else goes through the first rung, where you supply the invocation.
+3. **Nothing at all**, which is a supported answer and not a broken install. The work still happens — on a fresh same-model agent where a fresh reading is the point, or skipped with a note where a different model was the whole point.
+
+The first two rungs hand the material to another vendor's CLI: it leaves your machine, and the call can spend your quota there.
 
 ## Upgrading
 

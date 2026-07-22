@@ -7,13 +7,8 @@ description: Human-paced planning — one question at a time — with a peer tha
 
 This is the placeholder that ships in git. The real skill is generated per host from the sources in `src/`, so that the copy you read contains the mechanics for *your* agent host and nothing addressed to the other one.
 
-Tell the user to run `./setup` in the directory this file is in, then restart the agent. Give them that directory's real path, which you know — don't make them work it out. It is normally one of these:
+Run the `setup` script that sits beside this file. You know where this file lives, so run it yourself rather than handing the command to the user; invoking it by its full path works from any directory, since it works out its own. Then tell the user to restart the agent, which is the one part of this you can't do for them.
 
-```bash
-cd ~/.claude/skills/pln && ./setup   # Claude Code
-cd ~/.agents/skills/pln && ./setup   # Codex
-```
-
-`setup` works out the host from the install path (`~/.claude/skills/pln` → Claude Code, `~/.agents/skills/pln` → Codex) and writes the real `SKILL.md` over this file. If the path carries no such marker — a clone somewhere else, symlinked into place — set the host explicitly: `PLN_HOST=codex ./setup`.
+`setup` works out the host from the install path (`~/.claude/skills/pln` → Claude Code, `~/.agents/skills/pln` → Codex) and writes the real `SKILL.md` over this file. If this copy sits somewhere the path doesn't name a host, pass your own host in the environment: `PLN_HOST=claude` or `PLN_HOST=codex`.
 
 Do not plan a task from this file. It has none of the workflow.

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.18.1 — 2026-07-22
+
+### Fixed
+
+- **The unbuilt-skill placeholders now have the agent run `setup` itself, instead of handing the user a command that runs in the wrong directory.** An install that skips `./setup` — which is every `npx skills add`, since it copies files and doesn't run a repo's install script — leaves the skill files as placeholders, whose whole job is to get `setup` run. `SKILL.md` handed the user `cd "$(dirname "$0")" && ./setup`, a line lifted from a shell script rather than one a person can paste: `$0` in an interactive shell is the shell's own name, so `dirname` returns `.` and `./setup` runs from wherever the user happens to be standing — a missing-file error at best, some unrelated project's `setup` at worst. There was nothing to hand over in the first place. The agent reading the placeholder knows where the file lives, so both placeholders now tell it to run the script beside them by full path and pass its own `PLN_HOST` when the install path doesn't name a host. The user is left with the one step an agent can't do for them: restarting so the built skill loads.
+
 ## 1.18.0 — 2026-07-21
 
 ### Added

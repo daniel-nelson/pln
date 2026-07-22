@@ -160,7 +160,11 @@ fi
 
 # `codex exec resume` takes none of the session-shaping flags: no --sandbox, no
 # -C, no --add-dir. A resumed thread keeps the settings it started with.
-CMD=(env -u OPENAI_API_KEY "${TIMEOUT_CMD[@]}" codex exec)
+# The `+"${...[@]}"` guard is not decoration: bash 3.2, which is still the
+# /bin/bash every Mac ships, treats an empty array as an unbound variable under
+# `set -u` — so without it this line aborts the spawn on exactly the machines
+# that have no timeout(1) to put in the array.
+CMD=(env -u OPENAI_API_KEY "${TIMEOUT_CMD[@]+"${TIMEOUT_CMD[@]}"}" codex exec)
 if [ -n "$RESUME_ID" ]; then
   CMD+=(resume "$RESUME_ID")
 else

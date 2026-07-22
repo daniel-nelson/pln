@@ -79,7 +79,7 @@ Not every open choice is the user's to answer, and not every decision belongs in
 Routing:
 
 - **Ask** — the choice is unbacked and consequential: no authority decides it and something will depend on it. The deciding reason lives in the user's head: domain fact, taste, risk appetite, business context. This is the only lane that becomes a one-question-at-a-time interview question (Step 3).
-- **Decide-and-disclose** — the choice is cite-backed, or reversible. Make the call yourself. Record it with a one-line rationale that names its authority or its reversibility. Don't interrupt the user. These surface as the disclosed-decisions list at the gate (Step 4), phrased as overridable, not as commands.
+- **Decide-and-disclose** — the choice is cite-backed, or reversible. Make the call yourself. Record it with a one-line rationale that names its authority or its reversibility. Don't interrupt the user. These surface at the gate (Step 4), in its numbered list, phrased as overridable, not as commands.
 - **Defer** — you can't yet tell whether the choice will be depended on; it only becomes answerable in contact with the code. Don't raise it, and don't prescribe it in the plan. It surfaces during implementation, where the four blocker thresholds (the same reversibility/dependency test applied in Step 5) decide whether it triggers a hand-off.
 
 The tell that the filter is miscalibrated: the user answers an interview question with "sure", "your call", or "whatever's easiest." That indifference means the question was decide-and-disclose, not ask. Indifferent answers cluster on the choices an implementer should have owned.
@@ -358,15 +358,23 @@ When the interview is done, every item's section pins down the intent and the de
 Show the user the master plan in one message, with enough in it to adopt on without opening the file:
 
 - Print the dashboard (status list).
-- Print a digest of each item, in order: its title, what it does in a sentence or two, and any decision later items rest on. The detail sections stay in `PLAN.md` for the user to open; reprinting them here buries the disclosed decisions, which are the part that needs a reaction.
-- Print the **disclosed decisions**: the decide-and-disclose calls made during the interview. Number them globally (so the user can reply "3, 7, 8") but lay them out grouped under their parent item (e.g. "Item 4 → decisions 7–9"), so the unit the user scans is the item they already know, not a flat wall of forty. Each is one line with its cited rationale.
-- Self-triage the disclosed decisions; don't present them as equals. Lead with the handful you're least sure about: the ones closest to the ask/decide line, the ones whose authority is weakest or whose reversibility you're least certain of. Flag them for the user's eye ("worth a look: 3, 7"). The rest stand as a scannable, cited list the user can skim or ignore. The risk to avoid is a miscalibrated "all safe here" that buries a decision the user would have changed; when genuinely unsure, flag rather than bury.
-- End with one binary prompt: "Adopt this master plan as written, or reopen any decisions / change anything?"
+- Print a digest of each item, in order: its title, what it does in a sentence or two, and any decision later items rest on. The detail sections stay in `PLAN.md` for the user to open; reprinting them here buries the numbered list below, which is the part that needs a reaction.
+- Print **one numbered list of everything the user can act on**: the decide-and-disclose calls made during the interview, and — when Step 3.5 ran — the corrections the review applied to the plan and the findings it flagged. One number space across all three kinds (so the user can reply "3, 7, 8" without saying which kind each is), laid out grouped under their parent item (e.g. "Item 4 → 7–9"), so the unit the user scans is the item they already know, not a flat wall of forty. Each entry is one line that opens with its kind, because the three interleave inside an item:
+  - ***decision*** — what was decided, with its cited rationale.
+  - ***applied*** — what the plan said, what it says now, and the quote the correction rested on. All three, because the plan's own prose no longer shows what it replaced, and without the quote the user cannot tell a checked correction from a plausible one.
+  - ***flagged*** — the finding in one sentence, what the reviewer would change, and which kind it is: a false factual claim, a contradiction inside the plan, or a judgment call.
+
+  A finding that lands on the plan as a whole rather than on any one item — a missing item, an ordering that won't work — is numbered in the same sequence, in a final group of its own after the per-item ones. It is in the dashboard's Open questions, not in an item's section, but it is one of the things the user can act on, so it gets a number like everything else.
+- When Step 3.5 ran, say in one clause who read the plan: the peer CLI by name, or a fresh agent of the same model — and when it was the same model, why (no second CLI on this machine, peer consult switched off, or you were asked to keep this plan local for this run). The user weighs a flagged finding differently depending on whose eyes were on the plan. A review that found nothing gets the same one clause and no more; saying nothing reads as if the step never ran.
+- Self-triage the list; don't present forty entries as equals. Lead with the handful you're least sure about and flag them for the user's eye ("worth a look: 3, 7, 12"). One triage line covers the whole list rather than one per kind — the single number space exists so there is one thing to scan and one way to reply. What earns a place on it differs by kind: a decision closest to the ask/decide line, or whose authority is weakest or whose reversibility you're least certain of; an applied correction that changed something an item's acceptance criteria rest on; a flagged finding that would change what gets built. The rest stand as a scannable, cited list the user can skim or ignore. The risk to avoid is a miscalibrated "all safe here" that buries an entry the user would have changed; when genuinely unsure, flag rather than bury.
+- End with one binary prompt: "Adopt this master plan as written, or reopen anything by number / change something?"
+
+**When no review ran** — `plan_review` is off, the user skipped it, or the plan was written before the step existed — none of the review's part of this appears: no rung clause, no empty findings list, and no note explaining what didn't happen. The numbered list is the disclosed decisions and nothing else, exactly the gate it was before the step existed.
 
 This is the only place implementation-blocking approval lives. Possible responses:
 
-- *Adopt as written* — proceed to Step 5. Disclosed decisions not reopened stand as accepted.
-- *Reopen decisions by number* (e.g. "3, 7, 8") — each named decision returns to the one-question-at-a-time interview, exactly like Step 3, but starting from the recorded position and its rationale, not a blank question ("I chose X because Y; here's the tradeoff; what would you change?"). Resolve each, update `PLAN.md`, re-show, re-prompt. Unlisted decisions remain accepted.
+- *Adopt as written* — proceed to Step 5. Every numbered entry not reopened stands as accepted: decisions hold, applied corrections stay in the plan, flagged findings were seen and left alone.
+- *Reopen by number* (e.g. "3, 7, 8") — any entry, of any kind. A **decision** returns to the one-question-at-a-time interview, exactly like Step 3, but starting from the recorded position and its rationale, not a blank question ("I chose X because Y; here's the tradeoff; what would you change?"). An **applied** correction is shown with what it replaced, and reverted if the user says so — the record in the item's detail section is what makes that one edit instead of a reconstruction. A **flagged** finding becomes an interview question of the same shape: what the reviewer found, what it would change, what the user wants done. Resolve each, update `PLAN.md`, re-show, re-prompt. Unlisted entries remain accepted.
 - *Change X* — make the change in `PLAN.md`, re-show the affected section(s), re-prompt the same binary question. Loop until the user adopts.
 
 Do not enter Step 5 without an explicit adoption signal.
@@ -576,7 +584,7 @@ Per-item detail sections carry:
 
 - Status.
 - Intent, constraints, and acceptance criteria — what "done" means, not how each line gets written.
-- Decisions — each a *what* + *why*, tagged with its authority or its reversibility, and flagged if low-confidence (the flag is what surfaces it for the user's eye in the Step 4 disclosed-decisions list). Recorded as overridable-when-reversible context, never as imperative steps. The ones the user made are marked as theirs and written in their words — see "How a decision is recorded" in Step 3.
+- Decisions — each a *what* + *why*, tagged with its authority or its reversibility, and flagged if low-confidence (the flag is what puts it on the Step 4 gate's "worth a look" line). Recorded as overridable-when-reversible context, never as imperative steps. The ones the user made are marked as theirs and written in their words — see "How a decision is recorded" in Step 3.
 - Commit hash if any.
 - **Review findings** — what the plan review (Step 3.5) corrected in this section, and what it flagged for the user instead. See "What a finding becomes".
 - Discoveries (mid-item findings worth recording).

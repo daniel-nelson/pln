@@ -315,6 +315,22 @@ Walk every item, in order, gathering what the implementer needs to do the work w
 5. When the item's ask-lane questions are answered, write the item's detail section: intent, constraints, acceptance criteria, the decisions other work depends on, and the disclosed decisions (each tagged with its authority or reversibility, and flagged if low-confidence). Don't write a step-by-step of reversible mechanics; see "One filter, two surfaces."
 6. Move to the next item. Repeat until every item has a written final-form detail section, or is marked ⏸ deferred / 🚫 dropped.
 
+**How a decision is recorded.** The reviewer (Step 3.5) and every implementer get the plan and nothing else, so a decision has to mean the same thing to someone who never saw the interview as it did to the person who made it. A decision the user made is recorded as a pair, and marked as theirs so it is never confused with one made on their behalf:
+
+- **The winning option's own line, copied as it was written to the user** — the bolded label plus its em-dash clause, one line (see Message shape). Not the label alone: "flag for review", read a week later, names nothing. Not the option list: the losing options are proposals the user rejected, and the document implementers treat as the spec is the wrong place to keep them. When the answer picks from a list defined in an earlier message rather than the one directly above it, the earlier message's line is the one to copy. For a binary question, which has no list, copy the sentence that named what was being decided.
+- **Everything the user typed past the selector, verbatim.** Quote it. Don't smooth the grammar, don't finish the sentence, and don't fold it into the option's line. The selector is an address; the qualifier is the content, and it routinely changes what was decided — "(c), but you don't need to run the full suite" is not option (c). Recording the option's text as the answer when the user's own words narrowed it is how the wrong thing gets built.
+
+A bare selector with nothing after it is recorded as a bare choice, and the record says so: write "no reason given" and leave it at that. Never attach a rationale the user didn't give. An invented one is indistinguishable from a real one, and the next reader — the reviewer, or an implementer weighing whether a hard failure justifies departing from the plan — treats it as something the user would defend.
+
+```
+**Decision (user).** *Flag for review* — the cancel action marks the payment for a
+person to refund. In their words: "b, but the queue has to be per-property or
+support will never look at it."
+
+**Decision (user).** *Refund on cancel* — the cancel action issues the refund and
+marks the payment refunded. No reason given.
+```
+
 Cross-item interactions are normal during the interview. If answering item N's question forces a change to item M's detail (already written), update M in place and tell the user one short line: "Item M revised to match: <one-line summary>."
 
 When the interview is done, every item's section pins down the intent and the decisions other work depends on, enough that the implementer can't take it somewhere the user would veto. Reversible mechanics are deliberately left open: "decide this in contact with the code" is a valid, intended end state for a deferred choice, not a gap to be filled. What must be complete is the set of ask-lane answers, not a prescription of how every line gets written.
@@ -542,7 +558,7 @@ Per-item detail sections carry:
 
 - Status.
 - Intent, constraints, and acceptance criteria — what "done" means, not how each line gets written.
-- Decisions — each a *what* + *why*, tagged with its authority or its reversibility, and flagged if low-confidence (the flag is what surfaces it for the user's eye in the Step 4 disclosed-decisions list). Recorded as overridable-when-reversible context, never as imperative steps.
+- Decisions — each a *what* + *why*, tagged with its authority or its reversibility, and flagged if low-confidence (the flag is what surfaces it for the user's eye in the Step 4 disclosed-decisions list). Recorded as overridable-when-reversible context, never as imperative steps. The ones the user made are marked as theirs and written in their words — see "How a decision is recorded" in Step 3.
 - Commit hash if any.
 - Discoveries (mid-item findings worth recording).
 - **Dead ends / don't repeat** — approaches tried that failed, and why. A re-run after a blocker, or a later item, reads these so it doesn't retry a known dead end.

@@ -7,6 +7,8 @@ description: Review a branch and put up a pull request, the pln way — a fresh-
 
 This is the placeholder that ships in git. The real skill is generated per host from the sources in `src/`, so that the copy you read contains the mechanics for *your* agent host and nothing addressed to the other one.
 
-Tell the user to run `./setup` in the pln directory one level up from this file, then restart the agent. `setup` works out the host from the install path (`~/.claude/skills/pln` → Claude Code, `~/.agents/skills/pln` → Codex) and writes the real `SKILL.md` over this file. If the path carries no such marker, set the host explicitly: `PLN_HOST=codex ./setup`.
+Run the `setup` script in the pln directory one level up from this file. You know where this file lives, so run it yourself rather than handing the command to the user; invoking it by its full path works from any directory, since it works out its own. Then tell the user to restart the agent, which is the one part of this you can't do for them.
+
+`setup` works out the host from the install path (`~/.claude/skills/pln` → Claude Code, `~/.agents/skills/pln` → Codex) and writes the real `SKILL.md` over this file. If this copy sits somewhere the path doesn't name a host, pass your own host in the environment: `PLN_HOST=claude` or `PLN_HOST=codex`.
 
 Do not review a branch or open a PR from this file. It has none of the workflow.

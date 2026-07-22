@@ -79,7 +79,7 @@ Not every open choice is the user's to answer, and not every decision belongs in
 Routing:
 
 - **Ask** — the choice is unbacked and consequential: no authority decides it and something will depend on it. The deciding reason lives in the user's head: domain fact, taste, risk appetite, business context. This is the only lane that becomes a one-question-at-a-time interview question (Step 3).
-- **Decide-and-disclose** — the choice is cite-backed, or reversible. Make the call yourself. Record it with a one-line rationale that names its authority or its reversibility. Don't interrupt the user. These surface as the disclosed-decisions list at the gate (Step 4), phrased as overridable, not as commands.
+- **Decide-and-disclose** — the choice is cite-backed, or reversible. Make the call yourself. Record it with a one-line rationale that names its authority or its reversibility. Don't interrupt the user. These surface at the gate (Step 4), in its numbered list, phrased as overridable, not as commands.
 - **Defer** — you can't yet tell whether the choice will be depended on; it only becomes answerable in contact with the code. Don't raise it, and don't prescribe it in the plan. It surfaces during implementation, where the four blocker thresholds (the same reversibility/dependency test applied in Step 5) decide whether it triggers a hand-off.
 
 The tell that the filter is miscalibrated: the user answers an interview question with "sure", "your call", or "whatever's easiest." That indifference means the question was decide-and-disclose, not ask. Indifferent answers cluster on the choices an implementer should have owned.
@@ -118,11 +118,115 @@ How to spawn one on this host:
 
 <!-- pln:include spawn-agent -->
 
+## Consulting a peer model
+
+Some of this skill's work is worth putting to a **peer**: a model other than the one running this session, asked to check what that model produced. A fresh agent on this host is a fresh context; a peer is a fresh context *and* a different set of blind spots. Below, `$PLN_BIN` stands for `{{SKILL_DIR}}/bin` — substitute the real path when you run it.
+
+<!-- pln:include peer-consult -->
+
+## The plan review switch
+
+Before the approval gate, the finished plan itself goes under review (Step 3.5): a reader that never saw the interview argues with the plan and checks its claims against the files it names. It is on by default, and exactly two things turn it off — a standing preference in config, and an instruction in the session. Nothing else does. **The size of the plan never does:** a two-item plan and a twelve-item plan get the same review. There is no small-plan shortcut, because the reviewer's cost is reading the plan and checking its claims, which already scales with the plan, and because the short plan is regularly the dangerous one — two items that change how every future run behaves are worth more scrutiny than nine items of one-line edits.
+
+**The standing preference** is `plan_review` in `~/.pln/config.yaml`, read once where the review would start:
+
+```bash
+{{SKILL_DIR}}/bin/pln-config get plan_review
+```
+
+`false` or `no` means off, for every plan in every repository. Anything else — including absent, which is what an install that has never been told otherwise reads — means on. Off is a clean no-op rather than a degraded run: no brief is assembled, no peer is selected, no consent question is raised, and Step 4 is exactly the gate it would have been without the step. Don't announce the skip; a line explaining what didn't happen is noise on every plan of a user who already opted out. `{{SKILL_DIR}}/bin/pln-config set plan_review false` turns it off, `true` back on.
+
+**A spoken instruction wins over the key, for that run only**, in both directions — "skip the review" where the key is on, "review this one" where it is off — and never writes to config. Config is the standing preference; a sentence is about this plan. Honor it whenever it arrives before the gate, including mid-interview, and don't literal-match: infer the intent from natural phrasing, the way the defer / drop / think-offline signals are inferred.
+
+The review has three parts that can be switched off separately, and an instruction naming one leaves the others running:
+
+- **The whole step** — "skip the review", "no review this time", "straight to the gate". Step 3.5 doesn't run.
+- **The peer** — "skip the cross-model pass", "don't send it anywhere", "keep it local". The review still runs, on a fresh same-model agent, exactly as if no peer had been available. Treat it as a `peer_consent` of `false` for that run: nothing is sent, no consent question is raised, and the result says which rung ran as always.
+- **Applying anything** — "just tell me, don't change the plan", "flag everything". The review runs and every finding reaches the gate flagged; nothing is written into `PLAN.md`.
+
+An instruction broader than any one of those (a bare "skip it") is the whole step. When it is genuinely ambiguous which part is meant, ask one short question instead of guessing — guessing wrong either sends a plan the user meant to keep on the machine, or throws away a review they wanted.
+
+## The reviewer's brief
+
+Step 3.5's reviewer is a stranger to the conversation, and it gets the plan and nothing else: not the interview transcript, not the user's turns, not the options that lost. The plan is already the whole artifact every implementer works from. If the reviewer needs more than the plan to argue with it, the plan is the defect — and saying so is one of the findings worth having.
+
+The same brief goes to whoever runs the review, a peer CLI or a fresh same-model agent (see Consulting a peer model). Write it once to a file and use it on every rung. Two briefs that say almost the same thing drift, and then a finding depends on which rung happened to run.
+
+What the brief carries:
+
+- **The plan itself, inline and whole.** A peer may be a plain prompt-in, text-out CLI with no way to open a file, so the text goes in the brief rather than a path to it. Name `PLAN.md`'s path and the repository root as well, for a reviewer that *can* read — that is what makes checking the plan's claims possible at all.
+- **What a plan is**, in two lines, because the reviewer has likely never seen one: a dashboard plus one section per item, where each item is implemented by a fresh agent that reads that section and nothing else, and the sections record both the decisions the user made and the decisions the plan's author made on their behalf.
+- **The instruction to be adversarial**, with the reason this plan in particular needs it: it was written by the same model that ran the interview, so it carries that conversation's assumptions and cannot see them, and it is biased toward changes that feel productive. No praise, no inventory of what the plan gets right — the parts that are fine need no comment.
+- **Check the plan's factual claims against the files it names.** A plan asserting something untrue about the code it edits is the failure this step exists to catch, and it is invisible from inside the conversation that wrote it.
+- **Every finding quotes what it rests on** — `file:line` and the verbatim text for a claim about the repository, the plan's own sentence for a contradiction between two of its parts. A reviewer that cannot open files says so per claim instead of guessing; an unquoted correction from a reviewer with no repository access is exactly the confident wrong answer that must never reach the plan.
+- **A counterfactual, per item.** Take the problem the plan says exists today and ask whether the plan as written would actually have caught it. A bare "review this plan" produces agreement; a concrete artifact plus "would this have caught it?" produces the finding worth having. Where the plan quotes something real — an output, a message, a behavior the user objected to — that is the artifact; where it doesn't, the item's own acceptance criteria are.
+- **Finding nothing is a permitted answer**, said in those words. A review required to produce findings manufactures them, and a manufactured finding that quotes a line reads exactly like a real one.
+
+A brief that carries all of it, ready to fill in:
+
+```
+Review the plan below. It was written by an AI agent during an interview with the
+user it works for, and it is what the implementers build from. A plan is a
+dashboard plus one section per item; each item is implemented by a fresh agent
+that reads that section and nothing else. The sections record decisions the user
+made and decisions the agent made on their behalf.
+
+Repository root: <path>. The plan file is <path to PLAN.md>. Read any file the
+plan names. If you cannot read files, say so per claim rather than guessing.
+
+--- PLAN ---
+<the plan, verbatim and whole>
+--- END PLAN ---
+
+Be adversarial. The plan was written by the same model that ran the interview, so
+it carries that conversation's assumptions and cannot see them, and it leans
+toward changes that feel productive. Don't tell me what it gets right.
+
+Check its factual claims against the files it names. For each item, take the
+problem the plan says exists today and ask whether the plan as written would
+actually have caught it.
+
+Every finding quotes what it rests on: `file:line` plus the verbatim text for a
+claim about the code, or the plan's own sentence for a contradiction between two
+parts of the plan. A claim you could not verify is reported as unverified — not
+dropped, and not asserted.
+
+Report each finding as: which item it lands on, one sentence on what is wrong,
+the quote it rests on, what you would change, and which kind it is — a false
+factual claim, a contradiction inside the plan, or a judgment call (one that
+turns on taste, risk appetite or domain knowledge).
+
+"Nothing worth changing" is a complete answer. Don't manufacture findings.
+```
+
+The kind label is the reviewer's own reading, and it travels as a claim rather than an instruction: what happens to a finding is decided when the result comes back, not by the reviewer that wrote it.
+
+**Why nothing else travels.** The transcript carries the writing model's own rationalizations alongside the user's words, and a reviewer that reads those is primed by the reasoning it was brought in to audit. Quoting the rejected options has the same effect one step further on: it re-argues a question the user already closed. What makes the plan enough on its own is Step 3's recording rule — a decision is written down as the chosen option's own line plus everything the user said past the selector, so a reader who never saw the interview reads the same decision the user made.
+
+## What a finding becomes
+
+A finding that comes back from Step 3.5 is either **applied** — the plan's own prose is corrected before the user sees it — or **flagged**, which leaves the plan alone and puts the finding at the approval gate for the user to act on. That call is made here, not by the reviewer. Most findings are flagged, and that is the design: applying one is an edit to the document every implementer builds from, made by a reader the user never met.
+
+A finding is applied only when all three of these hold. Failing any one of them flags it:
+
+- **It is a false factual claim, or a contradiction between two parts of the plan.** Those are the two kinds where being right is checkable without knowing what the user wants. Anything turning on taste, risk appetite or domain knowledge is a judgment call and is flagged. The reviewer's own kind label is a claim, not a verdict — read the finding and decide the kind yourself. A stranger to the interview files a decision it disagrees with as a factual error routinely.
+- **It quotes what it rests on, and the quote is real.** `file:line` plus the verbatim text for a claim about the repository; the plan's own sentence for a contradiction between two of its parts. Open the file at that line and confirm the text is there before applying anything — a peer with no way to read the repository can still produce a well-formed, confident, invented citation, and that is exactly the finding that would otherwise land in the plan with nobody having seen it. An unquoted finding is flagged however certain it reads, and so is one the reviewer itself reported as unverified. Confidence is not evidence.
+- **It does not land on a decision the user made.** The plan marks those as theirs (see "How a decision is recorded" in Step 3) — look for a decision recorded as the user's rather than matching a fixed string, since the marker is a convention and not a syntax.
+
+**Why a user decision is never moved.** A choice reached the user in the first place because nothing already decided it and the deciding reason lived in their head: a domain fact, taste, risk appetite, business context. Correcting a fact underneath such a decision does not settle it — it gives the user something new to weigh, and whether that changes the answer is theirs. This is the blocker protocol one phase earlier: an implementer that discovers the plan won't work as written stops and hands the question back instead of deciding it, and a reviewer that discovers a decision rested on something false is the same event, found sooner. The correction is not lost — it goes to the gate flagged, with its quote, so reopening the decision there costs one reply.
+
+**Applying one.** Edit the sentences the finding lands on and nothing else: correct the false claim, or make the two contradicting parts agree. Where they cannot be made to agree without picking which one survives, picking is the judgment call — flag it instead. An applied correction never adds an item, widens scope, or rewrites acceptance criteria. Record it in that item's detail section: what the plan said, what it says now, and the quote it rested on. That record is what keeps the correction from being silent — it has to reach the gate (Step 4) even if the context between here and there compacts.
+
+**Flagging one.** Same place, same one line, carrying the reviewer's proposed change rather than an applied one, plus which kind it is and who found it — a peer, or a fresh same-model agent (see Consulting a peer model). A reader weighs a finding differently depending on whose eyes were on the plan. A finding that lands on the plan as a whole rather than on one item — a missing item, an ordering that won't work — is always flagged, because acting on it changes scope; record it in the dashboard's Open questions.
+
+**"Nothing worth changing" is a result, not a failed review.** Record nothing, and let the gate say the review ran and found nothing. Promoting a weak finding so the step looks worthwhile is how a manufactured finding becomes a plan change.
+
 ## The workflow (sequential steps)
 
 Steps 1–8 run in order, top to bottom. The skill has two distinct conversational phases separated by an explicit approval gate:
 
 - **Interview phase** (Step 3) — questions only, no code changes, no commits. Walks every item end-to-end, captures decisions in the master plan.
+- **Plan review** (Step 3.5) — a reader who never saw the interview argues with the finished plan before the user is asked to adopt it. Still no code changes; only `PLAN.md` is written to.
 - **Master-plan approval gate** (Step 4) — show the complete master plan, get a single yes-to-the-whole.
 <!-- pln:only claude -->
 - **Implementation phase** (Step 5) — a thin orchestrator runs one Workflow script covering every item, sequentially, with `PLAN.md` as the spec. No more discussion questions; the only interruptions are a blocker threshold, which pauses and resumes the same run.
@@ -230,24 +334,86 @@ Walk every item, in order, gathering what the implementer needs to do the work w
 5. When the item's ask-lane questions are answered, write the item's detail section: intent, constraints, acceptance criteria, the decisions other work depends on, and the disclosed decisions (each tagged with its authority or reversibility, and flagged if low-confidence). Don't write a step-by-step of reversible mechanics; see "One filter, two surfaces."
 6. Move to the next item. Repeat until every item has a written final-form detail section, or is marked ⏸ deferred / 🚫 dropped.
 
+**How a decision is recorded.** The reviewer (Step 3.5) and every implementer get the plan and nothing else, so a decision has to mean the same thing to someone who never saw the interview as it did to the person who made it. A decision the user made is recorded as a pair, and marked as theirs so it is never confused with one made on their behalf:
+
+- **The winning option's own line, copied as it was written to the user** — the bolded label plus its em-dash clause, one line (see Message shape). Not the label alone: "flag for review", read a week later, names nothing. Not the option list: the losing options are proposals the user rejected, and the document implementers treat as the spec is the wrong place to keep them. When the answer picks from a list defined in an earlier message rather than the one directly above it, the earlier message's line is the one to copy. For a binary question, which has no list, copy the sentence that named what was being decided.
+- **Everything the user typed past the selector, verbatim.** Quote it. Don't smooth the grammar, don't finish the sentence, and don't fold it into the option's line. The selector is an address; the qualifier is the content, and it routinely changes what was decided — "(c), but you don't need to run the full suite" is not option (c). Recording the option's text as the answer when the user's own words narrowed it is how the wrong thing gets built.
+
+A bare selector with nothing after it is recorded as a bare choice, and the record says so: write "no reason given" and leave it at that. Never attach a rationale the user didn't give. An invented one is indistinguishable from a real one, and the next reader — the reviewer, or an implementer weighing whether a hard failure justifies departing from the plan — treats it as something the user would defend.
+
+```
+**Decision (user).** *Flag for review* — the cancel action marks the payment for a
+person to refund. In their words: "b, but the queue has to be per-property or
+support will never look at it."
+
+**Decision (user).** *Refund on cancel* — the cancel action issues the refund and
+marks the payment refunded. No reason given.
+```
+
 Cross-item interactions are normal during the interview. If answering item N's question forces a change to item M's detail (already written), update M in place and tell the user one short line: "Item M revised to match: <one-line summary>."
 
 When the interview is done, every item's section pins down the intent and the decisions other work depends on, enough that the implementer can't take it somewhere the user would veto. Reversible mechanics are deliberately left open: "decide this in contact with the code" is a valid, intended end state for a deferred choice, not a gap to be filled. What must be complete is the set of ask-lane answers, not a prescription of how every line gets written.
+
+### Step 3.5. Plan review
+
+Every item's detail section is now written, and nobody has read the plan who wasn't in the conversation that produced it. That reading happens here, before the user is asked to adopt anything, so what reaches the gate is a plan that has already been argued with. When the switch is off, skip the whole step and say nothing about it — see The plan review switch.
+
+None of the review is restated here. What the reviewer is told is The reviewer's brief; who reads the plan is Consulting a peer model; what happens to each finding is What a finding becomes. This step is the order they run in:
+
+1. **Make a scratch directory**, outside the repository so nothing it holds can be swept into a commit:
+
+   ```bash
+   RUN="${TMPDIR:-/tmp}/pln-<plan-slug>"; mkdir -p "$RUN"; echo "$RUN"
+   ```
+
+   Substitute that printed path everywhere below — every shell call starts a fresh shell, so the variable itself is gone by the next one.
+
+2. **Write the brief** to `$RUN/plan-review.brief.md`, the plan inlined whole, per The reviewer's brief. One file, whichever rung ends up running it.
+
+3. **Say one line before it runs**, naming who is about to read the plan — `"$PLN_BIN/pln-peer" --which` answers that without sending anything. This step sits between the user's last answer and the gate and can take minutes; unexplained silence there reads as a hung session.
+
+4. **Run it**, and read what it prints per Consulting a peer model — including the one-time consent question, which is reached here on a machine that has never been asked:
+
+   ```bash
+   "$PLN_BIN/pln-peer" \
+     --brief "$RUN/plan-review.brief.md" \
+     --out   "$RUN/plan-review.peer.out"
+   ```
+
+5. **On rung 3, review the plan anyway, on a fresh same-model agent.** `/pln-pr`'s cross-model pass skips at that point because a different model is its whole point; this step's point is a reader who never saw the interview, and a fresh agent of the same model is exactly that. Exit 3 (no peer on the machine, or peer consult switched off), exit 4 (a peer was picked, ran, and failed), and a spoken "keep this one local" all land here, and none of them is a degraded run. Hand it the same brief file — see below.
+
+6. **File every finding** per What a finding becomes: applied into the plan's own prose, or flagged, and either way recorded in its item's detail section before moving on. That record is what survives a compaction between here and the gate. Then go to Step 4.
+
+**Spawning the rung-3 reviewer on this host:**
+
+<!-- pln:include plan-review-invoke -->
+
+A reviewer that errored, timed out, or came back empty is a review that did not happen — not a review that found nothing. Take no findings from it, and say which of the two it was where the gate names who read the plan.
+
+The review runs once, on the finished plan. Re-showing the plan at the gate — after a reopened decision, a reverted correction, a "change X" — does not re-run it: a second pass over a document the user is in the middle of editing spends minutes to produce findings about sentences that are mid-edit. Run it again only if the user asks.
 
 ### Step 4. Master-plan approval gate
 
 Show the user the master plan in one message, with enough in it to adopt on without opening the file:
 
 - Print the dashboard (status list).
-- Print a digest of each item, in order: its title, what it does in a sentence or two, and any decision later items rest on. The detail sections stay in `PLAN.md` for the user to open; reprinting them here buries the disclosed decisions, which are the part that needs a reaction.
-- Print the **disclosed decisions**: the decide-and-disclose calls made during the interview. Number them globally (so the user can reply "3, 7, 8") but lay them out grouped under their parent item (e.g. "Item 4 → decisions 7–9"), so the unit the user scans is the item they already know, not a flat wall of forty. Each is one line with its cited rationale.
-- Self-triage the disclosed decisions; don't present them as equals. Lead with the handful you're least sure about: the ones closest to the ask/decide line, the ones whose authority is weakest or whose reversibility you're least certain of. Flag them for the user's eye ("worth a look: 3, 7"). The rest stand as a scannable, cited list the user can skim or ignore. The risk to avoid is a miscalibrated "all safe here" that buries a decision the user would have changed; when genuinely unsure, flag rather than bury.
-- End with one binary prompt: "Adopt this master plan as written, or reopen any decisions / change anything?"
+- Print a digest of each item, in order: its title, what it does in a sentence or two, and any decision later items rest on. The detail sections stay in `PLAN.md` for the user to open; reprinting them here buries the numbered list below, which is the part that needs a reaction.
+- Print **one numbered list of everything the user can act on**: the decide-and-disclose calls made during the interview, and — when Step 3.5 ran — the corrections the review applied to the plan and the findings it flagged. One number space across all three kinds (so the user can reply "3, 7, 8" without saying which kind each is), laid out grouped under their parent item (e.g. "Item 4 → 7–9"), so the unit the user scans is the item they already know, not a flat wall of forty. Each entry is one line that opens with its kind, because the three interleave inside an item:
+  - ***decision*** — what was decided, with its cited rationale.
+  - ***applied*** — what the plan said, what it says now, and the quote the correction rested on. All three, because the plan's own prose no longer shows what it replaced, and without the quote the user cannot tell a checked correction from a plausible one.
+  - ***flagged*** — the finding in one sentence, what the reviewer would change, and which kind it is: a false factual claim, a contradiction inside the plan, or a judgment call.
+
+  A finding that lands on the plan as a whole rather than on any one item — a missing item, an ordering that won't work — is numbered in the same sequence, in a final group of its own after the per-item ones. It is in the dashboard's Open questions, not in an item's section, but it is one of the things the user can act on, so it gets a number like everything else.
+- When Step 3.5 ran, say in one clause who read the plan: the peer CLI by name, or a fresh agent of the same model — and when it was the same model, why (no second CLI on this machine, peer consult switched off, or you were asked to keep this plan local for this run). The user weighs a flagged finding differently depending on whose eyes were on the plan. A review that found nothing gets the same one clause and no more; saying nothing reads as if the step never ran.
+- Self-triage the list; don't present forty entries as equals. Lead with the handful you're least sure about and flag them for the user's eye ("worth a look: 3, 7, 12"). One triage line covers the whole list rather than one per kind — the single number space exists so there is one thing to scan and one way to reply. What earns a place on it differs by kind: a decision closest to the ask/decide line, or whose authority is weakest or whose reversibility you're least certain of; an applied correction that changed something an item's acceptance criteria rest on; a flagged finding that would change what gets built. The rest stand as a scannable, cited list the user can skim or ignore. The risk to avoid is a miscalibrated "all safe here" that buries an entry the user would have changed; when genuinely unsure, flag rather than bury.
+- End with one binary prompt: "Adopt this master plan as written, or reopen anything by number / change something?"
+
+**When no review ran** — `plan_review` is off, the user skipped it, or the plan was written before the step existed — none of the review's part of this appears: no rung clause, no empty findings list, and no note explaining what didn't happen. The numbered list is the disclosed decisions and nothing else, exactly the gate it was before the step existed.
 
 This is the only place implementation-blocking approval lives. Possible responses:
 
-- *Adopt as written* — proceed to Step 5. Disclosed decisions not reopened stand as accepted.
-- *Reopen decisions by number* (e.g. "3, 7, 8") — each named decision returns to the one-question-at-a-time interview, exactly like Step 3, but starting from the recorded position and its rationale, not a blank question ("I chose X because Y; here's the tradeoff; what would you change?"). Resolve each, update `PLAN.md`, re-show, re-prompt. Unlisted decisions remain accepted.
+- *Adopt as written* — proceed to Step 5. Every numbered entry not reopened stands as accepted: decisions hold, applied corrections stay in the plan, flagged findings were seen and left alone.
+- *Reopen by number* (e.g. "3, 7, 8") — any entry, of any kind. A **decision** returns to the one-question-at-a-time interview, exactly like Step 3, but starting from the recorded position and its rationale, not a blank question ("I chose X because Y; here's the tradeoff; what would you change?"). An **applied** correction is shown with what it replaced, and reverted if the user says so — the record in the item's detail section is what makes that one edit instead of a reconstruction. A **flagged** finding becomes an interview question of the same shape: what the reviewer found, what it would change, what the user wants done. Resolve each, update `PLAN.md`, re-show, re-prompt. Unlisted entries remain accepted.
 - *Change X* — make the change in `PLAN.md`, re-show the affected section(s), re-prompt the same binary question. Loop until the user adopts.
 
 Do not enter Step 5 without an explicit adoption signal.
@@ -457,8 +623,9 @@ Per-item detail sections carry:
 
 - Status.
 - Intent, constraints, and acceptance criteria — what "done" means, not how each line gets written.
-- Decisions — each a *what* + *why*, tagged with its authority or its reversibility, and flagged if low-confidence (the flag is what surfaces it for the user's eye in the Step 4 disclosed-decisions list). Recorded as overridable-when-reversible context, never as imperative steps.
+- Decisions — each a *what* + *why*, tagged with its authority or its reversibility, and flagged if low-confidence (the flag is what puts it on the Step 4 gate's "worth a look" line). Recorded as overridable-when-reversible context, never as imperative steps. The ones the user made are marked as theirs and written in their words — see "How a decision is recorded" in Step 3.
 - Commit hash if any.
+- **Review findings** — what the plan review (Step 3.5) corrected in this section, and what it flagged for the user instead. See "What a finding becomes".
 - Discoveries (mid-item findings worth recording).
 - **Dead ends / don't repeat** — approaches tried that failed, and why. A re-run after a blocker, or a later item, reads these so it doesn't retry a known dead end.
 - **Artifacts** — files created or changed, with locations.

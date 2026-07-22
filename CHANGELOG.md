@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.18.1 — 2026-07-22
+
+### Fixed
+
+- **The unbuilt-skill placeholder no longer hands out a command that runs in the wrong directory.** An install that skips `./setup` — which is every `npx skills add`, since it copies files and doesn't run a repo's install script — leaves `SKILL.md` as the placeholder, whose whole job is to get the user to run `setup`. It gave them `cd "$(dirname "$0")" && ./setup`, which is a line from a shell script, not one a person can paste: `$0` in an interactive shell is the shell's own name, so `dirname` returns `.` and the command runs `./setup` from wherever the user happens to be standing — a missing-file error at best, some unrelated project's `setup` at worst. It now names the two paths the skill actually installs to, and tells the model to give the user the real one rather than making them work it out.
+
 ## 1.18.0 — 2026-07-21
 
 ### Added

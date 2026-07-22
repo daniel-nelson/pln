@@ -203,6 +203,24 @@ The kind label is the reviewer's own reading, and it travels as a claim rather t
 
 **Why nothing else travels.** The transcript carries the writing model's own rationalizations alongside the user's words, and a reviewer that reads those is primed by the reasoning it was brought in to audit. Quoting the rejected options has the same effect one step further on: it re-argues a question the user already closed. What makes the plan enough on its own is Step 3's recording rule — a decision is written down as the chosen option's own line plus everything the user said past the selector, so a reader who never saw the interview reads the same decision the user made.
 
+## What a finding becomes
+
+A finding that comes back from Step 3.5 is either **applied** — the plan's own prose is corrected before the user sees it — or **flagged**, which leaves the plan alone and puts the finding at the approval gate for the user to act on. That call is made here, not by the reviewer. Most findings are flagged, and that is the design: applying one is an edit to the document every implementer builds from, made by a reader the user never met.
+
+A finding is applied only when all three of these hold. Failing any one of them flags it:
+
+- **It is a false factual claim, or a contradiction between two parts of the plan.** Those are the two kinds where being right is checkable without knowing what the user wants. Anything turning on taste, risk appetite or domain knowledge is a judgment call and is flagged. The reviewer's own kind label is a claim, not a verdict — read the finding and decide the kind yourself. A stranger to the interview files a decision it disagrees with as a factual error routinely.
+- **It quotes what it rests on, and the quote is real.** `file:line` plus the verbatim text for a claim about the repository; the plan's own sentence for a contradiction between two of its parts. Open the file at that line and confirm the text is there before applying anything — a peer with no way to read the repository can still produce a well-formed, confident, invented citation, and that is exactly the finding that would otherwise land in the plan with nobody having seen it. An unquoted finding is flagged however certain it reads, and so is one the reviewer itself reported as unverified. Confidence is not evidence.
+- **It does not land on a decision the user made.** The plan marks those as theirs (see "How a decision is recorded" in Step 3) — look for a decision recorded as the user's rather than matching a fixed string, since the marker is a convention and not a syntax.
+
+**Why a user decision is never moved.** A choice reached the user in the first place because nothing already decided it and the deciding reason lived in their head: a domain fact, taste, risk appetite, business context. Correcting a fact underneath such a decision does not settle it — it gives the user something new to weigh, and whether that changes the answer is theirs. This is the blocker protocol one phase earlier: an implementer that discovers the plan won't work as written stops and hands the question back instead of deciding it, and a reviewer that discovers a decision rested on something false is the same event, found sooner. The correction is not lost — it goes to the gate flagged, with its quote, so reopening the decision there costs one reply.
+
+**Applying one.** Edit the sentences the finding lands on and nothing else: correct the false claim, or make the two contradicting parts agree. Where they cannot be made to agree without picking which one survives, picking is the judgment call — flag it instead. An applied correction never adds an item, widens scope, or rewrites acceptance criteria. Record it in that item's detail section: what the plan said, what it says now, and the quote it rested on. That record is what keeps the correction from being silent — it has to reach the gate (Step 4) even if the context between here and there compacts.
+
+**Flagging one.** Same place, same one line, carrying the reviewer's proposed change rather than an applied one, plus which kind it is and who found it — a peer, or a fresh same-model agent (see Consulting a peer model). A reader weighs a finding differently depending on whose eyes were on the plan. A finding that lands on the plan as a whole rather than on one item — a missing item, an ordering that won't work — is always flagged, because acting on it changes scope; record it in the dashboard's Open questions.
+
+**"Nothing worth changing" is a result, not a failed review.** Record nothing, and let the gate say the review ran and found nothing. Promoting a weak finding so the step looks worthwhile is how a manufactured finding becomes a plan change.
+
 ## The workflow (sequential steps)
 
 Steps 1–8 run in order, top to bottom. The skill has two distinct conversational phases separated by an explicit approval gate:
@@ -560,6 +578,7 @@ Per-item detail sections carry:
 - Intent, constraints, and acceptance criteria — what "done" means, not how each line gets written.
 - Decisions — each a *what* + *why*, tagged with its authority or its reversibility, and flagged if low-confidence (the flag is what surfaces it for the user's eye in the Step 4 disclosed-decisions list). Recorded as overridable-when-reversible context, never as imperative steps. The ones the user made are marked as theirs and written in their words — see "How a decision is recorded" in Step 3.
 - Commit hash if any.
+- **Review findings** — what the plan review (Step 3.5) corrected in this section, and what it flagged for the user instead. See "What a finding becomes".
 - Discoveries (mid-item findings worth recording).
 - **Dead ends / don't repeat** — approaches tried that failed, and why. A re-run after a blocker, or a later item, reads these so it doesn't retry a known dead end.
 - **Artifacts** — files created or changed, with locations.

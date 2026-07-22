@@ -226,6 +226,7 @@ A finding is applied only when all three of these hold. Failing any one of them 
 Steps 1–8 run in order, top to bottom. The skill has two distinct conversational phases separated by an explicit approval gate:
 
 - **Interview phase** (Step 3) — questions only, no code changes, no commits. Walks every item end-to-end, captures decisions in the master plan.
+- **Plan review** (Step 3.5) — a reader who never saw the interview argues with the finished plan before the user is asked to adopt it. Still no code changes; only `PLAN.md` is written to.
 - **Master-plan approval gate** (Step 4) — show the complete master plan, get a single yes-to-the-whole.
 <!-- pln:only claude -->
 - **Implementation phase** (Step 5) — a thin orchestrator runs one Workflow script covering every item, sequentially, with `PLAN.md` as the spec. No more discussion questions; the only interruptions are a blocker threshold, which pauses and resumes the same run.
@@ -352,6 +353,44 @@ marks the payment refunded. No reason given.
 Cross-item interactions are normal during the interview. If answering item N's question forces a change to item M's detail (already written), update M in place and tell the user one short line: "Item M revised to match: <one-line summary>."
 
 When the interview is done, every item's section pins down the intent and the decisions other work depends on, enough that the implementer can't take it somewhere the user would veto. Reversible mechanics are deliberately left open: "decide this in contact with the code" is a valid, intended end state for a deferred choice, not a gap to be filled. What must be complete is the set of ask-lane answers, not a prescription of how every line gets written.
+
+### Step 3.5. Plan review
+
+Every item's detail section is now written, and nobody has read the plan who wasn't in the conversation that produced it. That reading happens here, before the user is asked to adopt anything, so what reaches the gate is a plan that has already been argued with. When the switch is off, skip the whole step and say nothing about it — see The plan review switch.
+
+None of the review is restated here. What the reviewer is told is The reviewer's brief; who reads the plan is Consulting a peer model; what happens to each finding is What a finding becomes. This step is the order they run in:
+
+1. **Make a scratch directory**, outside the repository so nothing it holds can be swept into a commit:
+
+   ```bash
+   RUN="${TMPDIR:-/tmp}/pln-<plan-slug>"; mkdir -p "$RUN"; echo "$RUN"
+   ```
+
+   Substitute that printed path everywhere below — every shell call starts a fresh shell, so the variable itself is gone by the next one.
+
+2. **Write the brief** to `$RUN/plan-review.brief.md`, the plan inlined whole, per The reviewer's brief. One file, whichever rung ends up running it.
+
+3. **Say one line before it runs**, naming who is about to read the plan — `"$PLN_BIN/pln-peer" --which` answers that without sending anything. This step sits between the user's last answer and the gate and can take minutes; unexplained silence there reads as a hung session.
+
+4. **Run it**, and read what it prints per Consulting a peer model — including the one-time consent question, which is reached here on a machine that has never been asked:
+
+   ```bash
+   "$PLN_BIN/pln-peer" \
+     --brief "$RUN/plan-review.brief.md" \
+     --out   "$RUN/plan-review.peer.out"
+   ```
+
+5. **On rung 3, review the plan anyway, on a fresh same-model agent.** `/pln-pr`'s cross-model pass skips at that point because a different model is its whole point; this step's point is a reader who never saw the interview, and a fresh agent of the same model is exactly that. Exit 3 (no peer on the machine, or peer consult switched off), exit 4 (a peer was picked, ran, and failed), and a spoken "keep this one local" all land here, and none of them is a degraded run. Hand it the same brief file — see below.
+
+6. **File every finding** per What a finding becomes: applied into the plan's own prose, or flagged, and either way recorded in its item's detail section before moving on. That record is what survives a compaction between here and the gate. Then go to Step 4.
+
+**Spawning the rung-3 reviewer on this host:**
+
+<!-- pln:include plan-review-invoke -->
+
+A reviewer that errored, timed out, or came back empty is a review that did not happen — not a review that found nothing. Take no findings from it, and say which of the two it was where the gate names who read the plan.
+
+The review runs once, on the finished plan. Re-showing the plan at the gate — after a reopened decision, a reverted correction, a "change X" — does not re-run it: a second pass over a document the user is in the middle of editing spends minutes to produce findings about sentences that are mid-edit. Run it again only if the user asks.
 
 ### Step 4. Master-plan approval gate
 

@@ -86,6 +86,8 @@ Two of those need a sentence. Codex reviewers run one at a time because concurre
 
 Before you're asked to adopt a master plan, the plan itself goes under review: a reader that never saw the interview goes through it cold, argues with it, and checks its factual claims against the files it names. Plain mistakes are corrected in the plan; anything that turns on your taste or your call arrives at the approval gate flagged, numbered alongside everything else you can reopen there. Where you have a second agent CLI it's a different model doing the reading (see [Second opinions](#second-opinions)); where you don't, it's a fresh agent of the same one.
 
+What the reviewer gets is the plan and nothing else — never the conversation that produced it, and never anything you typed that didn't end up in the plan. A reviewer that would have needed the transcript has found something about the plan worth telling you.
+
 It runs on every plan — there's no shortcut for a short one, because a two-item plan that changes how everything afterwards behaves is often the riskier one. Two ways to switch it off:
 
 - **For good**, in `~/.pln/config.yaml`:

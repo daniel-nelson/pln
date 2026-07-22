@@ -146,6 +146,63 @@ The review has three parts that can be switched off separately, and an instructi
 
 An instruction broader than any one of those (a bare "skip it") is the whole step. When it is genuinely ambiguous which part is meant, ask one short question instead of guessing — guessing wrong either sends a plan the user meant to keep on the machine, or throws away a review they wanted.
 
+## The reviewer's brief
+
+Step 3.5's reviewer is a stranger to the conversation, and it gets the plan and nothing else: not the interview transcript, not the user's turns, not the options that lost. The plan is already the whole artifact every implementer works from. If the reviewer needs more than the plan to argue with it, the plan is the defect — and saying so is one of the findings worth having.
+
+The same brief goes to whoever runs the review, a peer CLI or a fresh same-model agent (see Consulting a peer model). Write it once to a file and use it on every rung. Two briefs that say almost the same thing drift, and then a finding depends on which rung happened to run.
+
+What the brief carries:
+
+- **The plan itself, inline and whole.** A peer may be a plain prompt-in, text-out CLI with no way to open a file, so the text goes in the brief rather than a path to it. Name `PLAN.md`'s path and the repository root as well, for a reviewer that *can* read — that is what makes checking the plan's claims possible at all.
+- **What a plan is**, in two lines, because the reviewer has likely never seen one: a dashboard plus one section per item, where each item is implemented by a fresh agent that reads that section and nothing else, and the sections record both the decisions the user made and the decisions the plan's author made on their behalf.
+- **The instruction to be adversarial**, with the reason this plan in particular needs it: it was written by the same model that ran the interview, so it carries that conversation's assumptions and cannot see them, and it is biased toward changes that feel productive. No praise, no inventory of what the plan gets right — the parts that are fine need no comment.
+- **Check the plan's factual claims against the files it names.** A plan asserting something untrue about the code it edits is the failure this step exists to catch, and it is invisible from inside the conversation that wrote it.
+- **Every finding quotes what it rests on** — `file:line` and the verbatim text for a claim about the repository, the plan's own sentence for a contradiction between two of its parts. A reviewer that cannot open files says so per claim instead of guessing; an unquoted correction from a reviewer with no repository access is exactly the confident wrong answer that must never reach the plan.
+- **A counterfactual, per item.** Take the problem the plan says exists today and ask whether the plan as written would actually have caught it. A bare "review this plan" produces agreement; a concrete artifact plus "would this have caught it?" produces the finding worth having. Where the plan quotes something real — an output, a message, a behavior the user objected to — that is the artifact; where it doesn't, the item's own acceptance criteria are.
+- **Finding nothing is a permitted answer**, said in those words. A review required to produce findings manufactures them, and a manufactured finding that quotes a line reads exactly like a real one.
+
+A brief that carries all of it, ready to fill in:
+
+```
+Review the plan below. It was written by an AI agent during an interview with the
+user it works for, and it is what the implementers build from. A plan is a
+dashboard plus one section per item; each item is implemented by a fresh agent
+that reads that section and nothing else. The sections record decisions the user
+made and decisions the agent made on their behalf.
+
+Repository root: <path>. The plan file is <path to PLAN.md>. Read any file the
+plan names. If you cannot read files, say so per claim rather than guessing.
+
+--- PLAN ---
+<the plan, verbatim and whole>
+--- END PLAN ---
+
+Be adversarial. The plan was written by the same model that ran the interview, so
+it carries that conversation's assumptions and cannot see them, and it leans
+toward changes that feel productive. Don't tell me what it gets right.
+
+Check its factual claims against the files it names. For each item, take the
+problem the plan says exists today and ask whether the plan as written would
+actually have caught it.
+
+Every finding quotes what it rests on: `file:line` plus the verbatim text for a
+claim about the code, or the plan's own sentence for a contradiction between two
+parts of the plan. A claim you could not verify is reported as unverified — not
+dropped, and not asserted.
+
+Report each finding as: which item it lands on, one sentence on what is wrong,
+the quote it rests on, what you would change, and which kind it is — a false
+factual claim, a contradiction inside the plan, or a judgment call (one that
+turns on taste, risk appetite or domain knowledge).
+
+"Nothing worth changing" is a complete answer. Don't manufacture findings.
+```
+
+The kind label is the reviewer's own reading, and it travels as a claim rather than an instruction: what happens to a finding is decided when the result comes back, not by the reviewer that wrote it.
+
+**Why nothing else travels.** The transcript carries the writing model's own rationalizations alongside the user's words, and a reviewer that reads those is primed by the reasoning it was brought in to audit. Quoting the rejected options has the same effect one step further on: it re-argues a question the user already closed. What makes the plan enough on its own is Step 3's recording rule — a decision is written down as the chosen option's own line plus everything the user said past the selector, so a reader who never saw the interview reads the same decision the user made.
+
 ## The workflow (sequential steps)
 
 Steps 1–8 run in order, top to bottom. The skill has two distinct conversational phases separated by an explicit approval gate:

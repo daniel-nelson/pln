@@ -24,11 +24,25 @@
 # through to the next rung rather than failing the run.
 #
 # Rungs 1 and 2 send the brief to another vendor's CLI: it leaves the machine
-# and it may spend the user's quota.
+# and it may spend the user's quota. So they are gated on a one-time consent,
+# `peer_consent` in config, which this script enforces and never asks for —
+# only the session talking to the user can ask:
+#
+#   unset  → nothing is sent. STATUS=consent, exit 5, with RUNG/PEER naming who
+#            it would have gone to so the caller's question can name them too.
+#   false  → nothing is ever sent. Reported as rung 3 with STATUS=declined, so a
+#            caller that already handles "no peer" needs no new branch.
+#   true   → rungs 1 and 2 run.
+#
+# The question is only reachable when a peer actually exists: a machine with no
+# second CLI and no `peer_command` falls to rung 3 before consent is consulted,
+# and is never asked something that would change nothing.
 #
 # Usage:
 #   pln-peer --brief <file> --out <file> [options]
-#   pln-peer --which                     report the selection, run nothing
+#   pln-peer --which                     report the selection, run nothing (and
+#                                        still report `consent` when the
+#                                        one-time question is unanswered)
 #
 #   --brief FILE     the peer's entire prompt (required unless --which).
 #   --out FILE       where the peer's answer is written (required unless
@@ -54,13 +68,15 @@
 #
 #   RUNG=1|2|3
 #   PEER=<the command that ran, or 'none' on rung 3>
-#   STATUS=ok|empty|timeout|error|none
+#   STATUS=ok|empty|timeout|error|none|consent|declined
 #   RESULT_FILE=<path, empty on rung 3>
 #   LOG_FILE=<path, empty on rung 3>
 #
 # Exit codes: 0 a peer ran and wrote a result · 2 usage error · 3 no peer is
 # available, so the caller falls back to a fresh same-model agent (rung 3) ·
-# 4 a peer was selected, ran, and failed.
+# 4 a peer was selected, ran, and failed · 5 a peer is available but nothing was
+# sent, because consent has not been recorded yet — ask, store the answer with
+# `pln-config set peer_consent true|false`, and call again.
 set -uo pipefail
 
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -206,6 +222,29 @@ if [ -n "$PEER_COMMAND" ]; then
   set -- $PEER_COMMAND
   PEER_LABEL="$(basename "${1:-peer_command}")"
 fi
+
+# ── the one-time consent, checked once a peer is actually in hand ────────────
+# Deliberately after the selection and before everything else, --which and
+# --dry-run included: both of those name another vendor's CLI as the destination,
+# and neither is worth answering until the user has agreed there may be one.
+CONSENT=""
+if [ -x "$SELF_DIR/pln-config" ]; then
+  CONSENT="$("$SELF_DIR/pln-config" get peer_consent 2>/dev/null || true)"
+fi
+case "$(printf '%s' "$CONSENT" | tr '[:upper:]' '[:lower:]')" in
+  true | yes)
+    ;;
+  false | no)
+    report 3 none declined "" ""
+    exit 3
+    ;;
+  *)
+    # Not an error and not a refusal — nobody has been asked yet. The caller is
+    # the only thing here that can talk to the user.
+    report "$RUNG" "$PEER_LABEL" consent "" ""
+    exit 5
+    ;;
+esac
 
 if [ "$WHICH" = "1" ]; then
   report "$RUNG" "$PEER_LABEL" none "" ""

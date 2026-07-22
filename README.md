@@ -95,7 +95,13 @@ Where a second model is worth more than another run of the same one — `/pln-pr
 2. **A known CLI on your `PATH`** — `claude` or `codex`, whichever isn't hosting the session, and only when it is signed in. Under Codex it asks Claude; under Claude it asks Codex. Probes ship only for CLIs whose invocation pln has actually reproduced; anything else goes through the first rung, where you supply the invocation.
 3. **Nothing at all**, which is a supported answer and not a broken install. The work still happens — on a fresh same-model agent where a fresh reading is the point, or skipped with a note where a different model was the whole point.
 
-The first two rungs hand the material to another vendor's CLI: it leaves your machine, and the call can spend your quota there.
+The first two rungs hand the material to another vendor's CLI: it leaves your machine, and the call can spend your quota there. So pln asks you once — the first time anything would be sent, naming the CLI it found — and remembers the answer for every repo and every pln skill after that. Say no and nothing is ever sent: the work runs on a fresh agent of the same model, or is skipped with a note. Nothing is asked at all on a machine where there is no second CLI to reach for.
+
+Change your mind later, in either direction:
+
+```bash
+~/.claude/skills/pln/bin/pln-config set peer_consent false
+```
 
 ## Upgrading
 

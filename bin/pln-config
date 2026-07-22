@@ -2,7 +2,8 @@
 # pln-config — read/write ~/.pln/config.yaml
 #
 # Usage:
-#   pln-config get <key>          — read a config value
+#   pln-config get <key>          — read a config value (whole value, spaces and
+#                                   all, so a key can hold a full command line)
 #   pln-config set <key> <value>  — write a config value
 #   pln-config list               — show all config
 #
@@ -16,7 +17,10 @@ CONFIG_FILE="$STATE_DIR/config.yaml"
 case "${1:-}" in
   get)
     KEY="${2:?Usage: pln-config get <key>}"
-    grep -E "^${KEY}:" "$CONFIG_FILE" 2>/dev/null | tail -1 | awk '{print $2}' | tr -d '[:space:]' || true
+    # Return the whole value as written, not just its first token: a value may
+    # be a full command line. Strips the `KEY:` prefix and surrounding spaces.
+    grep -E "^${KEY}:" "$CONFIG_FILE" 2>/dev/null | tail -1 \
+      | sed -E "s/^${KEY}:[[:space:]]*//; s/[[:space:]]+\$//" || true
     ;;
   set)
     KEY="${2:?Usage: pln-config set <key> <value>}"

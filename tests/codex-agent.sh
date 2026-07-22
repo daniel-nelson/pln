@@ -100,6 +100,16 @@ rc=0; res="$(run timeout "$WORK/to.out")" || rc=$?
 [ "$rc" -eq 4 ] || fail "timeout exited $rc (expected 4)"
 grep -q '^STATUS=timeout$' <<<"$res" || fail "a 124 exit was not reported as STATUS=timeout"
 
+# --- a spawn with no time ceiling still runs ---------------------------------
+# `--timeout 0` leaves the timeout wrapper empty, which is also what happens on
+# any machine with neither timeout(1) nor gtimeout(1) — every stock Mac. Under
+# bash 3.2, still the /bin/bash macOS ships, an unguarded empty array is an
+# unbound variable and the helper dies before it ever calls the CLI.
+out="$WORK/noceiling.out"
+res="$(run ok "$out" --timeout 0)" || fail "a spawn with no time ceiling exited non-zero"
+grep -q '^STATUS=ok$' <<<"$res" || fail "a spawn with no time ceiling did not report STATUS=ok"
+[ "$(cat "$out")" = "the agent said this" ] || fail "a spawn with no time ceiling wrote no result"
+
 # --- the composed command: guards present, resume flags withheld -------------
 cmd="$("$BIN" --brief "$BRIEF" --out "$WORK/dry.out" --add-dir "$WORK" --dry-run 2>&1 >/dev/null)"
 grep -q -- '-u OPENAI_API_KEY' <<<"$cmd" || fail "OPENAI_API_KEY is not unset for the child"

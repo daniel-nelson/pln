@@ -1,0 +1,203 @@
+#!/usr/bin/env bash
+# pln-claude-agent — run one fresh-context Claude Code agent and hand back its
+# result. The mirror image of pln-codex-agent, for the other direction: it is
+# what a session running under Codex (or any host) uses to consult Claude.
+#
+# `claude -p` is a different shape from `codex exec`, so it needs its own set of
+# guards. Each one below is here because its absence fails *silently* or fails
+# a user whose setup differs from the author's:
+#
+#   - the prompt arrives on stdin, never in argv. A brief is a page of markdown
+#     full of backticks, quotes and `$`; hand-escaping it into an argument is
+#     how a spawn ends up running a truncated prompt. Redirecting stdin also
+#     guarantees an EOF, so a `-p` run can never sit waiting for input.
+#   - the run is wrapped in a timeout. `claude -p` has no built-in ceiling, and
+#     an agent that stalls would otherwise hold the caller forever.
+#   - a non-zero exit is a failure even when the run printed something. A bad
+#     `--model` exits 1 having written a sentence of prose to stdout; reading
+#     the file without checking the exit code turns that into a "review".
+#   - an empty result is a failure, not an agent that found nothing to say.
+#   - the tool set is restricted, not merely permission-gated. `--allowedTools`
+#     only *adds* permissions — it cannot take away what the user's own
+#     settings already allow, so it is no way to make a reviewer read-only.
+#     `--tools` is: the default `Read,Grep,Glob` leaves the agent no shell and
+#     no writer, which is what a peer reviewing someone's repo should have.
+#   - MCP servers are not loaded (`--strict-mcp-config` with no `--mcp-config`).
+#     A reviewer with the caller's MCP surface can reach the network and other
+#     people's systems, and every server it loads is startup latency for a run
+#     that only reads files.
+#   - the session is not persisted, so consulting a peer does not fill the
+#     user's own `/resume` picker with agent runs they never started.
+#   - ANTHROPIC_API_KEY is deliberately *left alone*, unlike the OPENAI_API_KEY
+#     the Codex helper unsets. Claude Code treats a key as a legitimate way to
+#     authenticate, and plenty of installs have nothing else; unsetting it would
+#     break the very users it pretended to protect. The auth probe in pln-peer
+#     and the run see the same environment, so they agree.
+#
+# Deliberately absent: `--resume`. This helper exists for one-shot peer
+# consultation — a review, a second opinion — not for pln's per-item loop, which
+# is the host's own job. Nothing here needs to continue a thread.
+#
+# Usage:
+#   pln-claude-agent --brief <file> --out <file> [options]
+#
+#   --brief FILE     the agent's entire prompt. Read from the file, never from
+#                    argv, so a brief with quotes/backticks/$ needs no escaping.
+#   --out FILE       where the agent's final message is written.
+#   --log FILE       stderr and diagnostics (default: <out>.log).
+#   --cd DIR         the agent's working root (default: the git top level, else
+#                    the current directory).
+#   --add-dir DIR    an extra readable directory, repeatable — e.g. a plan dir
+#                    outside the repo.
+#   --tools LIST     comma-separated built-in tools (default: Read,Grep,Glob).
+#                    Widen it only deliberately: anything beyond those three
+#                    gives the peer a way to change the caller's machine.
+#   --timeout SECS   ceiling on a hung run (default 1800; 0 disables).
+#   --model NAME     override the model for this run.
+#   --dry-run        print the command that would run and exit 0.
+#
+# Prints exactly three KEY=VALUE lines on stdout and nothing else:
+#
+#   STATUS=ok|empty|timeout|error
+#   RESULT_FILE=<path>
+#   LOG_FILE=<path>
+#
+# Exit codes: 0 the agent ran and wrote a result · 2 usage error · 3 the Claude
+# CLI is not installed · 4 the run failed (timed out, exited non-zero, or wrote
+# an empty result).
+set -uo pipefail
+
+BRIEF=""
+OUT=""
+LOG=""
+CD_DIR=""
+TOOLS="Read,Grep,Glob"
+TIMEOUT_SECS="1800"
+MODEL=""
+DRY_RUN=0
+ADD_DIRS=()
+
+usage() {
+  cat >&2 <<'USAGE'
+Usage: pln-claude-agent --brief <file> --out <file> [options]
+
+  --brief FILE     the agent's entire prompt (required)
+  --out FILE       where its final message is written (required)
+  --log FILE       stderr and diagnostics (default: <out>.log)
+  --cd DIR         working root (default: git top level, else PWD)
+  --add-dir DIR    extra readable directory (repeatable)
+  --tools LIST     comma-separated built-in tools (default: Read,Grep,Glob)
+  --timeout SECS   ceiling on a hung run (default 1800; 0 disables)
+  --model NAME     model override
+  --dry-run        print the command and exit
+USAGE
+  exit 2
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --brief) BRIEF="${2:-}"; shift 2 ;;
+    --out) OUT="${2:-}"; shift 2 ;;
+    --log) LOG="${2:-}"; shift 2 ;;
+    --cd) CD_DIR="${2:-}"; shift 2 ;;
+    --add-dir) ADD_DIRS+=("${2:-}"); shift 2 ;;
+    --tools) TOOLS="${2:-}"; shift 2 ;;
+    --timeout) TIMEOUT_SECS="${2:-}"; shift 2 ;;
+    --model) MODEL="${2:-}"; shift 2 ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    -h | --help) usage ;;
+    *) echo "pln-claude-agent: unknown argument '$1'" >&2; usage ;;
+  esac
+done
+
+[ -n "$BRIEF" ] && [ -n "$OUT" ] || usage
+[ -f "$BRIEF" ] || { echo "pln-claude-agent: no brief file at '$BRIEF'" >&2; exit 2; }
+[ -s "$BRIEF" ] || { echo "pln-claude-agent: brief file '$BRIEF' is empty" >&2; exit 2; }
+case "$TIMEOUT_SECS" in
+  '' | *[!0-9]*) echo "pln-claude-agent: --timeout must be a whole number of seconds" >&2; exit 2 ;;
+esac
+
+command -v claude >/dev/null 2>&1 || {
+  echo "pln-claude-agent: the Claude CLI is not on PATH — cannot run an agent." >&2
+  exit 3
+}
+
+[ -n "$LOG" ] || LOG="$OUT.log"
+for f in "$OUT" "$LOG"; do
+  d="$(dirname "$f")"
+  [ -d "$d" ] || mkdir -p "$d" || { echo "pln-claude-agent: cannot create '$d'" >&2; exit 2; }
+done
+# A stale result from a previous run must never be mistaken for this one's.
+: > "$OUT" || { echo "pln-claude-agent: cannot write '$OUT'" >&2; exit 2; }
+: > "$LOG" || { echo "pln-claude-agent: cannot write '$LOG'" >&2; exit 2; }
+
+if [ -z "$CD_DIR" ]; then
+  CD_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+fi
+[ -d "$CD_DIR" ] || { echo "pln-claude-agent: no such working root '$CD_DIR'" >&2; exit 2; }
+
+# macOS ships no timeout(1); coreutils installs it as gtimeout. Without either,
+# run unwrapped rather than refusing to run — a missing optional tool must not
+# be the thing that stops a plan. The caller is told so it can watch the run.
+TIMEOUT_CMD=()
+if [ "$TIMEOUT_SECS" != "0" ]; then
+  if command -v timeout >/dev/null 2>&1; then
+    TIMEOUT_CMD=(timeout -k 10 "$TIMEOUT_SECS")
+  elif command -v gtimeout >/dev/null 2>&1; then
+    TIMEOUT_CMD=(gtimeout -k 10 "$TIMEOUT_SECS")
+  else
+    echo "pln-claude-agent: no timeout(1) or gtimeout(1) on PATH — running without a time ceiling." >&2
+  fi
+fi
+
+# `claude` has no working-root flag, so the run is chdir'd in a subshell below;
+# --add-dir is what lets it read anything outside that root.
+# The `+"${...[@]}"` guard is not decoration: bash 3.2, which is still the
+# /bin/bash every Mac ships, treats an empty array as an unbound variable under
+# `set -u` — so without it this line aborts the helper on exactly the machines
+# that have no timeout(1) to put in the array.
+CMD=("${TIMEOUT_CMD[@]+"${TIMEOUT_CMD[@]}"}" claude -p
+  --output-format text
+  --tools "$TOOLS"
+  --strict-mcp-config
+  --no-session-persistence)
+for d in ${ADD_DIRS+"${ADD_DIRS[@]}"}; do
+  [ -n "$d" ] && CMD+=(--add-dir "$d")
+done
+[ -n "$MODEL" ] && CMD+=(--model "$MODEL")
+
+if [ "$DRY_RUN" = "1" ]; then
+  printf 'cd %q && ' "$CD_DIR" >&2
+  printf '%q ' "${CMD[@]}" >&2
+  printf '< %q > %q 2> %q\n' "$BRIEF" "$OUT" "$LOG" >&2
+  echo "STATUS=ok"
+  echo "RESULT_FILE=$OUT"
+  echo "LOG_FILE=$LOG"
+  exit 0
+fi
+
+rc=0
+( cd "$CD_DIR" && "${CMD[@]}" < "$BRIEF" > "$OUT" 2> "$LOG" ) || rc=$?
+
+STATUS="ok"
+EXIT=0
+if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+  STATUS="timeout"
+  EXIT=4
+  echo "pln-claude-agent: the agent hit the ${TIMEOUT_SECS}s ceiling and was killed." >&2
+elif [ "$rc" -ne 0 ]; then
+  # A failed run still prints prose to stdout — a rejected model, an auth
+  # error. Reading that file as a result is how a failure becomes a "review".
+  STATUS="error"
+  EXIT=4
+  echo "pln-claude-agent: claude exited $rc — see $LOG and $OUT." >&2
+elif [ ! -s "$OUT" ]; then
+  STATUS="empty"
+  EXIT=4
+  echo "pln-claude-agent: claude exited 0 but wrote no result — treat as a failed run, not an empty one." >&2
+fi
+
+echo "STATUS=$STATUS"
+echo "RESULT_FILE=$OUT"
+echo "LOG_FILE=$LOG"
+exit "$EXIT"

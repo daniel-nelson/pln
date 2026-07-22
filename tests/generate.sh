@@ -329,6 +329,65 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   has "$f" '### Echoing recorded decisions' "$f lost the shared formatting rules"
 done
 
+# The peer ladder is one shared source both skills read, and the property that
+# matters is that neither carries probe logic of its own: every build of both
+# targets reaches the peer through the same helper, behind the same one-time
+# consent key.
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" '## Consulting a peer model' "$f carries no peer section"
+  has "$f" 'pln-peer' "$f does not reach the peer through the picker"
+  has "$f" 'peer_consent' "$f names no consent key in front of the peer"
+done
+# The line 1.15.0 shipped on the Codex side — that there is no second model to
+# consult from here — was replaced, not kept: rung 2 reaches for `claude` from
+# Codex exactly as it reaches for `codex` from Claude.
+hasnt "$real_x/pln-pr/SKILL.md" 'no second one to consult' \
+  "the codex build still says a peer cannot be consulted from this host"
+
+# ─── the plan review, as skill text ───────────────────────────────────────────
+# Step 3.5 and the three sections it runs in order are prose a model reads, not
+# code — there is no entry point a bash test could drive. So what is asserted is
+# that the rules survive into both builds, and that the one host-specific part
+# of the step (spawning the rung-3 reviewer) is the host's own.
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+  has "$f" '### Step 3.5. Plan review' "$f lost the plan review step"
+  has "$f" '## The plan review switch' "$f lost the plan review switch"
+  has "$f" 'plan_review' "$f names no config key for the switch"
+  has "$f" 'The size of the plan never does' "$f lost the rule that plan size changes nothing"
+  has "$f" "## The reviewer's brief" "$f lost the reviewer's brief"
+  has "$f" '## What a finding becomes' "$f lost the findings rules"
+  # The applied lane is three conjunctive tests. Losing any one of them lets a
+  # judgment call, an invented citation, or a user's own decision be rewritten
+  # in the plan with nobody having seen it.
+  has "$f" 'It is a false factual claim, or a contradiction between two parts of the plan.' \
+    "$f lost the kind test in front of an applied finding"
+  has "$f" 'It quotes what it rests on, and the quote is real.' \
+    "$f lost the evidence test in front of an applied finding"
+  has "$f" 'It does not land on a decision the user made.' \
+    "$f lost the provenance test in front of an applied finding"
+  has "$f" 'Why a user decision is never moved.' \
+    "$f lost the rule that a finding never moves a user's decision"
+  has "$f" 'How a decision is recorded' "$f lost the rule that makes the plan readable alone"
+done
+
+# The rung-3 reviewer is spawned on this host, so that block — and only that
+# block — differs between the builds. Each must carry its own spawn and point at
+# the same brief file the peer would have been handed.
+spawn_of() { # spawn_of <file>
+  awk '/^\*\*Spawning the rung-3 reviewer/,/^A reviewer that errored/' "$1"
+}
+spawn_c="$(spawn_of "$real_c/SKILL.md")"
+spawn_x="$(spawn_of "$real_x/SKILL.md")"
+[ -n "$spawn_c" ] || fail "the claude build has no rung-3 spawn block"
+[ -n "$spawn_x" ] || fail "the codex build has no rung-3 spawn block"
+grep -qF 'agentType' <<<"$spawn_c" || fail "the claude build's rung-3 reviewer is not a harness agent"
+grep -qF 'pln-codex-agent' <<<"$spawn_x" || fail "the codex build's rung-3 reviewer is not a codex spawn"
+grep -qF 'read-only' <<<"$spawn_x" || fail "the codex build's rung-3 reviewer is not read-only"
+grep -qF 'brief file' <<<"$spawn_c" \
+  || fail "the claude build's rung-3 reviewer is not pointed at the brief file"
+grep -qF 'plan-review.brief.md' <<<"$spawn_x" \
+  || fail "the codex build's rung-3 reviewer is not handed the brief the peer would have had"
+
 # ─── and nothing above touched the working tree ───────────────────────────────
 if [ -d "$REPO_DIR/.git" ]; then
   dirty="$(git -C "$REPO_DIR" status --porcelain -- $targets)"

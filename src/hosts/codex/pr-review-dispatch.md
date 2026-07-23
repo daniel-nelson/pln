@@ -1,4 +1,4 @@
-Otherwise run the army in two stages, both serial — concurrent `codex` processes race on the shared OAuth token file, so there is no parallel army on this host.
+Otherwise run the army in two stages, both serial — one reviewer at a time keeps the wait a single-agent `wait_agent` poll and the tree quiet. Native subagents could in principle run at once here — they are in-session threads, not separate `codex` processes racing on the shared OAuth token — but a parallel review army has the orchestrator waiting on many children together, a wait pattern worth proving on this host before pln leans on it. Until then the army stays serial.
 
 **Stage 1 — the native review pass.** `codex review` is built for exactly this job and runs as one process, so it is the cheapest broad coverage available here. It takes no `-C`, so run it from the repo root, and capture its output to a file:
 

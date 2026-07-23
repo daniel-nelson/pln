@@ -8,6 +8,16 @@
 - **Prefer capabilities every user already has:** the agent harness's own tools and standard OS commands. Reach for a third-party service only when it's optional and the user configures it themselves.
 - **Environment-specific behavior is opt-in and degrades gracefully.** Gate it behind a config key (the existing `notify` / `auto_upgrade` pattern), default to the universal behavior, and no-op cleanly when the dependency is absent — never error or block on something a general user doesn't have.
 
+## Lean into native host tools
+
+When a host ships a native primitive for a job the skill needs — spawning a subagent, running a review, pushing a notification — use it. Do not shell out to reproduce it. On Claude that means the harness's own `Agent` / `Workflow` primitives; on Codex it means the native multi-agent tool rather than nested `codex exec` subprocesses.
+
+The reason is that the reimplementation rots. When pln's Codex spawning was built on nested `codex exec`, a later CLI shipped a native multi-agent feature that is on by default, so the model reached for the native tool anyway while the shell path additionally tripped the host's command-approval reviewer — a stuck loop born entirely of fighting the grain. Native tools also get the host's own guards, approvals, and UI for free, which a subprocess has to re-earn and never fully does.
+
+- **Native first, shell only as fallback.** Reach for a subprocess only where the host has no native primitive for the job, and say so where you do.
+- **Preserve the invariants, or drop them on purpose.** A scripted substrate you replace was carrying guarantees (per-item commit checkpoints, fresh context, a non-empty-result guard, sequential ordering). Each must find a home in the native design or be consciously abandoned — never lost silently in the swap.
+- **This is host-specific by nature, so it lives in `pln:only` blocks and host fragments,** not the host-neutral core. What is native on one host is absent on the other.
+
 ## The skill files are generated — edit `src/`
 
 `SKILL.md` and `pln-pr/SKILL.md` are **build output**. What git tracks at those paths is a placeholder telling the reader to run `./setup`; `bin/pln-generate` overwrites them at install time with a build for the host it was installed under, so a model never reads instructions addressed to the other host.

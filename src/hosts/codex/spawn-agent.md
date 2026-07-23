@@ -1,6 +1,22 @@
-A fresh-context agent is a nested `codex exec` call: a new session, its own context, one result. Codex has no harness-run script to hold a loop, so the orchestrator runs the loop itself and spawns one call at a time.
+A fresh-context agent is a **native Codex subagent**, started with the host's own multi-agent tools — not a nested `codex exec` process. Codex ships those tools (`spawn_agent`, `wait_agent`, `resume_agent`, `send_input`, `close_agent`) and has them on by default, so the orchestrator delegates through them rather than shelling out to a second Codex. Leaning on the native tools is the point: the model reaches for them anyway, they run under Codex's own approvals and sandbox instead of tripping an egress review on a nested launch, and their results arrive as summaries that keep the child's reasoning trace out of your context for free.
 
-Every spawn goes through pln's own helper, which owns the guards that spawn needs:
+**Spawn.** Call `spawn_agent` with the brief as its message, started with a fresh context — the "no inherited turns" fork (`fork_turns: "none"`), so the child begins blank rather than carrying this conversation. The brief is the child's entire spec, the same as for any fresh-context agent: the plan path, the item number, the mandated skills, the quality bar all go in it or in a file it names. Compose the brief in a file first (a heredoc keeps the shell from fighting its backticks and `$`), then pass its contents as the message — the child shares your working tree, so a path the brief names resolves for it. Keep the handle `spawn_agent` returns; it is what lets you wait on this child, resume it after a blocker, and close it when it's done.
+
+**Wait — this is where the loop lives, and where the old runs hung.** `wait_agent` is a *bounded long-poll*, not a call that blocks until the answer is ready. It waits up to a timeout and returns a *summary of which agents have an update*, not the child's result, and across a quiet interval it returns nothing at all. So wait in a loop: call `wait_agent`, and if the child has not reached a final status, call it again. Stop only when it reports `completed` or `errored`. Treating the first empty or timed-out `wait_agent` as "the agent came back with nothing" is exactly the mistake that produces an endless `No agents completed yet` — the child is still working; you stopped waiting on it.
+
+**Read the result.** Once the child is `completed`, its final message is delivered to you. That message is the whole result — the equivalent of a returned value, and the only thing that should reach your context. A child that reached `completed` with an empty final message is a failure wearing a success's clothes: treat it as a failed run, not an agent that found nothing to do. An `errored` final status is a failed run too. Say which, and don't mark the item done.
+
+**Pin to V1; never turn on multi-agent V2.** Codex has two multi-agent surfaces. V1 (`multi_agent`, on by default) carries each child's final status and message correctly. V2 (`multi_agent_v2`, off by default) has a known bug in its wait handler that drops the completion metadata, so the parent is told `No agents completed yet` even after the child finished — the very spin this design avoids. Rely on the default-on V1 tools; do not enable V2 (`--enable multi_agent_v2`, `-c features.multi_agent_v2=true`) for a pln run.
+
+**Fresh context, shared tree.** The child is a blank context but not a blank workspace: native subagents share the orchestrator's working directory and inherit its sandbox. That is what Step 5 wants — items run one at a time, each building on the last one's commit, so there is nothing to isolate. It also means no two children may run at once where either writes; the callers spawn one at a time for that reason. A read-only reviewer cannot be handed a read-only sandbox of its own — it inherits the orchestrator's — so a reviewer is held to reading by its brief, not by a sandbox flag.
+
+**The orchestrator commits; the child does not.** Unchanged, and deliberate whether or not a child could write `.git`: centralizing every commit in the orchestrator is what keeps each per-item commit a clean checkpoint. The child does its work, updates `PLAN.md`, and returns; the orchestrator commits the finished item's files by name.
+
+**Resuming after a blocker.** A child that stops at a blocker is not gone — its context is still live. Continue it with `resume_agent` (or `send_input`) on its handle, passing a short brief that carries the user's answer and says to continue from where it stopped rather than restart, then `wait_agent` on it again in the same loop. Because the child still holds everything the first attempt worked out, nothing finished is redone. Keep each child's handle against its item until the item is done; on a blocker the handle is what the handoff file records, the way a thread id was.
+
+**Close finished agents.** A `completed` child holds a concurrency slot until you `close_agent` it. Close each one after you've read its result and committed its work, so the next spawn has room; the per-session concurrency cap (`agents.max_concurrent_threads_per_session`) is small.
+
+**When the native tools aren't there — the fallback.** An install can have the multi-agent tools switched off (`agents.enabled = false`) or run a Codex old enough to lack them; there the orchestrator has no `spawn_agent` to call. Fall back to a nested `codex exec` through pln's helper, which owns the guards a raw nested launch needs (stdin redirected so it can't hang, a timeout ceiling, an empty result treated as failure, `OPENAI_API_KEY` unset, the thread id read from the event stream, the transcript sent to a file):
 
 ```bash
 "{{SKILL_DIR}}/bin/pln-codex-agent" \
@@ -10,48 +26,6 @@ Every spawn goes through pln's own helper, which owns the guards that spawn need
   --cd "$(git rev-parse --show-toplevel)"
 ```
 
-Write the brief to a file first and point `--brief` at it. The prompt never goes on the command line: a brief is a page of markdown full of backticks, quotes and `$`, and shell-escaping it by hand is how a spawn ends up running a truncated prompt.
+The helper prints exactly four lines — `STATUS=ok|empty|timeout|error`, `THREAD_ID`, `RESULT_FILE`, `EVENTS_FILE`. On `STATUS=ok` and exit 0 read `RESULT_FILE`, the agent's final message; any other status exits 4 and means the run failed (`empty` is a `codex exec` that exited 0 having written nothing — a failure, not an item with nothing to do). `THREAD_ID` is what makes a blocked item resumable; keep it with the item. Never read `EVENTS_FILE` into your context — it is the reasoning trace, and keeping it out is the point of spawning at all. Use `--sandbox read-only` for a reviewer, `--add-dir <dir>` for a writable path outside the working root, `--timeout <secs>` to raise the hung-run ceiling. Spawn one at a time: concurrent `codex` processes race on the shared OAuth token file. The spawned agent still does not commit — `.git` is read-only to it under `workspace-write` — so the orchestrator commits, exactly as on the native path.
 
-The helper prints exactly four lines and nothing else, so reading its output costs the orchestrator almost no context:
-
-```
-STATUS=ok
-THREAD_ID=019f851c-7561-75e3-ae3e-650a9c8cb1e9
-RESULT_FILE=/…/item-3.out
-EVENTS_FILE=/…/item-3.out.events
-```
-
-How to read that:
-
-- **`STATUS=ok` and exit 0** — the agent ran and wrote a result. Read `RESULT_FILE`; that text is the agent's final message and the only thing that reaches your context.
-- **Any other status** (`empty`, `timeout`, `error`) exits 4 and means the run failed. Say so and stop the loop; do not treat it as an item that had nothing to do. `empty` is the one to watch: `codex exec` can exit 0 having written nothing, so a spawn that "succeeded" with no output is a failure wearing a success's clothes. The one exception is a failed `--resume`, which has a fallback rather than a dead end — see below.
-- **`THREAD_ID`** is what makes a blocked item resumable. Keep it with the item until the item is done; on a blocker it goes into the handoff file.
-- **`EVENTS_FILE`** is the agent's full reasoning trace. Never read it into your context — it exists for a post-mortem when a run fails.
-
-Options worth knowing:
-
-- `--sandbox read-only` for agents that only read (reviewers, a verification run that writes no artifacts). `workspace-write` is the default and is what item work needs.
-- `--add-dir <dir>` when the agent must write somewhere outside the working root — a plan directory that isn't under the git top level, for instance.
-- `--timeout <secs>` (default 3600) is a ceiling on a *hung* run, not a work budget; raise it for an item you expect to take a long time. There is no built-in timeout, so something has to bound it. On a machine with neither `timeout` nor `gtimeout` the helper says so on stderr and runs unbounded — watch that run rather than walking away from it.
-- `--resume <thread-id>` continues an existing thread instead of starting a new one.
-
-**One call at a time.** Concurrent `codex` processes race on the shared OAuth token file, so spawns are serialized even where the work looks parallelizable.
-
-**The spawned agent does not commit.** `.git` stays read-only even under `workspace-write`, so a nested agent physically cannot commit; `git commit` fails with `Unable to create '.git/index.lock'`. The agent writes files and returns; the orchestrator commits once the item is complete. The invariant that matters — no commit for a partial item — is unchanged; only who runs `git commit` moves.
-
-**Resuming after a blocker.** Run the helper again with `--resume "$THREAD_ID"`, a brief carrying the user's answer, and a **new** `--out` path (`item-<N>.resume.out`); the helper truncates whatever `--out` it is given, so reusing the first path destroys the blocked agent's own result before you are done with it.
-
-```bash
-"{{SKILL_DIR}}/bin/pln-codex-agent" \
-  --resume "$THREAD_ID" \
-  --brief "$RUN/item-3.resume.brief.md" \
-  --out   "$RUN/item-3.resume.out"
-```
-
-The resume brief is short, because the thread still holds everything the first attempt worked out: the answer to the blocking question, what it means for the item, and an instruction to continue from where it stopped rather than restart. It does not re-explain the item. A resumed thread also keeps the sandbox and working root it started with — `--sandbox`, `--cd` and `--add-dir` are ignored on resume, so there is nothing to re-specify.
-
-**When the thread is gone.** Rollout files are written lazily at the first turn, so an agent killed early enough leaves nothing to resume; a resume of a missing thread comes back `STATUS=error`. Either way the fallback is the same, and it is not a failed run: spawn a **fresh** agent with a full brief that points it at the item's section, the handoff file, and the uncommitted diff (`git status` / `git diff`), and tell it to build on what is already in the tree rather than starting over. That is what the handoff file exists for. It costs the first attempt's reasoning, not its work.
-
-Never pass a thread id you did not capture. `--resume ""` is a usage error rather than a fresh session, deliberately: an agent with no memory of the first attempt, handed a brief that says "here is the answer, carry on", redoes work that is already in the tree. And never `resume --last`, which picks up whatever thread any Codex process on the machine touched most recently.
-
-If `{{SKILL_DIR}}` never resolved (the preamble printed `none`), the helper isn't installed. Fall back to the call it makes, keeping every guard: `env -u OPENAI_API_KEY timeout -k 10 3600 codex exec -C <root> -s workspace-write --json -o "$OUT" - < brief.md > "$EVENTS" 2>&1`, then read the thread id with `grep -m1 -o '"thread_id":"[^"]*"' "$EVENTS" | cut -d'"' -f4`, and treat an empty `$OUT` as a failure. Resuming that way is the same line with `resume <thread-id>` in place of `-C <root> -s workspace-write`, which `resume` rejects.
+Resume the fallback with `--resume "$THREAD_ID"`, a short brief carrying the answer, and a **new** `--out` path (the helper truncates whatever `--out` it is given). A resume of a thread that was never written — an agent killed before its first turn — comes back `STATUS=error`; that is not a dead end but the same fallback one level down: spawn a fresh agent pointed at the item's section, the handoff file, and the uncommitted diff (`git status` / `git diff`), and tell it to build on what is already in the tree. Never pass a thread id you did not capture, and never `resume --last`, which picks up whatever thread any Codex process on the machine touched most recently. If `{{SKILL_DIR}}` never resolved (the preamble printed `none`), the helper isn't installed either; run the call it makes, keeping every guard: `env -u OPENAI_API_KEY timeout -k 10 3600 codex exec -C <root> -s workspace-write --json -o "$OUT" - < brief.md > "$EVENTS" 2>&1`, read the thread id with `grep -m1 -o '"thread_id":"[^"]*"' "$EVENTS" | cut -d'"' -f4`, and treat an empty `$OUT` as a failure.

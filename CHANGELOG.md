@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.19.0 — 2026-07-22
+
+### Changed
+
+- **On Codex, pln now spawns fresh-context agents with the host's native multi-agent tools (`spawn_agent` / `wait_agent` / `resume_agent` / `close_agent`) instead of shelling out to a nested `codex exec` per item.** This is now a stated principle in `CLAUDE.md` — lean into the host's native primitives, don't reimplement them — because the reimplementation rots: by Codex CLI 0.145 the native multi-agent feature (`multi_agent`) is stable and on by default, so a model told to "spawn an agent and wait" reached for the native tool on its own and the nested-`codex exec` path additionally tripped the host's command-approval reviewer (`guardian_approval`) with a high-risk egress prompt on every launch. The two together produced a stuck orchestrator: the model spun on a misused native wait and, when steered to the shell helper, hit an approval gate the user had to clear by hand. Native spawning runs under Codex's own approvals and sandbox, so neither happens.
+- **The spawn substrate (`Spawning a fresh-context agent`) is rewritten around the one thing that made the old runs hang: `wait_agent` is a bounded long-poll, not a blocking call that returns the result.** It comes back with a summary of which agents have an update — or with nothing on a quiet interval — so the orchestrator waits in a loop and stops only at a final status. Treating the first empty or timed-out wait as "the agent returned nothing" is exactly what renders as an endless `No agents completed yet`. The rewrite also pins pln to the V1 `multi_agent` surface and forbids enabling multi-agent V2, whose wait handler has a known bug (openai/codex#24342) that drops completion metadata and reproduces that same spin even after a child has finished.
+- **pln's per-item invariants are preserved on the native path, reframed off the mechanism they used to lean on.** The child gets a fresh context (`fork_turns: "none"`) but shares the orchestrator's working tree and sandbox, which is what Step 5's one-at-a-time, build-on-the-last-commit loop already wants. The orchestrator still commits every item itself — stated now as the checkpoint-keeping choice it is, rather than "`.git` is read-only to the agent," since a native child's git access is the host's call. Blockers resume the same agent by its handle (its thread id on the fallback); finished agents are closed to free the small per-session concurrency slot.
+- **`/pln-pr`'s review and fix armies move to native subagents too**, since they read the same substrate. The review army stays serial for now — the old "concurrent `codex` processes race on the shared OAuth token" reason is gone (native subagents are in-session threads, not separate processes), but a parallel army waits on many children at once, a pattern left to prove on-host before pln leans on it.
+
+### Fixed
+
+- **The nested-`codex exec` helper (`bin/pln-codex-agent`) is kept as a documented fallback for installs where the native tools are switched off or absent, not deleted.** Every call site leads with the native spawn and falls back to the helper, so a machine without the multi-agent tools still runs — it just pays the approval prompt the native path avoids. The helper's own guards are unchanged.
+
 ## 1.18.1 — 2026-07-22
 
 ### Fixed

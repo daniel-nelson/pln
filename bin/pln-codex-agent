@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # pln-codex-agent — spawn one fresh-context Codex agent and hand back its result.
 #
-# Codex has no harness-run script to hold pln's per-item loop, so on that host
-# the orchestrator drives the loop itself and spawns one `codex exec` per item.
-# Every one of those spawns needs the same handful of guards, and each of them
-# exists because its absence fails *silently*:
+# This is pln's *fallback* spawn path. On Codex the orchestrator now delegates
+# each item to a native subagent (spawn_agent/wait_agent), which is on by
+# default; this helper is used only where those tools are unavailable — agents
+# switched off, or a Codex old enough to lack them. It drives pln's per-item
+# loop by spawning one `codex exec` per item. Every one of those spawns needs
+# the same handful of guards, and each exists because its absence fails
+# *silently*:
 #
 #   - stdin is always redirected. A non-TTY `codex exec` with a dangling stdin
 #     can wait forever (openai/codex#20919, #27019). The prompt arrives on

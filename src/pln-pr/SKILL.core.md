@@ -288,22 +288,43 @@ BODY_FILE=$(mktemp)
 # write the assembled PR body into "$BODY_FILE" (a heredoc, or your host's file-writing tool), then:
 ```
 
-Detect whether a PR already exists for this branch and **update instead of recreate** — re-running pln-pr on a branch that already has an open PR should refresh it, not error or open a duplicate:
+**Read `pr_draft` before creating anything:** `"$_PLN_DIR/bin/pln-config" get pr_draft`. Unless it prints `false`, draft mode is on (default on) — a brand-new PR opens as a draft and Step 9 below watches it. `pr_draft false` reverts Step 8 to opening straight to ready, and Step 9 does not run at all.
 
-- GitHub: `gh pr view "$BRANCH" --json number` succeeds → a PR exists. Update it: `gh pr edit "$BRANCH" --title "$TITLE" --body-file "$BODY_FILE"` (the push above already updated its commits). Otherwise create: `gh pr create --base "$BASE" --head "$BRANCH" --title "$TITLE" --body-file "$BODY_FILE"`.
-- GitLab: `glab mr view "$BRANCH"` succeeds → update: `glab mr update "$BRANCH" --title "$TITLE" --description "$(cat "$BODY_FILE")"`. Otherwise create: `glab mr create --target-branch "$BASE" --source-branch "$BRANCH" --title "$TITLE" --description "$(cat "$BODY_FILE")"`.
-- Unknown host: print the branch is pushed and give the compare URL if derivable; you cannot open the PR.
+Detect whether a PR already exists for this branch and **update instead of recreate** — re-running pln-pr on a branch that already has an open PR should refresh it, not error or open a duplicate. This check also decides whether Step 9 applies: **an update to an already-open PR never touches its draft/ready state**, no matter what `pr_draft` says — only a PR this run itself creates goes through the draft/watch/undraft cycle.
+
+- GitHub: `gh pr view "$BRANCH" --json number` succeeds → a PR exists (`IS_NEW_PR=false`). Update it: `gh pr edit "$BRANCH" --title "$TITLE" --body-file "$BODY_FILE"` (the push above already updated its commits; its draft/ready state is untouched). Otherwise (`IS_NEW_PR=true`) create: `gh pr create --base "$BASE" --head "$BRANCH" --title "$TITLE" --body-file "$BODY_FILE"`, adding `--draft` when `pr_draft` is on.
+- GitLab: `glab mr view "$BRANCH"` succeeds → update (`IS_NEW_PR=false`): `glab mr update "$BRANCH" --title "$TITLE" --description "$(cat "$BODY_FILE")"`. Otherwise (`IS_NEW_PR=true`) create: `glab mr create --target-branch "$BASE" --source-branch "$BRANCH" --title "$TITLE" --description "$(cat "$BODY_FILE")"`, adding `--draft` when `pr_draft` is on.
+- Unknown host: print the branch is pushed and give the compare URL if derivable; you cannot open the PR, so nothing below applies.
 
 Clean up: `rm -f "$BODY_FILE"`.
 
-Fire completion notifications first ({{NOTIFY_CALL}}), summarizing the outcome (e.g. "pln-pr: PR open, 12 findings fixed, gauntlet green"). Then give the user the PR URL and a one-line summary. Mention `REVIEW.md`'s path.
-
+**Only fire the completion notification and hand the PR to the user here if Step 9 will not run** — i.e. `IS_NEW_PR=false`, `pr_draft` is off, or the host is unknown. In that case, fire it now ({{NOTIFY_CALL}}), summarizing the outcome (e.g. "pln-pr: PR open, 12 findings fixed, gauntlet green"), give the user the PR URL and a one-line summary, and mention `REVIEW.md`'s path.
 <!-- pln:only claude -->
-Optionally offer to watch CI (`gh pr checks --watch` via a background command or the Monitor tool) — only if the user wants it; don't start it unprompted.
+Optionally offer to watch CI (`gh pr checks --watch` via a background command or the Monitor tool) — only if the user wants it; don't start it unprompted. (This is the `pr_draft false` path only — the default path watches unprompted, in Step 9.)
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-Optionally offer to watch CI (`gh pr checks --watch`, backgrounded) — only if the user wants it; don't start it unprompted.
+Optionally offer to watch CI (`gh pr checks --watch`, backgrounded) — only if the user wants it; don't start it unprompted. (This is the `pr_draft false` path only — the default path watches unprompted, in Step 9.)
 <!-- pln:endonly -->
+
+Otherwise (`IS_NEW_PR=true`, `pr_draft` on, host known) say the PR opened as a draft and continue straight to Step 9 — no confirmation needed, this is the default behavior, not an offer.
+
+### Step 9. Watch CI, undraft on green, fix-and-rewatch on red
+
+This step only runs right after Step 8 created a **brand-new** draft PR (`IS_NEW_PR=true`, `pr_draft` on, host known). Nothing here applies to an update to an already-open PR, to a `pr_draft false` run, or to an unknown host — Step 8 already covered those.
+
+**No CI configured — undraft immediately.** Check whether the repo reports any checks at all for this PR/MR (`gh pr checks "$BRANCH"`; `glab mr` equivalent). If it reports none — nothing was ever going to turn green — run `gh pr ready` (`glab mr update --ready` equivalent) right away, fire the completion notification ({{NOTIFY_CALL}}) noting there was no CI to wait on, hand the user the PR URL, and stop. Do not enter the watch loop for a repo with no CI.
+
+**"Green" means required checks if any exist, else all checks.** `gh pr checks "$BRANCH" --required` reports the subset marked required; if the repo has none marked required, fall back to plain `gh pr checks "$BRANCH"` and require all of those to pass instead — this is the same distinction the command ships for. A required check that fails is what drives the fix-and-rewatch loop below; a failing *optional* check when required checks exist is a follow-up note, not a blocker.
+
+**The adaptive poll interval.** Keep a small per-repo state value — this is operational telemetry (how long does this repo's CI usually take), not the kind of durable fact the cross-session memory system is for, so it lives beside the rest of pln's local state: `"$_PLN_DIR/bin/pln-config" get "ci_duration_$REPO_SLUG"`, where `REPO_SLUG` is the `owner-repo` form of `git remote get-url origin` (slashes and colons folded to `-`). If a prior duration `D` (seconds) is on record: wait roughly `D * 0.5` before the first check (no point polling before CI is usually even half done), then poll every `max(20, D * 0.1)` seconds (capped around 2 minutes) as the expected finish nears. With no history at all, fall back to a sane fixed default — wait ~4 minutes before the first check, then poll every 60–90 seconds. Once a round reaches green, record how long *that* round's CI actually took: `"$_PLN_DIR/bin/pln-config" set "ci_duration_$REPO_SLUG" "$ELAPSED"` — so the next run on this repo, in this run or a future one, starts smarter.
+
+<!-- pln:include pr-watch-dispatch -->
+
+**On green:** undraft (`gh pr ready`; `glab mr update --ready` equivalent), record the observed duration as above, fire the completion notification ({{NOTIFY_CALL}}), and hand the user the PR URL and a one-line summary, same as Step 8's own completion message would have.
+
+**On a red required check:** this is a new finding, not a one-off report. Append it to `REVIEW.md` (status `open`) the same way Step 3.1 writes any other finding — `file`/check name, what failed, and the check's own output or log link as the motivating evidence — then dispatch **exactly one fix cluster** for it through Step 4's mechanism (`pr-fix-dispatch` / `pr-fix-invoke`), push whatever it commits, and re-enter the watch loop above for the next round. Every round — win or lose — is logged in a `## CI watch log` section of `REVIEW.md` (create it the first time this step writes to it): the round number, the failing check, one line on what the fix cluster changed, and the resulting commit hash. A fresh fix agent in a later round reads this section first, so it isn't starting blind on a check that has already failed the same way twice.
+
+**Truly stumped — stop, don't loop forever.** Track, per failing check name, how many consecutive rounds it has gone fix-then-still-red. Stop the loop — do not dispatch another fix cluster — the moment either holds: the **same** check has now failed **three rounds in a row**, or a fix cluster's own return is a `BLOCKED:` (it could not identify a concrete fix, the same shape Step 4's fix agents already use). When that happens, leave the PR in draft, fire the notification channels first, then surface the blocker to the user in the same shape as Step 4's needs-a-decision path — one question, as prose, recommended-option format — naming the check, how many rounds were tried, and pointing at the CI watch log in `REVIEW.md` for the detail. Nothing here has an upper bound on *how many* rounds run before that point; only the three-in-a-row (or one-explicitly-stuck) condition ends it.
 
 ## Failure modes to watch for
 
@@ -315,6 +336,8 @@ Optionally offer to watch CI (`gh pr checks --watch`, backgrounded) — only if 
 - **Splicing refs or the PR body into a shell command.** Bind refs to quoted vars and pass the body by file (`--body-file` / `--description` from a temp file). Never inline `<body>`.
 - **Imposing VERSION/CHANGELOG on a repo that doesn't use them.** Step 6 is conditional. No `VERSION` file, no bump — and if the branch already bumped, don't bump again.
 - **Looking for gstack.** pln-pr is self-contained. It never reads gstack checklists, calls gstack binaries, or assumes gstack is installed.
+- **Looping the fix-and-rewatch cycle without ever reaching the stumped threshold.** "Unbounded" (Step 9) means no cap on *rounds*, not a license to keep dispatching fix clusters at the same red check forever. Track the same-check streak; three in a row (or one fix cluster returning `BLOCKED:`) means stop and surface the blocker, even if the underlying check has never been seen before that streak started.
+- **Re-drafting a PR a human is already reviewing.** Step 9's undraft/watch cycle only ever applies to a PR this same run just created (`IS_NEW_PR=true`). An update to a branch's existing PR never touches its draft/ready state either way — not `gh pr ready` on green, not anything else — because a reviewer may already be looking at it.
 <!-- pln:only claude -->
 - **`PushNotification` never loaded, so the call silently does nothing.** It is a deferred tool; the Notification-setup preamble must have run `ToolSearch (select:PushNotification)` and `notify_push` must not be `false`. If a push is reported missing, check that first.
 <!-- pln:endonly -->

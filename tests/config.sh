@@ -45,6 +45,15 @@ eq "$("$BIN" get notify_push)" "false" "a boolean did not read back byte-identic
 eq "$("$BIN" get notify_push)" "true" "an overwritten boolean did not read back"
 eq "$(grep -c '^notify_push:' "$CONFIG")" "1" "set appended a second line instead of rewriting the first"
 
+# --- pr_draft round-trips exactly like the other booleans --------------------
+# /pln-pr's Step 8/9 draft-and-watch gate reads this key the same way it reads
+# notify_push — no special-casing in the store, just the same generic get/set.
+"$BIN" set pr_draft false
+eq "$("$BIN" get pr_draft)" "false" "pr_draft did not read back byte-identical"
+"$BIN" set pr_draft true
+eq "$("$BIN" get pr_draft)" "true" "an overwritten pr_draft did not read back"
+eq "$(grep -c '^pr_draft:' "$CONFIG")" "1" "set appended a second line instead of rewriting the first"
+
 # --- a full command line survives whole --------------------------------------
 CMD="codex exec --model gpt-5 -s read-only"
 "$BIN" set peer_command "$CMD"

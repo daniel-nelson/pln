@@ -29,13 +29,14 @@ If the user gives a single small task, don't engage; just do the work. The skill
 - **Ask exactly one question per turn.** Never bundle sub-questions. If a topic has natural sub-parts, ask the first, wait, ask the next.
 - **Initial plan is always written before any work begins.** No matter how small the task, the user sees the proposed plan first.
 - **Interview before implementation, always.** All per-item questions are resolved in the interview phase (Step 3) and folded into the master plan. Implementation (Step 5) does not begin until the entire master plan has been shown and approved. Never propose-then-implement an item in isolation while later items still have open questions; that is the antipattern this rule prevents.
+- **A user instruction to implement, given during the interview, does not exit the interview.** "Fix it", "go do X now", "just delegate this" — none of these are authorization to leave Step 3. Acknowledge the request, record it in `PLAN.md` (as a decision, a new item, or an out-of-scope discovery / spinoff to run *after* the plan is adopted), and continue the interview. Emphasis, repetition, or specificity does not change this. The **only** thing that exits the interview early is the user explicitly abandoning the plan itself ("stop the plan", "forget the interview, just do it"). The binary "ask if unsure" escape hatch is reserved for actual ambiguity signals only: imperative-mood commands addressed to you to act *right now* ("go do X", "do it"), or explicit interview-exit language ("stop the plan", "forget the interview", "skip ahead"). **Naming a concrete action or outcome as a decision — including one that sounds executable, like "open a PR for X" — is never by itself ambiguous.** Litmus test: if the sentence would read naturally as a line inside an item's Decision write-up in `PLAN.md`, capture it silently and continue the interview. Do not ask. Every accepted plan item eventually becomes an executable action — that a decision names one is not a signal, it is the entire point of the interview.
 <!-- pln:only claude -->
 - **Per-item commits use the `Co-Authored-By: Claude <model-id> <noreply@anthropic.com>` trailer.** Never `--amend`, never `--no-verify`. If a hook fails: fix the issue, re-stage, create a new commit.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
 - **Per-item commits carry a `Co-Authored-By:` trailer naming the model that did the work.** Never `--amend`, never `--no-verify`. If a hook fails: fix the issue, re-stage, create a new commit.
 <!-- pln:endonly -->
-- **Implementation runs through subagents; the orchestrator never does an item's work inline.** In the implementation phase (Step 5) the main session is a thin orchestrator: it reads `PLAN.md`, spawns one subagent per item, checks the file was updated, and moves on. It does not read code or edit files itself. Doing the work inline defeats the fresh-context guarantee and fills the orchestrator's context across the run.
+- **Implementation runs through subagents; the orchestrator never does an item's work inline.** In the implementation phase (Step 5) the main session is a thin orchestrator: it reads `PLAN.md`, spawns one subagent per item, checks the file was updated, and moves on. It does not read code or edit files itself. Doing the work inline defeats the fresh-context guarantee and fills the orchestrator's context across the run. Spawning a sub-agent, background task, or workflow to do item work is **execution**, identical to doing it inline — it is never a way to make progress during Steps 1–4. Delegation is a Step 5 mechanism only.
 <!-- pln:only claude -->
 - **A subagent commits only a complete, verified item — never partial work.** If a subagent stops mid-item (a blocker), it leaves its changes uncommitted and writes a handoff file; it never commits a half-done item. This keeps every commit a clean checkpoint and lets a fresh subagent resume from the uncommitted state.
 <!-- pln:endonly -->
@@ -237,6 +238,8 @@ Steps 1–8 run in order, top to bottom. The skill has two distinct conversation
 
 Implementation never begins while items still have open per-item questions. If the user redirects mid-interview ("just go do item 1 now"), note gently that the rest of the interview comes first; the point of the two-phase split is to avoid the "answer Q1, implement, then ask Q2" antipattern.
 
+If the user reminds you that you are in pln, or that the interview isn't finished, treat it as a hard stop on all execution: halt and, if you spawned any background work, kill it. Return to questions-only immediately. If you already took a state-changing action, disclose exactly what you changed and offer to revert before continuing. Never treat the reminder as something to acknowledge and then keep going past.
+
 Cross-cutting concerns (mid-item discovery, auto-mode behavior, spinoffs, continuous learning + memory) are described in the next section.
 
 ### Step 1. Pre-flight
@@ -319,7 +322,9 @@ After writing the skeleton, **stop**. Show the user the dashboard (not the whole
 
 ### Step 3. Interview phase
 
-This is a **questions-only** phase. No file edits to the project, no migrations, no commits, no code changes. Only `PLAN.md` is written to (to record decisions as they come in).
+This is a **questions-only** phase. The only state change permitted anywhere is writing to `PLAN.md`. No file edits — not in this repo and not in any other repo, sibling, or dependency — no migrations, no commits, no state-mutating shell commands, and **no spawning of sub-agents, background tasks, or workflows to do work.** Read-only exploration (searching, reading code and files, running read-only commands) is encouraged. Anything that changes state or hands work to another agent is *implementation*, and implementation waits for Step 5 — no matter which repo it targets or who would carry it out.
+
+A discovery *during the interview* that warrants separate work — a fix in another repo, an upstream framework change, anything outside the current task's scope — is **captured, not executed**: record it in `PLAN.md` (Open questions, an out-of-scope-follow-ups note, or a spinoff stub) and keep interviewing. The correct response to "this surfaced a real bug elsewhere" is a line in the plan, never a branch and an edit.
 
 **Exploration before prose.** For each item, complete all code reading and exploration before writing any user-facing message. While exploring, emit no prose between tool calls — findings, surprises, and conclusions all belong in the final message after all exploration is done. The user should see one coherent response per item, never a running commentary with tool calls in between.
 
@@ -635,6 +640,8 @@ Each item section must be self-contained: a blank-context subagent reading only 
 
 ## Failure modes to watch for
 
+- **Editing code, running a mutating command, or spawning a sub-agent/workflow before the plan is adopted** — Steps 1–4 are questions-only, and delegating the work is not a loophole. Before any state-changing tool call, stop and ask: has the user adopted the plan at the gate (Step 4)? If not, the thing you want to do is a plan *item*, not an action you take now. This applies even when the user just asked for it and even when it targets a different repo.
+- **Resuming an in-flight interview from a hand-off note instead of reloading this file** — a session that picks up a `/pln` interview from a summary written by a prior run (a compaction, a session-boundary hand-off) still has to (re-)load `SKILL.core.md`'s interview rules, not rely solely on the note's prose recap of what went wrong last time. A postmortem-toned summary of a past mistake primes overcorrection into the opposite failure — e.g. treating an ordinary plan decision as an ambiguous request to break out of the interview. The note calibrates against repeating the same mistake; it is not a substitute for the actual rule text.
 - **Asking an item-2 question while implementing item-1** — if you are inside Step 5 and about to ask a design question that wasn't in the master plan, stop. That question belonged in Step 3. Pause execution, surface it as a master-plan amendment, get the user's decision, update the plan, then resume.
 - **Dropping a cross-cutting concern from the subagent brief** — memory capture, mandated-skill invocation, and (when gated on) Psychic learning-capture happen during item work, which now runs in subagents. If the brief omits them, they silently stop happening. The brief carries every per-item concern.
 - **Inventing a verification gauntlet** — if you didn't read `CLAUDE.md` / `AGENTS.md` and find the actual commands, ask the user. Don't run guessed commands.

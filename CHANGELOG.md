@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.20.0 — 2026-07-24
+
+### Changed
+
+- **The questions-only prohibition in Step 3 now covers every repo and every form of delegation, not just direct edits "to the project."** Two live runs found the exact wording gaps that let an agent rationalize its way out of it: editing code in a *different* repo read as not covered by "no file edits to the project," and spawning a sub-agent to do the work read as a different, permitted thing from doing it inline. The rule is now a single unmissable line — the only state change permitted anywhere during Steps 1–4 is writing `PLAN.md` — and it names sub-agents, background tasks, and workflows explicitly as execution, wherever they'd run.
+- **A user instruction to implement, given mid-interview, is now a hard constraint to capture rather than execute.** "Fix it", "go do X now", emphasis, repetition — none of it exits the interview; only explicit abandonment of the plan itself does. The escape hatch for genuine ambiguity is narrowed to actual exit signals (imperative commands to act *right now*, or explicit interview-exit language) after a second run showed the opposite failure: treating an ordinary plan decision that merely *named* an executable action ("open a PR for X") as ambiguous about timing. A decision naming something executable is the entire point of the interview, not a signal to ask.
+- **A reminder from the user that you're in pln, or that the interview isn't finished, is now a documented hard stop** — halt, kill any spawned background work, disclose any state change already made, and return to questions-only, rather than acknowledging the reminder and continuing past it.
+- **Interview-phase discoveries of out-of-scope work now have their own capture path**, mirroring the Step 5 Spinoffs mechanism: recorded in `PLAN.md`, never acted on during the interview.
+- **New failure modes documented:** executing (directly or by delegation) before the plan is adopted, and resuming an in-flight interview from a prior run's hand-off summary instead of reloading this file's actual interview rules — a postmortem-toned recap of a past mistake was shown to prime overcorrection into the opposite failure.
+
 ## 1.19.0 — 2026-07-22
 
 ### Changed

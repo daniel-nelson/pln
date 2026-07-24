@@ -238,8 +238,6 @@ Steps 1–8 run in order, top to bottom. The skill has two distinct conversation
 
 Implementation never begins while items still have open per-item questions. If the user redirects mid-interview ("just go do item 1 now"), note gently that the rest of the interview comes first; the point of the two-phase split is to avoid the "answer Q1, implement, then ask Q2" antipattern.
 
-If the user reminds you that you are in pln, or that the interview isn't finished, treat it as a hard stop on all execution: halt and, if you spawned any background work, kill it. Return to questions-only immediately. If you already took a state-changing action, disclose exactly what you changed and offer to revert before continuing. Never treat the reminder as something to acknowledge and then keep going past.
-
 Cross-cutting concerns (mid-item discovery, auto-mode behavior, spinoffs, continuous learning + memory) are described in the next section.
 
 ### Step 1. Pre-flight
@@ -651,7 +649,7 @@ Each item section must be self-contained: a blank-context subagent reading only 
 
 ## Failure modes to watch for
 
-- **Building out the feature under discussion before the plan is adopted** — inline, or by spawning a sub-agent/workflow to do it; delegating is not a loophole. Before any state-changing tool call during Steps 1–4, run Step 3's feature-work-vs-exceptions test. This applies even when the user asked for it directly, named the delegation mechanism themselves, or it targets a different repo.
+- **Building out the feature under discussion before the plan is adopted** — inline, or by spawning a sub-agent/workflow to do it; delegating is not a loophole. Before any state-changing tool call during Steps 1–4, run Step 3's feature-work-vs-exceptions test. This applies even when the user asked for it directly, named the delegation mechanism themselves, or it targets a different repo. If it happens anyway and the user calls it out — in any words, not just a reference to "pln" or "the interview" — halt immediately: kill any spawned background work, disclose exactly what changed, and offer to revert, rather than acknowledging the pushback and continuing past it.
 - **Resuming an in-flight interview from a hand-off note instead of reloading this file** — a session that picks up a `/pln` interview from a summary written by a prior run (a compaction, a session-boundary hand-off) still has to (re-)load `SKILL.core.md`'s interview rules, not rely solely on the note's prose recap of what went wrong last time. A postmortem-toned summary of a past mistake primes overcorrection into the opposite failure — e.g. treating an ordinary plan decision as an ambiguous request to break out of the interview. The note calibrates against repeating the same mistake; it is not a substitute for the actual rule text.
 - **Asking an item-2 question while implementing item-1** — if you are inside Step 5 and about to ask a design question that wasn't in the master plan, stop. That question belonged in Step 3. Pause execution, surface it as a master-plan amendment, get the user's decision, update the plan, then resume.
 - **Dropping a cross-cutting concern from the subagent brief** — memory capture, mandated-skill invocation, and (when gated on) Psychic learning-capture happen during item work, which now runs in subagents. If the brief omits them, they silently stop happening. The brief carries every per-item concern.

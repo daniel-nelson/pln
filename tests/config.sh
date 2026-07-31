@@ -54,6 +54,14 @@ eq "$("$BIN" get pr_draft)" "false" "pr_draft did not read back byte-identical"
 eq "$("$BIN" get pr_draft)" "true" "an overwritten pr_draft did not read back"
 eq "$(grep -c '^pr_draft:' "$CONFIG")" "1" "set appended a second line instead of rewriting the first"
 
+# --- peer_nudge_shown round-trips exactly like the other booleans ------------
+# setup's one-time postinstall tip reads/writes this key the same way it reads
+# peer_consent — no special-casing in the store, just the same generic get/set.
+eq "$("$BIN" get peer_nudge_shown)" "" "an unset peer_nudge_shown did not read as empty"
+"$BIN" set peer_nudge_shown true
+eq "$("$BIN" get peer_nudge_shown)" "true" "peer_nudge_shown did not read back byte-identical"
+eq "$(grep -c '^peer_nudge_shown:' "$CONFIG")" "1" "set appended a second line instead of rewriting the first"
+
 # --- a full command line survives whole --------------------------------------
 CMD="codex exec --model gpt-5 -s read-only"
 "$BIN" set peer_command "$CMD"

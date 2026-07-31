@@ -59,3 +59,34 @@ case "$HOST" in
   codex) echo "Built for Codex. Restart Codex to pick up the new skills." ;;
   *) echo "Built for Claude Code. Restart Claude Code to pick up the new skills." ;;
 esac
+
+# ─── One-time peer / cross-model check nudge ─────────────────
+# pln can send a plan or PR diff to a second model for review, but that only
+# happens when a peer CLI is actually reachable. Tell a user who has none
+# how to get one, once — not on every /pln run.
+if [ "$("$SKILL_DIR/bin/pln-config" get peer_nudge_shown 2>/dev/null)" != "true" ]; then
+  set +e
+  PEER_WHICH="$("$SKILL_DIR/bin/pln-peer" --which --host "$HOST" 2>/dev/null)"
+  PEER_RC=$?
+  set -e
+  PEER_RUNG="$(printf '%s\n' "$PEER_WHICH" | sed -n 's/^RUNG=//p')"
+  PEER_STATUS="$(printf '%s\n' "$PEER_WHICH" | sed -n 's/^STATUS=//p')"
+
+  if [ "$PEER_RC" -eq 3 ] && [ "$PEER_RUNG" = "3" ] && [ "$PEER_STATUS" = "none" ]; then
+    # Nothing usable was found — this also covers a known CLI on PATH that
+    # isn't signed in, so don't claim it's simply not installed.
+    case "$HOST" in
+      codex) PEER_CLI="claude" ;;
+      *) PEER_CLI="codex" ;;
+    esac
+    echo ""
+    echo "Tip: pln can get a cross-model check on plans and PRs from a peer CLI."
+    echo "  None was found installed and signed in. Install and sign in to $PEER_CLI,"
+    echo "  or point pln at another one:"
+    echo "  \"$SKILL_DIR/bin/pln-config\" set peer_command \"<invocation>\""
+  else
+    # Ready, consent-pending, or already declined — all settled states that
+    # don't need re-checking on the next setup run.
+    "$SKILL_DIR/bin/pln-config" set peer_nudge_shown true >/dev/null
+  fi
+fi

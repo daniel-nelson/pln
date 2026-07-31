@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.22.0 — 2026-07-31
+
+### Added
+
+- **`./setup` now prints a one-time tip when no peer CLI is usable for pln's cross-model check**, so a user who never gets a second opinion on a plan or PR at least learns the capability exists and how to turn it on. It runs `pln-peer --which` once at the end of setup and only speaks up for the one case that means nothing was found — `RUNG=3`/`STATUS=none` on exit 3, which also covers a known peer CLI that's on `PATH` but not signed in, so the tip says "installed and signed in" rather than claiming the CLI is missing. The three settled states (a usable peer, consent already declined, or consent pending — the latter left to the existing one-time consent gate) print nothing. A new `peer_nudge_shown` boolean in `~/.pln/config.yaml`, read and written through `pln-config` exactly like `peer_consent`, keeps the tip from repeating once a peer becomes usable or the user declines — but is deliberately left unset in the tip's own branch, so it resurfaces on every `setup` run (including the ones `pln-update-apply` triggers on upgrade) until the user's peer state actually settles.
+
 ## 1.21.0 — 2026-07-24
 
 ### Added

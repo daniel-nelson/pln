@@ -198,17 +198,29 @@ a lens or adversarial agent that completed, a `codex review` pass that came back
 If none succeeded, you have no coverage, not a clean bill of health. Do not write an empty `REVIEW.md` and do not proceed to the PR. Stop, say plainly that the review could not run, and let the user retry or review manually. An empty *merged findings* set is only "clean" when it comes from reviewers that ran and found nothing.
 
 <!-- pln:only claude -->
-Collect every reviewer's findings, plus the cross-model pass's, translated into the same shape.
+Collect every reviewer's findings and the cross-model pass's, translated into the same shape.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
 Collect every reviewer's findings, plus stage 1's and the cross-model pass's, translated into the same shape.
 <!-- pln:endonly -->
 
+This collection step only gathers the raw material; the merging *logic* below — reading every finding, deciding what survives — never runs in the orchestrator's own context. Delegate it to one fresh merge agent instead.
+
+<!-- pln:only claude -->
+The review army already ran as `agent()` calls inside this Step's Workflow script (see Spawning a fresh-context agent). Add one more `agent()` call to that same script, after every lens, adversarial, and cross-model call has returned: the merge agent. The script has no filesystem access, so its prompt is the only way material moves between calls — build a stringified JSON array of every raw finding collected above and carry it inline in the merge agent's prompt, the same way this skill's peer briefs already inline material the recipient can't read for itself.
+<!-- pln:endonly -->
+<!-- pln:only codex -->
+Each reviewer's findings already passed through the orchestrator's own turn on the way in — a native subagent's result lands there directly, and the fallback path's `RESULT_FILE` gets read into it (see Reading a reviewer back) — so collecting them here isn't new. What changes is what happens next: spawn one fresh-context merge agent (`spawn_agent` per Spawning a fresh-context agent, or the nested-`codex exec` fallback where native tools are unavailable) and hand it every raw finding collected above, inline in its brief as a stringified JSON array — the merge agent has no other way to see material that only exists in the orchestrator's own context.
+<!-- pln:endonly -->
+
+The merge agent's brief: given this JSON array of findings, do the following and return only a compact summary — nothing else.
+
 - **Deduplicate** by `file:line`. When two or more lenses report the same location, keep the highest-confidence one, tag it "confirmed by {lenses}", and raise its confidence by 1 (cap 10).
 - **Apply the confidence gate:** 7+ shown normally; 5–6 shown with a "medium confidence — verify" caveat; below 5 dropped to an appendix, not acted on. A finding whose `motivating_code` is empty cannot be 7+ regardless of what the reviewer claimed — treat it as ≤5.
 - **Write `REVIEW.md`** to the plan dir (or the standalone dir from Step 1) before any fix runs. It carries: a header line (`N findings — X critical, Y informational, from Z reviewers`), then each acted-on finding with its severity, confidence, `file:line`, summary, motivating code, and proposed fix, each with a status field starting at `open`. This file is the durable source of truth for the fix pass — an interrupted run rebuilds from it.
+- **Return only a compact summary** to the orchestrator: the header line's counts, the name of each acted-on cluster (by `file`/subsystem), and the title (`summary` field) of each critical finding. Not the full findings list — that stays in `REVIEW.md`, which the orchestrator does not need to read back into its own context to proceed.
 
-Print the merged summary. If there are zero acted-on findings (from reviewers that ran — see the fail-closed check above), note it and skip the fix pass: go to Step 6 (version/changelog) and then the Step 7 gauntlet.
+Print the merge agent's summary. If there are zero acted-on findings (from reviewers that ran — see the fail-closed check above), note it and skip the fix pass: go to Step 6 (version/changelog) and then the Step 7 gauntlet.
 
 ### Step 4. Fix pass — clustered fix subagents
 

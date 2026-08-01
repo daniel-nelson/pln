@@ -301,6 +301,10 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 
 - (none yet)
 
+## Cross-item notes
+
+- (none yet)
+
 ---
 
 ## Item details
@@ -448,7 +452,7 @@ Do not enter Step 5 without an explicit adoption signal.
 
 **The subagent brief.** The prompt handed to each subagent must make `PLAN.md` its entire spec and carry every per-item concern, because the orchestrator is no longer doing this work:
 
-1. Read `PLAN.md` in full at `<path>`. The top dashboard (pre-flight findings, mandated skills, verification commands) and item N's detail section are your spec.
+1. Read `PLAN.md` in full at `<path>`. The top dashboard (pre-flight findings, mandated skills, verification commands, cross-item notes) and item N's detail section are your spec.
 2. Follow any mandated skills noted in the pre-flight findings; you are a fresh context, so re-establish that yourself.
 3. Execute item N to its acceptance criteria. The plan records intent and the decisions other work depends on, not reversible mechanics — own those yourself, to the project's quality bar. If the item calls for a new test, hold it to this bar:
    - Test the path the code actually runs, not just its inputs — assert on what crosses a mocked boundary rather than only on the boundary itself. If the boundary (e.g. an external gateway) stays mocked, say so in the report.
@@ -463,10 +467,10 @@ Do not enter Step 5 without an explicit adoption signal.
 4. Run lightweight verification (type-check + lint, no specs). This gate is about the mandatory pre-commit check, not about whether new tests get written and run at all — a test called for by item 3's bar above still gets written and run, per those bullets. If lightweight verification fails: fix it. Do not commit — committing is the orchestrator's job, which is what keeps every per-item commit a clean checkpoint; leave the finished work in the tree and say in your final message what should be committed. A decision-only or doc-only item leaves nothing to commit; the plan file is the record.
 <!-- pln:endonly -->
 <!-- pln:only claude -->
-5. Before returning, update item N's section in `PLAN.md`: status ✅ done, commit hash, dead ends hit, artifacts produced, any discoveries.
+5. Before returning, update item N's section in `PLAN.md`: status ✅ done, commit hash, dead ends hit, artifacts produced, any discoveries. If this item discovered something a later item needs — a constant to reuse, a field that changed, a trap not to repeat — add one line to the dashboard's Cross-item notes too; skip it if there's nothing later items would need.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-5. Before returning, update item N's section in `PLAN.md`: status ✅ done, dead ends hit, artifacts produced, any discoveries. Leave the commit hash out — the orchestrator commits and fills it in. Then keep the final message itself to a few lines: what changed, which files should be committed, and anything the next item needs. That message is the only thing that reaches the orchestrator; everything else you have to say belongs in `PLAN.md`.
+5. Before returning, update item N's section in `PLAN.md`: status ✅ done, dead ends hit, artifacts produced, any discoveries. Leave the commit hash out — the orchestrator commits and fills it in. If this item discovered something a later item needs — a constant to reuse, a field that changed, a trap not to repeat — add one line to the dashboard's Cross-item notes too; skip it if there's nothing later items would need. Then keep the final message itself to a few lines: what changed, which files should be committed, and anything the next item needs. That message is the only thing that reaches the orchestrator; everything else you have to say belongs in `PLAN.md`.
 <!-- pln:endonly -->
 6. Capture memories the moment they surface, per the standard memory rules. (Include the Dream/Psychic learning-capture instruction here only when pre-flight detected both `RECORD_PSYCHIC_LEARNINGS` and Dream/Psychic context.)
 <!-- pln:only claude -->
@@ -655,6 +659,7 @@ Top-of-file dashboard carries:
 - **Ship** — the Step 4 adopt choice: `PR after implementation` or `implement only`, plus `PR base: <branch>` when a stacking override (item 4) applies. Set once, at adoption, and read back by Step 8 rather than trusted from the conversation — a restarted or resumed session still knows what was decided.
 - **Verification** — pass/fail per command at task end.
 - **Spinoffs** — links to any spinoff plan files.
+- **Cross-item notes** — one line per discovery a completed item makes that a later item needs (a constant to reuse, a field that changed, a trap not to repeat). Bounded and shared, not "read every earlier item's section" — it's part of the dashboard every subagent already reads in full regardless of plan size, so it stays cheap as the plan grows.
 
 Per-item detail sections carry:
 

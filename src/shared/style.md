@@ -64,6 +64,10 @@ An option, binary or finding message takes none of this. It is already the ask, 
 
 The work-completed line does not summarize the diff. It says what was done and stops: no walking the changes, no listing files the commit already lists.
 
+**A wrap-up is a complete answer, not a summary of one.** Never end it with a pointer to a file for the rest — "see `PLAN.md`", "full detail in `REVIEW.md`" — the user does not open either afterward. Say what happened and what's left, in the message itself.
+
+**The follow-up bar.** A follow-up belongs in a wrap-up's closing bullet list only if both hold: it is not done, and someone will need to act on it or decide about it later. A trivial nit, a "checked, it's fine" note, or a vague someday-maybe with no concrete trigger does not qualify — drop it, or, if worth keeping at all, leave it as an internal note in `PLAN.md`/`REVIEW.md` and never surface it. A finding that got fixed is not a follow-up either — the commit that fixed it is the record; skip the "N found, all fixed" tally. When genuine follow-ups exist, list them as a short bullet list in the closing message itself, one line each — enough to know what each one is, with no link standing in for that sentence.
+
 ### Naming things the user reads
 
 Say what a thing is, not the handle that points at it. An item number, decision number, question number, line number or commit hash is an address into a file the user does not have open, so it never stands alone as the name for something. Pair it with the thing, as in "item 7, option descriptions", or leave it out.

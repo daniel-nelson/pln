@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.23.0 — 2026-08-01
+
+### Added
+
+- **Step 5 now blesses a sequential-`Agent`-call fallback for when Claude Code's own standing instructions collide with the mandate to run implementation as a `Workflow` script, and requires disclosing whichever mechanism actually runs.** The collision is real: a host-level default against launching workflows or the Agent tool unprompted can silently veto Step 5's `Workflow` invocation, and previously that resolved with no run appearing anywhere and no word to the user — the trigger incident had them discover it from an empty `/workflows` panel. `step5-orchestration.md` now states plainly that engaging pln — typing `/pln`, or asking for pln-style treatment in plain language, on every invocation in a session, not only the first — is itself a request for `Workflow` and its subagents, so a general standing instruction against launching either does not outrank it. When `Workflow` is genuinely unavailable or refused anyway, the orchestrator falls back to sequential `Agent` calls, one per item, in Workflow's own order, with its own blocker protocol rather than a false claim of parity: there is no `resumeFromRunId` outside a Workflow run, so a blocked item resumes instead via `SendMessage` to the handle or name its own `Agent` call returned, carrying the user's answer — the same by-handle resume pattern this skill already uses on Codex's native path. Auto-mode blocker handling is unchanged, since stashing and resuming were already the orchestrator's own actions, not Workflow's. `spawn-agent.md` documents the fallback resume mechanism alongside the Workflow one. The "implementation is starting" message is now two branches on both hosts, naming whichever mechanism actually ran: the existing `/workflows` (Claude) / native agent view (Codex) text on the primary path, and on the fallback, that the run won't show up there and why. Codex's side gets only the disclosure half — its existing nested-`codex exec` fallback still triggers on "the native tools are unavailable," not broadened to "the session forbids calling them," since the incident was Claude-specific and Codex has no `Workflow`-equivalent batch mechanism to begin with.
+
 ## 1.22.0 — 2026-07-31
 
 ### Added

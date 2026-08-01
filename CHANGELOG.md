@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.24.0 — 2026-08-01
+
+### Added
+
+- **"Conversational voice" gains three rules against restatement and hedging padding in ordinary interview messages**, caught live during a `/pln` session: a finding restated once as prose and again inside every option's own description, and a defining word ("item" versus "cluster") used without saying what it meant. `src/hosts/claude/voice.md` and `src/hosts/codex/voice.md` now say to state the fact motivating an option message once — in the lead-in or as trailing evidence, whichever the option-message shape already calls for, never both a lead-in sentence and every option's description; to delete any sentence that wouldn't change what someone picks or does; and to define a pln-specific word in plain words at the point of use rather than assume it's obvious from context.
+
 ## 1.23.0 — 2026-08-01
 
 ### Added

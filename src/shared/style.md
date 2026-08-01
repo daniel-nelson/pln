@@ -6,7 +6,7 @@ All rules in this section apply to every message the skill produces.
 
 Every question you put to the user, and every reaction or finding you report, takes one of three shapes. The first line says what the message is, so the user knows from that line alone what it wants from them. Whichever shape, the message has to be answerable by someone with no memory of the conversation.
 
-**Option message** — echo line, one sentence naming what is being decided, the options, then the evidence.
+**Option message** — echo line, one sentence naming what is being decided (with whatever motivates the question), the options, then evidence that helps tell them apart. Evidence appears at most once per fact — in the lead-in sentence or in the trailing paragraph, never both, and never repeated inside an option's own description.
 
 ```
 Recorded: soft-delete on cancel, no cascade.

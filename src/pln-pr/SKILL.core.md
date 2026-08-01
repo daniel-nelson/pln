@@ -82,12 +82,14 @@ Every reviewer this skill spawns is the same model as the orchestrator spawning 
 
 Detect the git host from `git remote get-url origin`: "github.com" → GitHub; "gitlab" → GitLab; else probe `gh auth status` / `glab auth status`; neither → unknown (git-native only, no PR creation).
 
-Determine the base branch (what a PR targets, or the repo default):
+Determine the base branch (what a PR targets, or the repo default). If invoked with an explicit `base=<branch>` argument (a stacked PR targeting something other than the repo default), use it instead of auto-detecting: validate it first with `git check-ref-format --branch "<branch>"` — reject anything that fails validation with a one-line error naming the bad value, rather than substituting it textually. Do not fall through to auto-detection on a rejected override; stop and report it.
+
+Otherwise, auto-detect:
 - GitHub: `gh pr view --json baseRefName -q .baseRefName`, else `gh repo view --json defaultBranchRef -q .defaultBranchRef.name`.
 - GitLab: `glab mr view -F json` `target_branch`, else `glab repo view -F json` `default_branch`.
 - Git-native fallback: `git symbolic-ref refs/remotes/origin/HEAD | sed 's|refs/remotes/origin/||'`, else try `origin/main`, then `origin/master`, else `main`.
 
-Print the detected base. Fetch it: `git fetch origin <base>`. Substitute it for `<base>` everywhere below.
+Print the detected base in one line, and whether it came from the override or was auto-detected. Fetch it: `git fetch origin <base>`. Substitute it for `<base>` everywhere below — bound to the same quoted shell variable and interpolated the same way as Step 8's PR-body assembly (see "Interpolate safely" there); this override joins that existing safe-interpolation path rather than opening a new one.
 
 <!-- pln:include pr-host-note -->
 ### Step 1. Locate the plan and scope the diff

@@ -268,17 +268,17 @@ After the fix pass, dispatch one red-team agent (a single fresh-context agent) a
 
 ### Step 6. Version and changelog (conditional — before the gauntlet)
 
-This runs *before* the final gauntlet so the release files are verified by it, not after. Only if the repo carries these conventions — a `VERSION` file at the root, and/or a `CHANGELOG.md`. If neither exists, skip this step entirely; most repos don't use them and pln-pr must not impose them.
+This runs *before* the final gauntlet so the release files are verified by it, not after. Read the repo's `CLAUDE.md`/`AGENTS.md` first for a stated version-bump rule and follow it, whatever file(s) it names. Treat `VERSION`/`CHANGELOG.md` as one common shape of that convention, not the definition of "this repo has a version" — a repo that states its own rule around different files still gets a bump; a repo with no stated rule and no `VERSION` file and no `CHANGELOG.md` gets skipped entirely. If neither the stated rule nor the `VERSION`/`CHANGELOG.md` shape applies, skip this step entirely; most repos don't use either and pln-pr must not impose one.
 
-**Skip the bump if the branch already carries one.** A retry, or a branch that bumped its own version as part of the work, must not bump again. Compare the branch's `VERSION` against the base:
+**Skip the bump if the branch already carries one.** A retry, or a branch that bumped its own version as part of the work, must not bump again. Compare the branch's version file against the base — `<base>` here is whatever Step 0 resolved (the stacked-PR override when one was given, the repo default otherwise), so the "already bumped" check compares against the actual PR base, never silently against the repo default when an override is in play:
 
 ```bash
 git show "origin/<base>:VERSION" 2>/dev/null
 ```
 
-If that base value differs from the working-tree `VERSION` (the branch is already ahead), the bump is done — do not touch `VERSION` or `CHANGELOG.md`, just note "version already bumped (X → Y)" and continue. Only when the branch's `VERSION` still matches the base do you bump.
+If that base value differs from the working-tree version (the branch is already ahead), the bump is done — do not touch the version file(s), just note "version already bumped (X → Y)" and continue. Only when the branch's version still matches the base do you bump.
 
-When you do bump: raise `VERSION` per the repo's scheme (read recent `CHANGELOG.md` entries to infer major/minor/patch conventions) and add a matching changelog entry describing what shipped. If the repo's `CLAUDE.md`/`AGENTS.md` states a bump rule, follow it. Commit these with the co-author trailer, so they are part of the tree the Step 7 gauntlet runs against.
+When you do bump: raise the version per the repo's scheme (read recent changelog entries to infer major/minor/patch conventions) and add a matching changelog entry describing what shipped. If the repo's `CLAUDE.md`/`AGENTS.md` states a bump rule, follow it over the `VERSION`/`CHANGELOG.md` default. Commit these with the co-author trailer, so they are part of the tree the Step 7 gauntlet runs against.
 
 ### Step 7. Final gauntlet — once
 
@@ -353,7 +353,7 @@ This step only runs right after Step 8 created a **brand-new** draft PR (`IS_NEW
 - **Acting on unverified findings.** A finding with no `motivating_code` is a suspicion, not a bug. It stays in the appendix and is not fixed.
 - **Fix agents colliding on a file.** Cluster by file so two agents never edit the same one; run clusters sequentially so the tree is settled between them.
 - **Splicing refs or the PR body into a shell command.** Bind refs to quoted vars and pass the body by file (`--body-file` / `--description` from a temp file). Never inline `<body>`.
-- **Imposing VERSION/CHANGELOG on a repo that doesn't use them.** Step 6 is conditional. No `VERSION` file, no bump — and if the branch already bumped, don't bump again.
+- **Imposing a version bump on a repo that has no stated convention.** Step 6 is conditional. No stated version-bump rule found anywhere (`CLAUDE.md`/`AGENTS.md` or the `VERSION`/`CHANGELOG.md` shape), no bump — and if the branch already bumped, don't bump again.
 - **Looking for gstack.** pln-pr is self-contained. It never reads gstack checklists, calls gstack binaries, or assumes gstack is installed.
 - **Looping the fix-and-rewatch cycle without ever reaching the stumped threshold.** "Unbounded" (Step 9) means no cap on *rounds*, not a license to keep dispatching fix clusters at the same red check forever. Track the same-check streak; three in a row (or one fix cluster returning `BLOCKED:`) means stop and surface the blocker, even if the underlying check has never been seen before that streak started.
 - **Re-drafting a PR a human is already reviewing.** Step 9's undraft/watch cycle only ever applies to a PR this same run just created (`IS_NEW_PR=true`). An update to a branch's existing PR never touches its draft/ready state either way — not `gh pr ready` on green, not anything else — because a reviewer may already be looking at it.

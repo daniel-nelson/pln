@@ -8,7 +8,9 @@ The orchestrator's whole job is: spawn the item's agent, wait for it, read its r
 RUN="${TMPDIR:-/tmp}/pln-<plan-slug>"; mkdir -p "$RUN"; echo "$RUN"
 ```
 
-Then tell the user, in one short message: implementation is starting, it runs item by item without stopping, the only interruption will be a blocker, and they can watch any item live in Codex's own agent view — the native subagents show their activity there, and reading it costs the orchestrator's context nothing. (On the fallback path, the watch target is instead `tail -f "$RUN/item-<N>.out.events"`, the nested agent's event stream.)
+Then tell the user, in one short message: implementation is starting, it runs item by item without stopping, and the only interruption will be a blocker — naming whichever mechanism is actually spawning the items:
+- **On the native path:** they can watch any item live in Codex's own agent view — the native subagents show their activity there, and reading it costs the orchestrator's context nothing.
+- **On the nested-`codex exec` fallback:** say why (the native multi-agent tools were unavailable — switched off, or too old a Codex to have them), and that the watch target is instead `tail -f "$RUN/item-<N>.out.events"`, the nested agent's event stream, not Codex's own agent view.
 
 **The loop.** For each item, in order:
 

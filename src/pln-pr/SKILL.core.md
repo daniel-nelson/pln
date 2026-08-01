@@ -220,7 +220,12 @@ For needs-a-decision findings, surface them to the user **one at a time**, as pr
 
 1. "Read `REVIEW.md` at `<path>`. Your spec is the findings in cluster {K}, listed below. Fix each one to the project's quality bar.
 2. Follow any mandated skills or conventions noted in `PLAN.md`'s pre-flight findings (BDD, package manager, where commands run) — you are fresh context, re-establish them yourself.
-3. Where a finding has a `test_stub` or is about missing coverage, write the failing spec first, then make it pass.
+3. Where a finding has a `test_stub` or is about missing coverage, write the failing spec first, then make it pass. Hold any new test to this bar:
+   - Test the path the code actually runs, not just its inputs — assert on what crosses a mocked boundary rather than only on the boundary itself. If the boundary (e.g. an external gateway) stays mocked, say so in the report.
+   - Before fixing anything, run the new test and paste the actual failure message. Not "it failed."
+   - After fixing, report the exact command run and the count it printed (e.g. `pnpm uspec spec/unit/foo → 4 tests, 4 passed`) — not a raw paste of passing output, which is noise. Someone can re-run that exact command to check it.
+   - If a test's result could change depending on the time of day or date, say so and account for it.
+   - Before reporting verification, re-read the project's completion rule (`CLAUDE.md`/`AGENTS.md`) and reproduce any environmental condition it names — cleared credentials, a specific timezone, a service, a clean database — that this run didn't already match.
 <!-- pln:only claude -->
 4. Run lightweight verification only (type-check + lint on touched files, not the full suite). Fix and re-stage on failure.
 <!-- pln:endonly -->

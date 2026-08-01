@@ -440,12 +440,17 @@ Do not enter Step 5 without an explicit adoption signal.
 
 1. Read `PLAN.md` in full at `<path>`. The top dashboard (pre-flight findings, mandated skills, verification commands) and item N's detail section are your spec.
 2. Follow any mandated skills noted in the pre-flight findings; you are a fresh context, so re-establish that yourself.
-3. Execute item N to its acceptance criteria. The plan records intent and the decisions other work depends on, not reversible mechanics — own those yourself, to the project's quality bar.
+3. Execute item N to its acceptance criteria. The plan records intent and the decisions other work depends on, not reversible mechanics — own those yourself, to the project's quality bar. If the item calls for a new test, hold it to this bar:
+   - Test the path the code actually runs, not just its inputs — assert on what crosses a mocked boundary rather than only on the boundary itself. If the boundary (e.g. an external gateway) stays mocked, say so in the report.
+   - Before fixing anything, run the new test and paste the actual failure message. Not "it failed."
+   - After fixing, report the exact command run and the count it printed (e.g. `pnpm uspec spec/unit/foo → 4 tests, 4 passed`) — not a raw paste of passing output, which is noise. Someone can re-run that exact command to check it.
+   - If a test's result could change depending on the time of day or date, say so and account for it.
+   - Before reporting verification, re-read the project's completion rule (`CLAUDE.md`/`AGENTS.md`) and reproduce any environmental condition it names — cleared credentials, a specific timezone, a service, a clean database — that this run didn't already match.
 <!-- pln:only claude -->
-4. Run lightweight verification (type-check + lint, no specs). If it fails: fix, re-stage. Commit only a complete, verified item, with the co-author trailer; never `--amend`, never `--no-verify`. A decision-only or doc-only item needs no commit; the plan file is the record.
+4. Run lightweight verification (type-check + lint, no specs). This gate is about the mandatory pre-commit check, not about whether new tests get written and run at all — a test called for by item 3's bar above still gets written and run, per those bullets. If lightweight verification fails: fix, re-stage. Commit only a complete, verified item, with the co-author trailer; never `--amend`, never `--no-verify`. A decision-only or doc-only item needs no commit; the plan file is the record.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-4. Run lightweight verification (type-check + lint, no specs). If it fails: fix it. Do not commit — committing is the orchestrator's job, which is what keeps every per-item commit a clean checkpoint; leave the finished work in the tree and say in your final message what should be committed. A decision-only or doc-only item leaves nothing to commit; the plan file is the record.
+4. Run lightweight verification (type-check + lint, no specs). This gate is about the mandatory pre-commit check, not about whether new tests get written and run at all — a test called for by item 3's bar above still gets written and run, per those bullets. If lightweight verification fails: fix it. Do not commit — committing is the orchestrator's job, which is what keeps every per-item commit a clean checkpoint; leave the finished work in the tree and say in your final message what should be committed. A decision-only or doc-only item leaves nothing to commit; the plan file is the record.
 <!-- pln:endonly -->
 <!-- pln:only claude -->
 5. Before returning, update item N's section in `PLAN.md`: status ✅ done, commit hash, dead ends hit, artifacts produced, any discoveries.

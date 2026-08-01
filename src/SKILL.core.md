@@ -289,6 +289,10 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 
 - (none yet)
 
+## Ship
+
+- (not yet decided)
+
 ## Verification
 
 - (not yet run)
@@ -408,6 +412,8 @@ The review runs once, on the finished plan. Re-showing the plan at the gate — 
 
 ### Step 4. Master-plan approval gate
 
+**Resolve mandated questions first.** Before anything else in this step, check the dashboard's Pre-flight findings for a mandated rule (Step 1: a required decision named by the project's own `CLAUDE.md`/`AGENTS.md`) that the interview never actually resolved — not every mandated rule needs a decision, but one that does isn't allowed to ride into the gate unanswered. If one is still open, ask and resolve it now, in its own message, one question at a time exactly as in Step 3. Record the answer in the dashboard before moving on. Only once every mandated question is resolved does the gate itself get shown, and it gets shown in a message of its own — never folded into the same message as a mandated question, and never bundled with the three-way adopt choice below.
+
 Show the user the master plan in one message, with enough in it to adopt on without opening the file:
 
 - Print the dashboard (status list).
@@ -420,15 +426,17 @@ Show the user the master plan in one message, with enough in it to adopt on with
   A finding that lands on the plan as a whole rather than on any one item — a missing item, an ordering that won't work — is numbered in the same sequence, in a final group of its own after the per-item ones. It is in the dashboard's Open questions, not in an item's section, but it is one of the things the user can act on, so it gets a number like everything else.
 - When Step 3.5 ran, say in one clause who read the plan: the peer CLI by name, or a fresh agent of the same model — and when it was the same model, why (no second CLI on this machine, peer consult switched off, or you were asked to keep this plan local for this run). The user weighs a flagged finding differently depending on whose eyes were on the plan. A review that found nothing gets the same one clause and no more; saying nothing reads as if the step never ran.
 - Self-triage the list; don't present forty entries as equals. Lead with the handful you're least sure about and flag them for the user's eye ("worth a look: 3, 7, 12"). One triage line covers the whole list rather than one per kind — the single number space exists so there is one thing to scan and one way to reply. What earns a place on it differs by kind: a decision closest to the ask/decide line, or whose authority is weakest or whose reversibility you're least certain of; an applied correction that changed something an item's acceptance criteria rest on; a flagged finding that would change what gets built. The rest stand as a scannable, cited list the user can skim or ignore. The risk to avoid is a miscalibrated "all safe here" that buries an entry the user would have changed; when genuinely unsure, flag rather than bury.
-- End with one binary prompt: "Adopt this master plan as written, or reopen anything by number / change something?"
+- End with a three-way prompt: "Adopt this master plan — 1) implement it and open a PR when done, 2) implement it only, or 3) reopen anything by number / change something?"
 
 **When no review ran** — `plan_review` is off, the user skipped it, or the plan was written before the step existed — none of the review's part of this appears: no rung clause, no empty findings list, and no note explaining what didn't happen. The numbered list is the disclosed decisions and nothing else, exactly the gate it was before the step existed.
 
 This is the only place implementation-blocking approval lives. Possible responses:
 
-- *Adopt as written* — proceed to Step 5. Every numbered entry not reopened stands as accepted: decisions hold, applied corrections stay in the plan, flagged findings were seen and left alone.
+- *Adopt* — either of the two shapes below. Either way, every numbered entry not reopened stands as accepted: decisions hold, applied corrections stay in the plan, flagged findings were seen and left alone. Proceed to Step 5.
+  - **1) Implement and open a PR when done.** Record `Ship: PR after implementation` in the dashboard's Ship field, plus `PR base: <branch>` when item 4's stacking override applies. This answers Step 8's ask up front: Step 7's wrap-up hands straight to `/pln-pr` with no further prompt.
+  - **2) Implement only.** Record `Ship: implement only` in the dashboard's Ship field. Step 8 still asks once, at the end of Step 7's wrap-up, exactly as it did before this choice existed.
 - *Reopen by number* (e.g. "3, 7, 8") — any entry, of any kind. A **decision** returns to the one-question-at-a-time interview, exactly like Step 3, but starting from the recorded position and its rationale, not a blank question ("I chose X because Y; here's the tradeoff; what would you change?"). An **applied** correction is shown with what it replaced, and reverted if the user says so — the record in the item's detail section is what makes that one edit instead of a reconstruction. A **flagged** finding becomes an interview question of the same shape: what the reviewer found, what it would change, what the user wants done. Resolve each, update `PLAN.md`, re-show, re-prompt. Unlisted entries remain accepted.
-- *Change X* — make the change in `PLAN.md`, re-show the affected section(s), re-prompt the same binary question. Loop until the user adopts.
+- *Change X* — make the change in `PLAN.md`, re-show the affected section(s), re-prompt the same three-way question. Loop until the user adopts.
 
 **Re-review after a rewrite.** An edit made through either response above counts as a rewrite of an item, for this purpose, when it changes that item's premise, intent, acceptance criteria, or a decision another item depends on. An edit that only tightens wording or fixes a typo does not. When one or more items are rewritten, re-run Step 3.5 bounded to just those items before re-showing the gate — not the whole plan again. Give the re-review each rewritten item's section plus the sections of any items whose own text names it as a dependency, so a cross-item contradiction the rewrite introduced is still catchable. The new pass's findings replace the rewritten item's prior findings entirely; findings on every other, untouched item stand as they were. Say in one line which items were re-reviewed before re-prompting.
 
@@ -489,19 +497,22 @@ Items marked ⏸ blocked (auto mode) are different: each already has a concrete 
 
 A finished plan is not a shipped one, and shipping is `/pln-pr`'s job: it reviews the branch with fresh-context reviewers, fixes what they find, verifies once, and opens the pull request. Pushing and running `gh pr create` from here instead skips all of it.
 
-Ask once, at the end of the Step 7 wrap-up message rather than in a message of its own: open the PR now, or stop here? Skip the ask entirely when there is nothing to put up — no commits ahead of the base branch — or when the user has already said where this run ends.
+Read the dashboard's `Ship` field — not what the conversation remembers, so a restarted or resumed session doesn't have to recall a choice made turns ago:
 
-On yes, hand off:
+- **`PR after implementation`** — the Step 4 gate already asked and got a yes. Hand off immediately at the end of Step 7's wrap-up, no further prompt.
+- **`implement only`, absent, or the plan predates this field** — ask once, at the end of the Step 7 wrap-up message rather than in a message of its own: open the PR now, or stop here? Skip the ask entirely when there is nothing to put up — no commits ahead of the base branch — or when the user has already said where this run ends. On yes, hand off the same way.
+
+Handing off:
 
 <!-- pln:only claude -->
 Invoke `/pln-pr` with the `Skill` tool. Its steps then arrive verbatim at the moment they are used, instead of being recalled from a description read an hour of implementation ago — which is why it is a separate skill rather than a section of this file.
 
-When the interview recorded a decision to stack this plan's branch on another branch, pass that branch through in the `args` string rather than making a human type it at PR time: `Skill({skill: "pln-pr", args: "base=<branch>"})`.
+When the dashboard's `Ship` field carries a `PR base: <branch>` line (item 4's stacking override), pass that branch through in the `args` string rather than making a human type it at PR time: `Skill({skill: "pln-pr", args: "base=<branch>"})`.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
 This host has no tool that invokes a skill, so load it yourself: read `{{SKILL_DIR}}/pln-pr/SKILL.md` in full and follow it. Its steps then arrive verbatim at the moment they are used, instead of being recalled from a description read an hour of implementation ago — which is why it is a separate skill rather than a section of this file.
 
-When the interview recorded a decision to stack this plan's branch on another branch, there is no separate tool call to attach that argument to — carry it forward explicitly instead: when you reach `pln-pr/SKILL.md`'s Step 0, tell yourself the base is already decided (the stacked branch, not the auto-detected default) and follow that step's own validation before using it, rather than running its auto-detection.
+When the dashboard's `Ship` field carries a `PR base: <branch>` line (item 4's stacking override), there is no separate tool call to attach that argument to — carry it forward explicitly instead: when you reach `pln-pr/SKILL.md`'s Step 0, tell yourself the base is already decided (the stacked branch, not the auto-detected default) and follow that step's own validation before using it, rather than running its auto-detection.
 <!-- pln:endonly -->
 
 This holds for a PR ask anywhere in the session, not only at the end. "Put up a PR", "ship it", and PR asks carried inside a longer instruction — "bump the version and open the PR", "push this up" — all route through `/pln-pr`. The one exception is an explicit "skip the review", which you honor.
@@ -641,6 +652,7 @@ Top-of-file dashboard carries:
 - **Status** — per-item one-line entries with status icon, summary, and (if done) commit hash.
 - **Pre-flight findings** — mandated rules, persistent TODOs, verification commands discovered.
 - **Open questions** — questions asked but not yet answered (deferred sub-questions live here so nothing is lost).
+- **Ship** — the Step 4 adopt choice: `PR after implementation` or `implement only`, plus `PR base: <branch>` when a stacking override (item 4) applies. Set once, at adoption, and read back by Step 8 rather than trusted from the conversation — a restarted or resumed session still knows what was decided.
 - **Verification** — pass/fail per command at task end.
 - **Spinoffs** — links to any spinoff plan files.
 

@@ -6,7 +6,7 @@ All rules in this section apply to every message the skill produces.
 
 Every question you put to the user, and every reaction or finding you report, takes one of three shapes. The first line says what the message is, so the user knows from that line alone what it wants from them. Whichever shape, the message has to be answerable by someone with no memory of the conversation.
 
-**Option message** — echo line, one sentence naming what is being decided, the options, then the evidence.
+**Option message** — echo line, one sentence naming what is being decided (with whatever motivates the question), the options, then evidence that helps tell them apart. Evidence appears at most once per fact — in the lead-in sentence or in the trailing paragraph, never both, and never repeated inside an option's own description.
 
 ```
 Recorded: soft-delete on cancel, no cascade.
@@ -63,6 +63,10 @@ Above it goes a work-completed line: one to three lines saying what was done. Sk
 An option, binary or finding message takes none of this. It is already the ask, and a closing label on top would be a second name for the same thing.
 
 The work-completed line does not summarize the diff. It says what was done and stops: no walking the changes, no listing files the commit already lists.
+
+**A wrap-up is a complete answer, not a summary of one.** Never end it with a pointer to a file for the rest — "see `PLAN.md`", "full detail in `REVIEW.md`" — the user does not open either afterward. Say what happened and what's left, in the message itself.
+
+**The follow-up bar.** A follow-up belongs in a wrap-up's closing bullet list only if both hold: it is not done, and someone will need to act on it or decide about it later. A trivial nit, a "checked, it's fine" note, or a vague someday-maybe with no concrete trigger does not qualify — drop it, or, if worth keeping at all, leave it as an internal note in `PLAN.md`/`REVIEW.md` and never surface it. A finding that got fixed is not a follow-up either — the commit that fixed it is the record; skip the "N found, all fixed" tally. When genuine follow-ups exist, list them as a short bullet list in the closing message itself, one line each — enough to know what each one is, with no link standing in for that sentence.
 
 ### Naming things the user reads
 

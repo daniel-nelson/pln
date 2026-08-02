@@ -289,11 +289,19 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 
 - (none yet)
 
+## Ship
+
+- (not yet decided)
+
 ## Verification
 
 - (not yet run)
 
 ## Spinoffs
+
+- (none yet)
+
+## Cross-item notes
 
 - (none yet)
 
@@ -408,6 +416,8 @@ The review runs once, on the finished plan. Re-showing the plan at the gate — 
 
 ### Step 4. Master-plan approval gate
 
+**Resolve mandated questions first.** Before anything else in this step, check the dashboard's Pre-flight findings for a mandated rule (Step 1: a required decision named by the project's own `CLAUDE.md`/`AGENTS.md`) that the interview never actually resolved — not every mandated rule needs a decision, but one that does isn't allowed to ride into the gate unanswered. If one is still open, ask and resolve it now, in its own message, one question at a time exactly as in Step 3. Record the answer in the dashboard before moving on. Only once every mandated question is resolved does the gate itself get shown, and it gets shown in a message of its own — never folded into the same message as a mandated question, and never bundled with the three-way adopt choice below.
+
 Show the user the master plan in one message, with enough in it to adopt on without opening the file:
 
 - Print the dashboard (status list).
@@ -420,15 +430,19 @@ Show the user the master plan in one message, with enough in it to adopt on with
   A finding that lands on the plan as a whole rather than on any one item — a missing item, an ordering that won't work — is numbered in the same sequence, in a final group of its own after the per-item ones. It is in the dashboard's Open questions, not in an item's section, but it is one of the things the user can act on, so it gets a number like everything else.
 - When Step 3.5 ran, say in one clause who read the plan: the peer CLI by name, or a fresh agent of the same model — and when it was the same model, why (no second CLI on this machine, peer consult switched off, or you were asked to keep this plan local for this run). The user weighs a flagged finding differently depending on whose eyes were on the plan. A review that found nothing gets the same one clause and no more; saying nothing reads as if the step never ran.
 - Self-triage the list; don't present forty entries as equals. Lead with the handful you're least sure about and flag them for the user's eye ("worth a look: 3, 7, 12"). One triage line covers the whole list rather than one per kind — the single number space exists so there is one thing to scan and one way to reply. What earns a place on it differs by kind: a decision closest to the ask/decide line, or whose authority is weakest or whose reversibility you're least certain of; an applied correction that changed something an item's acceptance criteria rest on; a flagged finding that would change what gets built. The rest stand as a scannable, cited list the user can skim or ignore. The risk to avoid is a miscalibrated "all safe here" that buries an entry the user would have changed; when genuinely unsure, flag rather than bury.
-- End with one binary prompt: "Adopt this master plan as written, or reopen anything by number / change something?"
+- End with a three-way prompt: "Adopt this master plan — 1) implement it and open a PR when done, 2) implement it only, or 3) reopen anything by number / change something?"
 
 **When no review ran** — `plan_review` is off, the user skipped it, or the plan was written before the step existed — none of the review's part of this appears: no rung clause, no empty findings list, and no note explaining what didn't happen. The numbered list is the disclosed decisions and nothing else, exactly the gate it was before the step existed.
 
 This is the only place implementation-blocking approval lives. Possible responses:
 
-- *Adopt as written* — proceed to Step 5. Every numbered entry not reopened stands as accepted: decisions hold, applied corrections stay in the plan, flagged findings were seen and left alone.
+- *Adopt* — either of the two shapes below. Either way, every numbered entry not reopened stands as accepted: decisions hold, applied corrections stay in the plan, flagged findings were seen and left alone. Proceed to Step 5.
+  - **1) Implement and open a PR when done.** Record `Ship: PR after implementation` in the dashboard's Ship field, plus `PR base: <branch>` when item 4's stacking override applies. This answers Step 8's ask up front: Step 7's wrap-up hands straight to `/pln-pr` with no further prompt.
+  - **2) Implement only.** Record `Ship: implement only` in the dashboard's Ship field. Step 8 still asks once, at the end of Step 7's wrap-up, exactly as it did before this choice existed.
 - *Reopen by number* (e.g. "3, 7, 8") — any entry, of any kind. A **decision** returns to the one-question-at-a-time interview, exactly like Step 3, but starting from the recorded position and its rationale, not a blank question ("I chose X because Y; here's the tradeoff; what would you change?"). An **applied** correction is shown with what it replaced, and reverted if the user says so — the record in the item's detail section is what makes that one edit instead of a reconstruction. A **flagged** finding becomes an interview question of the same shape: what the reviewer found, what it would change, what the user wants done. Resolve each, update `PLAN.md`, re-show, re-prompt. Unlisted entries remain accepted.
-- *Change X* — make the change in `PLAN.md`, re-show the affected section(s), re-prompt the same binary question. Loop until the user adopts.
+- *Change X* — make the change in `PLAN.md`, re-show the affected section(s), re-prompt the same three-way question. Loop until the user adopts.
+
+**Re-review after a rewrite.** An edit made through either response above counts as a rewrite of an item, for this purpose, when it changes that item's premise, intent, acceptance criteria, or a decision another item depends on. An edit that only tightens wording or fixes a typo does not. When one or more items are rewritten, re-run Step 3.5 bounded to just those items before re-showing the gate — not the whole plan again. Give the re-review each rewritten item's section plus the sections of any items whose own text names it as a dependency, so a cross-item contradiction the rewrite introduced is still catchable. The new pass's findings replace the rewritten item's prior findings entirely; findings on every other, untouched item stand as they were. Say in one line which items were re-reviewed before re-prompting.
 
 Do not enter Step 5 without an explicit adoption signal.
 
@@ -438,20 +452,25 @@ Do not enter Step 5 without an explicit adoption signal.
 
 **The subagent brief.** The prompt handed to each subagent must make `PLAN.md` its entire spec and carry every per-item concern, because the orchestrator is no longer doing this work:
 
-1. Read `PLAN.md` in full at `<path>`. The top dashboard (pre-flight findings, mandated skills, verification commands) and item N's detail section are your spec.
+1. Read `PLAN.md` in full at `<path>`. The top dashboard (pre-flight findings, mandated skills, verification commands, cross-item notes) and item N's detail section are your spec.
 2. Follow any mandated skills noted in the pre-flight findings; you are a fresh context, so re-establish that yourself.
-3. Execute item N to its acceptance criteria. The plan records intent and the decisions other work depends on, not reversible mechanics — own those yourself, to the project's quality bar.
+3. Execute item N to its acceptance criteria. The plan records intent and the decisions other work depends on, not reversible mechanics — own those yourself, to the project's quality bar. If the item calls for a new test, hold it to this bar:
+   - Test the path the code actually runs, not just its inputs — assert on what crosses a mocked boundary rather than only on the boundary itself. If the boundary (e.g. an external gateway) stays mocked, say so in the report.
+   - Before fixing anything, run the new test and paste the actual failure message. Not "it failed."
+   - After fixing, report the exact command run and the count it printed (e.g. `pnpm uspec spec/unit/foo → 4 tests, 4 passed`) — not a raw paste of passing output, which is noise. Someone can re-run that exact command to check it.
+   - If a test's result could change depending on the time of day or date, say so and account for it.
+   - Before reporting verification, re-read the project's completion rule (`CLAUDE.md`/`AGENTS.md`) and reproduce any environmental condition it names — cleared credentials, a specific timezone, a service, a clean database — that this run didn't already match.
 <!-- pln:only claude -->
-4. Run lightweight verification (type-check + lint, no specs). If it fails: fix, re-stage. Commit only a complete, verified item, with the co-author trailer; never `--amend`, never `--no-verify`. A decision-only or doc-only item needs no commit; the plan file is the record.
+4. Run lightweight verification (type-check + lint, no specs). This gate is about the mandatory pre-commit check, not about whether new tests get written and run at all — a test called for by item 3's bar above still gets written and run, per those bullets. If lightweight verification fails: fix, re-stage. Commit only a complete, verified item, with the co-author trailer; never `--amend`, never `--no-verify`. A decision-only or doc-only item needs no commit; the plan file is the record.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-4. Run lightweight verification (type-check + lint, no specs). If it fails: fix it. Do not commit — committing is the orchestrator's job, which is what keeps every per-item commit a clean checkpoint; leave the finished work in the tree and say in your final message what should be committed. A decision-only or doc-only item leaves nothing to commit; the plan file is the record.
+4. Run lightweight verification (type-check + lint, no specs). This gate is about the mandatory pre-commit check, not about whether new tests get written and run at all — a test called for by item 3's bar above still gets written and run, per those bullets. If lightweight verification fails: fix it. Do not commit — committing is the orchestrator's job, which is what keeps every per-item commit a clean checkpoint; leave the finished work in the tree and say in your final message what should be committed. A decision-only or doc-only item leaves nothing to commit; the plan file is the record.
 <!-- pln:endonly -->
 <!-- pln:only claude -->
-5. Before returning, update item N's section in `PLAN.md`: status ✅ done, commit hash, dead ends hit, artifacts produced, any discoveries.
+5. Before returning, update item N's section in `PLAN.md`: status ✅ done, commit hash, dead ends hit, artifacts produced, any discoveries. If this item discovered something a later item needs — a constant to reuse, a field that changed, a trap not to repeat — add one line to the dashboard's Cross-item notes too; skip it if there's nothing later items would need.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-5. Before returning, update item N's section in `PLAN.md`: status ✅ done, dead ends hit, artifacts produced, any discoveries. Leave the commit hash out — the orchestrator commits and fills it in. Then keep the final message itself to a few lines: what changed, which files should be committed, and anything the next item needs. That message is the only thing that reaches the orchestrator; everything else you have to say belongs in `PLAN.md`.
+5. Before returning, update item N's section in `PLAN.md`: status ✅ done, dead ends hit, artifacts produced, any discoveries. Leave the commit hash out — the orchestrator commits and fills it in. If this item discovered something a later item needs — a constant to reuse, a field that changed, a trap not to repeat — add one line to the dashboard's Cross-item notes too; skip it if there's nothing later items would need. Then keep the final message itself to a few lines: what changed, which files should be committed, and anything the next item needs. That message is the only thing that reaches the orchestrator; everything else you have to say belongs in `PLAN.md`.
 <!-- pln:endonly -->
 6. Capture memories the moment they surface, per the standard memory rules. (Include the Dream/Psychic learning-capture instruction here only when pre-flight detected both `RECORD_PSYCHIC_LEARNINGS` and Dream/Psychic context.)
 <!-- pln:only claude -->
@@ -476,21 +495,29 @@ Items marked ⏸ blocked (auto mode) are different: each already has a concrete 
 1. Spawn one fresh-context agent (see Spawning a fresh-context agent) to run the full gauntlet once and return pass/fail per command. Running it in an agent keeps the large stdout/stderr out of the orchestrator's context; that output stays with the agent and is not persisted to a file. The orchestrator writes the pass/fail summary to the dashboard's Verification section.
 2. If anything fails: it's now a new item. Don't paper over. Either spawn an agent to fix-and-rerun, or spawn a spinoff if the failure is out-of-scope.
 3. If notifications are on, fire them first (see Notifications): {{NOTIFY_CALL}}, summarizing the outcome (e.g. "pln: plan done, 8/8 items, gauntlet passed").
-4. Final message to the user: one or two sentences. What changed and what's next. Reference `PLAN.md`'s path.
+4. Final message to the user: one or two sentences saying what changed and what's next, in plain words. This message is the complete answer on its own — no pointer to `PLAN.md` for the rest (see Style's "Ending a message"). If genuine follow-ups remain, list them per the follow-up bar below.
+5. If that message listed any follow-ups, follow the to-do-location flow below, as a message of its own — never folded into Step 8's ask.
 
 ### Step 8. Ship — hand off to `/pln-pr`
 
 A finished plan is not a shipped one, and shipping is `/pln-pr`'s job: it reviews the branch with fresh-context reviewers, fixes what they find, verifies once, and opens the pull request. Pushing and running `gh pr create` from here instead skips all of it.
 
-Ask once, at the end of the Step 7 wrap-up message rather than in a message of its own: open the PR now, or stop here? Skip the ask entirely when there is nothing to put up — no commits ahead of the base branch — or when the user has already said where this run ends.
+Read the dashboard's `Ship` field — not what the conversation remembers, so a restarted or resumed session doesn't have to recall a choice made turns ago:
 
-On yes, hand off:
+- **`PR after implementation`** — the Step 4 gate already asked and got a yes. Hand off immediately at the end of Step 7's wrap-up, no further prompt.
+- **`implement only`, absent, or the plan predates this field** — ask once, at the end of the Step 7 wrap-up message rather than in a message of its own: open the PR now, or stop here? Skip the ask entirely when there is nothing to put up — no commits ahead of the base branch — or when the user has already said where this run ends. On yes, hand off the same way.
+
+Handing off:
 
 <!-- pln:only claude -->
 Invoke `/pln-pr` with the `Skill` tool. Its steps then arrive verbatim at the moment they are used, instead of being recalled from a description read an hour of implementation ago — which is why it is a separate skill rather than a section of this file.
+
+When the dashboard's `Ship` field carries a `PR base: <branch>` line (item 4's stacking override), pass that branch through in the `args` string rather than making a human type it at PR time: `Skill({skill: "pln-pr", args: "base=<branch>"})`.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
 This host has no tool that invokes a skill, so load it yourself: read `{{SKILL_DIR}}/pln-pr/SKILL.md` in full and follow it. Its steps then arrive verbatim at the moment they are used, instead of being recalled from a description read an hour of implementation ago — which is why it is a separate skill rather than a section of this file.
+
+When the dashboard's `Ship` field carries a `PR base: <branch>` line (item 4's stacking override), there is no separate tool call to attach that argument to — carry it forward explicitly instead: when you reach `pln-pr/SKILL.md`'s Step 0, tell yourself the base is already decided (the stacked branch, not the auto-detected default) and follow that step's own validation before using it, rather than running its auto-detection.
 <!-- pln:endonly -->
 
 This holds for a PR ask anywhere in the session, not only at the end. "Put up a PR", "ship it", and PR asks carried inside a longer instruction — "bump the version and open the PR", "push this up" — all route through `/pln-pr`. The one exception is an explicit "skip the review", which you honor.
@@ -562,6 +589,14 @@ Spinoff file structure (in order):
 
 A subagent does not create a spinoff itself. When it judges an item warrants one, it hands off (`BLOCKED:`) recommending the spinoff with its reasoning; the orchestrator writes the spinoff file and updates `PLAN.md`. After writing the spinoff, update the parent `PLAN.md`: mark the item ⏸ deferred and add a link in the Spinoffs section.
 
+### Follow-ups
+
+Applies at Step 7's wrap-up, and at the equivalent point in `/pln-pr`. The bar and the closing-message shape are Style's "Ending a message" rules — not done, and someone will need to act on it or decide about it later; a fixed finding is not a follow-up.
+
+**Full detail lives in `PLAN.md`,** not the closing message — the bullet list there names each follow-up, `PLAN.md` (or, in a standalone `/pln-pr` run with no `PLAN.md`, `REVIEW.md`) carries the rest.
+
+**The to-do-location flow.** When the closing message lists any follow-ups: check whether the project already has a to-do/future-plans location — named in `CLAUDE.md`/`AGENTS.md`, or an existing convention such as an issue tracker or a TODO file. If one exists, offer, in a message of its own, to write the follow-ups there with full detail pulled from `PLAN.md` (or `REVIEW.md` in standalone mode). If none exists, ask once, also in a message of its own, where to save them. Never bundle this with another question in the same message — the Step 8 ship ask is a separate turn.
+
 ### Continuous learning + memory capture
 
 This happens during item work, which now runs in subagents — so these instructions live in the subagent brief (Step 5), not in the orchestrator. The orchestrator captures memory only for things that surface in its own conversation (e.g., during the interview or at a blocker).
@@ -630,8 +665,10 @@ Top-of-file dashboard carries:
 - **Status** — per-item one-line entries with status icon, summary, and (if done) commit hash.
 - **Pre-flight findings** — mandated rules, persistent TODOs, verification commands discovered.
 - **Open questions** — questions asked but not yet answered (deferred sub-questions live here so nothing is lost).
+- **Ship** — the Step 4 adopt choice: `PR after implementation` or `implement only`, plus `PR base: <branch>` when a stacking override (item 4) applies. Set once, at adoption, and read back by Step 8 rather than trusted from the conversation — a restarted or resumed session still knows what was decided.
 - **Verification** — pass/fail per command at task end.
 - **Spinoffs** — links to any spinoff plan files.
+- **Cross-item notes** — one line per discovery a completed item makes that a later item needs (a constant to reuse, a field that changed, a trap not to repeat). Bounded and shared, not "read every earlier item's section" — it's part of the dashboard every subagent already reads in full regardless of plan size, so it stays cheap as the plan grows.
 
 Per-item detail sections carry:
 

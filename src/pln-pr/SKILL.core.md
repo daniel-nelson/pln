@@ -82,12 +82,14 @@ Every reviewer this skill spawns is the same model as the orchestrator spawning 
 
 Detect the git host from `git remote get-url origin`: "github.com" → GitHub; "gitlab" → GitLab; else probe `gh auth status` / `glab auth status`; neither → unknown (git-native only, no PR creation).
 
-Determine the base branch (what a PR targets, or the repo default):
+Determine the base branch (what a PR targets, or the repo default). If invoked with an explicit `base=<branch>` argument (a stacked PR targeting something other than the repo default), use it instead of auto-detecting: validate it first with `git check-ref-format --branch "<branch>"` — reject anything that fails validation with a one-line error naming the bad value, rather than substituting it textually. Do not fall through to auto-detection on a rejected override; stop and report it.
+
+Otherwise, auto-detect:
 - GitHub: `gh pr view --json baseRefName -q .baseRefName`, else `gh repo view --json defaultBranchRef -q .defaultBranchRef.name`.
 - GitLab: `glab mr view -F json` `target_branch`, else `glab repo view -F json` `default_branch`.
 - Git-native fallback: `git symbolic-ref refs/remotes/origin/HEAD | sed 's|refs/remotes/origin/||'`, else try `origin/main`, then `origin/master`, else `main`.
 
-Print the detected base. Fetch it: `git fetch origin <base>`. Substitute it for `<base>` everywhere below.
+Print the detected base in one line, and whether it came from the override or was auto-detected. Fetch it: `git fetch origin <base>`. Substitute it for `<base>` everywhere below — bound to the same quoted shell variable and interpolated the same way as Step 8's PR-body assembly (see "Interpolate safely" there); this override joins that existing safe-interpolation path rather than opening a new one.
 
 <!-- pln:include pr-host-note -->
 ### Step 1. Locate the plan and scope the diff
@@ -154,7 +156,7 @@ Print: "Small diff (N lines) — codex review + security + adversarial."
 1. **Correctness & edge cases** — logic errors, off-by-one, null/undefined dereferences, boundary conditions, error handling that swallows failures, code paths that return wrong results silently. If the diff touches frontend: also broken states, unhandled loading/error UI, and accessibility regressions (missing labels, focus traps, contrast).
 2. **Security & trust boundaries** — injection (SQL, shell, template), missing authorization checks, unsafe handling of user or model output, secrets in code, SSRF and URL-trust mistakes (hostname spoofing like `https://good.com@evil.com`), unvalidated redirects. Fail closed is the bar.
 3. **Data & persistence** — migration safety (destructive or non-reversible steps, data loss), transaction atomicity and compare-and-set correctness under the DB's isolation level, race conditions between read and write, N+1 queries, orphaned rows from broken cascade rules.
-4. **Testing & coverage** — new behavior with no spec, untested error and edge paths, tests that assert nothing or can't fail, fixtures that drifted from the code. Where you can, write a minimal failing-test skeleton in the finding's `test_stub`.
+4. **Testing & coverage** — new behavior with no spec, untested error and edge paths, tests that assert nothing or can't fail, fixtures that drifted from the code. For each new or changed test, ask: would this fail if the change it's testing were undone? If no, flag it as a finding. Where you can, write a minimal failing-test skeleton in the finding's `test_stub`.
 5. **Maintainability & API contract** — dead code, duplication, unclear naming, leaked abstractions, and breaking changes to any public interface (route, exported function, event shape, serializer field) without a compatibility path. If frontend: also design-system drift (ad-hoc colors/spacing instead of tokens, inconsistent components).
 6. **Performance & resources** — hot-path allocations, unbounded retries or loops, missing timeouts, connection/handle/memory leaks, blocking calls on a request path, work that should be batched or deferred.
 
@@ -198,29 +200,46 @@ a lens or adversarial agent that completed, a `codex review` pass that came back
 If none succeeded, you have no coverage, not a clean bill of health. Do not write an empty `REVIEW.md` and do not proceed to the PR. Stop, say plainly that the review could not run, and let the user retry or review manually. An empty *merged findings* set is only "clean" when it comes from reviewers that ran and found nothing.
 
 <!-- pln:only claude -->
-Collect every reviewer's findings, plus the cross-model pass's, translated into the same shape.
+Collect every reviewer's findings and the cross-model pass's, translated into the same shape.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
 Collect every reviewer's findings, plus stage 1's and the cross-model pass's, translated into the same shape.
 <!-- pln:endonly -->
 
+This collection step only gathers the raw material; the merging *logic* below — reading every finding, deciding what survives — never runs in the orchestrator's own context. Delegate it to one fresh merge agent instead.
+
+<!-- pln:only claude -->
+The review army already ran as `agent()` calls inside this Step's Workflow script (see Spawning a fresh-context agent). Add one more `agent()` call to that same script, after every lens, adversarial, and cross-model call has returned: the merge agent. The script has no filesystem access, so its prompt is the only way material moves between calls — build a stringified JSON array of every raw finding collected above and carry it inline in the merge agent's prompt, the same way this skill's peer briefs already inline material the recipient can't read for itself.
+<!-- pln:endonly -->
+<!-- pln:only codex -->
+Each reviewer's findings already passed through the orchestrator's own turn on the way in — a native subagent's result lands there directly, and the fallback path's `RESULT_FILE` gets read into it (see Reading a reviewer back) — so collecting them here isn't new. What changes is what happens next: spawn one fresh-context merge agent (`spawn_agent` per Spawning a fresh-context agent, or the nested-`codex exec` fallback where native tools are unavailable) and hand it every raw finding collected above, inline in its brief as a stringified JSON array — the merge agent has no other way to see material that only exists in the orchestrator's own context.
+<!-- pln:endonly -->
+
+The merge agent's brief: given this JSON array of findings, do the following and return only a compact summary — nothing else.
+
 - **Deduplicate** by `file:line`. When two or more lenses report the same location, keep the highest-confidence one, tag it "confirmed by {lenses}", and raise its confidence by 1 (cap 10).
 - **Apply the confidence gate:** 7+ shown normally; 5–6 shown with a "medium confidence — verify" caveat; below 5 dropped to an appendix, not acted on. A finding whose `motivating_code` is empty cannot be 7+ regardless of what the reviewer claimed — treat it as ≤5.
-- **Write `REVIEW.md`** to the plan dir (or the standalone dir from Step 1) before any fix runs. It carries: a header line (`N findings — X critical, Y informational, from Z reviewers`), then each acted-on finding with its severity, confidence, `file:line`, summary, motivating code, and proposed fix, each with a status field starting at `open`. This file is the durable source of truth for the fix pass — an interrupted run rebuilds from it.
+- **Write `REVIEW.md`** to the plan dir (or the standalone dir from Step 1) before any fix runs. It carries: a header line (`N findings — X critical, Y informational, from Z reviewers`), then each acted-on finding with its severity, confidence, `file:line`, summary, motivating code, and proposed fix, each with a status field starting at `open`. This file is internal working state — it lets an interrupted run rebuild where it left off, and nothing in it is ever shown to the user as "see `REVIEW.md`."
+- **Return only a compact summary** to the orchestrator: the header line's counts, the name of each acted-on cluster (by `file`/subsystem), and the title (`summary` field) of each critical finding. Not the full findings list — that stays in `REVIEW.md`, which the orchestrator does not need to read back into its own context to proceed.
 
-Print the merged summary. If there are zero acted-on findings (from reviewers that ran — see the fail-closed check above), note it and skip the fix pass: go to Step 6 (version/changelog) and then the Step 7 gauntlet.
+Print the merge agent's summary. If there are zero acted-on findings (from reviewers that ran — see the fail-closed check above), note it and skip the fix pass: go to Step 6 (version/changelog) and then the Step 7 gauntlet.
 
 ### Step 4. Fix pass — clustered fix subagents
 
 Classify each acted-on finding as **auto-fix** (mechanical, unambiguous — a null check, a missing timeout, a spec for uncovered behavior) or **needs-a-decision** (a judgment call — a design change, a tradeoff, anything where the fix isn't obvious or is destructive).
 
-For needs-a-decision findings, surface them to the user **one at a time**, as prose, recommended-option format, fire notifications first. Record each answer in `REVIEW.md` against its finding. A skipped finding is marked `skipped` and becomes a PR follow-up note, not a fix.
+For needs-a-decision findings, surface them to the user **one at a time**, as prose, recommended-option format, fire notifications first. Record each answer in `REVIEW.md` against its finding. A skipped finding is marked `skipped`; it becomes a follow-up in the closing message's bullet list only if it clears the follow-up bar (Style's "Ending a message") — someone will actually need to act on it or decide about it later. A skip that was really "not worth doing" gets no follow-up entry.
 
 <!-- pln:include pr-fix-dispatch -->
 
 1. "Read `REVIEW.md` at `<path>`. Your spec is the findings in cluster {K}, listed below. Fix each one to the project's quality bar.
 2. Follow any mandated skills or conventions noted in `PLAN.md`'s pre-flight findings (BDD, package manager, where commands run) — you are fresh context, re-establish them yourself.
-3. Where a finding has a `test_stub` or is about missing coverage, write the failing spec first, then make it pass.
+3. Where a finding has a `test_stub` or is about missing coverage, write the failing spec first, then make it pass. Hold any new test to this bar:
+   - Test the path the code actually runs, not just its inputs — assert on what crosses a mocked boundary rather than only on the boundary itself. If the boundary (e.g. an external gateway) stays mocked, say so in the report.
+   - Before fixing anything, run the new test and paste the actual failure message. Not "it failed."
+   - After fixing, report the exact command run and the count it printed (e.g. `pnpm uspec spec/unit/foo → 4 tests, 4 passed`) — not a raw paste of passing output, which is noise. Someone can re-run that exact command to check it.
+   - If a test's result could change depending on the time of day or date, say so and account for it.
+   - Before reporting verification, re-read the project's completion rule (`CLAUDE.md`/`AGENTS.md`) and reproduce any environmental condition it names — cleared credentials, a specific timezone, a service, a clean database — that this run didn't already match.
 <!-- pln:only claude -->
 4. Run lightweight verification only (type-check + lint on touched files, not the full suite). Fix and re-stage on failure.
 <!-- pln:endonly -->
@@ -244,22 +263,22 @@ After the fix pass, dispatch one red-team agent (a single fresh-context agent) a
 
 "The diff has already been reviewed and fixed. Read the current diff (`DIFF_BASE=$(git merge-base origin/<base> HEAD) && git diff \"$DIFF_BASE\"`). Verify the fixes for these findings actually resolve them (listed below), and hunt for anything the review missed — cross-cutting concerns, integration-boundary failures, regressions the fixes introduced. Report only real, line-quoted findings. End with `Recommendation: ship` or `Recommendation: hold because <reason>`."
 
-- If the red team confirms and finds nothing blocking: record its non-blocking notes as **PR follow-ups** (not fixes) and continue.
+- If the red team confirms and finds nothing blocking: record its non-blocking notes in `REVIEW.md`. Only the ones that clear the follow-up bar (Style's "Ending a message") reach the closing message's bullet list and the PR body; the rest stay internal.
 - If it surfaces a new blocking finding: add it to `REVIEW.md` and run **one** more fix cluster (Step 4's mechanism) to clear it, then continue. Do not loop indefinitely — a second blocking round means stop and hand the situation to the user.
 
 ### Step 6. Version and changelog (conditional — before the gauntlet)
 
-This runs *before* the final gauntlet so the release files are verified by it, not after. Only if the repo carries these conventions — a `VERSION` file at the root, and/or a `CHANGELOG.md`. If neither exists, skip this step entirely; most repos don't use them and pln-pr must not impose them.
+This runs *before* the final gauntlet so the release files are verified by it, not after. Read the repo's `CLAUDE.md`/`AGENTS.md` first for a stated version-bump rule and follow it, whatever file(s) it names. Treat `VERSION`/`CHANGELOG.md` as one common shape of that convention, not the definition of "this repo has a version" — a repo that states its own rule around different files still gets a bump; a repo with no stated rule and no `VERSION` file and no `CHANGELOG.md` gets skipped entirely. If neither the stated rule nor the `VERSION`/`CHANGELOG.md` shape applies, skip this step entirely; most repos don't use either and pln-pr must not impose one.
 
-**Skip the bump if the branch already carries one.** A retry, or a branch that bumped its own version as part of the work, must not bump again. Compare the branch's `VERSION` against the base:
+**Skip the bump if the branch already carries one.** A retry, or a branch that bumped its own version as part of the work, must not bump again. Compare the branch's version file against the base — `<base>` here is whatever Step 0 resolved (the stacked-PR override when one was given, the repo default otherwise), so the "already bumped" check compares against the actual PR base, never silently against the repo default when an override is in play:
 
 ```bash
 git show "origin/<base>:VERSION" 2>/dev/null
 ```
 
-If that base value differs from the working-tree `VERSION` (the branch is already ahead), the bump is done — do not touch `VERSION` or `CHANGELOG.md`, just note "version already bumped (X → Y)" and continue. Only when the branch's `VERSION` still matches the base do you bump.
+If that base value differs from the working-tree version (the branch is already ahead), the bump is done — do not touch the version file(s), just note "version already bumped (X → Y)" and continue. Only when the branch's version still matches the base do you bump.
 
-When you do bump: raise `VERSION` per the repo's scheme (read recent `CHANGELOG.md` entries to infer major/minor/patch conventions) and add a matching changelog entry describing what shipped. If the repo's `CLAUDE.md`/`AGENTS.md` states a bump rule, follow it. Commit these with the co-author trailer, so they are part of the tree the Step 7 gauntlet runs against.
+When you do bump: raise the version per the repo's scheme (read recent changelog entries to infer major/minor/patch conventions) and add a matching changelog entry describing what shipped. If the repo's `CLAUDE.md`/`AGENTS.md` states a bump rule, follow it over the `VERSION`/`CHANGELOG.md` default. Commit these with the co-author trailer, so they are part of the tree the Step 7 gauntlet runs against.
 
 ### Step 7. Final gauntlet — once
 
@@ -278,7 +297,7 @@ Ensure everything intended is committed (fixed files by name; the version/change
 The commits, the push and the `gh`/`glab` calls are the orchestrator's own work — a spawned agent has no network and no writable `.git`, so handing any of this to one produces a silent no-op. If the host asks you to approve a command that leaves the sandbox, ask the user for it rather than routing around it.
 <!-- pln:endonly -->
 
-Assemble the PR body from `REVIEW.md`: what the branch does, then a review summary — findings count, how many fixed, the red-team verdict, any follow-ups, and the final gauntlet result. Keep it factual.
+Assemble the PR body: what the branch does, then what's relevant to a reviewer — the final gauntlet result and the genuine follow-ups (Style's "Ending a message" bar), each one line. Drop the rest: a finding that got fixed needs no summary (the commit that fixed it is the record), and there is no "N findings, all fixed" tally. This is the same follow-up list the closing message uses — don't maintain a second one.
 
 **Interpolate safely — never inline refs or the body into a shell command.** The base, branch, title, and PR body can all carry shell metacharacters (`$()`, backticks, quotes); a generated body assembled from findings especially so. Bind the refs to quoted shell variables, and write the body to a temp file passed by path — do not splice `<body>` into the command line:
 
@@ -298,7 +317,7 @@ Detect whether a PR already exists for this branch and **update instead of recre
 
 Clean up: `rm -f "$BODY_FILE"`.
 
-**Only fire the completion notification and hand the PR to the user here if Step 9 will not run** — i.e. `IS_NEW_PR=false`, `pr_draft` is off, or the host is unknown. In that case, fire it now ({{NOTIFY_CALL}}), summarizing the outcome (e.g. "pln-pr: PR open, 12 findings fixed, gauntlet green"), give the user the PR URL and a one-line summary, and mention `REVIEW.md`'s path.
+**Only fire the completion notification and hand the PR to the user here if Step 9 will not run** — i.e. `IS_NEW_PR=false`, `pr_draft` is off, or the host is unknown. In that case, fire it now ({{NOTIFY_CALL}}), then close with the PR URL and a one-line summary — the complete answer on its own, no pointer to `REVIEW.md`. If any genuine follow-ups made it into the PR body above, list them again as the closing message's bullet list, then follow the to-do-location flow (Follow-ups, `/pln`'s cross-cutting concerns) as a message of its own.
 <!-- pln:only claude -->
 Optionally offer to watch CI (`gh pr checks --watch` via a background command or the Monitor tool) — only if the user wants it; don't start it unprompted. (This is the `pr_draft false` path only — the default path watches unprompted, in Step 9.)
 <!-- pln:endonly -->
@@ -314,17 +333,17 @@ This step only runs right after Step 8 created a **brand-new** draft PR (`IS_NEW
 
 **No CI configured — undraft immediately.** Check whether the repo reports any checks at all for this PR/MR (`gh pr checks "$BRANCH"`; `glab mr` equivalent). If it reports none — nothing was ever going to turn green — run `gh pr ready` (`glab mr update --ready` equivalent) right away, fire the completion notification ({{NOTIFY_CALL}}) noting there was no CI to wait on, hand the user the PR URL, and stop. Do not enter the watch loop for a repo with no CI.
 
-**"Green" means required checks if any exist, else all checks.** `gh pr checks "$BRANCH" --required` reports the subset marked required; if the repo has none marked required, fall back to plain `gh pr checks "$BRANCH"` and require all of those to pass instead — this is the same distinction the command ships for. A required check that fails is what drives the fix-and-rewatch loop below; a failing *optional* check when required checks exist is a follow-up note, not a blocker.
+**"Green" means required checks if any exist, else all checks.** `gh pr checks "$BRANCH" --required` reports the subset marked required; if the repo has none marked required, fall back to plain `gh pr checks "$BRANCH"` and require all of those to pass instead — this is the same distinction the command ships for. A required check that fails is what drives the fix-and-rewatch loop below; a failing *optional* check when required checks exist is a follow-up, not a blocker, if it clears the follow-up bar (Style's "Ending a message"). The PR body was already assembled at Step 8, so this can't be folded back into it — post it as a PR comment (or a body edit, if the host makes that easy) once found, and carry it into the eventual closing message's bullet list.
 
 **The adaptive poll interval.** Keep a small per-repo state value — this is operational telemetry (how long does this repo's CI usually take), not the kind of durable fact the cross-session memory system is for, so it lives beside the rest of pln's local state: `"$_PLN_DIR/bin/pln-config" get "ci_duration_$REPO_SLUG"`, where `REPO_SLUG` is the `owner-repo` form of `git remote get-url origin` (slashes and colons folded to `-`). If a prior duration `D` (seconds) is on record: wait roughly `D * 0.5` before the first check (no point polling before CI is usually even half done), then poll every `max(20, D * 0.1)` seconds (capped around 2 minutes) as the expected finish nears. With no history at all, fall back to a sane fixed default — wait ~4 minutes before the first check, then poll every 60–90 seconds. Once a round reaches green, record how long *that* round's CI actually took: `"$_PLN_DIR/bin/pln-config" set "ci_duration_$REPO_SLUG" "$ELAPSED"` — so the next run on this repo, in this run or a future one, starts smarter.
 
 <!-- pln:include pr-watch-dispatch -->
 
-**On green:** undraft (`gh pr ready`; `glab mr update --ready` equivalent), record the observed duration as above, fire the completion notification ({{NOTIFY_CALL}}), and hand the user the PR URL and a one-line summary, same as Step 8's own completion message would have.
+**On green:** undraft (`gh pr ready`; `glab mr update --ready` equivalent), record the observed duration as above, fire the completion notification ({{NOTIFY_CALL}}), and close with the PR URL and a one-line summary, same as Step 8's own completion message would have — including any genuine follow-ups (found during review or during this watch loop) as a closing bullet list, then the to-do-location flow as its own message.
 
 **On a red required check:** this is a new finding, not a one-off report. Append it to `REVIEW.md` (status `open`) the same way Step 3.1 writes any other finding — `file`/check name, what failed, and the check's own output or log link as the motivating evidence — then dispatch **exactly one fix cluster** for it through Step 4's mechanism (`pr-fix-dispatch` / `pr-fix-invoke`), push whatever it commits, and re-enter the watch loop above for the next round. Every round — win or lose — is logged in a `## CI watch log` section of `REVIEW.md` (create it the first time this step writes to it): the round number, the failing check, one line on what the fix cluster changed, and the resulting commit hash. A fresh fix agent in a later round reads this section first, so it isn't starting blind on a check that has already failed the same way twice.
 
-**Truly stumped — stop, don't loop forever.** Track, per failing check name, how many consecutive rounds it has gone fix-then-still-red. Stop the loop — do not dispatch another fix cluster — the moment either holds: the **same** check has now failed **three rounds in a row**, or a fix cluster's own return is a `BLOCKED:` (it could not identify a concrete fix, the same shape Step 4's fix agents already use). When that happens, leave the PR in draft, fire the notification channels first, then surface the blocker to the user in the same shape as Step 4's needs-a-decision path — one question, as prose, recommended-option format — naming the check, how many rounds were tried, and pointing at the CI watch log in `REVIEW.md` for the detail. Nothing here has an upper bound on *how many* rounds run before that point; only the three-in-a-row (or one-explicitly-stuck) condition ends it.
+**Truly stumped — stop, don't loop forever.** Track, per failing check name, how many consecutive rounds it has gone fix-then-still-red. Stop the loop — do not dispatch another fix cluster — the moment either holds: the **same** check has now failed **three rounds in a row**, or a fix cluster's own return is a `BLOCKED:` (it could not identify a concrete fix, the same shape Step 4's fix agents already use). When that happens, leave the PR in draft, fire the notification channels first, then surface the blocker to the user in the same shape as Step 4's needs-a-decision path — one question, as prose, recommended-option format — naming the check, how many rounds were tried, and what each round's fix cluster attempted. State that in the question itself; do not point at the CI watch log in `REVIEW.md` for it. Nothing here has an upper bound on *how many* rounds run before that point; only the three-in-a-row (or one-explicitly-stuck) condition ends it.
 
 ## Failure modes to watch for
 
@@ -334,7 +353,7 @@ This step only runs right after Step 8 created a **brand-new** draft PR (`IS_NEW
 - **Acting on unverified findings.** A finding with no `motivating_code` is a suspicion, not a bug. It stays in the appendix and is not fixed.
 - **Fix agents colliding on a file.** Cluster by file so two agents never edit the same one; run clusters sequentially so the tree is settled between them.
 - **Splicing refs or the PR body into a shell command.** Bind refs to quoted vars and pass the body by file (`--body-file` / `--description` from a temp file). Never inline `<body>`.
-- **Imposing VERSION/CHANGELOG on a repo that doesn't use them.** Step 6 is conditional. No `VERSION` file, no bump — and if the branch already bumped, don't bump again.
+- **Imposing a version bump on a repo that has no stated convention.** Step 6 is conditional. No stated version-bump rule found anywhere (`CLAUDE.md`/`AGENTS.md` or the `VERSION`/`CHANGELOG.md` shape), no bump — and if the branch already bumped, don't bump again.
 - **Looking for gstack.** pln-pr is self-contained. It never reads gstack checklists, calls gstack binaries, or assumes gstack is installed.
 - **Looping the fix-and-rewatch cycle without ever reaching the stumped threshold.** "Unbounded" (Step 9) means no cap on *rounds*, not a license to keep dispatching fix clusters at the same red check forever. Track the same-check streak; three in a row (or one fix cluster returning `BLOCKED:`) means stop and surface the blocker, even if the underlying check has never been seen before that streak started.
 - **Re-drafting a PR a human is already reviewing.** Step 9's undraft/watch cycle only ever applies to a PR this same run just created (`IS_NEW_PR=true`). An update to a branch's existing PR never touches its draft/ready state either way — not `gh pr ready` on green, not anything else — because a reviewer may already be looking at it.

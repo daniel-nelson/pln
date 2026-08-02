@@ -29,6 +29,16 @@ The reason is that the reimplementation rots. When pln's Codex spawning was buil
 - Preview a build without touching the tree: `bin/pln-generate --host codex --out-dir /tmp/out`.
 - Anything host-specific you add must exist for both hosts. Text that is true on only one belongs in a `pln:only` block, not in the core.
 
+## Voice and register fixes are Claude-specific until proven otherwise
+
+The rules about how the skill *sounds* — cutting padding, the deletion test, not restating a fact three times, not posturing, defining a term before using it — exist because of Claude's register, not because planning needs them. Codex does not exhibit these habits; that is why `src/hosts/codex/voice.md` and `src/hosts/claude/voice.md` are separate files rather than one shared fragment.
+
+- **A new register or verbosity rule goes in `src/hosts/claude/voice.md` only.** Do not add it to Codex's file "for symmetry." Symmetry is the failure mode here: the fix is aimed at a habit only one model has.
+- **Touch Codex's voice file only with evidence that Codex needs it** — a real Codex `/pln` transcript showing the problem, not a guess that the rule is universally good. Absent that, leave it.
+- **Interview *discipline* is different from register.** Rules about scope, structure, and which evidence to carry are model-neutral and can live in both files. The test: would this rule fire on a model that already writes plainly? If no, it's a register fix and belongs to Claude alone.
+
+This is the one place the host seam is about the *model's* behavior rather than the *host's* mechanics, so it is easy to forget and cross-apply.
+
 ## Releases
 
 Every PR that changes skill behavior must include both:

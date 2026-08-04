@@ -441,7 +441,7 @@ and I'm not starting now."
 
 Both user forms carry the same weight. The reviewer never applies a finding over either (see "What a finding becomes"), and every rule that protects a decision because the user made it protects both, unchanged. What differs is how the decision is cited: a later turn leaning on a selected decision says the agent wrote the wording, and never quotes the option line back as the user's own words. Their words are the part after the selector, and only that part. An interview asks enough questions that agreeing to a proposal is not the same as having written it, and a reader who is told otherwise defends a sentence they never composed.
 
-Cross-item interactions are normal during the interview. If answering item N's question forces a change to item M's detail (already written), update M in place and tell the user one short line: "Item M revised to match: <one-line summary>."
+Cross-item interactions are normal during the interview. If answering item N's question forces a change to item M's detail (already written), update M in place and tell the user one short line: "Item M revised to match: <one-line summary>." Where the interaction is a fact both items turn on — a precedence order, a substitution several items make — write it once in the dashboard's Cross-item notes as well, rather than describing it separately in each. Each item still says what it does; the shared fact has one home.
 
 When the interview is done, every item's section pins down the intent and the decisions other work depends on, enough that the implementer can't take it somewhere the user would veto. Reversible mechanics are deliberately left open: "decide this in contact with the code" is a valid, intended end state for a deferred choice, not a gap to be filled. What must be complete is the set of ask-lane answers, not a prescription of how every line gets written.
 
@@ -749,7 +749,7 @@ Top-of-file dashboard carries:
 - **Reversals** — one line per decision in this plan that overturns something already settled or already built: what it reverses, and where that was decided. `/pln-pr` reads it into the PR body, so a reversal reaches the branch's reviewer even when the user adopted the plan without reading it (see Delegated mode).
 - **Verification** — pass/fail per command at task end.
 - **Spinoffs** — links to any spinoff plan files.
-- **Cross-item notes** — one line per discovery a completed item makes that a later item needs (a constant to reuse, a field that changed, a trap not to repeat). Bounded and shared, not "read every earlier item's section" — it's part of the dashboard every subagent already reads in full regardless of plan size, so it stays cheap as the plan grows.
+- **Cross-item notes** — one line per fact more than one item turns on: a discovery a completed item makes that a later item needs (a constant to reuse, a field that changed, a trap not to repeat), and an interaction between items (a precedence order, a substitution several items make). An interaction is recorded here, not described inside each item — a subagent reads its own item and the dashboard, so two half-descriptions in two sections never get reconciled by anyone. Only what another item would get wrong without it, not every cross-reference: this is part of the dashboard every subagent already reads in full regardless of plan size, and it stays cheap only while it stays bounded.
 
 Per-item detail sections carry:
 

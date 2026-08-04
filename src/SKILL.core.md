@@ -573,7 +573,7 @@ Items marked ⏸ blocked (auto mode) are different: each already has a concrete 
 2. If anything fails: it's now a new item. Don't paper over. Either spawn an agent to fix-and-rerun, or spawn a spinoff if the failure is out-of-scope.
 3. If notifications are on, fire them first (see Notifications): {{NOTIFY_CALL}}, summarizing the outcome (e.g. "pln: plan done, 8/8 items, gauntlet passed").
 4. Final message to the user: one or two sentences saying what changed and what's next, in plain words. This message is the complete answer on its own — no pointer to `PLAN.md` for the rest (see Style's "Ending a message"). If genuine follow-ups remain, list them per the follow-up bar below.
-5. If that message listed any follow-ups, follow the to-do-location flow below, as a message of its own — never folded into Step 8's ask.
+5. If that message listed any follow-ups, run the to-do-location flow below. Anything it asks or offers is a message of its own — never folded into Step 8's ask.
 
 ### Step 8. Ship — hand off to `/pln-pr`
 
@@ -670,11 +670,11 @@ A subagent does not create a spinoff itself. When it judges an item warrants one
 
 ### Follow-ups
 
-Applies at Step 7's wrap-up, and at the equivalent point in `/pln-pr`. The bar and the closing-message shape are Style's "Ending a message" rules — not done, and someone will need to act on it or decide about it later; a fixed finding is not a follow-up.
+Applies at Step 7's wrap-up, and at the equivalent point in `/pln-pr`. The bar and the closing-message shape are Style's "Ending a message" rules — true when checked, not done, and someone will need to act on it or decide about it later; a fixed finding is not a follow-up.
 
 **Full detail lives in `PLAN.md`,** not the closing message — the bullet list there names each follow-up, `PLAN.md` (or, in a standalone `/pln-pr` run with no `PLAN.md`, `REVIEW.md`) carries the rest.
 
-**The to-do-location flow.** When the closing message lists any follow-ups: check whether the project already has a to-do/future-plans location — named in `CLAUDE.md`/`AGENTS.md`, or an existing convention such as an issue tracker or a TODO file. If one exists, offer, in a message of its own, to write the follow-ups there with full detail pulled from `PLAN.md` (or `REVIEW.md` in standalone mode). If none exists, ask once, also in a message of its own, where to save them. Never bundle this with another question in the same message — the Step 8 ship ask is a separate turn.
+<!-- pln:include todo-location -->
 
 ### Continuous learning + memory capture
 

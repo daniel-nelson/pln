@@ -329,6 +329,17 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   has "$f" '### Echoing recorded decisions' "$f lost the shared formatting rules"
 done
 
+# The to-do-location flow is one source per host, included by both skills — a
+# follow-up recorded by one and only offered by the other would be the same bug
+# the write-by-default rule exists to fix. The global instructions file it reads
+# is the one host-specific part, so each build must name its own path.
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" 'The to-do-location flow' "$f lost the to-do-location flow"
+  has "$f" 'without asking' "$f does not record follow-ups without asking"
+done
+has "$real_c/SKILL.md" '~/.claude/CLAUDE.md' "the claude build reads no global instructions file"
+has "$real_x/SKILL.md" '$CODEX_HOME/AGENTS.md' "the codex build reads no global instructions file"
+
 # The peer ladder is one shared source both skills read, and the property that
 # matters is that neither carries probe logic of its own: every build of both
 # targets reaches the peer through the same helper, behind the same one-time

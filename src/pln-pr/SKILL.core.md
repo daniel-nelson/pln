@@ -319,7 +319,7 @@ Detect whether a PR already exists for this branch and **update instead of recre
 
 Clean up: `rm -f "$BODY_FILE"`.
 
-**Only fire the completion notification and hand the PR to the user here if Step 9 will not run** — i.e. `IS_NEW_PR=false`, `pr_draft` is off, or the host is unknown. In that case, fire it now ({{NOTIFY_CALL}}), then close with the PR URL and a one-line summary — the complete answer on its own, no pointer to `REVIEW.md`. If any genuine follow-ups made it into the PR body above, list them again as the closing message's bullet list, then follow the to-do-location flow (Follow-ups, `/pln`'s cross-cutting concerns) as a message of its own.
+**Only fire the completion notification and hand the PR to the user here if Step 9 will not run** — i.e. `IS_NEW_PR=false`, `pr_draft` is off, or the host is unknown. In that case, fire it now ({{NOTIFY_CALL}}), then close with the PR URL and a one-line summary — the complete answer on its own, no pointer to `REVIEW.md`. If any genuine follow-ups made it into the PR body above, list them again as the closing message's bullet list, then run the to-do-location flow (Follow-ups, below).
 <!-- pln:only claude -->
 Optionally offer to watch CI (`gh pr checks --watch` via a background command or the Monitor tool) — only if the user wants it; don't start it unprompted. (This is the `pr_draft false` path only — the default path watches unprompted, in Step 9.)
 <!-- pln:endonly -->
@@ -341,11 +341,17 @@ This step only runs right after Step 8 created a **brand-new** draft PR (`IS_NEW
 
 <!-- pln:include pr-watch-dispatch -->
 
-**On green:** undraft (`gh pr ready`; `glab mr update --ready` equivalent), record the observed duration as above, fire the completion notification ({{NOTIFY_CALL}}), and close with the PR URL and a one-line summary, same as Step 8's own completion message would have — including any genuine follow-ups (found during review or during this watch loop) as a closing bullet list, then the to-do-location flow as its own message.
+**On green:** undraft (`gh pr ready`; `glab mr update --ready` equivalent), record the observed duration as above, fire the completion notification ({{NOTIFY_CALL}}), and close with the PR URL and a one-line summary, same as Step 8's own completion message would have — including any genuine follow-ups (found during review or during this watch loop) as a closing bullet list, then the to-do-location flow (Follow-ups, below).
 
 **On a red required check:** this is a new finding, not a one-off report. Append it to `REVIEW.md` (status `open`) the same way Step 3.1 writes any other finding — `file`/check name, what failed, and the check's own output or log link as the motivating evidence — then dispatch **exactly one fix cluster** for it through Step 4's mechanism (`pr-fix-dispatch` / `pr-fix-invoke`), push whatever it commits, and re-enter the watch loop above for the next round. Every round — win or lose — is logged in a `## CI watch log` section of `REVIEW.md` (create it the first time this step writes to it): the round number, the failing check, one line on what the fix cluster changed, and the resulting commit hash. A fresh fix agent in a later round reads this section first, so it isn't starting blind on a check that has already failed the same way twice.
 
 **Truly stumped — stop, don't loop forever.** Track, per failing check name, how many consecutive rounds it has gone fix-then-still-red. Stop the loop — do not dispatch another fix cluster — the moment either holds: the **same** check has now failed **three rounds in a row**, or a fix cluster's own return is a `BLOCKED:` (it could not identify a concrete fix, the same shape Step 4's fix agents already use). When that happens, leave the PR in draft, fire the notification channels first, then surface the blocker to the user in the same shape as Step 4's needs-a-decision path — one question, as prose, recommended-option format — naming the check, how many rounds were tried, and what each round's fix cluster attempted. State that in the question itself; do not point at the CI watch log in `REVIEW.md` for it. Nothing here has an upper bound on *how many* rounds run before that point; only the three-in-a-row (or one-explicitly-stuck) condition ends it.
+
+## Follow-ups
+
+Runs at whichever close hands the PR to the user — Step 8's or Step 9's — after that message's own bullet list. Which items belong on that list is Style's "Ending a message" bar; this is where the ones that do get recorded somewhere durable.
+
+<!-- pln:include todo-location -->
 
 ## Failure modes to watch for
 

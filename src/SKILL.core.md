@@ -572,8 +572,9 @@ Items marked ⏸ blocked (auto mode) are different: each already has a concrete 
 1. Spawn one fresh-context agent (see Spawning a fresh-context agent) to run the full gauntlet once and return pass/fail per command. Running it in an agent keeps the large stdout/stderr out of the orchestrator's context; that output stays with the agent and is not persisted to a file. The orchestrator writes the pass/fail summary to the dashboard's Verification section.
 2. If anything fails: it's now a new item. Don't paper over. Either spawn an agent to fix-and-rerun, or spawn a spinoff if the failure is out-of-scope.
 3. If notifications are on, fire them first (see Notifications): {{NOTIFY_CALL}}, summarizing the outcome (e.g. "pln: plan done, 8/8 items, gauntlet passed").
-4. Final message to the user: one or two sentences saying what changed and what's next, in plain words. This message is the complete answer on its own — no pointer to `PLAN.md` for the rest (see Style's "Ending a message"). If genuine follow-ups remain, list them per the follow-up bar below.
-5. If that message listed any follow-ups, run the to-do-location flow below. Anything it asks or offers is a message of its own — never folded into Step 8's ask.
+4. Sweep the run's own record for outstanding work (see Follow-ups) before drafting anything. A run that never looks reports whatever it happens to remember.
+5. Final message to the user: one or two sentences saying what changed and what's next, in plain words. This message is the complete answer on its own — no pointer to `PLAN.md` for the rest (see Style's "Ending a message"). If genuine follow-ups remain, list them per the follow-up bar below.
+6. If that message listed any follow-ups, run the to-do-location flow below. Anything it asks or offers is a message of its own — never folded into Step 8's ask.
 
 ### Step 8. Ship — hand off to `/pln-pr`
 
@@ -671,6 +672,8 @@ A subagent does not create a spinoff itself. When it judges an item warrants one
 ### Follow-ups
 
 Applies at Step 7's wrap-up, and at the equivalent point in `/pln-pr`. The bar and the closing-message shape are Style's "Ending a message" rules — true when checked, not done, and someone will need to act on it or decide about it later; a fixed finding is not a follow-up.
+
+<!-- pln:include outstanding-sweep -->
 
 **Full detail lives in `PLAN.md`,** not the closing message — the bullet list there names each follow-up, `PLAN.md` (or, in a standalone `/pln-pr` run with no `PLAN.md`, `REVIEW.md`) carries the rest.
 

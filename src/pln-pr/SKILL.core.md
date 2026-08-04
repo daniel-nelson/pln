@@ -297,7 +297,7 @@ Ensure everything intended is committed (fixed files by name; the version/change
 The commits, the push and the `gh`/`glab` calls are the orchestrator's own work — a spawned agent has no network and no writable `.git`, so handing any of this to one produces a silent no-op. If the host asks you to approve a command that leaves the sandbox, ask the user for it rather than routing around it.
 <!-- pln:endonly -->
 
-Assemble the PR body: what the branch does, then what's relevant to a reviewer — the final gauntlet result and the genuine follow-ups (Style's "Ending a message" bar), each one line. Drop the rest: a finding that got fixed needs no summary (the commit that fixed it is the record), and there is no "N findings, all fixed" tally. This is the same follow-up list the closing message uses — don't maintain a second one.
+Sweep the run's own record for outstanding work first (Follow-ups, below) — this is where the follow-up list is assembled, and both closes below reuse it. Then assemble the PR body: what the branch does, then what's relevant to a reviewer — the final gauntlet result and the genuine follow-ups (Style's "Ending a message" bar), each one line. Drop the rest: a finding that got fixed needs no summary (the commit that fixed it is the record), and there is no "N findings, all fixed" tally. This is the same follow-up list the closing message uses — don't maintain a second one.
 
 One more section, when the branch came from a `/pln` run whose `PLAN.md` carries a non-empty Reversals list: render those lines under their own heading, one each, saying what the branch overturns and where it was originally decided. A decision that reverses something already settled is the part of a branch a reviewer most needs to see, and `/pln`'s delegated mode can adopt a plan the user never read.
 
@@ -349,7 +349,9 @@ This step only runs right after Step 8 created a **brand-new** draft PR (`IS_NEW
 
 ## Follow-ups
 
-Runs at whichever close hands the PR to the user — Step 8's or Step 9's — after that message's own bullet list. Which items belong on that list is Style's "Ending a message" bar; this is where the ones that do get recorded somewhere durable.
+Both halves run at whichever close hands the PR to the user — Step 8's or Step 9's: the sweep before that message is drafted, the recording flow after its bullet list. Which items belong on the list is Style's "Ending a message" bar; the flow is where the ones that do get recorded somewhere durable.
+
+<!-- pln:include outstanding-sweep -->
 
 <!-- pln:include todo-location -->
 

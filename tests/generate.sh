@@ -337,6 +337,14 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   has "$f" 'The to-do-location flow' "$f lost the to-do-location flow"
   has "$f" 'without asking' "$f does not record follow-ups without asking"
 done
+# The end-of-run sweep is the other half of that flow, shared the same way: a
+# close that never looks at the run's own record reports whatever it happens to
+# remember, and the to-do-location flow then has nothing to write.
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" "Sweep the run's own record" "$f lost the end-of-run sweep"
+  has "$f" 'nothing outstanding says so' "$f does not report an empty sweep"
+done
+
 has "$real_c/SKILL.md" '~/.claude/CLAUDE.md' "the claude build reads no global instructions file"
 has "$real_x/SKILL.md" '$CODEX_HOME/AGENTS.md' "the codex build reads no global instructions file"
 

@@ -7,3 +7,5 @@
 The named location is frequently outside the repository and untracked. Write to it exactly as named; never substitute a path inside the repo.
 
 Never bundle the offer or the ask with another question in the same message — in `/pln`, the Step 8 ship ask is a separate turn.
+
+**A PR body, a PR comment and a commit message are copies, never the record.** Each is a place a follow-up gets *mentioned* on the way past; none is where someone goes to find out what is still outstanding. Putting a follow-up in one of them and treating it as filed is the failure this flow exists to prevent, and it reads as done because the text is visibly written somewhere. The to-do location above is the record; everything else quotes it.

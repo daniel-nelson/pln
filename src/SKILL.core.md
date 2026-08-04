@@ -171,7 +171,7 @@ An instruction broader than any one of those (a bare "skip it") is the whole ste
 
 Step 3.5's reviewer is a stranger to the conversation, and it gets the plan and nothing else: not the interview transcript, not the user's turns, not the options that lost. The plan is already the whole artifact every implementer works from. If the reviewer needs more than the plan to argue with it, the plan is the defect — and saying so is one of the findings worth having.
 
-The same brief goes to whoever runs the review, a peer CLI or a fresh same-model agent (see Consulting a peer model). Write it once to a file and use it on every rung. Two briefs that say almost the same thing drift, and then a finding depends on which rung happened to run.
+The same brief goes to everyone who reads the plan — a peer CLI *and* a fresh same-model agent, or whichever of the two is available (see Consulting a peer model). Write it once to a file and use it on every rung and for both readers. Two briefs that say almost the same thing drift, and then a finding depends on which reader happened to produce it.
 
 What the brief carries:
 
@@ -236,9 +236,11 @@ A finding is applied only when all three of these hold. Failing any one of them 
 
 **Why a user decision is never moved.** A choice reached the user in the first place because nothing already decided it and the deciding reason lived in their head: a domain fact, taste, risk appetite, business context. Correcting a fact underneath such a decision does not settle it — it gives the user something new to weigh, and whether that changes the answer is theirs. This is the blocker protocol one phase earlier: an implementer that discovers the plan won't work as written stops and hands the question back instead of deciding it, and a reviewer that discovers a decision rested on something false is the same event, found sooner. The correction is not lost — it goes to the gate flagged, with its quote, so reopening the decision there costs one reply.
 
-**Applying one.** Edit the sentences the finding lands on and nothing else: correct the false claim, or make the two contradicting parts agree. Where they cannot be made to agree without picking which one survives, picking is the judgment call — flag it instead. An applied correction never adds an item, widens scope, or rewrites acceptance criteria. Record it in that item's detail section: what the plan said, what it says now, and the quote it rested on. That record is what keeps the correction from being silent — it has to reach the gate (Step 4) even if the context between here and there compacts.
+**Applying one.** Edit the sentences the finding lands on and nothing else: correct the false claim, or make the two contradicting parts agree. Where they cannot be made to agree without picking which one survives, picking is the judgment call — flag it instead. An applied correction never adds an item, widens scope, or rewrites acceptance criteria. Record it in that item's detail section: what the plan said, what it says now, the quote it rested on, and which reader found it. That record is what keeps the correction from being silent — it has to reach the gate (Step 4) even if the context between here and there compacts.
 
 **Flagging one.** Same place, same one line, carrying the reviewer's proposed change rather than an applied one, plus which kind it is and who found it — a peer, or a fresh same-model agent (see Consulting a peer model). A reader weighs a finding differently depending on whose eyes were on the plan. A finding that lands on the plan as a whole rather than on one item — a missing item, an ordering that won't work — is always flagged, because acting on it changes scope; record it in the dashboard's Open questions.
+
+**Two readers, one record.** Where a peer and a same-model agent both read the plan, their findings merge before anything is filed: a defect both raised is one finding, recorded once, naming both readers. Merge first, then write `PLAN.md` once. Filing each reader's findings as they land runs two edit passes over the same file and numbers one defect twice at the gate.
 
 **"Nothing worth changing" is a result, not a failed review.** Record nothing, and let the gate say the review ran and found nothing. Promoting a weak finding so the step looks worthwhile is how a manufactured finding becomes a plan change.
 
@@ -446,7 +448,7 @@ None of the review is restated here. What the reviewer is told is The reviewer's
 
 3. **Write the brief** to `$RUN/plan-review.brief.md`, the plan inlined whole, per The reviewer's brief. One file, whichever rung ends up running it.
 
-4. **Run it**, and read what it prints per Consulting a peer model — including the one-time consent question, which is reached here on a machine that has never been asked:
+4. **Run the peer**, and read what it prints per Consulting a peer model — including the one-time consent question, which is reached here on a machine that has never been asked:
 
    ```bash
    "$PLN_BIN/pln-peer" \
@@ -454,15 +456,15 @@ None of the review is restated here. What the reviewer is told is The reviewer's
      --out   "$RUN/plan-review.peer.out"
    ```
 
-5. **On rung 3, review the plan anyway, on a fresh same-model agent.** `/pln-pr`'s cross-model pass skips at that point because a different model is its whole point; this step's point is a reader who never saw the interview, and a fresh agent of the same model is exactly that. Exit 3 (no peer on the machine, or peer consult switched off), exit 4 (a peer was picked, ran, and failed), and a spoken "keep this one local" all land here, and none of them is a degraded run. Hand it the same brief file — see below.
+5. **Review the plan on a fresh same-model agent as well**, on that same brief file, whether or not a peer ran — and where one did, at the same time as it rather than after (see the host note below). The two readers fail differently, which is the whole reason for both: the same-model agent shares this model's priors, so it is strong on whether the plan contradicts itself and whether its claims about the code are true, and blind to what the model family assumes; a peer carries neither those priors nor this codebase's idiom. `/pln-pr`'s cross-model pass skips at rung 3 because a different model is its whole point; this step's point is a reader who never saw the interview, and a fresh agent of the same model is exactly that. So exit 3 (no peer on the machine, or peer consult switched off), exit 4 (a peer was picked, ran, and failed), and a spoken "keep this one local" all leave this reader as the whole review, and none of them is a degraded run.
 
-6. **File every finding** per What a finding becomes: applied into the plan's own prose, or flagged, and either way recorded in its item's detail section before moving on. That record is what survives a compaction between here and the gate. Then go to Step 4.
+6. **File the findings**, both readers' together, per What a finding becomes: applied into the plan's own prose, or flagged, and either way recorded in its item's detail section before moving on — merged first, so a defect both readers raised is one record naming both. That record is what survives a compaction between here and the gate. Then go to Step 4.
 
-**Spawning the rung-3 reviewer on this host:**
+**Spawning the same-model reviewer on this host, and running it alongside the peer:**
 
 <!-- pln:include plan-review-invoke -->
 
-A reviewer that errored, timed out, or came back empty is a review that did not happen — not a review that found nothing. Take no findings from it, and say which of the two it was where the gate names who read the plan.
+A reviewer that errored, timed out, or came back empty is a review that did not happen — not a review that found nothing. Take no findings from it, and say which of the two it was where the gate names who read the plan. With two readers that applies to each: one failing leaves the other's reading as the review, and the gate names what actually ran. Both failing is the no-review case, unchanged.
 
 The review runs once, on the finished plan. Re-showing the plan at the gate — after a reopened decision, a reverted correction, a "change X" — does not re-run it: a second pass over a document the user is in the middle of editing spends minutes to produce findings about sentences that are mid-edit. Run it again only if the user asks.
 
@@ -479,8 +481,10 @@ Show the user the master plan in one message, with enough in it to adopt on with
   - ***applied*** — what the plan said, what it says now, and the quote the correction rested on. All three, because the plan's own prose no longer shows what it replaced, and without the quote the user cannot tell a checked correction from a plausible one.
   - ***flagged*** — the finding in one sentence, what the reviewer would change, and which kind it is: a false factual claim, a contradiction inside the plan, or a judgment call.
 
+  When both readers ran, each ***applied*** and ***flagged*** entry names the reader that raised it, which the plan's own record already carries; a defect both raised is one numbered entry naming both.
+
   A finding that lands on the plan as a whole rather than on any one item — a missing item, an ordering that won't work — is numbered in the same sequence, in a final group of its own after the per-item ones. It is in the dashboard's Open questions, not in an item's section, but it is one of the things the user can act on, so it gets a number like everything else.
-- When Step 3.5 ran, say in one clause who read the plan: the peer CLI by name, or a fresh agent of the same model — and when it was the same model, why (no second CLI on this machine, peer consult switched off, or you were asked to keep this plan local for this run). The user weighs a flagged finding differently depending on whose eyes were on the plan. A review that found nothing gets the same one clause and no more; saying nothing reads as if the step never ran.
+- When Step 3.5 ran, say in one clause who read the plan: the peer CLI by name and a fresh agent of the same model when both ran, or whichever one did — and when no peer read it, why (no second CLI on this machine, peer consult switched off, you were asked to keep this plan local for this run, or the peer ran and failed). The user weighs a flagged finding differently depending on whose eyes were on the plan. A review that found nothing gets the same one clause and no more; saying nothing reads as if the step never ran.
 - Self-triage the list; don't present forty entries as equals. Lead with the handful you're least sure about and flag them for the user's eye ("worth a look: 3, 7, 12"). One triage line covers the whole list rather than one per kind — the single number space exists so there is one thing to scan and one way to reply. What earns a place on it differs by kind: a decision closest to the ask/decide line, or whose authority is weakest or whose reversibility you're least certain of; an applied correction that changed something an item's acceptance criteria rest on; a flagged finding that would change what gets built. The rest stand as a scannable, cited list the user can skim or ignore. The risk to avoid is a miscalibrated "all safe here" that buries an entry the user would have changed; when genuinely unsure, flag rather than bury.
 - End with a three-way prompt: "Adopt this master plan — 1) implement it and open a PR when done, 2) implement it only, or 3) reopen anything by number / change something?"
 

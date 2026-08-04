@@ -370,23 +370,30 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
   has "$f" 'How a decision is recorded' "$f lost the rule that makes the plan readable alone"
 done
 
-# The rung-3 reviewer is spawned on this host, so that block — and only that
-# block — differs between the builds. Each must carry its own spawn and point at
-# the same brief file the peer would have been handed.
+# The same-model reviewer is spawned on this host, so that block — and only that
+# block — differs between the builds. Each must carry its own spawn, point at the
+# same brief file the peer would have been handed, and say how to run it
+# alongside the peer rather than after it.
 spawn_of() { # spawn_of <file>
-  awk '/^\*\*Spawning the rung-3 reviewer/,/^A reviewer that errored/' "$1"
+  awk '/^\*\*Spawning the same-model reviewer/,/^A reviewer that errored/' "$1"
 }
 spawn_c="$(spawn_of "$real_c/SKILL.md")"
 spawn_x="$(spawn_of "$real_x/SKILL.md")"
-[ -n "$spawn_c" ] || fail "the claude build has no rung-3 spawn block"
-[ -n "$spawn_x" ] || fail "the codex build has no rung-3 spawn block"
-grep -qF 'agentType' <<<"$spawn_c" || fail "the claude build's rung-3 reviewer is not a harness agent"
-grep -qF 'pln-codex-agent' <<<"$spawn_x" || fail "the codex build's rung-3 reviewer is not a codex spawn"
-grep -qF 'read-only' <<<"$spawn_x" || fail "the codex build's rung-3 reviewer is not read-only"
+[ -n "$spawn_c" ] || fail "the claude build has no same-model spawn block"
+[ -n "$spawn_x" ] || fail "the codex build has no same-model spawn block"
+grep -qF 'agentType' <<<"$spawn_c" || fail "the claude build's reviewer is not a harness agent"
+grep -qF 'pln-codex-agent' <<<"$spawn_x" || fail "the codex build's reviewer is not a codex spawn"
+grep -qF 'read-only' <<<"$spawn_x" || fail "the codex build's reviewer is not read-only"
 grep -qF 'brief file' <<<"$spawn_c" \
-  || fail "the claude build's rung-3 reviewer is not pointed at the brief file"
+  || fail "the claude build's reviewer is not pointed at the brief file"
 grep -qF 'plan-review.brief.md' <<<"$spawn_x" \
-  || fail "the codex build's rung-3 reviewer is not handed the brief the peer would have had"
+  || fail "the codex build's reviewer is not handed the brief the peer would have had"
+grep -qF 'run_in_background' <<<"$spawn_c" \
+  || fail "the claude build does not say how to run the reviewer alongside the peer"
+grep -qF 'Alongside the peer' <<<"$spawn_x" \
+  || fail "the codex build does not say how to run the reviewer alongside the peer"
+grep -qF 'wait_agent' <<<"$spawn_x" \
+  || fail "the codex build's concurrency seam is not the native wait loop"
 
 # ─── and nothing above touched the working tree ───────────────────────────────
 if [ -d "$REPO_DIR/.git" ]; then

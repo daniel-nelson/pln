@@ -56,6 +56,7 @@ If the user gives a single small task, don't engage; just do the work. The skill
 <!-- pln:only codex -->
 - **When notifications are on, fire them before writing the user-facing text, not after.** At each of the three notify moments (interview question, blocker, completion), {{NOTIFY_CALL}} (it self-gates) in the same turn, before producing the message the user reads. This is not a "when convenient" aside: asking the model to fire a notification *after* it has already written the text is the exact wording that made an earlier version fail — the trailing tool call gets dropped mid-turn. Fire first, then write.
 <!-- pln:endonly -->
+- **Never report the state of pln's own machinery without checking it first.** Why a mechanism did not run — the peer review, a notification, a subagent, a verification step — and what the pipeline did or did not do are readable facts: the helper's own output, `pln-config`, `PLAN.md`, the transcript. Read one before you tell the user; never infer it from what the mechanism was supposed to do. `pln-peer --which` reports `STATUS=ready` on rungs 1 and 2 because one session read the older `STATUS=none` as "no peer available" and skipped a cross-model review with the peer installed, authenticated and consented.
 
 <!-- pln:include style -->
 
@@ -772,7 +773,7 @@ Each item section must be self-contained: a blank-context subagent reading only 
 - **Dropping a cross-cutting concern from the subagent brief** — memory capture, mandated-skill invocation, and (when gated on) Psychic learning-capture happen during item work, which now runs in subagents. If the brief omits them, they silently stop happening. The brief carries every per-item concern.
 - **Inventing a verification gauntlet** — if you didn't read `CLAUDE.md` / `AGENTS.md` and find the actual commands, ask the user. Don't run guessed commands.
 <!-- pln:only claude -->
-- **`PushNotification` never loaded, so the call silently does nothing** — it is commonly a deferred tool; "call `PushNotification`" at a site does nothing unless the Notification setup preamble already ran `ToolSearch` (`select:PushNotification`). This fails with no error and nothing in the transcript. If a push is reported missing, first check the preamble ran and `notify_push` wasn't `false` — don't assume the tool misbehaved. (The desktop channel has no such trap: `pln-notify-desktop` is a plain script, always callable.)
+- **`PushNotification` never loaded, so the call silently does nothing** — it is commonly a deferred tool; "call `PushNotification`" at a site does nothing unless the Notification setup preamble already ran `ToolSearch` (`select:PushNotification`). This fails with no error and nothing in the transcript. (The desktop channel has no such trap: `pln-notify-desktop` is a plain script, always callable.)
 <!-- pln:endonly -->
 <!-- pln:only codex -->
 - **Calling the notifier by bare name, or through a variable a fresh shell doesn't have** — `pln-notify-desktop` is not on `PATH`, and `$_PLN_DIR` is resolved once in the preamble and gone by the next shell call. Every notify site runs the full path you resolved there. A bare `pln-notify-desktop` fails with `command not found`; `"$_PLN_DIR/bin/pln-notify-desktop"` in a later shell silently runs `/bin/pln-notify-desktop`, which doesn't exist either. Neither is visible to the user, who just doesn't get notified.

@@ -13,6 +13,13 @@ You are running the user's personal planning skill. Read every section of this f
 
 See Notifications (in Cross-cutting concerns) for the call sites and message format.
 
+<!-- pln:only claude -->
+**Agent authorization**: invoking pln — typing `/pln`, or asking for pln-style treatment in plain words, on every invocation in a session rather than only the first — is itself the request for `Agent` and `Workflow`. It authorizes every phase that spawns one, not implementation alone: Step 3's read-only research subagent, the record check included; Step 3.5's plan reviewer; Step 5's implementation run; and Step 7's verifier. A general standing instruction against launching workflows or subagents unprompted does not outrank it, because that instruction guards against the model starting a fan-out of its own accord. Step 5 carries the full resolution and the fallback for a session where `Workflow` is missing or refused.
+<!-- pln:endonly -->
+<!-- pln:only codex -->
+**Agent authorization**: invoking pln — typing `/pln`, or asking for pln-style treatment in plain words, on every invocation in a session rather than only the first — is itself the request for Codex's native multi-agent tools (`spawn_agent` and the rest). It authorizes every phase that spawns one, not implementation alone: Step 3's read-only research subagent, the record check included; Step 3.5's plan reviewer; Step 5's implementation run; and Step 7's verifier. A general standing instruction against spawning subagents unprompted does not outrank it, because that instruction guards against the model starting a fan-out of its own accord. See Spawning a fresh-context agent for what to do on an install where those tools are switched off.
+<!-- pln:endonly -->
+
 ## When to engage
 
 Engage automatically when the user:

@@ -74,7 +74,7 @@ During the planning session, act as a peer thinking through the problem with the
 
 Not every open choice is the user's to answer, and not every decision belongs in the plan. The interview's value is in the choices only the user can make; spending their attention on choices a capable implementer should own is the waste this section prevents. Route every open choice into one of three lanes using two checkable tests, not a gut feel about importance:
 
-- **Authority** — can you cite a concrete source that already decides this, by name? An existing pattern in the codebase, a documented convention, a framework idiom, a skill the project mandates, or a decision already made earlier in this plan. "Matches the existing `AWS_*` vars in this file" cites a real authority; "felt cleaner" cites only yourself. Treat whatever authority is present in this context as the source; never hardcode a particular framework's conventions into the skill.
+- **Authority** — can you cite a concrete source that already decides this, by name? An existing pattern in the codebase, a documented convention, a framework idiom, a skill the project mandates, a decision already made earlier in this plan, or a decision recorded in a plan from an earlier session (see Step 3's "Before asking, check the record"). A prior plan's decision is authority of the same kind as a convention in the code: it routes the choice to decide-and-disclose, so it reaches the user at the gate stated as overridable with its source named, not as a fresh question. "Matches the existing `AWS_*` vars in this file" cites a real authority; "felt cleaner" cites only yourself. Treat whatever authority is present in this context as the source; never hardcode a particular framework's conventions into the skill.
 - **Reversibility of consequence** — can you name what would have to depend on the choice before it could change? A migration against populated rows, a deployed config, an external party who has acted on it (a regulator, another team, a vendor approval), or a later plan item built on top of it. Cheap-to-retype is not the test; a one-line string already sent for approval is irreversible. Reversibility decays as the plan proceeds: the same call deserves a quiet decision at item 9 and a surfaced question at item 1, because more is built on top of it.
 
 Routing:
@@ -257,6 +257,15 @@ Before producing the initial plan, do all of:
    1. Read `CLAUDE.md` / `AGENTS.md` for a completion rule or "before pushing" section.
    2. If silent there, inspect `package.json` / `Cargo.toml` / `pyproject.toml` scripts and pick conventional names like `build`, `lint`, `test`, `spec`.
    3. If still ambiguous, ask the user once and save the answer to memory keyed by repo.
+6. Find where past decisions are recorded, if they are recorded anywhere. In-repo, that is a `./plans/` directory left by earlier `/pln` runs and a conventional architecture-decision directory (`docs/adr/`, `doc/adr/`, `adr/`, `decisions/`) — found by looking, with no configuration. A record kept outside the repository is named by `plan_corpus`:
+
+   ```bash
+   {{SKILL_DIR}}/bin/pln-config get plan_corpus
+   ```
+
+   The value is a path or a list of paths; `{{SKILL_DIR}}/bin/pln-config set plan_corpus <path>` sets it, and absent means in-repo only. The user can also name a location in the session, the way the plan review switch takes a spoken instruction, and that names it for this run without writing to config.
+
+   Note the locations in Pre-flight findings when there are any. This step finds where the record is; it does not read it. What the record says is checked one interview question at a time in Step 3, so nothing is summarized here. When there is no `./plans/`, no decision directory and no key, there is no record, Step 3's check does not run, and nothing is said about it.
 
 ### Step 2. Write the initial plan skeleton
 
@@ -355,6 +364,16 @@ Walk every item, in order, gathering what the implementer needs to do the work w
 4. Update the item's detail section in `PLAN.md` after each answered question, so the file becomes the durable record and nothing is lost if context compacts.
 5. When the item's ask-lane questions are answered, write the item's detail section: intent, constraints, acceptance criteria, the decisions other work depends on, and the disclosed decisions (each tagged with its authority or reversibility, and flagged if low-confidence). Don't write a step-by-step of reversible mechanics; see "One filter, two surfaces."
 6. Move to the next item. Repeat until every item has a written final-form detail section, or is marked ⏸ deferred / 🚫 dropped.
+
+**Before asking, check the record.** Where a project has planned this way for a while, its own plans are the decision record, and a question about something they already settle spends the user's attention on a matter that has an answer. So when Step 1 found a record, check it before each ask-lane question goes out, against that one question rather than against the item or the plan.
+
+Do the check in a read-only research subagent (see Spawning a fresh-context agent), never in this context. Its brief is the question, the record's locations, and the instruction to answer only whether the record settles that question and where — the `file:line` and the decision's own words. That is all that comes back; reading a corpus of past plans into the interview's context is what a fresh-context agent exists to prevent.
+
+A question the record answers is not asked. It becomes a disclosed decision naming where it was settled, and it reaches the user at the Step 4 gate as overridable like any other, because a prior plan's decision is a citable authority (see "What reaches the user"). A question the record does not answer is asked exactly as it would have been.
+
+**What the check is not.** It is not a test of whether this plan may contradict what was decided before. A `/pln` session exists to change existing behavior, and overturning an earlier decision is routinely the point of the work. So the check never adds a question, never vetoes anything, and never fires on a choice nobody is asking about — its whole job is removing a question, and it either removes one or it changes nothing.
+
+One thing it does raise. A decision already reflected in the codebase is not changed silently, whoever made it: where the plan reverses one, the item's section says which decision it reverses and where it was made, and that goes to the gate as a disclosure the user can act on rather than as a question that stops the interview.
 
 **How a decision is recorded.** The reviewer (Step 3.5) and every implementer get the plan and nothing else, so a decision has to mean the same thing to someone who never saw the interview as it did to the person who made it. A decision the user made is recorded as a pair, and marked as theirs so it is never confused with one made on their behalf:
 

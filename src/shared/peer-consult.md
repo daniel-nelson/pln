@@ -50,9 +50,10 @@ On yes, `"$PLN_BIN/pln-config" set peer_consent true` and run the same command a
 Reading the result:
 
 - **exit 0, `STATUS=ok`** — read `RESULT_FILE`. That text is the peer's whole answer and the only thing that should reach your context.
+- **exit 0, `STATUS=ready`** — a `--which` call, nothing sent: a peer is selected and consent is recorded. It is not rung 3's `none`, which is the no-peer case; the two statuses are distinct so a selection cannot be read as an empty ladder and the pass skipped for no reason.
 - **exit 5, `STATUS=consent`** — nothing was sent. Ask the one-time question above, record the answer, and either re-run or fall back.
 - **exit 3** — rung 3 above. `STATUS=declined` is the same fallback with a different cause: the user has peer consult switched off, so say that rather than "no peer available", which would read as a broken install.
 - **exit 4**, `STATUS=empty|timeout|error` — a peer was picked, ran, and failed. An empty answer is a failed peer, not a peer that found nothing; don't read `RESULT_FILE`. Fall back exactly as if the run had come back rung 3, and say in one line that the peer failed.
 - **`LOG_FILE`** is the peer's stderr and event trace. Never read it into your context — it exists for a post-mortem on a failed run.
 
-Say which rung ran, in a clause, wherever the result is reported: "reviewed by codex", "no peer available — reviewed by a fresh same-model agent". A reader weighs a finding differently depending on whose eyes were on it. `--which` reports the selection without running anything, for when that has to be known before the brief is assembled; it is gated the same way, so it answers `consent` too.
+Say which rung ran, in a clause, wherever the result is reported: "reviewed by codex", "no peer available — reviewed by a fresh same-model agent". A reader weighs a finding differently depending on whose eyes were on it. `--which` reports the selection without running anything, for when that has to be known before the brief is assembled; it takes neither `--brief` nor `--out`, and it is gated the same way, so it answers `consent` too.

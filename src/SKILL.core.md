@@ -442,9 +442,9 @@ None of the review is restated here. What the reviewer is told is The reviewer's
 
    Substitute that printed path everywhere below — every shell call starts a fresh shell, so the variable itself is gone by the next one.
 
-2. **Write the brief** to `$RUN/plan-review.brief.md`, the plan inlined whole, per The reviewer's brief. One file, whichever rung ends up running it.
+2. **Say one line before any of it runs**, naming who is about to read the plan — `"$PLN_BIN/pln-peer" --which` answers that with no brief written and nothing sent. This step sits between the user's last answer and the gate and can take minutes; unexplained silence there reads as a hung session. `STATUS=ready` names a peer; only rung 3's `none` means there is nobody to send to.
 
-3. **Say one line before it runs**, naming who is about to read the plan — `"$PLN_BIN/pln-peer" --which` answers that without sending anything. This step sits between the user's last answer and the gate and can take minutes; unexplained silence there reads as a hung session.
+3. **Write the brief** to `$RUN/plan-review.brief.md`, the plan inlined whole, per The reviewer's brief. One file, whichever rung ends up running it.
 
 4. **Run it**, and read what it prints per Consulting a peer model — including the one-time consent question, which is reached here on a machine that has never been asked:
 

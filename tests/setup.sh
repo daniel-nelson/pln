@@ -16,7 +16,7 @@
 # quietly finding something real.
 #
 # What it pins down, from the matrix in PLAN.md's item 1:
-#   - ready (rung 1 or 2, STATUS=none, exit 0) — no tip, flag set
+#   - ready (rung 1 or 2, STATUS=ready, exit 0) — no tip, flag set
 #   - consent pending (exit 5, STATUS=consent) — no tip, flag set
 #   - declined (exit 3, STATUS=declined) — no tip, flag set
 #   - nothing usable (exit 3, RUNG=3, STATUS=none) — the tip, flag left unset
@@ -74,7 +74,7 @@ cat > "$SKILL/bin/pln-peer" <<'FAKE_PEER'
 printf '%s\n' "$*" >> "${FAKE_PEER_LOG:-/dev/null}"
 case "${FAKE_PEER_SCENARIO:?FAKE_PEER_SCENARIO not set}" in
   ready)
-    printf 'RUNG=1\nPEER=fakepeer\nSTATUS=none\nRESULT_FILE=\nLOG_FILE=\n'
+    printf 'RUNG=1\nPEER=fakepeer\nSTATUS=ready\nRESULT_FILE=\nLOG_FILE=\n'
     exit 0 ;;
   consent)
     printf 'RUNG=2\nPEER=claude\nSTATUS=consent\nRESULT_FILE=\nLOG_FILE=\n'

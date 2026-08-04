@@ -182,7 +182,7 @@ The same brief goes to everyone who reads the plan — a peer CLI *and* a fresh 
 
 What the brief carries:
 
-- **The plan itself, inline and whole.** A peer may be a plain prompt-in, text-out CLI with no way to open a file, so the text goes in the brief rather than a path to it. Name `PLAN.md`'s path and the repository root as well, for a reviewer that *can* read — that is what makes checking the plan's claims possible at all.
+- **The plan itself, inline and whole.** A peer may be a plain prompt-in, text-out CLI with no way to open a file, so the text goes in the brief rather than a path to it. Name `PLAN.md`'s path and the repository root as well, for a reviewer that *can* read — that is what makes checking the plan's claims possible at all. Name the commit the tree is at too (`git rev-parse HEAD`): the plan's claims are about that state, and a reader that finds `HEAD` somewhere else can say the files have moved instead of reporting the difference as the plan's error.
 - **What a plan is**, in two lines, because the reviewer has likely never seen one: a dashboard plus one section per item, where each item is implemented by a fresh agent that reads that section and nothing else, and the sections record both the decisions the user made and the decisions the plan's author made on their behalf.
 - **The instruction to be adversarial**, with the reason this plan in particular needs it: it was written by the same model that ran the interview, so it carries that conversation's assumptions and cannot see them, and it is biased toward changes that feel productive. No praise, no inventory of what the plan gets right — the parts that are fine need no comment.
 - **Check the plan's factual claims against the files it names.** A plan asserting something untrue about the code it edits is the failure this step exists to catch, and it is invisible from inside the conversation that wrote it.
@@ -201,6 +201,9 @@ made and decisions the agent made on their behalf.
 
 Repository root: <path>. The plan file is <path to PLAN.md>. Read any file the
 plan names. If you cannot read files, say so per claim rather than guessing.
+The plan's claims describe the repository at commit <sha>. If HEAD is not that
+commit, the tree has moved past what the plan was written against: say so, and
+don't report the difference as a false claim in the plan.
 
 --- PLAN ---
 <the plan, verbatim and whole>
@@ -478,6 +481,8 @@ None of the review is restated here. What the reviewer is told is The reviewer's
 A reviewer that errored, timed out, or came back empty is a review that did not happen — not a review that found nothing. Take no findings from it, and say which of the two it was where the gate names who read the plan. With two readers that applies to each: one failing leaves the other's reading as the review, and the gate names what actually ran. Both failing is the no-review case, unchanged.
 
 The review runs once, on the finished plan. Re-showing it at the gate is not by itself a reason to read it again: a second pass over a document the user is in the middle of editing spends minutes producing findings about sentences that are still moving. What does earn another pass is a rewrite the user asked for at the gate, on the terms set out under Re-review after a rewrite in Step 4. A correction you applied yourself in response to a finding never does.
+
+**What the plan is checked against** is the tree as it stands before any item runs, and this step finishes before Step 5 starts. A review that overlaps implementation reads a repository the plan no longer describes: an item's own applied fix comes back as the pre-existing state, the plan is reported as wrong about the world, and the items still unbuilt yield nothing, so the half of the review that is still valid is the half that found nothing. Reviewing what implementation produced is a diff review and belongs to `/pln-pr`.
 
 ### Step 4. Master-plan approval gate
 

@@ -11,6 +11,8 @@ Write the brief to a file first and point `--brief` at it. The prompt never goes
 
 **The brief has to stand alone.** A peer may be a plain prompt-in, text-out CLI with no access to the repository at all, so the material being reviewed goes *in* the brief — the plan text, the diff — and the paths are named as well, for a peer that can read files. A brief that only says "review the plan at ./plans/…/PLAN.md" gets a competent answer from one peer and an invented one from another. Where the material is too large to inline whole, inline the part that carries the question and name the rest.
 
+**Naming the paths only helps while the tree still matches the material.** Asking a peer to check the brief's claims against the files it names holds while those files are still the state the material was written against, so send the commit the material was taken from alongside the paths. A peer reading a repository that has moved past that commit is reading someone else's edits and will report them as errors in the material.
+
 The helper prints exactly five lines and nothing else, so reading it costs almost no context:
 
 ```

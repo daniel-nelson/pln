@@ -66,7 +66,7 @@ During the planning session, act as a peer thinking through the problem with the
 - Push back when something seems off.
 - In the interview phase especially: ask one real question, share one specific reaction, surface one consideration, and stop. Wait for the user to develop the thought.
 
-**Exit condition:** switch from peer-exploration to execution when the user adopts the master plan at Step 4. Before that gate, stay in conversation.
+**Exit condition:** switch from peer-exploration to execution when the user adopts the master plan at Step 4 — or, in delegated mode, when they hand the interview over. Before that, stay in conversation.
 
 **The failure mode to watch for:** producing a wall of text in the moment a peer would have said "huh, interesting, what about X?" The approval gate exists so the user gets one coherent document to react to, not a stream of proposals.
 
@@ -105,6 +105,26 @@ Three intents the user can express in any phrasing:
 Common vocabulary: `defer`, `skip for now`, `come back to this`, `parking it`, `drop`, `abandon`, `forget it`, `not relevant`, `n/a`, `think about it`, `let me sit with it`, `offline`. Don't literal-match; infer the intent from natural phrasing.
 
 **Scope these intents to the item or question under discussion, never the whole session.** When one of these signals arrives mid-interview, it applies to the current item (or the specific sub-question being asked), not to the interview or the planning session as a whole. "drop" / "abandon" / "forget it" in answer to a question about item N means mark item N 🚫 dropped and continue to item N+1 — it does **not** mean exit the interview. The interview ends only when every item has been walked, or when the user unambiguously ends the whole session ("abandon the whole plan", "stop the session", "we're done here", "cancel everything") **and confirms it**, per Step 3's exit-confirmation rule — recognizing the language is never itself the exit. A bare one-word reply during an item discussion is scoped to that item by default; if you genuinely can't tell whether the user means the item or the session, ask one clarifying question rather than tearing down the session — exiting the interview is expensive to undo and re-establish, so the safe default is the narrow scope.
+
+### Delegated mode
+
+One further intent, and the only one scoped to the session rather than to the item: the user hands the rest of the interview over. "you decide", "stop asking me", "answer them yourself and build it". Infer it from natural phrasing like the three above, but read it as covering the whole interview — the agent resolves every remaining ask-lane question itself and goes on to implementation.
+
+**Only unambiguous session-wide phrasing enters it.** The narrow-scope default still governs everything else: "I don't know", "your call", "whatever's easiest" in answer to a question is an answer to that question, and the filter above already says what to do with it — indifference means the choice was decide-and-disclose, not ask. Where you can't tell whether the user means this question or the interview, ask one clarifying question. Entering the mode is expensive to undo, because after it there is almost nothing left that stops.
+
+**What the agent may decide from:** the decision record Step 1 found (see Step 3's "Before asking, check the record"), the code itself, the project's stated principles, and this session's own prompts and whatever they name. A question none of those answers is not one to invent an answer to — it goes on the short list below.
+
+**Every resolution is recorded** in its item's detail section as `**Decision (agent).**` with its cited authority and its reversibility, the way a decide-and-disclose call already is. The user reads them afterwards rather than at a gate, so that record is what they read.
+
+**Adoption is given once, in advance.** The instruction that entered the mode is the adoption signal for the run, so both prompts that would otherwise block are self-adopted: write the Step 2 skeleton and keep going, and move from the finished plan into Step 5 without showing it for approval. Record `Ship: PR after implementation` in the dashboard — the mode takes the implement-and-open-a-PR shape of Step 4's three-way prompt.
+
+**What still stops the run: one short list, printed before implementation starts.** Three things reach it, each resolved with the user before Step 5 begins:
+
+- A decision that reverses something already settled or already built, or one that cannot be undone. Record the reversals in the dashboard's Reversals section as well, so `/pln-pr` carries them into the PR body.
+- A Step 3.5 finding the review flagged rather than applied. Flagged findings are the gate's business (see What a finding becomes), and there is no gate here, so a flagged false factual claim would otherwise be built with nobody having seen it.
+- A question the sources above do not answer.
+
+Nothing waives that list, including a spoken "just go, don't check with me" — that instruction is what entering the mode already means, and the list is what it was traded against. A run with nothing on the list says so in one line and proceeds. Everything else runs without interruption, which is the point of the mode.
 
 ## Spawning a fresh-context agent
 
@@ -228,7 +248,7 @@ Steps 1–8 run in order, top to bottom. The skill has two distinct conversation
 
 - **Interview phase** (Step 3) — questions only, no code changes, no commits. Walks every item end-to-end, captures decisions in the master plan.
 - **Plan review** (Step 3.5) — a reader who never saw the interview argues with the finished plan before the user is asked to adopt it. Still no code changes; only `PLAN.md` is written to.
-- **Master-plan approval gate** (Step 4) — show the complete master plan, get a single yes-to-the-whole.
+- **Master-plan approval gate** (Step 4) — show the complete master plan, get a single yes-to-the-whole. Self-adopted in delegated mode, where that yes was given in advance.
 <!-- pln:only claude -->
 - **Implementation phase** (Step 5) — a thin orchestrator runs one Workflow script covering every item, sequentially, with `PLAN.md` as the spec. No more discussion questions; the only interruptions are a blocker threshold, which pauses and resumes the same run.
 <!-- pln:endonly -->
@@ -302,6 +322,10 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 
 - (not yet decided)
 
+## Reversals
+
+- (none)
+
 ## Verification
 
 - (not yet run)
@@ -333,7 +357,7 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 
 Items in the dashboard are one-line summaries. Detail sections are stub-brief at this point; they fill in during the interview and the per-item loop with Decisions, Commit, Open questions, Discoveries, Dead ends, Artifacts as the work unfolds.
 
-After writing the skeleton, **stop**. Show the user the dashboard (not the whole file) and prompt: "Plan written to `<path>`. Ready to start the interview?" If the user answers in the affirmative, begin the interview phase (Step 3).
+After writing the skeleton, **stop**. Show the user the dashboard (not the whole file) and prompt: "Plan written to `<path>`. Ready to start the interview?" If the user answers in the affirmative, begin the interview phase (Step 3). In delegated mode there is nothing to ask: show the dashboard and go straight into Step 3 (see Delegated mode).
 
 ### Step 3. Interview phase
 
@@ -373,7 +397,7 @@ A question the record answers is not asked. It becomes a disclosed decision nami
 
 **What the check is not.** It is not a test of whether this plan may contradict what was decided before. A `/pln` session exists to change existing behavior, and overturning an earlier decision is routinely the point of the work. So the check never adds a question, never vetoes anything, and never fires on a choice nobody is asking about — its whole job is removing a question, and it either removes one or it changes nothing.
 
-One thing it does raise. A decision already reflected in the codebase is not changed silently, whoever made it: where the plan reverses one, the item's section says which decision it reverses and where it was made, and that goes to the gate as a disclosure the user can act on rather than as a question that stops the interview.
+One thing it does raise. A decision already reflected in the codebase is not changed silently, whoever made it: where the plan reverses one, the item's section says which decision it reverses and where it was made, it gets a line in the dashboard's Reversals section, and it goes to the gate as a disclosure the user can act on rather than as a question that stops the interview.
 
 **How a decision is recorded.** The reviewer (Step 3.5) and every implementer get the plan and nothing else, so a decision has to mean the same thing to someone who never saw the interview as it did to the person who made it. A decision the user made is recorded as a pair, and marked as theirs so it is never confused with one made on their behalf:
 
@@ -472,7 +496,7 @@ This is the only place implementation-blocking approval lives. Possible response
 
 **Re-review after a rewrite.** An edit made through either response above counts as a rewrite of an item, for this purpose, when it changes that item's premise, intent, acceptance criteria, or a decision another item depends on. An edit that only tightens wording or fixes a typo does not. When one or more items are rewritten, re-run Step 3.5 bounded to just those items before re-showing the gate — not the whole plan again. Give the re-review each rewritten item's section plus the sections of any items whose own text names it as a dependency, so a cross-item contradiction the rewrite introduced is still catchable. The new pass's findings replace the rewritten item's prior findings entirely; findings on every other, untouched item stand as they were. Say in one line which items were re-reviewed before re-prompting.
 
-Do not enter Step 5 without an explicit adoption signal.
+Do not enter Step 5 without an explicit adoption signal. Delegated mode is the one exception, and only because the signal was already given: the instruction that entered it adopts the plan in advance for the whole run, and what that mode prints before Step 5 is its short list of reversals, one-way doors, flagged findings and unanswerable questions — not a gate.
 
 ### Step 5. Implementation phase
 
@@ -595,6 +619,8 @@ It does NOT bypass:
 - The Step 4 master-plan approval gate: explicit adoption is always required before implementation begins.
 - The four blocker thresholds: a subagent still stops and hands off on any of them. Auto mode only changes whether the orchestrator surfaces the blocker now or defers it.
 
+Delegated mode is the only thing that bypasses the first and third of those, and it does so because the user adopted the plan in advance (see Delegated mode). The two modes compose without cancelling each other: a run in both still stops for delegated mode's pre-implementation short list, and auto mode still defers a blocker to the end-of-run review rather than surfacing it live.
+
 ### Spinoffs
 
 Spawn a spinoff plan file when an item meets any of:
@@ -694,6 +720,7 @@ Top-of-file dashboard carries:
 - **Pre-flight findings** — mandated rules, persistent TODOs, verification commands discovered.
 - **Open questions** — questions asked but not yet answered (deferred sub-questions live here so nothing is lost).
 - **Ship** — the Step 4 adopt choice: `PR after implementation` or `implement only`, plus `PR base: <branch>` when a stacking override (item 4) applies. Set once, at adoption, and read back by Step 8 rather than trusted from the conversation — a restarted or resumed session still knows what was decided.
+- **Reversals** — one line per decision in this plan that overturns something already settled or already built: what it reverses, and where that was decided. `/pln-pr` reads it into the PR body, so a reversal reaches the branch's reviewer even when the user adopted the plan without reading it (see Delegated mode).
 - **Verification** — pass/fail per command at task end.
 - **Spinoffs** — links to any spinoff plan files.
 - **Cross-item notes** — one line per discovery a completed item makes that a later item needs (a constant to reuse, a field that changed, a trap not to repeat). Bounded and shared, not "read every earlier item's section" — it's part of the dashboard every subagent already reads in full regardless of plan size, so it stays cheap as the plan grows.

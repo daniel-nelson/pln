@@ -299,6 +299,8 @@ The commits, the push and the `gh`/`glab` calls are the orchestrator's own work 
 
 Assemble the PR body: what the branch does, then what's relevant to a reviewer — the final gauntlet result and the genuine follow-ups (Style's "Ending a message" bar), each one line. Drop the rest: a finding that got fixed needs no summary (the commit that fixed it is the record), and there is no "N findings, all fixed" tally. This is the same follow-up list the closing message uses — don't maintain a second one.
 
+One more section, when the branch came from a `/pln` run whose `PLAN.md` carries a non-empty Reversals list: render those lines under their own heading, one each, saying what the branch overturns and where it was originally decided. A decision that reverses something already settled is the part of a branch a reviewer most needs to see, and `/pln`'s delegated mode can adopt a plan the user never read.
+
 **Interpolate safely — never inline refs or the body into a shell command.** The base, branch, title, and PR body can all carry shell metacharacters (`$()`, backticks, quotes); a generated body assembled from findings especially so. Bind the refs to quoted shell variables, and write the body to a temp file passed by path — do not splice `<body>` into the command line:
 
 ```bash

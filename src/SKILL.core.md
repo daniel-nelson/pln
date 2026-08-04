@@ -313,11 +313,11 @@ Plan layout — top-of-file dashboard followed by per-item detail sections:
 
 ## Status
 
-- [ ] 1. <one-line summary> — pending
-- [ ] 2. <one-line summary> — pending
-- ⏸ 3. <one-line summary> — deferred → ./item-3-<slug>.md
-- [x] 4. <one-line summary> — done (commit <hash>)
-- 🚫 5. <one-line summary> — dropped
+1. <one-line summary> — ⬜ pending
+2. <one-line summary> — 🟦 in progress
+3. <one-line summary> — ⏸ deferred → ./item-3-<slug>.md
+4. <one-line summary> — ✅ done (commit <hash>)
+5. <one-line summary> — 🚫 dropped
 
 Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · 🚫 dropped
 
@@ -371,6 +371,10 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 
 …
 ```
+
+**One row shape, for all five states**: the number first, as the ordered list's own marker, then the summary, then the status at the end of the line. The number is the address every later step uses — the Step 4 gate's reply-by-number, a subagent's brief, a cross-item note — so it is a Markdown list number a client can reference rather than text nested inside a bullet.
+
+Rows are never removed and numbers are never reused. An item that is dropped or deferred keeps its row and its number, with its status trailing; deleting it would shift every number after it and stale every reference already written down or already spoken.
 
 Items in the dashboard are one-line summaries. Detail sections are stub-brief at this point; they fill in during the interview and the per-item loop with Decisions, Commit, Open questions, Discoveries, Dead ends, Artifacts as the work unfolds.
 
@@ -493,7 +497,7 @@ Show the user the master plan in one message, with enough in it to adopt on with
 
 - Print the dashboard (status list).
 - Print a digest of each item, in order: its title, what it does in a sentence or two, and any decision later items rest on. The detail sections stay in `PLAN.md` for the user to open; reprinting them here buries the numbered list below, which is the part that needs a reaction.
-- Print **one numbered list of everything the user can act on**: the decide-and-disclose calls made during the interview, and — when Step 3.5 ran — the corrections the review applied to the plan and the findings it flagged. One number space across all three kinds (so the user can reply "3, 7, 8" without saying which kind each is), laid out grouped under their parent item (e.g. "Item 4 → 7–9"), so the unit the user scans is the item they already know, not a flat wall of forty. Each entry is one line that opens with its kind, because the three interleave inside an item:
+- Print **one numbered list of everything the user can act on**: the decide-and-disclose calls made during the interview, and — when Step 3.5 ran — the corrections the review applied to the plan and the findings it flagged. One number space across all three kinds (so the user can reply "3, 7, 8" without saying which kind each is), laid out grouped under their parent item, named by number *and* title (e.g. "Item 4, refund on cancel → 7–9") per Naming things the user reads, so the unit the user scans is the item they already know, not a flat wall of forty. Each entry is one line that opens with its kind, because the three interleave inside an item:
   - ***decision*** — what was decided, with its cited rationale.
   - ***applied*** — what the plan said, what it says now, and the quote the correction rested on. All three, because the plan's own prose no longer shows what it replaced, and without the quote the user cannot tell a checked correction from a plausible one.
   - ***flagged*** — the finding in one sentence, what the reviewer would change, and which kind it is: a false factual claim, a contradiction inside the plan, or a judgment call.
@@ -744,7 +748,7 @@ Toggle any of these mid-session with `pln-config set <key> false` (or `true`); i
 
 Top-of-file dashboard carries:
 
-- **Status** — per-item one-line entries with status icon, summary, and (if done) commit hash.
+- **Status** — one numbered row per item: the number, the summary, then the status icon at the end of the line and (if done) the commit hash. Rows are never removed and numbers never reused, so an item's number is permanent (see Step 2).
 - **Pre-flight findings** — mandated rules, persistent TODOs, verification commands discovered.
 - **Open questions** — questions asked but not yet answered (deferred sub-questions live here so nothing is lost).
 - **Plan review** — one line per Step 3.5 round: which items it read, who read them, and what it turned up. The round the user is looking at is the last line, and the count is however many lines there are, so a re-showing gate and a resumed session both know how far the review got without reconstructing it from the conversation.

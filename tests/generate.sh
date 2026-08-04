@@ -363,6 +363,30 @@ done
 hasnt "$real_x/pln-pr/SKILL.md" 'no second one to consult' \
   "the codex build still says a peer cannot be consulted from this host"
 
+# ─── the dashboard skeleton ───────────────────────────────────────────────────
+# The skeleton in Step 2 is the shape every later step addresses items by: the
+# number is the list's own marker so a client can reference it, and the status
+# trails. Nothing else in either build pins it, so a row that drifts back to a
+# checkbox — where the number is text nested inside a bullet, and some renderers
+# relabel it a) b) c) — would ship silently. The sections are asserted here for
+# the same reason: each is written by one step and read by another.
+has "$real_c/SKILL.md" '1. <one-line summary> — ⬜ pending' \
+  "the claude build's dashboard row is not number-first with a trailing status"
+has "$real_x/SKILL.md" '1. <one-line summary> — ⬜ pending' \
+  "the codex build's dashboard row is not number-first with a trailing status"
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+  hasnt "$f" '- [ ] 1.' "$f still writes the dashboard as checkbox bullets"
+  has "$f" '5. <one-line summary> — 🚫 dropped' "$f lost a dashboard state from the skeleton"
+  has "$f" 'Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · 🚫 dropped' \
+    "$f lost the status legend, or its icons no longer match the rows"
+  has "$f" 'Rows are never removed and numbers are never reused' \
+    "$f does not say item numbers are permanent"
+  for section in '## Status' '## Pre-flight findings' '## Open questions' '## Plan review' \
+    '## Ship' '## Reversals' '## Verification' '## Spinoffs' '## Cross-item notes'; do
+    has "$f" "$section" "$f lost '$section' from the dashboard skeleton"
+  done
+done
+
 # ─── the plan review, as skill text ───────────────────────────────────────────
 # Step 3.5 and the three sections it runs in order are prose a model reads, not
 # code — there is no entry point a bash test could drive. So what is asserted is

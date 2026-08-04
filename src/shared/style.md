@@ -74,6 +74,10 @@ The work-completed line does not summarize the diff. It says what was done and s
 
 Say what a thing is, not the handle that points at it. An item number, decision number, question number, line number or commit hash is an address into a file the user does not have open, so it never stands alone as the name for something. Pair it with the thing, as in "item 7, option descriptions", or leave it out.
 
+**A bare item number is never a name for the item.** Not in an aside, not in a reaction line, not in a numbered list at an approval gate — every time an item number is written for the user, its title travels with it. This is a requirement, not a preference: by the time you refer back to item 12 the dashboard is several screens up, and the number alone makes the user go and find it.
+
+One thing is exempt, and only it: a list of numbers whose whole job is to index a numbered list printed in the same message — an approval gate's "worth a look: 3, 7, 12" — where the titles are already on screen a few lines above and the point is one thing to scan and one way to reply. An entry inside such a list has no title of its own, so it pairs with its parent item's number and title instead.
+
 This holds everywhere the user reads what you wrote: interview questions, echo lines, blocker questions, approval gates, findings.
 
 ### What each answer changes

@@ -212,7 +212,7 @@ A finding is applied only when all three of these hold. Failing any one of them 
 
 - **It is a false factual claim, or a contradiction between two parts of the plan.** Those are the two kinds where being right is checkable without knowing what the user wants. Anything turning on taste, risk appetite or domain knowledge is a judgment call and is flagged. The reviewer's own kind label is a claim, not a verdict — read the finding and decide the kind yourself. A stranger to the interview files a decision it disagrees with as a factual error routinely.
 - **It quotes what it rests on, and the quote is real.** `file:line` plus the verbatim text for a claim about the repository; the plan's own sentence for a contradiction between two of its parts. Open the file at that line and confirm the text is there before applying anything — a peer with no way to read the repository can still produce a well-formed, confident, invented citation, and that is exactly the finding that would otherwise land in the plan with nobody having seen it. An unquoted finding is flagged however certain it reads, and so is one the reviewer itself reported as unverified. Confidence is not evidence.
-- **It does not land on a decision the user made.** The plan marks those as theirs (see "How a decision is recorded" in Step 3) — look for a decision recorded as the user's rather than matching a fixed string, since the marker is a convention and not a syntax.
+- **It does not land on a decision the user made.** The plan marks those as theirs (see "How a decision is recorded" in Step 3) — look for a decision recorded as the user's rather than matching a fixed string, since the marker is a convention and not a syntax. One the user selected from options the agent wrote is as much theirs as one they raised themselves; that distinction changes how a decision is quoted back, never whether it is protected.
 
 **Why a user decision is never moved.** A choice reached the user in the first place because nothing already decided it and the deciding reason lived in their head: a domain fact, taste, risk appetite, business context. Correcting a fact underneath such a decision does not settle it — it gives the user something new to weigh, and whether that changes the answer is theirs. This is the blocker protocol one phase earlier: an implementer that discovers the plan won't work as written stops and hands the question back instead of deciding it, and a reviewer that discovers a decision rested on something false is the same event, found sooner. The correction is not lost — it goes to the gate flagged, with its quote, so reopening the decision there costs one reply.
 
@@ -364,13 +364,22 @@ Walk every item, in order, gathering what the implementer needs to do the work w
 A bare selector with nothing after it is recorded as a bare choice, and the record says so: write "no reason given" and leave it at that. Never attach a rationale the user didn't give. An invented one is indistinguishable from a real one, and the next reader — the reviewer, or an implementer weighing whether a hard failure justifies departing from the plan — treats it as something the user would defend.
 
 ```
-**Decision (user).** *Flag for review* — the cancel action marks the payment for a
-person to refund. In their words: "b, but the queue has to be per-property or
-support will never look at it."
+**Decision (user, selected).** *Flag for review* — the cancel action marks the
+payment for a person to refund. In their words: "b, but the queue has to be
+per-property or support will never look at it." (Option text written by the agent.)
 
-**Decision (user).** *Refund on cancel* — the cancel action issues the refund and
-marks the payment refunded. No reason given.
+**Decision (user, selected).** *Refund on cancel* — the cancel action issues the
+refund and marks the payment refunded. No reason given. (Option text written by
+the agent.)
+
+**Decision (user, originated).** *No refund after check-in* — a cancellation past
+the check-in time keeps the charge. In their words: "we've never refunded those
+and I'm not starting now."
 ```
+
+**Which of the two it was.** A decision the user raised themselves and a decision they picked from options the agent wrote are different evidence, so the marker says which: `**Decision (user, originated).**` where the substance came from them, `**Decision (user, selected).**` where they chose from a list the agent wrote, and `**Decision (agent).**` for one made on their behalf. Plain `Decision (user)` is retired. A selected decision also records that the option text is the agent's, in a short parenthesis after the qualifier, so a reader can tell whose sentence they are looking at.
+
+Both user forms carry the same weight. The reviewer never applies a finding over either (see "What a finding becomes"), and every rule that protects a decision because the user made it protects both, unchanged. What differs is how the decision is cited: a later turn leaning on a selected decision says the agent wrote the wording, and never quotes the option line back as the user's own words. Their words are the part after the selector, and only that part. An interview asks enough questions that agreeing to a proposal is not the same as having written it, and a reader who is told otherwise defends a sentence they never composed.
 
 Cross-item interactions are normal during the interview. If answering item N's question forces a change to item M's detail (already written), update M in place and tell the user one short line: "Item M revised to match: <one-line summary>."
 
@@ -674,7 +683,7 @@ Per-item detail sections carry:
 
 - Status.
 - Intent, constraints, and acceptance criteria — what "done" means, not how each line gets written.
-- Decisions — each a *what* + *why*, tagged with its authority or its reversibility, and flagged if low-confidence (the flag is what puts it on the Step 4 gate's "worth a look" line). Recorded as overridable-when-reversible context, never as imperative steps. The ones the user made are marked as theirs and written in their words — see "How a decision is recorded" in Step 3.
+- Decisions — each a *what* + *why*, tagged with its authority or its reversibility, and flagged if low-confidence (the flag is what puts it on the Step 4 gate's "worth a look" line). Recorded as overridable-when-reversible context, never as imperative steps. The ones the user made are marked as theirs — originated where they raised the substance, selected where they picked from options the agent wrote — and written in their words. See "How a decision is recorded" in Step 3.
 - Commit hash if any.
 - **Review findings** — what the plan review (Step 3.5) corrected in this section, and what it flagged for the user instead. See "What a finding becomes".
 - Discoveries (mid-item findings worth recording).

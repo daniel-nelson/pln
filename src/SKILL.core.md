@@ -320,6 +320,10 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 
 - (none yet)
 
+## Plan review
+
+- (not yet run)
+
 ## Ship
 
 - (not yet decided)
@@ -458,7 +462,7 @@ None of the review is restated here. What the reviewer is told is The reviewer's
 
 5. **Review the plan on a fresh same-model agent as well**, on that same brief file, whether or not a peer ran — and where one did, at the same time as it rather than after (see the host note below). The two readers fail differently, which is the whole reason for both: the same-model agent shares this model's priors, so it is strong on whether the plan contradicts itself and whether its claims about the code are true, and blind to what the model family assumes; a peer carries neither those priors nor this codebase's idiom. `/pln-pr`'s cross-model pass skips at rung 3 because a different model is its whole point; this step's point is a reader who never saw the interview, and a fresh agent of the same model is exactly that. So exit 3 (no peer on the machine, or peer consult switched off), exit 4 (a peer was picked, ran, and failed), and a spoken "keep this one local" all leave this reader as the whole review, and none of them is a degraded run.
 
-6. **File the findings**, both readers' together, per What a finding becomes: applied into the plan's own prose, or flagged, and either way recorded in its item's detail section before moving on — merged first, so a defect both readers raised is one record naming both. That record is what survives a compaction between here and the gate. Then go to Step 4.
+6. **File the findings**, both readers' together, per What a finding becomes: applied into the plan's own prose, or flagged, and either way recorded in its item's detail section before moving on — merged first, so a defect both readers raised is one record naming both. That record is what survives a compaction between here and the gate. Add the round's line to the dashboard's Plan review section as well — which items were read, by whom, what came back — so a later round counts from the record rather than from memory. Then go to Step 4.
 
 **Spawning the same-model reviewer on this host, and running it alongside the peer:**
 
@@ -466,7 +470,7 @@ None of the review is restated here. What the reviewer is told is The reviewer's
 
 A reviewer that errored, timed out, or came back empty is a review that did not happen — not a review that found nothing. Take no findings from it, and say which of the two it was where the gate names who read the plan. With two readers that applies to each: one failing leaves the other's reading as the review, and the gate names what actually ran. Both failing is the no-review case, unchanged.
 
-The review runs once, on the finished plan. Re-showing the plan at the gate — after a reopened decision, a reverted correction, a "change X" — does not re-run it: a second pass over a document the user is in the middle of editing spends minutes to produce findings about sentences that are mid-edit. Run it again only if the user asks.
+The review runs once, on the finished plan. Re-showing it at the gate is not by itself a reason to read it again: a second pass over a document the user is in the middle of editing spends minutes producing findings about sentences that are still moving. What does earn another pass is a rewrite the user asked for at the gate, on the terms set out under Re-review after a rewrite in Step 4. A correction you applied yourself in response to a finding never does.
 
 ### Step 4. Master-plan approval gate
 
@@ -498,7 +502,11 @@ This is the only place implementation-blocking approval lives. Possible response
 - *Reopen by number* (e.g. "3, 7, 8") — any entry, of any kind. A **decision** returns to the one-question-at-a-time interview, exactly like Step 3, but starting from the recorded position and its rationale, not a blank question ("I chose X because Y; here's the tradeoff; what would you change?"). An **applied** correction is shown with what it replaced, and reverted if the user says so — the record in the item's detail section is what makes that one edit instead of a reconstruction. A **flagged** finding becomes an interview question of the same shape: what the reviewer found, what it would change, what the user wants done. Resolve each, update `PLAN.md`, re-show, re-prompt. Unlisted entries remain accepted.
 - *Change X* — make the change in `PLAN.md`, re-show the affected section(s), re-prompt the same three-way question. Loop until the user adopts.
 
-**Re-review after a rewrite.** An edit made through either response above counts as a rewrite of an item, for this purpose, when it changes that item's premise, intent, acceptance criteria, or a decision another item depends on. An edit that only tightens wording or fixes a typo does not. When one or more items are rewritten, re-run Step 3.5 bounded to just those items before re-showing the gate — not the whole plan again. Give the re-review each rewritten item's section plus the sections of any items whose own text names it as a dependency, so a cross-item contradiction the rewrite introduced is still catchable. The new pass's findings replace the rewritten item's prior findings entirely; findings on every other, untouched item stand as they were. Say in one line which items were re-reviewed before re-prompting.
+**Re-review after a rewrite.** Both responses above are the user changing the plan, and a change the user made is the only thing that starts another round. An edit made through either counts as a rewrite of an item, for this purpose, when it changes that item's premise, intent, acceptance criteria, or a decision another item depends on. An edit that only tightens wording, fixes a typo, or is otherwise trivially correct does not. Neither does a correction you made yourself to apply a review finding: an applied correction is finished once it is applied and recorded in its item's section, and reading your own response to a reviewer is the loop that has no end. So an item a correction touched and the user did not is not a changed item here.
+
+When one or more items are rewritten, re-run Step 3.5 bounded to just those items before re-showing the gate — not the whole plan again. Give the re-review each rewritten item's section plus the sections of any items whose own text names it as a dependency, so a cross-item contradiction the rewrite introduced is still catchable. The new pass's findings replace the rewritten item's prior findings entirely; findings on every other, untouched item stand as they were. Say in one line which items were re-reviewed before re-prompting, and record the round in the dashboard's Plan review section.
+
+**When the rounds stop.** Coverage decides this, not cost. They stop when every item the user changed has been read since they changed it and that latest reading found no false factual claim and no contradiction inside the plan. A judgment call earns no further round; it goes to the gate flagged like any other finding. There is no round cap and none is needed — only the user's own edits start a round, so the rounds end when the user stops editing. A cap would end them somewhere else instead, leaving whatever the last rewrite introduced unread.
 
 Do not enter Step 5 without an explicit adoption signal. Delegated mode is the one exception, and only because the signal was already given: the instruction that entered it adopts the plan in advance for the whole run, and what that mode prints before Step 5 is its short list of reversals, one-way doors, flagged findings and unanswerable questions — not a gate.
 
@@ -723,6 +731,7 @@ Top-of-file dashboard carries:
 - **Status** — per-item one-line entries with status icon, summary, and (if done) commit hash.
 - **Pre-flight findings** — mandated rules, persistent TODOs, verification commands discovered.
 - **Open questions** — questions asked but not yet answered (deferred sub-questions live here so nothing is lost).
+- **Plan review** — one line per Step 3.5 round: which items it read, who read them, and what it turned up. The round the user is looking at is the last line, and the count is however many lines there are, so a re-showing gate and a resumed session both know how far the review got without reconstructing it from the conversation.
 - **Ship** — the Step 4 adopt choice: `PR after implementation` or `implement only`, plus `PR base: <branch>` when a stacking override (item 4) applies. Set once, at adoption, and read back by Step 8 rather than trusted from the conversation — a restarted or resumed session still knows what was decided.
 - **Reversals** — one line per decision in this plan that overturns something already settled or already built: what it reverses, and where that was decided. `/pln-pr` reads it into the PR body, so a reversal reaches the branch's reviewer even when the user adopted the plan without reading it (see Delegated mode).
 - **Verification** — pass/fail per command at task end.

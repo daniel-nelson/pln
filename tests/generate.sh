@@ -329,6 +329,25 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   has "$f" '### Echoing recorded decisions' "$f lost the shared formatting rules"
 done
 
+# The to-do-location flow is one source per host, included by both skills — a
+# follow-up recorded by one and only offered by the other would be the same bug
+# the write-by-default rule exists to fix. The global instructions file it reads
+# is the one host-specific part, so each build must name its own path.
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" 'The to-do-location flow' "$f lost the to-do-location flow"
+  has "$f" 'without asking' "$f does not record follow-ups without asking"
+done
+# The end-of-run sweep is the other half of that flow, shared the same way: a
+# close that never looks at the run's own record reports whatever it happens to
+# remember, and the to-do-location flow then has nothing to write.
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" "Sweep the run's own record" "$f lost the end-of-run sweep"
+  has "$f" 'nothing outstanding says so' "$f does not report an empty sweep"
+done
+
+has "$real_c/SKILL.md" '~/.claude/CLAUDE.md' "the claude build reads no global instructions file"
+has "$real_x/SKILL.md" '$CODEX_HOME/AGENTS.md' "the codex build reads no global instructions file"
+
 # The peer ladder is one shared source both skills read, and the property that
 # matters is that neither carries probe logic of its own: every build of both
 # targets reaches the peer through the same helper, behind the same one-time
@@ -343,6 +362,30 @@ done
 # Codex exactly as it reaches for `codex` from Claude.
 hasnt "$real_x/pln-pr/SKILL.md" 'no second one to consult' \
   "the codex build still says a peer cannot be consulted from this host"
+
+# ─── the dashboard skeleton ───────────────────────────────────────────────────
+# The skeleton in Step 2 is the shape every later step addresses items by: the
+# number is the list's own marker so a client can reference it, and the status
+# trails. Nothing else in either build pins it, so a row that drifts back to a
+# checkbox — where the number is text nested inside a bullet, and some renderers
+# relabel it a) b) c) — would ship silently. The sections are asserted here for
+# the same reason: each is written by one step and read by another.
+has "$real_c/SKILL.md" '1. <one-line summary> — ⬜ pending' \
+  "the claude build's dashboard row is not number-first with a trailing status"
+has "$real_x/SKILL.md" '1. <one-line summary> — ⬜ pending' \
+  "the codex build's dashboard row is not number-first with a trailing status"
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+  hasnt "$f" '- [ ] 1.' "$f still writes the dashboard as checkbox bullets"
+  has "$f" '5. <one-line summary> — 🚫 dropped' "$f lost a dashboard state from the skeleton"
+  has "$f" 'Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · 🚫 dropped' \
+    "$f lost the status legend, or its icons no longer match the rows"
+  has "$f" 'Rows are never removed and numbers are never reused' \
+    "$f does not say item numbers are permanent"
+  for section in '## Status' '## Pre-flight findings' '## Open questions' '## Plan review' \
+    '## Ship' '## Reversals' '## Verification' '## Spinoffs' '## Cross-item notes'; do
+    has "$f" "$section" "$f lost '$section' from the dashboard skeleton"
+  done
+done
 
 # ─── the plan review, as skill text ───────────────────────────────────────────
 # Step 3.5 and the three sections it runs in order are prose a model reads, not
@@ -370,23 +413,30 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
   has "$f" 'How a decision is recorded' "$f lost the rule that makes the plan readable alone"
 done
 
-# The rung-3 reviewer is spawned on this host, so that block — and only that
-# block — differs between the builds. Each must carry its own spawn and point at
-# the same brief file the peer would have been handed.
+# The same-model reviewer is spawned on this host, so that block — and only that
+# block — differs between the builds. Each must carry its own spawn, point at the
+# same brief file the peer would have been handed, and say how to run it
+# alongside the peer rather than after it.
 spawn_of() { # spawn_of <file>
-  awk '/^\*\*Spawning the rung-3 reviewer/,/^A reviewer that errored/' "$1"
+  awk '/^\*\*Spawning the same-model reviewer/,/^A reviewer that errored/' "$1"
 }
 spawn_c="$(spawn_of "$real_c/SKILL.md")"
 spawn_x="$(spawn_of "$real_x/SKILL.md")"
-[ -n "$spawn_c" ] || fail "the claude build has no rung-3 spawn block"
-[ -n "$spawn_x" ] || fail "the codex build has no rung-3 spawn block"
-grep -qF 'agentType' <<<"$spawn_c" || fail "the claude build's rung-3 reviewer is not a harness agent"
-grep -qF 'pln-codex-agent' <<<"$spawn_x" || fail "the codex build's rung-3 reviewer is not a codex spawn"
-grep -qF 'read-only' <<<"$spawn_x" || fail "the codex build's rung-3 reviewer is not read-only"
+[ -n "$spawn_c" ] || fail "the claude build has no same-model spawn block"
+[ -n "$spawn_x" ] || fail "the codex build has no same-model spawn block"
+grep -qF 'agentType' <<<"$spawn_c" || fail "the claude build's reviewer is not a harness agent"
+grep -qF 'pln-codex-agent' <<<"$spawn_x" || fail "the codex build's reviewer is not a codex spawn"
+grep -qF 'read-only' <<<"$spawn_x" || fail "the codex build's reviewer is not read-only"
 grep -qF 'brief file' <<<"$spawn_c" \
-  || fail "the claude build's rung-3 reviewer is not pointed at the brief file"
+  || fail "the claude build's reviewer is not pointed at the brief file"
 grep -qF 'plan-review.brief.md' <<<"$spawn_x" \
-  || fail "the codex build's rung-3 reviewer is not handed the brief the peer would have had"
+  || fail "the codex build's reviewer is not handed the brief the peer would have had"
+grep -qF 'run_in_background' <<<"$spawn_c" \
+  || fail "the claude build does not say how to run the reviewer alongside the peer"
+grep -qF 'Alongside the peer' <<<"$spawn_x" \
+  || fail "the codex build does not say how to run the reviewer alongside the peer"
+grep -qF 'wait_agent' <<<"$spawn_x" \
+  || fail "the codex build's concurrency seam is not the native wait loop"
 
 # ─── and nothing above touched the working tree ───────────────────────────────
 if [ -d "$REPO_DIR/.git" ]; then

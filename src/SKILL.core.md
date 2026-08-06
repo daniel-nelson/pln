@@ -527,15 +527,22 @@ Show the user the master plan in one message, with enough in it to adopt on with
   A finding that lands on the plan as a whole rather than on any one item — a missing item, an ordering that won't work — is numbered in the same sequence, in a final group of its own after the per-item ones. It is in the dashboard's Open questions, not in an item's section, but it is one of the things the user can act on, so it gets a number like everything else.
 - When Step 3.5 ran, say in one clause who read the plan: the peer CLI by name and a fresh agent of the same model when both ran, or whichever one did — and when no peer read it, why (no second CLI on this machine, peer consult switched off, you were asked to keep this plan local for this run, or the peer ran and failed). The user weighs a flagged finding differently depending on whose eyes were on the plan. A review that found nothing gets the same one clause and no more; saying nothing reads as if the step never ran.
 - Self-triage the list; don't present forty entries as equals. Lead with the handful you're least sure about and flag them for the user's eye ("worth a look: 3, 7, 12"). One triage line covers the whole list rather than one per kind — the single number space exists so there is one thing to scan and one way to reply. What earns a place on it differs by kind: a decision closest to the ask/decide line, or whose authority is weakest or whose reversibility you're least certain of; an applied correction that changed something an item's acceptance criteria rest on; a flagged finding that would change what gets built. The rest stand as a scannable, cited list the user can skim or ignore. The risk to avoid is a miscalibrated "all safe here" that buries an entry the user would have changed; when genuinely unsure, flag rather than bury. Then offer to walk the flagged entries one at a time (see Walking the flagged entries below), so the user answers them where they are told about them instead of scrolling back up a forty-entry list to reply by number. The offer rides here, with the triage line — never after the prompt below, which stays the message's last line.
-- End with a three-way prompt: "Adopt this master plan — 1) implement it and open a PR when done, 2) implement it only, or 3) reopen anything by number / change something?"
+- End with a three-way prompt, one option per line:
+
+  ```
+  Adopt this master plan?
+  a) implement it and open a PR when done
+  b) implement only
+  c) reopen anything by number / change something?
+  ```
 
 **When no review ran** — `plan_review` is off, the user skipped it, or the plan was written before the step existed — none of the review's part of this appears: no rung clause, no empty findings list, and no note explaining what didn't happen. The numbered list is the disclosed decisions and nothing else, exactly the gate it was before the step existed.
 
 This is the only place implementation-blocking approval lives. Possible responses:
 
 - *Adopt* — either of the two shapes below. Either way, every numbered entry not reopened stands as accepted: decisions hold, applied corrections stay in the plan, flagged findings were seen and left alone. Proceed to Step 5.
-  - **1) Implement and open a PR when done.** Record `Ship: PR after implementation` in the dashboard's Ship field, plus `PR base: <branch>` when item 4's stacking override applies. This answers Step 8's ask up front: Step 7's wrap-up hands straight to `/pln-pr` with no further prompt.
-  - **2) Implement only.** Record `Ship: implement only` in the dashboard's Ship field. Step 8 still asks once, at the end of Step 7's wrap-up, exactly as it did before this choice existed.
+  - **a) Implement and open a PR when done.** Record `Ship: PR after implementation` in the dashboard's Ship field, plus `PR base: <branch>` when item 4's stacking override applies. This answers Step 8's ask up front: Step 7's wrap-up hands straight to `/pln-pr` with no further prompt.
+  - **b) Implement only.** Record `Ship: implement only` in the dashboard's Ship field. Step 8 still asks once, at the end of Step 7's wrap-up, exactly as it did before this choice existed.
 - *Reopen by number* (e.g. "3, 7, 8") — any entry, of any kind. A **decision** returns to the one-question-at-a-time interview, exactly like Step 3, but starting from the recorded position and its rationale, not a blank question ("I chose X because Y; here's the tradeoff; what would you change?"). An **applied** correction is shown with what it replaced, and reverted if the user says so — the record in the item's detail section is what makes that one edit instead of a reconstruction, and the revert is re-read to confirm it landed, per Confirm the write landed. A **flagged** finding becomes an interview question of the same shape: what the reviewer found, what it would change, what the user wants done. Resolve each, update `PLAN.md`, re-show, re-prompt. Unlisted entries remain accepted.
 - *Change X* — make the change in `PLAN.md`, re-show the affected section(s), re-prompt the same three-way question. Loop until the user adopts.
 

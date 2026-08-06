@@ -66,11 +66,17 @@ The work-completed line does not summarize the diff. It says what was done and s
 
 **A wrap-up is a complete answer, not a summary of one.** Never end it with a pointer to a file for the rest — "see `PLAN.md`", "full detail in `REVIEW.md`" — the user does not open either afterward. Say what happened and what's left, in the message itself.
 
-**The follow-up bar.** A follow-up belongs in a wrap-up's closing bullet list only if both hold: it is not done, and someone will need to act on it or decide about it later. A trivial nit, a "checked, it's fine" note, or a vague someday-maybe with no concrete trigger does not qualify — drop it, or, if worth keeping at all, leave it as an internal note in `PLAN.md`/`REVIEW.md` and never surface it. A finding that got fixed is not a follow-up either — the commit that fixed it is the record; skip the "N found, all fixed" tally. When genuine follow-ups exist, list them as a short bullet list in the closing message itself, one line each — enough to know what each one is, with no link standing in for that sentence.
+**A question about state is answered as of the moment it was asked.** Closing the gap between the question and the answer does not make the answer yes — "yes, it is now" reports the present in reply to a question about the past. Say what was true when they asked, then what you changed since, as two facts. The user is judging whether the run can be trusted, and an answer that quietly repairs itself takes that judgment away from them.
+
+**The follow-up bar.** A follow-up belongs in a wrap-up's closing bullet list only if all three hold: its factual claim is true, it is not done, and someone will need to act on it or decide about it later. Check the claim before listing it rather than recalling it — a follow-up describes the state of the world, and a wrong one either sends someone to redo finished work or hides a real gap. A trivial nit, a "checked, it's fine" note, or a vague someday-maybe with no concrete trigger does not qualify — drop it, or, if worth keeping at all, leave it as an internal note in `PLAN.md`/`REVIEW.md` and never surface it. A finding that got fixed is not a follow-up either — the commit that fixed it is the record; skip the "N found, all fixed" tally. When genuine follow-ups exist, list them as a short bullet list in the closing message itself, one line each — enough to know what each one is, with no link standing in for that sentence.
 
 ### Naming things the user reads
 
 Say what a thing is, not the handle that points at it. An item number, decision number, question number, line number or commit hash is an address into a file the user does not have open, so it never stands alone as the name for something. Pair it with the thing, as in "item 7, option descriptions", or leave it out.
+
+**A bare item number is never a name for the item.** Not in an aside, not in a reaction line, not in a numbered list at an approval gate — every time an item number is written for the user, its title travels with it. This is a requirement, not a preference: by the time you refer back to item 12 the dashboard is several screens up, and the number alone makes the user go and find it.
+
+One thing is exempt, and only it: a list of numbers whose whole job is to index a numbered list printed in the same message — an approval gate's "worth a look: 3, 7, 12" — where the titles are already on screen a few lines above and the point is one thing to scan and one way to reply. An entry inside such a list has no title of its own, so it pairs with its parent item's number and title instead.
 
 This holds everywhere the user reads what you wrote: interview questions, echo lines, blocker questions, approval gates, findings.
 

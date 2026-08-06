@@ -1,3 +1,5 @@
 One `Agent` call with `agentType: 'general-purpose'` (see Spawning a fresh-context agent), whose prompt points it at the brief file: "Read `<path to the brief>` in full and follow it. Your final message is your findings, in the shape the brief asks for." Point at the file rather than pasting its text back in — a same-model agent on this host can open it, the brief already carries the plan whole, and this way the reviewer reads byte-for-byte what a peer would have been sent.
 
 The call's return value is that final message, and it is the only thing that reaches your context.
+
+**Alongside the peer.** Where a peer ran too, start its shell call (step 4) in the background — `Bash` with `run_in_background: true` — and make this `Agent` call in the same turn without waiting on the peer. The `Agent` call is what blocks; the peer runs while it does, so the step costs the slower reader rather than the sum of the two. Read the helper's five lines and its `--out` file once the agent has returned. Where a background shell call isn't available, run them in sequence: the review is the same, it just costs both.

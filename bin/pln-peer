@@ -40,9 +40,12 @@
 #
 # Usage:
 #   pln-peer --brief <file> --out <file> [options]
-#   pln-peer --which                     report the selection, run nothing (and
-#                                        still report `consent` when the
-#                                        one-time question is unanswered)
+#   pln-peer --which                     report the selection, run nothing —
+#                                        `STATUS=ready` when a peer is picked
+#                                        and consented, `consent` when the
+#                                        one-time question is unanswered, and
+#                                        rung 3's `none` only when there is
+#                                        genuinely nobody to send to
 #
 #   --brief FILE     the peer's entire prompt (required unless --which).
 #   --out FILE       where the peer's answer is written (required unless
@@ -68,7 +71,7 @@
 #
 #   RUNG=1|2|3
 #   PEER=<the command that ran, or 'none' on rung 3>
-#   STATUS=ok|empty|timeout|error|none|consent|declined
+#   STATUS=ok|ready|empty|timeout|error|none|consent|declined
 #   RESULT_FILE=<path, empty on rung 3>
 #   LOG_FILE=<path, empty on rung 3>
 #
@@ -247,7 +250,9 @@ case "$(printf '%s' "$CONSENT" | tr '[:upper:]' '[:lower:]')" in
 esac
 
 if [ "$WHICH" = "1" ]; then
-  report "$RUNG" "$PEER_LABEL" none "" ""
+  # `ready`, not `none`: rung 3 reports `none` for the genuine no-peer case, and
+  # a caller that saw the same string here read a working peer as a missing one.
+  report "$RUNG" "$PEER_LABEL" ready "" ""
   exit 0
 fi
 

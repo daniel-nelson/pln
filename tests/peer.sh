@@ -18,6 +18,9 @@
 #     lets a run through, and nothing is sent in any state until it is granted
 #     — `--which` and `--dry-run` included, because both name another vendor's
 #     CLI as a destination.
+#   - `--which` reporting a selection (`STATUS=ready`) and an empty ladder
+#     (rung 3, `STATUS=none`) as two different things, so neither can be read
+#     as the other.
 #   - a peer that is absent, unauthenticated, empty, failed, timed out, or
 #     answering with malformed output is a fallback or a failed run, never a
 #     review.
@@ -210,14 +213,24 @@ nothing_ran "the skip-the-host rule"
 
 # --- rung 2, both directions --------------------------------------------------
 peer "$BOTH" --host claude --which
-expect 2 codex none 0 "a Claude host reaching for codex"
+expect 2 codex ready 0 "a Claude host reaching for codex"
+SELECTED_STATUS="$(field STATUS)"
 peer "$BOTH" --host codex --which
-expect 2 claude none 0 "a Codex host reaching for claude"
+expect 2 claude ready 0 "a Codex host reaching for claude"
+
+# A selection is not an empty ladder. The two once shared STATUS=none, and a
+# caller read a peer that was installed, authenticated and consented as "no peer
+# available" and skipped the cross-model review over it.
+peer "$NEITHER" --host claude --which
+expect 3 none none 3 "--which with nobody to send to"
+if [ "$SELECTED_STATUS" = "$(field STATUS)" ]; then
+  fail "a selected peer and an empty ladder report the same STATUS ($SELECTED_STATUS)"
+fi
 
 # Host detection is pln-host's, and pln-peer uses it when --host is absent.
 RC=0
 OUT="$(env PATH="$BOTH:$BASE_PATH" PLN_HOST=codex "$BIN" --which 2>"$WORK/stderr")" || RC=$?
-expect 2 claude none 0 "an undeclared host detected as codex"
+expect 2 claude ready 0 "an undeclared host detected as codex"
 
 # --- an unauthenticated peer falls through to the next rung ------------------
 RC=0
@@ -261,7 +274,7 @@ nothing_ran "consent declined"
 # Granted, in any casing.
 cfg peer_consent YES
 peer "$BOTH" --host codex --which
-expect 2 claude none 0 "consent granted as YES"
+expect 2 claude ready 0 "consent granted as YES"
 cfg peer_consent true
 
 # --- rung 1 beats rung 2, and carries the whole configured command -----------
@@ -270,7 +283,7 @@ cfg peer_consent true
 cfg peer_command "fakepeer --flag one two"
 fresh
 peer "$BOTH" --host codex --which
-expect 1 fakepeer none 0 "a configured command outranking an installed peer"
+expect 1 fakepeer ready 0 "a configured command outranking an installed peer"
 
 peer "$BOTH" --host codex --brief "$BRIEF" --out "$WORK/run.out"
 expect 1 fakepeer ok 0 "a configured peer that answered"

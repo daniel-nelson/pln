@@ -1,8 +1,9 @@
-**The to-do-location flow.** When the closing message lists any follow-ups, find where this project records future work, in this order: a location named in the project's `AGENTS.md`/`CLAUDE.md`, then one named in the global instructions file (`$CODEX_HOME/AGENTS.md`, `~/.codex/AGENTS.md` by default), then an existing convention such as an issue tracker or a `TODO.md`.
+**The to-do-location flow.** When the closing message lists any follow-ups, find where this project records future work, in this order: a location named in the project's `AGENTS.md`/`CLAUDE.md`, then one named in the global instructions file (`$CODEX_HOME/AGENTS.md`, `~/.codex/AGENTS.md` by default), then one recorded in this project's memories, then an existing convention such as an issue tracker or a `TODO.md`.
 
 - **Named in either instructions file** — append the follow-ups there without asking, with full detail pulled from `PLAN.md` (or `REVIEW.md` in standalone mode), and say in the closing message where they went. An offer nobody makes records nothing, and the location is already the user's stated answer to the question.
+- **Recorded in a memory** — append without asking, the same as an instructions file. A memory naming a to-do location is the user's own answer to this question from a previous session, written down precisely so it isn't asked again.
 - **Found only by convention** — offer, in a message of its own, to write them there. A file nobody named may be someone's private scratch.
-- **Nothing found** — ask once, in a message of its own, where to save them.
+- **Nothing found** — ask once, in a message of its own, where to save them. Then write the answer to a memory, so the next run finds it here instead of asking again.
 
 The named location is frequently outside the repository and untracked. Write to it exactly as named; never substitute a path inside the repo.
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.0 — 2026-08-06
+
+### Added
+
+- **A finding the user has to act on is written as the ask, not as an explanation with the ask buried inside it.** Caught live: asked where to record a follow-up, the agent wrote a paragraph describing which files a search order covers, which it doesn't, why the chosen mechanism works anyway, and what the fix would be if it didn't — when the whole content was one question, "I need to add X to the search order, do that now?". `src/hosts/claude/voice.md` already dropped facts that change nothing the user does; it had no rule for the opposite case, where the fact matters and gets buried in the machinery that produced it. The new rule sits beside that one: give the action or the question in one line, and explain the mechanism only if asked. Claude-only, per this project's rule that register fixes stay on the host whose model exhibits them.
+
 ## 1.25.0 — 2026-08-04
 
 ### Added

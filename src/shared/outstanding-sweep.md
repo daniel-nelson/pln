@@ -1,0 +1,5 @@
+**Sweep the run's own record before the closing message is drafted.** What is outstanding is what the run wrote down, not what you happen to remember an hour of implementation later. Go and read it: the dashboard's Open questions; every item not marked ✅ done, the ⏸ deferred and 🚫 dropped ones included; each item's Discoveries and Dead ends; every handoff file still in the plan dir (a resolved blocker's file is deleted, so what is left is still open); and `REVIEW.md`'s open findings where a review produced one.
+
+That is the whole input — files this run already produced. No repository scan, no re-verification, nothing that turns the close into another pass of work. The sweep gathers candidates; the follow-up bar in Style's "Ending a message" decides which of them the user sees, and checks each claim before it is listed.
+
+**A run with nothing outstanding says so**, in one clause of the closing message. Silence reads the same whether the run looked and found nothing or never looked.

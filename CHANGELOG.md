@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.1 — 2026-08-06
+
+### Fixed
+
+- **Step 4's adopt prompt used numbers where the skill's own convention is letters.** Every other ask-lane choice in the skill is offered as `a) / b) / c)` — the numbered lists in this same step are reserved for the disclosed decisions, applied corrections, and flagged findings the user reopens by number. The adopt prompt itself, and its two option lines, used `1) / 2) / 3)` instead, which reads as a fourth numbered list competing with the one right above it. Relettered to match.
+
 ## 1.26.0 — 2026-08-06
 
 ### Added

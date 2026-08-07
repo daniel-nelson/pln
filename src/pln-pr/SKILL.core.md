@@ -240,15 +240,10 @@ For needs-a-decision findings, surface them to the user **one at a time**, as pr
    - After fixing, report the exact command run and the count it printed (e.g. `pnpm uspec spec/unit/foo → 4 tests, 4 passed`) — not a raw paste of passing output, which is noise. Someone can re-run that exact command to check it.
    - If a test's result could change depending on the time of day or date, say so and account for it.
    - Before reporting verification, re-read the project's completion rule (`CLAUDE.md`/`AGENTS.md`) and reproduce any environmental condition it names — cleared credentials, a specific timezone, a service, a clean database — that this run didn't already match.
-<!-- pln:only claude -->
-4. Run lightweight verification only (type-check + lint on touched files, not the full suite). Fix and re-stage on failure.
-<!-- pln:endonly -->
-<!-- pln:only codex -->
 4. Run lightweight verification only (type-check + lint on touched files, not the full suite). Fix on failure — nothing here is staged, since `git` writes are not yours to make.
-<!-- pln:endonly -->
 <!-- pln:only claude -->
-5. Commit the cluster's fixed files by name with the co-author trailer — never `--amend`, never `--no-verify`, never `git add -A`. One commit per cluster, message `fix: review findings — {cluster summary}`.
-6. Update each finding's status in `REVIEW.md` to `fixed` with the commit hash before returning."
+5. Do not commit — clusters run in parallel and share this working tree, so a commit from you here could race another cluster's. Leave the fixed files in the tree and name them in your final message; the orchestrator commits the cluster.
+6. Update each finding's status in `REVIEW.md` to `fixed` before returning, and say in your final message which findings the cluster cleared."
 <!-- pln:endonly -->
 <!-- pln:only codex -->
 5. Do not commit — `.git` is read-only to you. Leave the fixed files in the tree and name them in your final message; the orchestrator commits the cluster.
@@ -361,7 +356,7 @@ Both halves run at whichever close hands the PR to the user — Step 8's or Step
 - **Treating a failed review as a clean one.** If no reviewer succeeds, that is zero coverage, not zero findings. Fail closed and stop — never write an empty ledger and open the PR.
 - **The orchestrator fixing findings itself.** It dispatches fix agents; it does not read code or edit files. If you catch yourself editing in the orchestrator, stop and spawn the cluster.
 - **Acting on unverified findings.** A finding with no `motivating_code` is a suspicion, not a bug. It stays in the appendix and is not fixed.
-- **Fix agents colliding on a file.** Cluster by file so two agents never edit the same one; run clusters sequentially so the tree is settled between them.
+- **Fix agents colliding on a file.** Cluster by file so two agents never edit the same one. Clusters run in parallel on Claude (`parallel()`, isolation-free since files don't overlap) and one at a time on Codex; either way, only the orchestrator touches git, one commit at a time, so the tree still settles predictably.
 - **Splicing refs or the PR body into a shell command.** Bind refs to quoted vars and pass the body by file (`--body-file` / `--description` from a temp file). Never inline `<body>`.
 - **Imposing a version bump on a repo that has no stated convention.** Step 6 is conditional. No stated version-bump rule found anywhere (`CLAUDE.md`/`AGENTS.md` or the `VERSION`/`CHANGELOG.md` shape), no bump — and if the branch already bumped, don't bump again.
 - **Looking for gstack.** pln-pr is self-contained. It never reads gstack checklists, calls gstack binaries, or assumes gstack is installed.

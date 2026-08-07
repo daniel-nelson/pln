@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.27.0 — 2026-08-06
+
+### Changed
+
+- **`/pln-pr`'s fix pass runs its clusters in parallel on Claude instead of one at a time.** Traced from a real session where the fix pass alone ran 35+ minutes for four clusters after an already-fast, correctly-parallel review army — the clusters were already guaranteed file-disjoint (that's the whole point of clustering by file), so serializing them bought nothing but wall-clock. Claude's fix agents now match the shape Codex's already used for a different reason (a sandboxed agent can't write `.git` there): they edit and verify their own files but don't commit, and the orchestrator commits each cluster by name once its agent returns — one commit at a time, so two agents' commits never race even though their edits ran concurrently. `/pln`'s own per-item implementation loop is untouched; items can carry real cross-item dependencies that fix clusters don't.
+
 ## 1.26.1 — 2026-08-06
 
 ### Fixed

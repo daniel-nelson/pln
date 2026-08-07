@@ -1,1 +1,3 @@
-Invoke, wait for the notification. If a cluster returns `BLOCKED:`, follow the same shape `/pln` uses: surface the one question, record the answer in `REVIEW.md`, resume the same run via `resumeFromRunId`.
+Invoke, wait for the notification. As each cluster's agent returns, check `git status` shows the files it said it changed, then commit them by name with the co-author trailer — never `--amend`, never `--no-verify`, never `git add -A`. One commit per cluster, message `fix: review findings — {cluster summary}`. Write the commit hash against each of that cluster's findings in `REVIEW.md`.
+
+If a cluster returns `BLOCKED:`, follow the same shape `/pln` uses: surface the one question, record the answer in `REVIEW.md`, resume the same run via `resumeFromRunId` — nothing gets committed for a half-finished cluster.

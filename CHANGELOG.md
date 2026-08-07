@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.27.1 — 2026-08-06
+
+### Fixed
+
+- **A background research sub-agent's notification could land mid-question, burying it.** Traced from a live session: Step 3 spawned a non-blocking sub-agent to research a later item while an earlier item's a)/b)/c) question sat unanswered; the sub-agent's multi-paragraph result posted as the next chat turn, and the reply that followed it spent one throwaway line pointing back at the still-open question instead of restating it — leaving the user looking at a wall of unrelated findings with the actual question scrolled out of view. Step 3 now says plainly: a background research result that completes while an earlier question is still open is never surfaced as its own turn — it's written straight into that item's `PLAN.md` section instead, and nothing is said about it until the interview reaches that item.
+
 ## 1.27.0 — 2026-08-06
 
 ### Changed

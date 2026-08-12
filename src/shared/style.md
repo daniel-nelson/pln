@@ -6,19 +6,21 @@ All rules in this section apply to every message the skill produces.
 
 Every question you put to the user, and every reaction or finding you report, takes one of three shapes. The first line says what the message is, so the user knows from that line alone what it wants from them. Whichever shape, the message has to be answerable by someone with no memory of the conversation.
 
-**Option message** — echo line, one sentence naming what is being decided (with whatever motivates the question), the options, then evidence that helps tell them apart. Evidence appears at most once per fact — in the lead-in sentence or in the trailing paragraph, never both, and never repeated inside an option's own description.
+**Option message** — echo line, one sentence naming what is being decided (with whatever motivates the question), the options, then — only when there is one — a consequence the options themselves cannot show. Evidence appears at most once per fact — in the lead-in sentence or in the trailing paragraph, never both, and never repeated inside an option's own description.
 
 ```
 Recorded: soft-delete on cancel, no cascade.
 
 Cancelling a booking leaves the guest's payment alone, so every refund is issued by hand. What should cancelling do to the payment?
 
-a) **[recommended] Refund on cancel** — the cancel action issues the refund and marks the payment refunded.
+a) **Refund on cancel** — the cancel action issues the refund and marks the payment refunded.
 b) **Flag for review** — the cancel action marks the payment for a person to refund.
 c) **Leave it** — the cancel action touches the booking only, and refunds stay a separate step.
 
-The payment provider's refund call is idempotent, so (a) is safe to retry, but the money is gone once it fires. (b) keeps a person in the loop and needs a review queue nobody owns yet.
+The money is gone once a refund fires, and nobody owns a review queue yet.
 ```
+
+The trailing paragraph is the message's most abused part: it is read *after* the answer is already visible, so a user who has decided pays for it and gets nothing. It earns its place only by naming a cost or a dependency none of the option lines carry — never by weighing the options against each other, and never by arguing for one. Where every option's line already says what it does, there is no trailing paragraph.
 
 **Binary message** — echo line, one sentence naming what is being decided, the question in plain prose, then the evidence.
 
@@ -45,7 +47,9 @@ Rename it, or leave the name and have the new code read `cancelled_at`?
 In all three:
 
 - The sentence naming the decision says what happens now and what should happen instead, in words someone who has never read the plan would use.
-- Cut any paragraph whose only work is establishing that the problem is real. The user asked for this; they already believe there is a problem. Evidence that changes which answer wins stays, however long it runs. There is no word limit here, and holding information back is not the point.
+- Cut any paragraph whose only work is establishing that the problem is real. The user asked for this; they already believe there is a problem.
+- **Evidence is what changes which answer wins, and nothing else qualifies.** A `file:line` citation, a quoted function name, a note on which reader raised something, a record of what the text said before — these are evidence for *your* confidence that the question is well-founded. They are not inputs to the user's choice, and in front of the question they are what the user has to read past to reach it. They belong in `PLAN.md`. What stays in the message is what the thing does in the user's own vocabulary, and what each answer changes.
+- **A question is answerable in what fits on one screen.** This is a working budget, not a word count: if the ask cannot be posed in a short paragraph plus its options, the problem is that the question is carrying its own derivation. Cut the derivation, not the fork.
 - Name a prior conclusion in a clause so the user never has to scroll up to answer. Don't re-derive the argument for it; naming it is the whole job.
 
 ### Ending a message
@@ -75,6 +79,10 @@ The work-completed line does not summarize the diff. It says what was done and s
 Say what a thing is, not the handle that points at it. An item number, decision number, question number, line number or commit hash is an address into a file the user does not have open, so it never stands alone as the name for something. Pair it with the thing, as in "item 7, option descriptions", or leave it out.
 
 **A bare item number is never a name for the item.** Not in an aside, not in a reaction line, not in a numbered list at an approval gate — every time an item number is written for the user, its title travels with it. This is a requirement, not a preference: by the time you refer back to item 12 the dashboard is several screens up, and the number alone makes the user go and find it.
+
+**The user does not have the plan open, and never will.** `PLAN.md` and `REVIEW.md` are durable state for you, for a reviewer, and for the next session — they are not a channel the user reads, during the run or after it. So nothing in a message may require them: not "see the item's section", not "as recorded in the plan", not a bare entry number, and not a report that the document was edited. Measured across six days of sessions, 411 of 1,099 user-facing turns leaned on plan-internal bookkeeping this way — an echo of what was just typed, an item or entry named only by number, or a pointer at a file. Each one asks the user to hold state from a document they do not have.
+
+The rule that follows: **say the thing, don't cite where the thing lives.** Bookkeeping you did inside the plan — a section rewritten, criteria re-derived, a correction applied to your own prose — is not news; it is the work, and it reaches the user only if it changed what gets built.
 
 One thing is exempt, and only it: a list of numbers whose whole job is to index a numbered list printed in the same message — an approval gate's "worth a look: 3, 7, 12" — where the titles are already on screen a few lines above and the point is one thing to scan and one way to reply. An entry inside such a list has no title of its own, so it pairs with its parent item's number and title instead.
 

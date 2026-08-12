@@ -399,22 +399,42 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
   has "$f" 'The size of the plan never does' "$f lost the rule that plan size changes nothing"
   has "$f" "## The reviewer's brief" "$f lost the reviewer's brief"
   has "$f" '## What a finding becomes' "$f lost the findings rules"
-  # A finding ends in one of three places, and each half of that matters. Lose
-  # the reject lane and a reviewer's disagreement with this skill reaches the
-  # user as something to adjudicate; lose "flagged is the smallest" and a merge
-  # agent forwards the list it was handed.
+  # One test decides what spends the user's attention, and both surfaces run it.
+  # Two separately-worded batteries is what filled the gate with a log of the
+  # agent's own work.
+  has "$f" '### The fork test — what spends the user'"'"'s attention' \
+    "$f lost the fork test"
+  has "$f" 'you can name two answers you would honestly implement' \
+    "$f lost the fork half of the fork test"
+  has "$f" 'The consequence is theirs, and material' \
+    "$f lost the consequence half of the fork test — where proportionality lives"
+  has "$f" 'anything landing on a decision the user made' \
+    "$f lost the override that sends a protected decision to the user regardless"
+  # The record is not a channel. Every silent lane below rests on this being
+  # said out loud, because a user who never opens PLAN.md cannot be told by it.
+  has "$f" 'a channel to the user' \
+    "$f lost the rule that the plan record is not how the user is told"
+  # A finding ends in one of three places, and each matters. Lose the reject
+  # lane and a reviewer's disagreement with this skill reaches the user to
+  # adjudicate; let a rejection go unrecorded and its misfires are invisible.
   has "$f" 'ends in one of three places' "$f lost the three outcomes a finding can have"
   has "$f" '### Rejected' "$f lost the reject lane"
-  has "$f" 'Flagged is the smallest of the three, not the default.' \
-    "$f lost the rule that flagging is not the default outcome"
-  # The applied lane is three conjunctive tests. Losing any one of them lets a
-  # judgment call, an invented citation, or a user's own decision be rewritten
-  # in the plan with nobody having seen it. The kind test carries the omission
-  # lane, without which every mechanical repair lands on the user instead.
-  has "$f" 'It is a false factual claim, a contradiction between two parts of the plan, or an omission whose completion is forced.' \
-    "$f lost the kind test in front of an applied finding"
-  has "$f" 'An omission is forced when exactly one completion is consistent with what the plan already decides.' \
-    "$f lost the test that separates a mechanical completion from a judgment call"
+  has "$f" '### Repaired' "$f lost the repair lane"
+  has "$f" 'Judge by substance, never by phrasing' \
+    "$f lost the rule that a reject is judged on substance, not on how it is worded"
+  has "$f" 'Record every rejection' \
+    "$f lost the rule that a rejection is recorded rather than dropped"
+  has "$f" 'Findings that share a root are one entry.' \
+    "$f lost the rule that findings reopening one decision are one entry"
+  # The repair lane is three conjunctive tests. Losing any one lets a fork, an
+  # invented citation, or a user's own decision be rewritten in the plan with
+  # nobody having seen it. The first must stay checkable: uniqueness is not.
+  has "$f" 'The least-scope repair restores an outcome the plan already records, and you can name both.' \
+    "$f lost the checkable test in front of a repair"
+  has "$f" 'Do not test whether the repair is the only possible one.' \
+    "$f lost the ban on the uncheckable uniqueness test"
+  has "$f" 'a rule they wrote is not a decision they made about this case' \
+    "$f lost the rule that applying the user's own rule can itself be the fork"
   has "$f" 'It quotes what it rests on, and the quote is real.' \
     "$f lost the evidence test in front of an applied finding"
   has "$f" 'It does not land on a decision the user made.' \

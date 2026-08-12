@@ -43,6 +43,8 @@ a real per-room fact, and it connects to Place.sleeps. Say if the style enum fit
 
 That is not an option list, it costs three lines, and it can be overruled with one word. What it is not allowed to become is `a) / b) / c)` with a preference attached, which costs a round trip and, measured, changes almost nothing.
 
+**Never under a header.** "Two calls I made rather than asking, both overridable:" is the tell that the bar dropped — a heading over a list exists because there is a list, and a list gets filled by lowering the threshold rather than by two genuine forks landing in the same turn. Each disclosure rides in the sentence where its choice is made, and a message that seems to want three of them is a message whose calls mostly were not forks at all and belong in the record unsaid. Two can legitimately land together; a heading over them cannot. The disclosure has to read as a thing you said because it mattered, not as a ritual the message performs before getting to the question.
+
 The measurement, from six days of real sessions: of 170 recommendation-marked questions with a traceable reply, 68 picked the marked option, **3 picked a different one, and 99 — 58% — did not answer with a letter at all.** They corrected the framing, challenged the premise, or supplied a fact the options did not contain: "Where did that come from?", "is a misinterpretation of the changes", "not a real break — listen, major version bump is reserved for real, intentional changes." So the ladder was almost never used as a ladder, and what earned its keep was the disclosure inside it. Keep that; drop the rest. Twice, pushed to restate such a question plainly, the agent concluded the question was its own to answer — "that wasn't a fair question to put to you, and it's mine to decide."
 
 The tells that a question is really a disclosure, any one of which is enough:
@@ -52,7 +54,7 @@ The tells that a question is really a disclosure, any one of which is enough:
 - One option exists only so the list has three.
 - Your own prose already contains the deciding fact — "it's strictly less work", "it's what the item's intent already says", "this is work the change requires, not a choice".
 
-Each of those means: state it, name the runner-up, and keep going. It never means decide it silently.
+Each of those means the question was really a disclosure. What happens to it next turns on whether it was a fork at all — two answers you would honestly implement, and which wins changes something the user meets. If it was, state the call, name the runner-up, and keep going. If it wasn't, there was no decision: the record carries it and the user is not told. What it never means is a round trip.
 
 ### Binary "adopt as written / change?" questions
 

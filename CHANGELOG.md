@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.29.0 — 2026-08-11
+
+### Changed
+
+- **A recommendation is no longer a question.** The `[recommended]` option marker is removed from the skill, and arguing for one option after the list is banned. Having a preference you can defend *is* the test the filter already applies for the decide-and-disclose lane — you can name an authority, or bound a consequence — so a marked option means the routing was wrong, not that the question needed help. Traced by auditing six days of real sessions: in three of them the user replied with a bare selector twenty-one times and every one picked the option already marked recommended, so the marker never changed an outcome and the losing branches were never read. Twice, when pushed to restate such a question plainly, the agent concluded the question was its own — "that wasn't a fair question to put to you, and it's mine to decide." "What reaches the user" now names the preference as the tell that fires *before* the question goes out, beside the existing one ("sure", "your call") that only fires after.
+
+- **The Step 4 gate no longer restates the plan or its own bookkeeping.** Three changes, from measuring a real 9,195-character gate: the per-item digest is gone, because every item's intent was settled with the user question by question in the interview they just finished; corrections the review applied are never listed, because a reviewer's finding you fixed in your own draft was never the user's to write or ratify (they were 16 of that gate's 36 numbered entries — 44% of the list, none of it actionable); and what remains is one numbered list of what the user has *not* seen, the disclosed decisions and the flagged findings. The dashboard's bullet list of items stays exactly as it is — it was under a tenth of that gate and it is the user's overview and editing surface. An applied correction can still be named in prose and reverted; it just no longer has a number.
+
+- **Evidence in a question is what changes which answer wins, and nothing else.** `file:line` citations, function names, which reader raised something, what the text said before — these are evidence for the agent's own confidence that a question is well-founded, not inputs to the user's choice, and in front of the question they are what has to be read past to reach it. They go to `PLAN.md`. The Style section's licence to run long ("There is no word limit here") is replaced by a one-screen working budget, and the option message's trailing paragraph now earns its place only by naming a cost or dependency no option line carries — never by weighing the options, which is read after the answer is already visible and so buys the user nothing.
+
+### Fixed
+
+- **The skill narrated a document the user does not read.** Across 1,099 user-facing turns in twelve audited sessions, 411 — 37% — leaned on plan-internal bookkeeping: an echo of what the user had just typed, an item or entry named only by number, or a pointer at `PLAN.md`/`REVIEW.md`. Each asks the user to hold state from a file they do not have open. "Naming things the user reads" now says plainly that those files are durable state for the agent, the reviewer and the next session, and never a channel — say the thing, don't cite where the thing lives — and that bookkeeping done inside the plan reaches the user only if it changed what gets built. The one-line decision echo survives but may never be a message of its own; one audited session sent twenty-eight standalone ones, several under thirty characters.
+
 ## 1.28.0 — 2026-08-11
 
 ### Fixed

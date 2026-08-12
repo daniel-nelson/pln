@@ -88,12 +88,16 @@ Not every open choice is the user's to answer, and not every decision belongs in
 Routing:
 
 - **Ask** — the choice is unbacked and consequential: no authority decides it and something will depend on it. The deciding reason lives in the user's head: domain fact, taste, risk appetite, business context. This is the only lane that becomes a one-question-at-a-time interview question (Step 3).
-- **Decide-and-disclose** — the choice is cite-backed, or reversible. Make the call yourself. Record it with a one-line rationale that names its authority or its reversibility. Don't interrupt the user. These surface at the gate (Step 4), in its numbered list, phrased as overridable, not as commands.
+- **Decide-and-disclose** — the choice is cite-backed, or reversible. Make the call yourself. Record it with a one-line rationale that names its authority or its reversibility. Don't interrupt the user: nothing here waits for an answer. These surface at the gate (Step 4), in its numbered list, phrased as overridable, not as commands.
+
+  **One kind of them is also said where it is made**: a call that had a live runner-up — a second option you seriously weighed and rejected. The gate carries the decision and its rationale, but never the option that lost, so a runner-up disclosed only there has already vanished by the time the user reads it. Say it in one line in the flow, naming what you rejected and the fact that decided it, requiring no reply (see Style's "A recommendation is a statement, not a question"). This is the lane's safety valve: the user's corrections in a real interview come as "that's the wrong framing" far more often than as "I pick (b)", and they can only arrive if the framing was visible.
 - **Defer** — you can't yet tell whether the choice will be depended on; it only becomes answerable in contact with the code. Don't raise it, and don't prescribe it in the plan. It surfaces during implementation, where the four blocker thresholds (the same reversibility/dependency test applied in Step 5) decide whether it triggers a hand-off.
 
 The tell that the filter is miscalibrated: the user answers an interview question with "sure", "your call", or "whatever's easiest." That indifference means the question was decide-and-disclose, not ask. Indifferent answers cluster on the choices an implementer should have owned.
 
-**The tell that fires before the question goes out: you have a preference.** If you can say which option you would take, you have already applied one of the two tests above and got an answer — an authority you can name, or a consequence you can bound — and the choice is in the decide-and-disclose lane by this section's own rules. Ask only where you genuinely cannot say. See Style's "A recommendation is not a question" for what this bans in the message itself; this is where the routing decision is made.
+**The tell that fires before the question goes out: you have a preference.** If you can say which option you would take, you have already applied one of the two tests above and got an answer — an authority you can name, or a consequence you can bound — and the choice is in the decide-and-disclose lane by this section's own rules. Ask only where you genuinely cannot say. See Style's "A recommendation is a statement, not a question" for the shape it takes instead; this is where the routing decision is made.
+
+What this reroutes is the round trip, never the visibility. A preference that goes unsaid is worse than one put as a needless question, because the user cannot overrule what they were never shown — so the disclosure is the part that survives, and it is what the decide-and-disclose lane above requires in the flow.
 
 ### One filter, two surfaces
 

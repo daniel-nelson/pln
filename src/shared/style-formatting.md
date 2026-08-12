@@ -30,13 +30,20 @@ Every description answers the same questions in the same order. Above, that is w
 
 Exactly one space after `a)`, `b)`, `c)`. Never break alignment by varying the post-paren whitespace.
 
-### A recommendation is not a question
+### A recommendation is a statement, not a question
 
-**Never mark an option as recommended, and never argue for one after the list.** Having a recommendation you can defend is the test that the choice was yours to make: it means you can cite an authority or name what would have to change, which is exactly the decide-and-disclose lane. Make the call, record it in one line, and let the gate carry it as overridable.
+**Never mark an option as recommended, and never argue for one after the list.** Having a recommendation you can defend is the test that the choice was yours to make: it means you can cite an authority or name what would have to change, which is exactly the decide-and-disclose lane. An option list is for a genuine fork — one where you cannot say which side you'd take. If you can, you are not asking a question; you are asking the user to ratify an answer.
 
-An option list is for a genuine fork — one where you cannot say which side you'd take. If you can, you are not asking a question; you are asking the user to ratify an answer, and the reading it costs them buys nothing.
+**But make the call in the open, in the flow, naming what you rejected.** This is the part that must not be lost, and it is the whole reason the marker existed: a recommendation the user can see is a recommendation they can catch being wrong. So a decide-and-disclose call with a live runner-up is stated as one line where the choice is made — what you are doing, what you are not doing, and the fact that decides it — and it requires no reply. Nothing waits on it. A single word stops it.
 
-Traced from six days of sessions: across three of them the user replied with a bare selector twenty-one times, and every one picked the option already marked recommended. The marker never changed an outcome and the losing branches were never read. Where the agent was pushed to restate such a question plainly, it twice concluded the question was its own to answer — "that wasn't a fair question to put to you, and it's mine to decide."
+```
+Using RoomTypesEnum with a sleeping-capacity datum rather than PlaceStylesEnum —
+a real per-room fact, and it connects to Place.sleeps. Say if the style enum fits better.
+```
+
+That is not an option list, it costs three lines, and it can be overruled with one word. What it is not allowed to become is `a) / b) / c)` with a preference attached, which costs a round trip and, measured, changes almost nothing.
+
+The measurement, from six days of real sessions: of 170 recommendation-marked questions with a traceable reply, 68 picked the marked option, **3 picked a different one, and 99 — 58% — did not answer with a letter at all.** They corrected the framing, challenged the premise, or supplied a fact the options did not contain: "Where did that come from?", "is a misinterpretation of the changes", "not a real break — listen, major version bump is reserved for real, intentional changes." So the ladder was almost never used as a ladder, and what earned its keep was the disclosure inside it. Keep that; drop the rest. Twice, pushed to restate such a question plainly, the agent concluded the question was its own to answer — "that wasn't a fair question to put to you, and it's mine to decide."
 
 The tells that a question is really a disclosure, any one of which is enough:
 
@@ -44,6 +51,8 @@ The tells that a question is really a disclosure, any one of which is enough:
 - The paragraph after the options argues for one of them.
 - One option exists only so the list has three.
 - Your own prose already contains the deciding fact — "it's strictly less work", "it's what the item's intent already says", "this is work the change requires, not a choice".
+
+Each of those means: state it, name the runner-up, and keep going. It never means decide it silently.
 
 ### Binary "adopt as written / change?" questions
 

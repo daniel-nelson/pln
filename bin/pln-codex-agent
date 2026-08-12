@@ -18,9 +18,16 @@
 #   - the result is the output file, never the exit code. An exec can exit 0
 #     having written nothing at all (openai/codex#19945); an empty file is a
 #     failure, not an agent that found nothing to do.
-#   - OPENAI_API_KEY is unset for the child. A stray key silently overrides the
-#     CLI's OAuth session and the call dies with a misleading 401
-#     (openai/codex#15151).
+#   - OPENAI_API_KEY *and* CODEX_API_KEY are unset for the child. Either one on
+#     its own silently overrides the CLI's OAuth session, so unsetting one and
+#     leaving the other still routes the call to api.openai.com. Sometimes that
+#     is a misleading 401 (openai/codex#15151); sometimes it is worse — the run
+#     bills the metered API while `codex login status` goes on printing
+#     "Logged in using ChatGPT" and `auth.json` still reads
+#     `auth_mode: chatgpt`, so an exhausted API balance surfaces as
+#     "You have no credits remaining" and gets misread as an exhausted
+#     subscription. The tell is the URL in the error: api.openai.com rather
+#     than chatgpt.com/backend-api/codex.
 #   - the thread id is read out of the event stream, so a blocked item can be
 #     resumed by id. `resume --last` races with any other Codex process.
 #   - stdout/stderr go to a file. The event stream is the agent's reasoning
@@ -167,7 +174,7 @@ fi
 # /bin/bash every Mac ships, treats an empty array as an unbound variable under
 # `set -u` — so without it this line aborts the spawn on exactly the machines
 # that have no timeout(1) to put in the array.
-CMD=(env -u OPENAI_API_KEY "${TIMEOUT_CMD[@]+"${TIMEOUT_CMD[@]}"}" codex exec)
+CMD=(env -u OPENAI_API_KEY -u CODEX_API_KEY "${TIMEOUT_CMD[@]+"${TIMEOUT_CMD[@]}"}" codex exec)
 if [ -n "$RESUME_ID" ]; then
   CMD+=(resume "$RESUME_ID")
 else

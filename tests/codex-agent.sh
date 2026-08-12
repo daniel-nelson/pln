@@ -113,6 +113,7 @@ grep -q '^STATUS=ok$' <<<"$res" || fail "a spawn with no time ceiling did not re
 # --- the composed command: guards present, resume flags withheld -------------
 cmd="$("$BIN" --brief "$BRIEF" --out "$WORK/dry.out" --add-dir "$WORK" --dry-run 2>&1 >/dev/null)"
 grep -q -- '-u OPENAI_API_KEY' <<<"$cmd" || fail "OPENAI_API_KEY is not unset for the child"
+grep -q -- '-u CODEX_API_KEY' <<<"$cmd" || fail "CODEX_API_KEY is not unset for the child"
 grep -q -- '--json' <<<"$cmd" || fail "the event stream is not requested"
 grep -q -- '-s workspace-write' <<<"$cmd" || fail "default sandbox is not workspace-write"
 grep -q -- '--add-dir' <<<"$cmd" || fail "--add-dir was dropped"

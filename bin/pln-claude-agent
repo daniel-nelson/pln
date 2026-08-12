@@ -28,7 +28,7 @@
 #     that only reads files.
 #   - the session is not persisted, so consulting a peer does not fill the
 #     user's own `/resume` picker with agent runs they never started.
-#   - ANTHROPIC_API_KEY is deliberately *left alone*, unlike the OPENAI_API_KEY
+#   - ANTHROPIC_API_KEY is deliberately *left alone*, unlike the OpenAI keys
 #     the Codex helper unsets. Claude Code treats a key as a legitimate way to
 #     authenticate, and plenty of installs have nothing else; unsetting it would
 #     break the very users it pretended to protect. The auth probe in pln-peer

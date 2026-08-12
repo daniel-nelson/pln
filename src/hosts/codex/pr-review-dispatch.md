@@ -3,7 +3,7 @@ Otherwise run the army in two stages, both serial — one reviewer at a time kee
 **Stage 1 — the native review pass.** `codex review` is built for exactly this job and runs as one process, so it is the cheapest broad coverage available here. It takes no `-C`, so run it from the repo root, and capture its output to a file:
 
 ```bash
-env -u OPENAI_API_KEY timeout -k 10 1800 codex review --base "<base>" < /dev/null > "$RUN/codex-review.out" 2>&1
+env -u OPENAI_API_KEY -u CODEX_API_KEY timeout -k 10 1800 codex review --base "<base>" < /dev/null > "$RUN/codex-review.out" 2>&1
 ```
 
 That redirect is not optional. It streams the whole diff, its own reasoning, and every command it runs to stdout, escape codes and all — thousands of lines on a middling branch. Read the review summary at the end (`tail -n 200 "$RUN/codex-review.out"`) and nothing else. Translate what it reports into the findings schema below, giving each item a `file:line` and the quoted code; anything it raises without a line reference is a suspicion and gates like one.

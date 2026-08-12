@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.30.0 — 2026-08-12
+
+### Changed
+
+- **One test now decides what spends the user's attention, replacing two overlapping ones.** The interview routed choices by "authority or reversibility"; the plan review routed findings by "false claim, contradiction, quoted, not the user's." Both bars were low, both were worded differently, and between them a swap of one static landing page for another put **six agent decisions and ten review findings** in front of the user at the approval gate. One of the sixteen turned on anything they could have wanted either way; their replies to the rest were "yes, add it", "a", "fix it". **The fork test** is stated once and run by both surfaces: something reaches the user only when it **is a fork** — you can name two answers you would honestly implement, so one answer plus a defect is not one and neither is a completion the plan already forces — and when **the consequence is theirs and material**: visible behavior, scope, cost, risk, irreversible or external state, or work outside the approved item. One override outranks both: anything landing on a decision the user made goes to them regardless. Everything else is the work — make the least-scope repair that restores what the plan already says it wants, record it, move on.
+
+- **Proportionality is now in the test rather than missing from it.** "Material" is what carries it: the same defect is a fork on a payments migration and quiet work on a static page, because being wrong does not cost the same. Review depth is unchanged — what scales is what interrupts.
+
+- **A review finding is rejected, repaired, or flagged, and flagging is the smallest by a wide margin.** *Rejected* is new and is judged **by substance, never by phrasing**: reject only when the finding, taken as entirely true, changes nothing about whether the plan delivers its acceptance criteria. A finding that reads like internal plumbing and means "the job never fires" is a repair, not a rejection. **Every rejection is recorded** with its reason in the plan's review section — it is the one outcome where a finding disappears, so it is the one whose misfires are otherwise invisible. *Applied* is renamed *repaired* and gains omissions, which had no lane at all: a page needing three fonts where the plan vendors two used to reach the user however mechanical the fix.
+
+- **The repair test is checkable by a stranger: name the outcome, quote the plan's own sentence stating it, name the change that restores it.** An earlier draft asked whether "exactly one completion is consistent" — uniqueness across an open solution space cannot be checked by a reader who never saw the interview, and a rule that demands it collapses into "the agent decides what's obvious", which is the failure it was meant to replace. Least-scope and recorded-outcome are checkable; unique is not.
+
+- **A rule the user wrote is not a decision they made about this case.** Following their repo's convention repairs. But where applying it *here* is itself the question — whether this change is the kind the rule means — that is a fork and it is theirs. This user is on record overruling exactly such a call: "not a real break — listen, major version bump is reserved for real, intentional changes."
+
+- **Findings that share a root are one entry.** A reduced-motion bug, an inline `:root` that beats the stylesheet, and two items contradicting about which wins are one question — *is it still shipping verbatim?* Numbering them apart asks the user to answer one question three times and to notice unaided that it was one. This is distinct from the existing merge of the *same* finding raised by both readers.
+
+- **The gate's triage line got a real bar.** "Worth a look" now means your answer and theirs would produce different builds — harder than the fork test on purpose. Two or three entries is its usual size; a triage line naming half the list has triaged nothing.
+
+### Fixed
+
+- **The plan record was being used as a channel to the user.** Every quiet lane above ends "recorded in its item's section", and the skill never said what that record is for. It is for the implementer, the reviewer, and the next revision of this filter — **not** a way of telling the user, who does not open the file. Said out loud now, because it is the assumption the whole cut rests on: nothing that clears the fork test may be left to the record instead.
+
+- **A disclosed call is said in the flow *and* numbered at the gate.** An intermediate draft collapsed the already-said ones into a count. That rested on a one-line disclosure having registered, and it lands mid-interview inside a message about something else — a line read past is not a decision ratified.
+
+- **An internal contradiction introduced by the same draft**: one paragraph said a preference must never go unsaid, fifteen lines below a new rule making most of the lane unsaid. And a dangling cross-reference — the shared Style section named a section that exists only in `/pln`, so `/pln-pr` shipped a pointer to nothing.
+
 ## 1.29.0 — 2026-08-11
 
 ### Changed

@@ -399,11 +399,22 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
   has "$f" 'The size of the plan never does' "$f lost the rule that plan size changes nothing"
   has "$f" "## The reviewer's brief" "$f lost the reviewer's brief"
   has "$f" '## What a finding becomes' "$f lost the findings rules"
+  # A finding ends in one of three places, and each half of that matters. Lose
+  # the reject lane and a reviewer's disagreement with this skill reaches the
+  # user as something to adjudicate; lose "flagged is the smallest" and a merge
+  # agent forwards the list it was handed.
+  has "$f" 'ends in one of three places' "$f lost the three outcomes a finding can have"
+  has "$f" '### Rejected' "$f lost the reject lane"
+  has "$f" 'Flagged is the smallest of the three, not the default.' \
+    "$f lost the rule that flagging is not the default outcome"
   # The applied lane is three conjunctive tests. Losing any one of them lets a
   # judgment call, an invented citation, or a user's own decision be rewritten
-  # in the plan with nobody having seen it.
-  has "$f" 'It is a false factual claim, or a contradiction between two parts of the plan.' \
+  # in the plan with nobody having seen it. The kind test carries the omission
+  # lane, without which every mechanical repair lands on the user instead.
+  has "$f" 'It is a false factual claim, a contradiction between two parts of the plan, or an omission whose completion is forced.' \
     "$f lost the kind test in front of an applied finding"
+  has "$f" 'An omission is forced when exactly one completion is consistent with what the plan already decides.' \
+    "$f lost the test that separates a mechanical completion from a judgment call"
   has "$f" 'It quotes what it rests on, and the quote is real.' \
     "$f lost the evidence test in front of an applied finding"
   has "$f" 'It does not land on a decision the user made.' \

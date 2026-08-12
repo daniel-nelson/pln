@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.30.0 — 2026-08-12
+
+### Changed
+
+- **A disclosed decision now has to earn the line.** 1.29.0 said a decide-and-disclose call with a live runner-up is stated where it is made, and put every call in the lane on the gate's numbered list — but that lane's bar is "cite-backed *or* reversible", which is nearly every choice an implementer makes in an hour, so the disclosure became a log of the agent's own work with the two calls the user would have changed buried in it. A call reaches the user only if all three hold: the **runner-up is live** (you can name what you rejected without arguing it was wrong — "…which holds the wrong value", "…which the repo's rule forbids" means there was no fork, only the work); the **user holds the stake** (the alternative changes behavior, cost, scope, a file they read, or work they'd do later — not two shapes of the same internal mechanics); and the **deciding fact is yours, not theirs** (a rule in their own repo or an answer they gave an hour ago, said back, tells them what they already told you). In the gate this was drawn from, three of six disclosed decisions failed a test: dropping a colour variable that held the wrong value, following the repo's own version-bump rule, and naming the one doc that describes the file being replaced.
+
+- **The gate stops re-listing what was already said in the flow.** A call that cleared the three tests was stated at the moment it was made and could have been stopped with one word; no word came, so it stands. Three of that same gate's six numbered decisions were entries the user had already read once. They now collapse into one clause carrying the count — "the four calls I stated as I made them still stand; name any you want reopened" — and a number is spent only on what the user is seeing for the first time.
+
+- **One disclosure line per message, never under a header.** "Two calls I made rather than asking, both overridable:" is the tell that the threshold dropped: a heading over a list exists because there is a list, and the list got filled by lowering the bar rather than by two genuine forks landing in the same turn. The weaker one either failed the three tests and belongs in `PLAN.md`, or clears them and can wait for the gate.
+
 ## 1.29.0 — 2026-08-11
 
 ### Changed

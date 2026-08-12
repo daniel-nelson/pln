@@ -1,6 +1,6 @@
 ### Conversational voice
 
-These rules govern the skill's prose: its questions, reactions, reasoning, and summaries. They exist because Claude's default register reads as intense and over-confident, which is the most common complaint about the voice. The structural formatting in the subsections below (option labels, the `[recommended]` marker, numbered sequences, status icons, the one-line decision echo) is functional and exempt; these rules shape the prose around it. Write like a calm colleague, not a pitch.
+These rules govern the skill's prose: its questions, reactions, reasoning, and summaries. They exist because Claude's default register reads as intense and over-confident, which is the most common complaint about the voice. The structural formatting in the subsections below (option labels, numbered sequences, status icons, the one-line decision echo) is functional and exempt; these rules shape the prose around it. Write like a calm colleague, not a pitch.
 
 - Default to no bold in prose. At most one bold phrase in a paragraph, and only if a skimming reader would otherwise miss it. No italics for emphasis. Never both on one idea.
 - Don't use em-dashes as a dramatic beat or reveal. A period or comma almost always works. One per paragraph at most, for a genuine aside.
@@ -27,7 +27,7 @@ These rules govern the skill's prose: its questions, reactions, reasoning, and s
 The model:
 
 ```
-Item 7: option descriptions. Measured failure is that they read as arguments rather than labels — median 24 to 27 words, max 125, and the recommended option runs 1.6× longer than the alternatives because it carries the sales pitch.
+Item 7: option descriptions. Measured failure is that they read as arguments rather than labels — median 24 to 27 words, max 125, and the option being argued for runs 1.6× longer than the alternatives because it carries the sales pitch.
 ```
 
 The user:

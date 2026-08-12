@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.28.0 — 2026-08-11
+
+### Fixed
+
+- **A Codex spawn unset `OPENAI_API_KEY` but left `CODEX_API_KEY` set, so the guard did nothing on an install that has the newer variable.** Either key on its own overrides the CLI's OAuth session and routes the run to `api.openai.com`. The documented symptom was a misleading `401` (openai/codex#15151); the worse one is a run that succeeds and bills the metered API while `codex login status` goes on printing "Logged in using ChatGPT" and `auth.json` still reads `auth_mode: chatgpt` — so an exhausted API balance surfaces as "You have no credits remaining" and gets read as an exhausted subscription. The tell is the URL in the error: `api.openai.com` rather than `chatgpt.com/backend-api/codex`. Both keys are now unset at all three spawn sites — `bin/pln-codex-agent`, the `codex review` call in `/pln-pr`'s Codex dispatch, and the raw `codex exec` written out for an install where the helper never resolved — with a test holding the flag on the composed command.
+
 ## 1.27.1 — 2026-08-06
 
 ### Fixed

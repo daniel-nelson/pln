@@ -57,13 +57,16 @@ Always skip `/pln-pr` in this repository. This is the repo that ships `/pln-pr`,
 
 ## Testing
 
-Run every script in `tests/` before opening a PR — each needs only bash and git, no network, no agent CLI installed, no credentials, and none of them writes to the working tree or reads the developer's own `~/.pln`. All five must print `OK`:
+Run every script in `tests/` before opening a PR — each needs only bash and git, no network, no agent CLI installed, no credentials, and none of them writes to the working tree or reads the developer's own `~/.pln`. All eight must print `OK`:
 
 - `bash tests/generate.sh` — `bin/pln-generate`: the three directives, the generated-by banner, `--list`, `--clean`, every error path, and the two properties the host seam rests on — each host's build carries its own mechanics and none of the other's, and a `pln:include` resolves against `src/shared/` for a host that has no fragment of that name while a host fragment of the same name still wins (a missing name fails loudly, naming both folders). Checked against the real `src/` — where both skills must carry the whole Style section, the peer ladder behind its consent key, and the plan review's rules, the rung-3 spawn being the one part that differs by host — as well as fixtures.
 - `bash tests/config.sh` — `bin/pln-config`: a value survives the round trip as written, spaces and flags and all, so a key can hold a whole invocation; the booleans still read identically; one key is never another key's prefix.
 - `bash tests/codex-agent.sh` — `bin/pln-codex-agent` against a fake `codex` on `PATH`: an empty result is a failure, the thread id comes out of the event stream, the brief travels on stdin, and `resume` is never handed the flags it rejects.
 - `bash tests/claude-agent.sh` — `bin/pln-claude-agent` against a fake `claude` on `PATH`: a non-zero exit is a failure even when prose was printed, the peer is restricted with `--tools` and never with `--allowedTools`, and `ANTHROPIC_API_KEY` is left alone.
 - `bash tests/peer.sh` — `bin/pln-peer` against fake `claude`/`codex` CLIs and a scratch `PLN_STATE_DIR`: the three rungs in order, the skip-the-host rule in both directions, the one-time consent gate (nothing is sent in any state until it is granted, `--which` and `--dry-run` included), and a peer that is absent, unauthenticated, empty, failed or malformed falling back rather than passing for a review.
+- `bash tests/setup.sh` — `setup` against an isolated fake install: the one-time peer nudge appears only when no usable peer exists, names the other host, persists settled states, and never reads the developer's own install or config.
+- `bash tests/envelope.sh` — `bin/pln-read-envelope`: valid and exact-boundary envelopes pass, while oversized, missing, out-of-root, final-component symlink, and parent-directory symlink results fail before content reaches stdout.
+- `bash tests/worker-contracts.sh` — every worker-owned runtime contract is installed, complete, host-neutral, and absent from the generated coordinator prompt; the review-brief helper assembles repository metadata, the exact worker contract, and the complete plan.
 
 A test that drives a `bin/` helper does it through a fake CLI on `PATH` — never a real `claude` or `codex`, which most users of this repo will not have.
 

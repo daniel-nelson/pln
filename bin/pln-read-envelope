@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# pln-read-envelope — print a worker result only after its path and size pass.
+#
+# Usage:
+#   pln-read-envelope --root <plan-dir> --max-bytes <count> <result-file>
+#
+# The coordinator uses this instead of reading a worker result directly.  The
+# result must be a non-empty regular file below the plan directory, must not be
+# a symlink, and must fit within the caller's byte budget.  All validation is
+# performed before any result bytes are written to stdout.
+set -euo pipefail
+
+ROOT=""
+MAX_BYTES=""
+
+usage() {
+  echo "Usage: pln-read-envelope --root <plan-dir> --max-bytes <count> <result-file>" >&2
+  exit 2
+}
+
+fail() {
+  echo "pln-read-envelope: $*" >&2
+  exit 1
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --root)
+      [ $# -ge 2 ] || usage
+      ROOT="$2"
+      shift 2
+      ;;
+    --max-bytes)
+      [ $# -ge 2 ] || usage
+      MAX_BYTES="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*) usage ;;
+    *) break ;;
+  esac
+done
+
+[ -n "$ROOT" ] || usage
+case "$MAX_BYTES" in
+  '' | *[!0-9]*) usage ;;
+esac
+[ "$MAX_BYTES" -gt 0 ] || usage
+[ $# -eq 1 ] || usage
+
+RESULT_FILE="$1"
+[ -d "$ROOT" ] || fail "plan root is not a directory: $ROOT"
+[ -e "$RESULT_FILE" ] || fail "result file does not exist: $RESULT_FILE"
+[ ! -L "$RESULT_FILE" ] || fail "result file must not be a symlink: $RESULT_FILE"
+[ -f "$RESULT_FILE" ] || fail "result path is not a regular file: $RESULT_FILE"
+
+ROOT_REAL="$(cd "$ROOT" && pwd -P)" \
+  || fail "could not resolve plan root: $ROOT"
+RESULT_DIR="$(dirname "$RESULT_FILE")"
+RESULT_BASE="$(basename "$RESULT_FILE")"
+RESULT_DIR_REAL="$(cd "$RESULT_DIR" 2>/dev/null && pwd -P)" \
+  || fail "could not resolve result directory: $RESULT_DIR"
+RESULT_REAL="$RESULT_DIR_REAL/$RESULT_BASE"
+
+case "$RESULT_REAL" in
+  "$ROOT_REAL"/*) ;;
+  *) fail "result file is outside the plan root: $RESULT_FILE" ;;
+esac
+
+BYTE_COUNT="$(LC_ALL=C wc -c < "$RESULT_REAL")"
+BYTE_COUNT="${BYTE_COUNT//[[:space:]]/}"
+[ "$BYTE_COUNT" -gt 0 ] || fail "result file is empty: $RESULT_FILE"
+[ "$BYTE_COUNT" -le "$MAX_BYTES" ] \
+  || fail "result file is $BYTE_COUNT bytes; limit is $MAX_BYTES: $RESULT_FILE"
+
+cat "$RESULT_REAL"

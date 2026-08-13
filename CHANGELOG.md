@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.31.0 — 2026-08-12
+
+### Changed
+
+- **`/pln` now keeps substantial repository research outside the coordinator's context on both Claude and Codex.** After reading only the root instruction files, Step 1 dispatches a mandatory fresh pre-flight worker for nested mandates, repository shape, current behavior, verification commands, decision-record locations, and git state. Before the coordinator's first proposal for each active item, another fresh worker gathers that item's code and test evidence; prior decisions remain a separate one-question-at-a-time lookup. Detailed notes stay beneath the local plan directory, while the coordinator accepts only bounded result envelopes—8 KiB for pre-flight and 4 KiB for item or follow-up research—with exact durable references. Missing, empty, malformed, out-of-root, symlinked, or oversized results fail closed instead of causing inline exploration.
+
+- **Runtime instructions now live with the agent that executes them.** Host-neutral worker contracts under `src/workers/` own pre-flight and interview research, the adversarial plan review, reject/repair/flag merging, item implementation, and final verification. The generated coordinator keeps the adaptive interview, fork decisions, approval and re-review gates, sequencing, blocker handling, commit ownership, and final hand-off. Native same-model reviewers write findings to the plan's evidence directory and return only a result pointer; stdin/stdout peer CLIs remain compatible through one deterministic on-disk brief assembled from the same reviewer contract and complete plan.
+
+- **The generated always-resident coordinator is smaller without splitting the user conversation or changing either host's execution semantics.** The Claude build falls from 152,121 to 133,522 bytes and the Codex build from 156,477 to 136,903 bytes, with a 138,000-byte regression ceiling. Claude retains its sequential whole-run Workflow and worker-owned commits; Codex retains native sequential subagents, coordinator-owned commits, resumable blockers, and the guarded nested-CLI fallback. Context-residency policy, worker contracts, budgets, and failure behavior are shared; only native invocation mechanics remain host-specific.
+
+### Added
+
+- **Two deterministic helpers and focused offline coverage enforce the context firewall.** `bin/pln-read-envelope` validates that a non-empty result is a regular in-plan file and within its byte budget before printing any bytes; `bin/pln-build-review-brief` produces the byte-identical reviewer input used by native and peer readers. `tests/envelope.sh` covers boundaries and path escapes, `tests/worker-contracts.sh` pins contract completeness and host neutrality, and `tests/generate.sh` now guards mandatory research dispatch, worker-detail exclusion, host commit/blocker invariants, and the coordinator-size ceiling.
+
 ## 1.30.0 — 2026-08-12
 
 ### Changed

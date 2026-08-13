@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# pln-build-review-brief — assemble one byte-identical plan review brief for
+# native and prompt-in/text-out readers without loading either input in the
+# coordinator conversation.
+set -euo pipefail
+
+usage() {
+  echo "Usage: pln-build-review-brief --contract FILE --plan FILE --root DIR --commit SHA --out FILE" >&2
+  exit 2
+}
+
+CONTRACT=""
+PLAN=""
+ROOT=""
+COMMIT=""
+OUT=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --contract) CONTRACT="${2:-}"; shift 2 ;;
+    --plan) PLAN="${2:-}"; shift 2 ;;
+    --root) ROOT="${2:-}"; shift 2 ;;
+    --commit) COMMIT="${2:-}"; shift 2 ;;
+    --out) OUT="${2:-}"; shift 2 ;;
+    -h|--help) usage ;;
+    *) echo "pln-build-review-brief: unknown argument '$1'" >&2; usage ;;
+  esac
+done
+
+[ -n "$CONTRACT" ] && [ -n "$PLAN" ] && [ -n "$ROOT" ] && [ -n "$COMMIT" ] && [ -n "$OUT" ] || usage
+[ -f "$CONTRACT" ] && [ -r "$CONTRACT" ] || { echo "pln-build-review-brief: unreadable contract: $CONTRACT" >&2; exit 1; }
+[ -f "$PLAN" ] && [ -r "$PLAN" ] || { echo "pln-build-review-brief: unreadable plan: $PLAN" >&2; exit 1; }
+
+mkdir -p "$(dirname "$OUT")"
+TMP="$(mktemp "${TMPDIR:-/tmp}/pln-review-brief.XXXXXX")"
+trap 'rm -f "$TMP"' EXIT
+{
+  printf 'Repository root: %s\nPlan file: %s\nRepository commit: %s\n\n' "$ROOT" "$PLAN" "$COMMIT"
+  cat "$CONTRACT"
+  printf '\n\n--- PLAN ---\n'
+  cat "$PLAN"
+  printf '\n--- END PLAN ---\n'
+} > "$TMP"
+mv "$TMP" "$OUT"
+trap - EXIT

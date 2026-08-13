@@ -318,6 +318,48 @@ done <<< "$targets"
 # checks above would pass on an empty file.
 has "$real_c/SKILL.md" 'Workflow' "the claude build has no Workflow mechanics"
 has "$real_x/SKILL.md" 'pln-codex-agent' "the codex build has no Codex agent mechanics"
+has "$real_c/SKILL.md" 'commit owner: worker' \
+  "the claude build lost worker-owned item commits"
+has "$real_x/SKILL.md" 'commit owner: coordinator' \
+  "the codex build lost coordinator-owned item commits"
+has "$real_c/SKILL.md" 'resumeFromRunId' \
+  "the claude build lost Workflow blocker resume"
+has "$real_x/SKILL.md" 'resume_agent' \
+  "the codex build lost native blocker resume"
+
+# This is a regression ceiling on the always-resident coordinator prompt, not a
+# target. The worker-owned contracts below are deliberately outside it. The
+# ceiling leaves a narrow allowance over this release's 133–137 KB builds while
+# preventing a return to the prior 152–156 KB coordinator.
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+  bytes="$(LC_ALL=C wc -c < "$f")"
+  bytes="${bytes//[[:space:]]/}"
+  [ "$bytes" -le 138000 ] \
+    || fail "$f is $bytes bytes; coordinator ceiling is 138000"
+done
+
+# Repository discovery is shared planning discipline: both coordinators must
+# delegate it, while the detailed worker contracts remain outside the generated
+# coordinator prompt.
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+  has "$f" '## Coordinator context firewall' "$f lost the shared context firewall"
+  has "$f" 'src/workers/preflight-research.md' "$f does not mandate a pre-flight research worker"
+  has "$f" '8192-byte ceiling' "$f lost the pre-flight envelope budget"
+  has "$f" 'src/workers/interview-research.md' "$f does not mandate per-item research"
+  has "$f" 'Before the first proposal for every active item' "$f makes per-item research optional"
+  has "$f" 'decision-record-query mode' "$f lost query-scoped prior-decision checks"
+  has "$f" '.git/info/exclude' "$f does not keep local plans out of .gitignore"
+  has "$f" 'Outside a git worktree' "$f does not allocate an external non-git run directory"
+  hasnt "$f" 'WORKER_ONLY_SENTINEL_' "$f embedded worker-only runtime instructions"
+  has "$f" 'Outside a git worktree, use the external temporary run directory' \
+    "$f contradicts pre-flight's non-git plan location"
+done
+hasnt "$real_c/SKILL.md" "Codex's native path" \
+  "the claude build explains its blocker mechanics through the other host"
+hasnt "$real_x/SKILL.md" "Claude path's behavior" \
+  "the codex build explains its blocker mechanics through the other host"
+hasnt "$real_x/SKILL.md" 'where Claude was launched' \
+  "the codex build carries a Claude-specific plan-path rule"
 
 # The Style section is one shared source read by both skills. Every build of
 # both targets carries it whole, host voice fragment included — a rule added to
@@ -388,17 +430,18 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
 done
 
 # ─── the plan review, as skill text ───────────────────────────────────────────
-# Step 3.5 and the three sections it runs in order are prose a model reads, not
-# code — there is no entry point a bash test could drive. So what is asserted is
-# that the rules survive into both builds, and that the one host-specific part
-# of the step (spawning the rung-3 reviewer) is the host's own.
+# Step 3.5 keeps coordinator policy in the generated skill while the detailed
+# reviewer and merge rubrics remain in installed worker contracts.
 for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
   has "$f" '### Step 3.5. Plan review' "$f lost the plan review step"
   has "$f" '## The plan review switch' "$f lost the plan review switch"
   has "$f" 'plan_review' "$f names no config key for the switch"
   has "$f" 'The size of the plan never does' "$f lost the rule that plan size changes nothing"
-  has "$f" "## The reviewer's brief" "$f lost the reviewer's brief"
-  has "$f" '## What a finding becomes' "$f lost the findings rules"
+  has "$f" '## Plan review ownership' "$f lost review ownership policy"
+  has "$f" 'src/workers/plan-review.md' "$f lost the reviewer contract pointer"
+  has "$f" 'src/workers/plan-review-merge.md' "$f lost the merge contract pointer"
+  has "$f" 'pln-build-review-brief' "$f no longer assembles one on-disk brief"
+  has "$f" 'Never open raw findings in this context' "$f may read raw findings inline"
   # One test decides what spends the user's attention, and both surfaces run it.
   # Two separately-worded batteries is what filled the gate with a log of the
   # agent's own work.
@@ -414,34 +457,13 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
   # said out loud, because a user who never opens PLAN.md cannot be told by it.
   has "$f" 'a channel to the user' \
     "$f lost the rule that the plan record is not how the user is told"
-  # A finding ends in one of three places, and each matters. Lose the reject
-  # lane and a reviewer's disagreement with this skill reaches the user to
-  # adjudicate; let a rejection go unrecorded and its misfires are invisible.
-  has "$f" 'ends in one of three places' "$f lost the three outcomes a finding can have"
-  has "$f" '### Rejected' "$f lost the reject lane"
-  has "$f" '### Repaired' "$f lost the repair lane"
-  has "$f" 'Judge by substance, never by phrasing' \
-    "$f lost the rule that a reject is judged on substance, not on how it is worded"
-  has "$f" 'Record every rejection' \
-    "$f lost the rule that a rejection is recorded rather than dropped"
-  has "$f" 'Findings that share a root are one entry.' \
-    "$f lost the rule that findings reopening one decision are one entry"
-  # The repair lane is three conjunctive tests. Losing any one lets a fork, an
-  # invented citation, or a user's own decision be rewritten in the plan with
-  # nobody having seen it. The first must stay checkable: uniqueness is not.
-  has "$f" 'The least-scope repair restores an outcome the plan already records, and you can name both.' \
-    "$f lost the checkable test in front of a repair"
-  has "$f" 'Do not test whether the repair is the only possible one.' \
-    "$f lost the ban on the uncheckable uniqueness test"
-  has "$f" 'a rule they wrote is not a decision they made about this case' \
-    "$f lost the rule that applying the user's own rule can itself be the fork"
-  has "$f" 'It quotes what it rests on, and the quote is real.' \
-    "$f lost the evidence test in front of an applied finding"
-  has "$f" 'It does not land on a decision the user made.' \
-    "$f lost the provenance test in front of an applied finding"
-  has "$f" 'Why a user decision is never moved.' \
-    "$f lost the rule that a finding never moves a user's decision"
+  has "$f" 'A finding on a user-made decision is always protected from repair' \
+    "$f lost coordinator-facing user-decision protection"
+  has "$f" 'Flagging is reserved for material user-owned forks' \
+    "$f lost coordinator-facing outcome policy"
   has "$f" 'How a decision is recorded' "$f lost the rule that makes the plan readable alone"
+  hasnt "$f" '### Rejected' "$f embeds worker-only rejection detail"
+  hasnt "$f" 'Judge by substance, never by phrasing' "$f embeds worker-only merge detail"
 done
 
 # The same-model reviewer is spawned on this host, so that block — and only that
@@ -449,7 +471,7 @@ done
 # same brief file the peer would have been handed, and say how to run it
 # alongside the peer rather than after it.
 spawn_of() { # spawn_of <file>
-  awk '/^\*\*Spawning the same-model reviewer/,/^A reviewer that errored/' "$1"
+  awk '/^\*\*Spawning the same-model reviewer/,/^The review runs once/' "$1"
 }
 spawn_c="$(spawn_of "$real_c/SKILL.md")"
 spawn_x="$(spawn_of "$real_x/SKILL.md")"
@@ -458,7 +480,7 @@ spawn_x="$(spawn_of "$real_x/SKILL.md")"
 grep -qF 'agentType' <<<"$spawn_c" || fail "the claude build's reviewer is not a harness agent"
 grep -qF 'pln-codex-agent' <<<"$spawn_x" || fail "the codex build's reviewer is not a codex spawn"
 grep -qF 'read-only' <<<"$spawn_x" || fail "the codex build's reviewer is not read-only"
-grep -qF 'brief file' <<<"$spawn_c" \
+grep -qF 'plan-review.brief.md' <<<"$spawn_c" \
   || fail "the claude build's reviewer is not pointed at the brief file"
 grep -qF 'plan-review.brief.md' <<<"$spawn_x" \
   || fail "the codex build's reviewer is not handed the brief the peer would have had"

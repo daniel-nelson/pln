@@ -427,6 +427,22 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
     '## Ship' '## Reversals' '## Verification' '## Spinoffs' '## Cross-item notes'; do
     has "$f" "$section" "$f lost '$section' from the dashboard skeleton"
   done
+
+  # The outline is a turn boundary, not only a file shape. It gives the user a
+  # cheap scope-editing pass before any item-level question or implementation,
+  # and edits loop through the displayed dashboard until the current outline is
+  # accepted. Delegated mode keeps the display but uses its advance adoption;
+  # auto mode has no effect on this checkpoint.
+  has "$f" "This checkpoint is the user's scope-editing surface" \
+    "$f does not explain the initial outline checkpoint's purpose"
+  has "$f" 'ask no item-level interview question in that turn, and perform no implementation' \
+    "$f does not preserve the post-skeleton turn boundary"
+  has "$f" 'update the skeleton before the interview starts, re-show the complete dashboard, and ask again' \
+    "$f does not apply checkpoint edits before the interview"
+  has "$f" 'In delegated mode there is nothing to ask: show the dashboard and go straight into Step 3' \
+    "$f lost the delegated-mode outline display and advance adoption"
+  has "$f" 'Auto mode does not bypass this checkpoint' \
+    "$f lets auto mode bypass the initial outline checkpoint"
 done
 
 # ─── the plan review, as skill text ───────────────────────────────────────────

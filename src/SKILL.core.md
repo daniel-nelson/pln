@@ -318,7 +318,11 @@ Rows are never removed and numbers are never reused. An item that is dropped or 
 
 Items in the dashboard are one-line summaries. Detail sections are stub-brief at this point; they fill in during the interview and the per-item loop with Decisions, Commit, Open questions, Discoveries, Dead ends, Artifacts as the work unfolds.
 
-After writing the skeleton, **stop**. Show the user the dashboard (not the whole file) and prompt: "Plan written to `<path>`. Ready to start the interview?" If the user answers in the affirmative, begin the interview phase (Step 3). In delegated mode there is nothing to ask: show the dashboard and go straight into Step 3 (see Delegated mode).
+This checkpoint is the user's scope-editing surface: a chapter-outline view for understanding the whole shape and removing, adding, renaming, or reordering items while those changes are still cheap, before entering item-level discussion. It is distinct from Step 4's approval of the fully resolved plan before implementation.
+
+After writing the skeleton, **stop**. In normal mode, show the user the complete dashboard (not the whole file), ask no item-level interview question in that turn, and perform no implementation. Prompt: "Plan written to `<path>`. Ready to start the interview?" Only an affirmative answer to the current outline begins the interview phase (Step 3). If the user changes the outline instead, update the skeleton before the interview starts, re-show the complete dashboard, and ask again.
+
+In delegated mode there is nothing to ask: show the dashboard and go straight into Step 3 (see Delegated mode). Auto mode does not bypass this checkpoint; it changes only Step 5 blocker handling (see Auto-mode behavior).
 
 ### Step 3. Interview phase
 

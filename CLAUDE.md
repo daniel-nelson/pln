@@ -29,6 +29,12 @@ The reason is that the reimplementation rots. When pln's Codex spawning was buil
 - Preview a build without touching the tree: `bin/pln-generate --host codex --out-dir /tmp/out`.
 - Anything host-specific you add must exist for both hosts. Text that is true on only one belongs in a `pln:only` block, not in the core.
 
+## The initial outline checkpoint is intentional
+
+`/pln` writes and shows the plan skeleton, then stops before the item-by-item interview. Do not remove that stop, merge it into the first interview question, or describe it as redundant permission friction.
+
+The checkpoint gives the user a chapter-outline view before entering the details. It lets them understand the whole shape, strike items that should not be discussed, and add missing items while the plan is still cheap to change. The later master-plan approval gate serves a different purpose: it approves the fully resolved plan before implementation. Both checkpoints stay.
+
 ## Voice and register fixes are Claude-specific until proven otherwise
 
 The rules about how the skill *sounds* — cutting padding, the deletion test, not restating a fact three times, not posturing, defining a term before using it — exist because of Claude's register, not because planning needs them. Codex does not exhibit these habits; that is why `src/hosts/codex/voice.md` and `src/hosts/claude/voice.md` are separate files rather than one shared fragment.

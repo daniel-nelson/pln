@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pln-assurance — deterministic assurance-tier, roster, and candidate identity.
+# pln-assurance — deterministic assurance tier, roster, repair progress, and candidate identity.
 set -euo pipefail
 
 usage() {
@@ -7,6 +7,7 @@ usage() {
 Usage:
   pln-assurance classify --signals CSV --substantive-files N --non-generated-lines N
   pln-assurance roster --risk R1|R2|R3 --areas CSV --adversary peer|local
+  pln-assurance repair-action --disposition new|persisted|needs-decision|out-of-scope|destructive|worker-blocked --failed-attempts N
   pln-assurance fingerprint --root DIR --commands FILE --environment FILE
 USAGE
   exit 2
@@ -109,6 +110,41 @@ case "$command" in
         printf 'SLOT\tadversarial\tsame-model\n'
       fi
     fi
+    ;;
+
+  repair-action)
+    disposition=""
+    failed_attempts=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --disposition) disposition="${2:-}"; shift 2 ;;
+        --failed-attempts) failed_attempts="${2:-}"; shift 2 ;;
+        *) usage ;;
+      esac
+    done
+    whole_number "$failed_attempts" || usage
+
+    action="block"
+    case "$disposition" in
+      new)
+        [ "$failed_attempts" -eq 0 ] || usage
+        action="repair"
+        reason="new-verified-finding"
+        ;;
+      persisted)
+        if [ "$failed_attempts" -lt 3 ]; then
+          action="repair"
+          reason="same-defect-retry"
+        else
+          reason="same-defect-stuck"
+        fi
+        ;;
+      needs-decision | out-of-scope | destructive | worker-blocked)
+        reason="$disposition"
+        ;;
+      *) usage ;;
+    esac
+    printf 'ACTION=%s\nREASON=%s\nFAILED_ATTEMPTS=%s\n' "$action" "$reason" "$failed_attempts"
     ;;
 
   fingerprint)

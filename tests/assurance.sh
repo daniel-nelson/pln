@@ -45,6 +45,29 @@ out="$($ASSURANCE roster --risk R2 --areas data,testing,security --adversary loc
 out="$($ASSURANCE roster --risk R1 --areas security --adversary peer)"
 [ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 1 ] || fail 'R1 roster was not broad-only'
 
+# Adopted shipping authorizes every new, verified, in-scope repair regardless
+# of how many prior review rounds ran. Only per-defect non-progress or a real
+# user-owned boundary can stop the unattended flow.
+out="$($ASSURANCE repair-action --disposition new --failed-attempts 0)"
+has_line "$out" 'ACTION=repair' 'a new round-two finding asked for redundant permission'
+has_line "$out" 'REASON=new-verified-finding' 'a new finding lost its repair reason'
+
+out="$($ASSURANCE repair-action --disposition persisted --failed-attempts 2)"
+has_line "$out" 'ACTION=repair' 'a same-defect retry stopped before the stuck threshold'
+
+out="$($ASSURANCE repair-action --disposition persisted --failed-attempts 3)"
+has_line "$out" 'ACTION=block' 'three failed repairs of the same defect did not stop'
+has_line "$out" 'REASON=same-defect-stuck' 'a stuck defect lost its blocker reason'
+
+for disposition in needs-decision out-of-scope destructive worker-blocked; do
+  out="$($ASSURANCE repair-action --disposition "$disposition" --failed-attempts 0)"
+  has_line "$out" 'ACTION=block' "$disposition did not preserve a genuine blocker"
+done
+
+if "$ASSURANCE" repair-action --disposition persisted --failed-attempts nope >/dev/null 2>&1; then
+  fail 'repair action accepted a non-numeric attempt count'
+fi
+
 # Fingerprints bind verification to the exact candidate tree, command set, and
 # relevant environment. Any one changing invalidates reuse.
 FIXTURE="$(mktemp -d "${TMPDIR:-/tmp}/pln-assurance-test.XXXXXX")"

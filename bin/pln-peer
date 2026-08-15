@@ -67,13 +67,16 @@
 #
 #   pln-config set peer_command "gemini -p"
 #
-# Prints exactly five KEY=VALUE lines on stdout and nothing else:
+# Prints exactly eight KEY=VALUE lines on stdout and nothing else:
 #
 #   RUNG=1|2|3
 #   PEER=<the command that ran, or 'none' on rung 3>
 #   STATUS=ok|ready|empty|timeout|error|none|consent|declined
 #   RESULT_FILE=<path, empty on rung 3>
 #   LOG_FILE=<path, empty on rung 3>
+#   ACTUAL_PROFILE=judgment|none
+#   ACTUAL_MODEL=<selected model, or a truthful unreported/unavailable value>
+#   ACTUAL_EFFORT=<selected effort, or a truthful unreported/unavailable value>
 #
 # Exit codes: 0 a peer ran and wrote a result · 2 usage error · 3 no peer is
 # available, so the caller falls back to a fresh same-model agent (rung 3) ·
@@ -144,12 +147,19 @@ case "$HOST" in
   *) echo "pln-peer: --host must be claude or codex" >&2; exit 2 ;;
 esac
 
+ACTUAL_PROFILE="none"
+ACTUAL_MODEL="unavailable"
+ACTUAL_EFFORT="unavailable"
+
 report() { # report <rung> <peer> <status> <result-file> <log-file>
   echo "RUNG=$1"
   echo "PEER=$2"
   echo "STATUS=$3"
   echo "RESULT_FILE=$4"
   echo "LOG_FILE=$5"
+  echo "ACTUAL_PROFILE=$ACTUAL_PROFILE"
+  echo "ACTUAL_MODEL=$ACTUAL_MODEL"
+  echo "ACTUAL_EFFORT=$ACTUAL_EFFORT"
 }
 
 # Same fallback the agent helpers use: coreutils installs timeout(1) as
@@ -224,6 +234,41 @@ if [ -n "$PEER_COMMAND" ]; then
   # the command's own name rather than the whole line.
   set -- $PEER_COMMAND
   PEER_LABEL="$(basename "${1:-peer_command}")"
+fi
+
+# A peer is a judgment path, never the economy lane. Known peers resolve the
+# current frontier target and high effort before consent is checked; this is a
+# local metadata operation and sends no material. A configured command is the
+# user's complete invocation, so its underlying model remains unreported.
+ROUTED_MODEL=""
+ROUTED_EFFORT=""
+if [ "$RUNG" = "1" ]; then
+  ACTUAL_PROFILE="judgment"
+  ACTUAL_MODEL="configured-peer-unreported"
+  ACTUAL_EFFORT="configured-peer-unreported"
+else
+  if [ -n "$MODEL" ]; then
+    ROUTED_MODEL="$MODEL"
+    ROUTED_EFFORT="high"
+  elif [ -x "$SELF_DIR/pln-model-route" ]; then
+    route_out="$($SELF_DIR/pln-model-route resolve --host "$PEER" --profile judgment \
+      --current-capability below 2>/dev/null)" || {
+        report 3 none none "" ""
+        exit 3
+      }
+    ROUTED_MODEL="$(printf '%s\n' "$route_out" | sed -n 's/^MODEL_ARGUMENT=//p')"
+    ROUTED_EFFORT="$(printf '%s\n' "$route_out" | sed -n 's/^EFFORT=//p')"
+  else
+    report 3 none none "" ""
+    exit 3
+  fi
+  [ -n "$ROUTED_MODEL" ] && [ "$ROUTED_MODEL" != "none" ] || {
+    report 3 none none "" ""
+    exit 3
+  }
+  ACTUAL_PROFILE="judgment"
+  ACTUAL_MODEL="$ROUTED_MODEL"
+  ACTUAL_EFFORT="${ROUTED_EFFORT:-high}"
 fi
 
 # ── the one-time consent, checked once a peer is actually in hand ────────────
@@ -309,18 +354,21 @@ fi
 # Rung 2 goes through the helper that owns that CLI's guards, so this script
 # never reproduces an invocation a second time.
 HELPER_ARGS=(--brief "$BRIEF" --out "$OUT" --cd "$CD_DIR" --timeout "$TIMEOUT_SECS")
+[ "$RUNG" = "2" ] && HELPER_ARGS+=(--profile judgment)
 [ "$DRY_RUN" = "1" ] && HELPER_ARGS+=(--dry-run)
 case "$PEER" in
   claude)
     HELPER="$SELF_DIR/pln-claude-agent"
     HELPER_ARGS+=(--log "$LOG")
-    [ -n "$MODEL" ] && HELPER_ARGS+=(--model "$MODEL")
+    [ -n "$ROUTED_MODEL" ] && HELPER_ARGS+=(--model "$ROUTED_MODEL")
+    [ -n "$ROUTED_EFFORT" ] && HELPER_ARGS+=(--effort "$ROUTED_EFFORT")
     ;;
   codex)
     HELPER="$SELF_DIR/pln-codex-agent"
     # A peer only reads; the events file is that helper's log.
     HELPER_ARGS+=(--events "$LOG" --sandbox read-only)
-    [ -n "$MODEL" ] && HELPER_ARGS+=(--model "$MODEL")
+    [ -n "$ROUTED_MODEL" ] && HELPER_ARGS+=(--model "$ROUTED_MODEL")
+    [ -n "$ROUTED_EFFORT" ] && HELPER_ARGS+=(--effort "$ROUTED_EFFORT")
     ;;
 esac
 HELPER_ARGS+=(${ADD_ARGS[@]+"${ADD_ARGS[@]}"})

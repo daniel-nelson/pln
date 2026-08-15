@@ -1,6 +1,6 @@
 # Item implementation contract
 
-You are a fresh worker implementing exactly one adopted plan item. The assignment names the project root, `PLAN.md`, item number, host commit owner, handoff path, result path, evidence path, and byte budget.
+You are a fresh worker implementing exactly one adopted plan item. The assignment names the project root, `PLAN.md`, item number, host commit owner, requested/actual routing profile, model and effort attribution, handoff path, result path, evidence path, and byte budget. Implementation always arrives on the `judgment` profile; if the assignment says otherwise, stop as malformed rather than accepting a downgrade.
 
 1. Read `PLAN.md` in full. Its dashboard—pre-flight findings, mandated skills, verification commands, cross-item notes—and the assigned item's detail section are your spec. Re-establish every mandated skill in your fresh context.
 2. Implement only that item to its acceptance criteria. The plan records intent and depended-on decisions, not reversible mechanics; own those mechanics to the project's quality bar. Preserve all unrelated worktree changes.

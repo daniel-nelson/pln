@@ -60,6 +60,27 @@ case "$HOST" in
   *) echo "Built for Claude Code. Restart Claude Code to pick up the new skills." ;;
 esac
 
+# ─── One-time optional economy-evidence nudge ───────────────
+# This is setup-time discoverability only. `/pln` never interrupts an
+# interview to advertise it, and an older host without usable model/effort
+# controls gets a clean no-op so setup remains portable.
+if [ "$("$SKILL_DIR/bin/pln-config" get economy_nudge_shown 2>/dev/null)" != "true" ] \
+  && [ -x "$SKILL_DIR/bin/pln-model-route" ]; then
+  set +e
+  ECONOMY_ROUTE="$("$SKILL_DIR/bin/pln-model-route" probe --host "$HOST" 2>/dev/null)"
+  ECONOMY_RC=$?
+  set -e
+  ECONOMY_STATUS="$(printf '%s\n' "$ECONOMY_ROUTE" | sed -n 's/^STATUS=//p')"
+  if [ "$ECONOMY_RC" -eq 0 ] && [ "$ECONOMY_STATUS" = "available" ]; then
+    echo ""
+    echo "Optional: pln can route only bounded fact-and-citation collection to a lower-cost model."
+    echo "  Same-host work currently inherits your selected model; implementation, review, and"
+    echo "  user-facing decisions always stay on the judgment profile. Enable the narrow lane with:"
+    echo "  \"$SKILL_DIR/bin/pln-config\" set evidence_profile economy"
+    "$SKILL_DIR/bin/pln-config" set economy_nudge_shown true >/dev/null
+  fi
+fi
+
 # ─── One-time peer / cross-model check nudge ─────────────────
 # pln can send a plan or PR diff to a second model for review, but that only
 # happens when a peer CLI is actually reachable. Tell a user who has none

@@ -18,6 +18,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN="$SCRIPT_DIR/../bin/pln-config"
+ROUTER="$SCRIPT_DIR/../bin/pln-model-route"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/pln-config-test.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
@@ -35,8 +36,15 @@ eq() { # eq <got> <want> <description>
 # Every caller in the suite reads a key before anything has ever written one, so
 # this is the common case, not the edge one.
 eq "$("$BIN" get peer_command)" "" "a missing config file did not read as empty"
-eq "$("$BIN" list)" "" "list on a missing config file printed something"
+eq "$("$BIN" get evidence_profile)" "inherit" "an unset evidence profile did not default to inherit"
+eq "$("$BIN" list)" "evidence_profile: inherit" "list did not expose the default evidence profile"
 [ -e "$CONFIG" ] && fail "a read created the config file"
+
+# --- evidence routing is opt-in and validated -------------------------------
+"$BIN" set evidence_profile economy
+eq "$("$BIN" get evidence_profile)" "economy" "economy evidence routing did not round-trip"
+eq "$("$BIN" list | grep '^evidence_profile:' | wc -l | tr -d ' ')" "1" \
+  "list printed the evidence profile more than once"
 
 # --- a boolean survives the round trip byte-identical ------------------------
 "$BIN" set notify_push false
@@ -119,6 +127,49 @@ guard "set with no value" set lonely
 # the consent flow only ever writes true/false, and anything that wants a key
 # *un*answered has to remove the line, not blank it.
 guard "set with an empty value" set peer_consent ""
+guard "an unknown evidence profile" set evidence_profile turbo
 eq "$("$BIN" get peer_command)" "$CMD" "a rejected write still altered the file"
+
+# --- semantic model routing --------------------------------------------------
+route_field() { sed -n "s/^$1=//p" <<<"$2"; }
+
+route="$("$ROUTER" resolve --host claude --profile judgment \
+  --current-model claude-opus-5 --current-effort xhigh)"
+eq "$(route_field ACTUAL_PROFILE "$route")" "judgment" "Opus did not satisfy the judgment floor"
+eq "$(route_field MODEL "$route")" "claude-opus-5" "Opus was replaced instead of inherited"
+eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "Opus was forced through an override"
+eq "$(route_field EFFORT "$route")" "xhigh" "judgment routing downgraded an inherited frontier effort"
+
+route="$("$ROUTER" resolve --host claude --profile judgment \
+  --current-model claude-fable-5 --current-effort high)"
+eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "Fable was replaced instead of inherited"
+
+route="$("$ROUTER" resolve --host claude --profile judgment \
+  --current-model claude-sonnet-5 --current-effort medium)"
+eq "$(route_field MODEL_ARGUMENT "$route")" "fable" "a known-below-floor Claude model did not route to frontier"
+eq "$(route_field EFFORT "$route")" "high" "Claude judgment did not request high effort"
+
+rc=0
+route="$("$ROUTER" resolve --host codex --profile judgment \
+  --current-model custom-gateway-model 2>/dev/null)" || rc=$?
+eq "$rc" "5" "unknown judgment capability did not require a deliberate fallback"
+eq "$(route_field STATUS "$route")" "confirmation" "unknown judgment capability reported the wrong status"
+
+"$BIN" set evidence_profile inherit
+route="$(PLN_STATE_DIR="$PLN_STATE_DIR" "$ROUTER" resolve --host codex --profile evidence \
+  --current-model gpt-5.6-sol --current-effort high)"
+eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "default evidence routing did not inherit"
+eq "$(route_field EFFORT "$route")" "low" "bounded evidence did not use low effort"
+
+"$BIN" set evidence_profile economy
+route="$(PLN_STATE_DIR="$PLN_STATE_DIR" "$ROUTER" resolve --host codex --profile evidence \
+  --current-model gpt-5.6-sol --current-effort high --economy-available true)"
+eq "$(route_field MODEL_ARGUMENT "$route")" "gpt-5.6-luna" "opted-in Codex evidence did not use its economy profile"
+eq "$(route_field ACTUAL_PROFILE "$route")" "evidence" "economy evidence lost semantic attribution"
+
+route="$(PLN_STATE_DIR="$PLN_STATE_DIR" "$ROUTER" resolve --host codex --profile evidence \
+  --current-model gpt-5.6-sol --current-effort high --economy-available false)"
+eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "unavailable economy routing did not fall back to inherit"
+eq "$(route_field FALLBACK "$route")" "economy-unavailable" "the economy fallback was not attributed"
 
 echo "OK"

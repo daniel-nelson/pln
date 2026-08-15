@@ -9,9 +9,9 @@
 # builds a throwaway install directory shaped like a real one (`setup`,
 # `bin/pln-host`, `bin/pln-generate`, `bin/pln-config` — real copies, since
 # none of them shells out to an agent CLI or reads the developer's own
-# `~/.pln` once PLN_STATE_DIR/PLN_HOST are overridden — plus a fake
-# `bin/pln-peer`, since that is the one helper whose exit code and STATUS this
-# branch actually branches on) and runs the real `setup` script against it,
+# `~/.pln` once PLN_STATE_DIR/PLN_HOST are overridden — plus fake peer and
+# route helpers, since their exit codes and STATUS fields are what these
+# branches inspect) and runs the real `setup` script against it,
 # with PATH trimmed to a base so a bare command would fail loudly rather than
 # quietly finding something real.
 #
@@ -69,21 +69,21 @@ chmod +x "$SKILL/bin/pln-generate"
 
 cat > "$SKILL/bin/pln-peer" <<'FAKE_PEER'
 #!/usr/bin/env bash
-# A fake --which: prints the five-line contract and exits per scenario, so the
+# A fake --which: prints the eight-line contract and exits per scenario, so the
 # test controls exactly what setup's nudge branch sees.
 printf '%s\n' "$*" >> "${FAKE_PEER_LOG:-/dev/null}"
 case "${FAKE_PEER_SCENARIO:?FAKE_PEER_SCENARIO not set}" in
   ready)
-    printf 'RUNG=1\nPEER=fakepeer\nSTATUS=ready\nRESULT_FILE=\nLOG_FILE=\n'
+    printf 'RUNG=1\nPEER=fakepeer\nSTATUS=ready\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
     exit 0 ;;
   consent)
-    printf 'RUNG=2\nPEER=claude\nSTATUS=consent\nRESULT_FILE=\nLOG_FILE=\n'
+    printf 'RUNG=2\nPEER=claude\nSTATUS=consent\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
     exit 5 ;;
   declined)
-    printf 'RUNG=3\nPEER=none\nSTATUS=declined\nRESULT_FILE=\nLOG_FILE=\n'
+    printf 'RUNG=3\nPEER=none\nSTATUS=declined\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
     exit 3 ;;
   none)
-    printf 'RUNG=3\nPEER=none\nSTATUS=none\nRESULT_FILE=\nLOG_FILE=\n'
+    printf 'RUNG=3\nPEER=none\nSTATUS=none\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
     exit 3 ;;
   *) echo "FAKE_PEER: unknown scenario '$FAKE_PEER_SCENARIO'" >&2; exit 9 ;;
 esac
@@ -162,5 +162,40 @@ OUT="$(env PATH="$BASE_PATH" HOME="$FAKE_HOME" PLN_HOST="claude" PLN_STATE_DIR="
 [ "$RC" -eq 0 ] || fail "setup exited $RC when already nudged — output:\n$OUT"
 echo "$OUT" | grep -q "Tip:" && fail "an already-nudged install printed the tip again"
 peer_was_called && fail "an already-nudged install still called pln-peer"
+
+# --- optional economy evidence routing is surfaced once, only when usable ---
+cat > "$SKILL/bin/pln-model-route" <<'FAKE_ROUTE'
+#!/usr/bin/env bash
+case "${FAKE_ECONOMY_SCENARIO:-unavailable}" in
+  available) printf 'STATUS=available\nHOST=%s\nMODEL=economy\nEFFORT=low\n' "${3:-unknown}"; exit 0 ;;
+  unavailable) printf 'STATUS=unavailable\nHOST=%s\nMODEL=\nEFFORT=\n' "${3:-unknown}"; exit 3 ;;
+esac
+FAKE_ROUTE
+chmod +x "$SKILL/bin/pln-model-route"
+
+rm -rf "$STORE"; mkdir -p "$STORE"
+RC=0
+OUT="$(env PATH="$BASE_PATH" HOME="$FAKE_HOME" PLN_HOST=codex PLN_STATE_DIR="$STORE" \
+  FAKE_PEER_SCENARIO=ready FAKE_ECONOMY_SCENARIO=available "$SKILL/setup" 2>&1)" || RC=$?
+[ "$RC" -eq 0 ] || fail "setup exited $RC while surfacing economy routing — output:\n$OUT"
+echo "$OUT" | grep -q 'bounded fact-and-citation collection' \
+  || fail "available economy routing was not surfaced — output:\n$OUT"
+echo "$OUT" | grep -qF "$SKILL/bin/pln-config\" set evidence_profile economy" \
+  || fail "the economy notice did not include the exact enable command"
+[ "$(env PLN_STATE_DIR="$STORE" "$SKILL/bin/pln-config" get economy_nudge_shown)" = true ] \
+  || fail "the economy notice did not persist its one-time marker"
+
+OUT="$(env PATH="$BASE_PATH" HOME="$FAKE_HOME" PLN_HOST=codex PLN_STATE_DIR="$STORE" \
+  FAKE_PEER_SCENARIO=ready FAKE_ECONOMY_SCENARIO=available "$SKILL/setup" 2>&1)"
+echo "$OUT" | grep -q 'bounded fact-and-citation collection' \
+  && fail "the economy notice repeated after its marker was set"
+
+rm -rf "$STORE"; mkdir -p "$STORE"
+OUT="$(env PATH="$BASE_PATH" HOME="$FAKE_HOME" PLN_HOST=codex PLN_STATE_DIR="$STORE" \
+  FAKE_PEER_SCENARIO=ready FAKE_ECONOMY_SCENARIO=unavailable "$SKILL/setup" 2>&1)"
+echo "$OUT" | grep -q 'bounded fact-and-citation collection' \
+  && fail "unavailable economy routing printed a notice"
+[ "$(env PLN_STATE_DIR="$STORE" "$SKILL/bin/pln-config" get economy_nudge_shown)" = "" ] \
+  || fail "unavailable economy routing marked the notice as shown"
 
 echo "OK"

@@ -62,6 +62,10 @@ This skill follows pln's discipline. Never call the `AskUserQuestion` tool. Surf
 - **Findings are durable, best-effort.** Merged findings live in `REVIEW.md` before any fix runs, and Step 1 resumes an existing ledger rather than re-reviewing from scratch. Resume is best-effort, not transactional: a fix commit lands before its status is written back, so a crash in that narrow window can leave a fixed finding still marked `open` — on resume, re-checking it is cheap and safe, so prefer re-running a possibly-done fix over skipping a possibly-open one.
 - **Commit discipline:** commit only complete, verified work with the co-author trailer; never `--amend`, never `--no-verify`, never `git add -A` (stage fixed files by name).
 
+<!-- pln:include model-routing-policy -->
+
+<!-- pln:include model-routing-host -->
+
 ## Spawning a fresh-context agent
 
 Every reviewer, fix pass, and verification run below is a **fresh-context agent**: a blank-slate worker that gets one prompt, does the work, and returns one final message. It has none of this conversation's context, so its brief carries everything it needs — the diff command, the ledger path, the findings it owns.

@@ -1,5 +1,7 @@
 # Plan review merge contract
 
+Finding reconciliation is `judgment` work. The assignment includes requested/actual profile, model, and effort attribution; do not proceed on an evidence/economy route.
+
 You are the only worker that reads raw plan-review findings and the only review worker allowed to edit `PLAN.md`. Read the assigned plan, the peer findings path when that reader ran, the same-model findings path when that reader ran, and the stated review scope. Never infer that a missing, empty, errored, or timed-out result means the reader found nothing.
 
 ## Merge before classification

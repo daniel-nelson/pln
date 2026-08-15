@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# pln-model-route — resolve semantic worker profiles into host-local controls.
+set -euo pipefail
+
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(dirname "$SELF_DIR")"
+
+usage() {
+  cat >&2 <<'USAGE'
+Usage:
+  pln-model-route resolve --host <claude|codex> --profile <inherit|judgment|evidence> [options]
+  pln-model-route probe --host <claude|codex>
+
+Resolve options:
+  --current-model NAME
+  --current-effort LEVEL
+  --current-capability frontier|below|unknown
+  --evidence-profile inherit|economy
+  --economy-available true|false
+USAGE
+  exit 2
+}
+
+ACTION="${1:-}"
+[ "$ACTION" = "resolve" ] || [ "$ACTION" = "probe" ] || usage
+shift
+
+HOST=""
+PROFILE=""
+CURRENT_MODEL=""
+CURRENT_EFFORT=""
+CURRENT_CAPABILITY=""
+EVIDENCE_PROFILE=""
+ECONOMY_AVAILABLE="auto"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --host) HOST="${2:-}"; shift 2 ;;
+    --profile) PROFILE="${2:-}"; shift 2 ;;
+    --current-model) CURRENT_MODEL="${2:-}"; shift 2 ;;
+    --current-effort) CURRENT_EFFORT="${2:-}"; shift 2 ;;
+    --current-capability) CURRENT_CAPABILITY="${2:-}"; shift 2 ;;
+    --evidence-profile) EVIDENCE_PROFILE="${2:-}"; shift 2 ;;
+    --economy-available) ECONOMY_AVAILABLE="${2:-}"; shift 2 ;;
+    *) echo "pln-model-route: unknown argument '$1'" >&2; usage ;;
+  esac
+done
+
+case "$HOST" in claude | codex) ;; *) usage ;; esac
+PROFILE_FILE="$ROOT_DIR/src/hosts/$HOST/model-profiles"
+[ -f "$PROFILE_FILE" ] || { echo "pln-model-route: missing host profiles at $PROFILE_FILE" >&2; exit 3; }
+# shellcheck disable=SC1090
+. "$PROFILE_FILE"
+
+probe_available() {
+  local help
+  case "$HOST" in
+    claude)
+      command -v claude >/dev/null 2>&1 || return 1
+      help="$(claude --help 2>/dev/null || true)"
+      grep -q -- '--model' <<<"$help" && grep -q -- '--effort' <<<"$help"
+      ;;
+    codex)
+      command -v codex >/dev/null 2>&1 || return 1
+      help="$(codex exec --help 2>/dev/null || true)"
+      grep -q -- '--model' <<<"$help" && grep -q -- '--config' <<<"$help"
+      ;;
+  esac
+}
+
+if [ "$ACTION" = "probe" ]; then
+  if probe_available; then
+    echo 'STATUS=available'
+    echo "HOST=$HOST"
+    echo "MODEL=$ECONOMY_MODEL"
+    echo "EFFORT=$EVIDENCE_EFFORT"
+    exit 0
+  fi
+  echo 'STATUS=unavailable'
+  echo "HOST=$HOST"
+  echo 'MODEL='
+  echo 'EFFORT='
+  exit 3
+fi
+
+case "$PROFILE" in inherit | judgment | evidence) ;; *) usage ;; esac
+case "$CURRENT_CAPABILITY" in '' | frontier | below | unknown) ;; *) usage ;; esac
+case "$ECONOMY_AVAILABLE" in auto | true | false) ;; *) usage ;; esac
+
+lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+judgment_effort() {
+  case "$1" in
+    high | xhigh | max | ultracode) printf '%s\n' "$1" ;;
+    *) printf '%s\n' "$JUDGMENT_EFFORT" ;;
+  esac
+}
+CURRENT_LOWER="$(lower "$CURRENT_MODEL")"
+if [ -z "$CURRENT_CAPABILITY" ]; then
+  if [ -z "$CURRENT_MODEL" ]; then
+    CURRENT_CAPABILITY="unknown"
+  elif [[ "$CURRENT_LOWER" =~ $FRONTIER_PATTERN ]]; then
+    CURRENT_CAPABILITY="frontier"
+  elif [[ "$CURRENT_LOWER" =~ $BELOW_FLOOR_PATTERN ]]; then
+    CURRENT_CAPABILITY="below"
+  else
+    CURRENT_CAPABILITY="unknown"
+  fi
+fi
+
+STATUS="ok"
+ACTUAL_PROFILE="$PROFILE"
+MODEL="${CURRENT_MODEL:-inherited-unreported}"
+MODEL_ARGUMENT="inherit"
+EFFORT="${CURRENT_EFFORT:-inherited-unreported}"
+FALLBACK="none"
+
+case "$PROFILE" in
+  inherit)
+    ;;
+  judgment)
+    EFFORT="$(judgment_effort "$CURRENT_EFFORT")"
+    case "$CURRENT_CAPABILITY" in
+      frontier)
+        MODEL="${CURRENT_MODEL:-inherited-frontier-unreported}"
+        ;;
+      below)
+        MODEL="$FRONTIER_MODEL"
+        MODEL_ARGUMENT="$FRONTIER_MODEL"
+        ;;
+      unknown)
+        STATUS="confirmation"
+        ACTUAL_PROFILE="unresolved"
+        MODEL="${CURRENT_MODEL:-unknown}"
+        MODEL_ARGUMENT="none"
+        EFFORT="none"
+        FALLBACK="deliberate-inherit-required"
+        ;;
+    esac
+    ;;
+  evidence)
+    [ -n "$EVIDENCE_PROFILE" ] || EVIDENCE_PROFILE="$($SELF_DIR/pln-config get evidence_profile 2>/dev/null || true)"
+    [ -n "$EVIDENCE_PROFILE" ] || EVIDENCE_PROFILE="inherit"
+    case "$EVIDENCE_PROFILE" in inherit | economy) ;; *) EVIDENCE_PROFILE="inherit" ;; esac
+    EFFORT="$EVIDENCE_EFFORT"
+    if [ "$EVIDENCE_PROFILE" = "economy" ]; then
+      if [ "$ECONOMY_AVAILABLE" = "auto" ]; then
+        probe_available && ECONOMY_AVAILABLE="true" || ECONOMY_AVAILABLE="false"
+      fi
+      if [ "$ECONOMY_AVAILABLE" = "true" ]; then
+        MODEL="$ECONOMY_MODEL"
+        MODEL_ARGUMENT="$ECONOMY_MODEL"
+      else
+        MODEL="${CURRENT_MODEL:-inherited-unreported}"
+        FALLBACK="economy-unavailable"
+      fi
+    fi
+    ;;
+esac
+
+echo "STATUS=$STATUS"
+echo "REQUESTED_PROFILE=$PROFILE"
+echo "ACTUAL_PROFILE=$ACTUAL_PROFILE"
+echo "MODEL=$MODEL"
+echo "MODEL_ARGUMENT=$MODEL_ARGUMENT"
+echo "EFFORT=$EFFORT"
+echo "FALLBACK=$FALLBACK"
+[ "$STATUS" = "ok" ] || exit 5

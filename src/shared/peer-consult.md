@@ -13,7 +13,7 @@ Write the brief to a file first and point `--brief` at it. The prompt never goes
 
 **Naming the paths only helps while the tree still matches the material.** Asking a peer to check the brief's claims against the files it names holds while those files are still the state the material was written against, so send the commit the material was taken from alongside the paths. A peer reading a repository that has moved past that commit is reading someone else's edits and will report them as errors in the material.
 
-The helper prints exactly five lines and nothing else, so reading it costs almost no context:
+The helper prints exactly eight lines and nothing else, so reading it costs almost no context:
 
 ```
 RUNG=2
@@ -21,6 +21,9 @@ PEER=codex
 STATUS=ok
 RESULT_FILE=/…/peer.out
 LOG_FILE=/…/peer.out.log
+ACTUAL_PROFILE=judgment
+ACTUAL_MODEL=<selected model, or configured-peer-unreported>
+ACTUAL_EFFORT=<selected effort, or configured-peer-unreported>
 ```
 
 The three rungs, in order. The helper walks them; nothing above it needs to know how:

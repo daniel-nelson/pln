@@ -72,7 +72,10 @@ res="$(run ok "$out")" || fail "successful run exited non-zero"
 grep -q '^STATUS=ok$' <<<"$res" || fail "success did not report STATUS=ok"
 grep -q "^RESULT_FILE=$out\$" <<<"$res" || fail "RESULT_FILE line missing or wrong"
 grep -q "^LOG_FILE=$out.log\$" <<<"$res" || fail "LOG_FILE did not default to <out>.log"
-[ "$(wc -l <<<"$res")" -eq 3 ] || fail "helper printed something other than its three lines"
+grep -q '^ACTUAL_PROFILE=inherit$' <<<"$res" || fail "default semantic profile was not attributed"
+grep -q '^ACTUAL_MODEL=inherited-unreported$' <<<"$res" || fail "default inherited model was not attributed truthfully"
+grep -q '^ACTUAL_EFFORT=inherited-unreported$' <<<"$res" || fail "default inherited effort was not attributed truthfully"
+[ "$(wc -l <<<"$res")" -eq 6 ] || fail "helper printed something other than its six lines"
 [ "$(cat "$out")" = "the peer said this" ] || fail "result file does not hold the peer's answer"
 [ -f "$out.log" ] || fail "no log file was written"
 
@@ -124,9 +127,10 @@ grep -q -- '--add-dir' <<<"$cmd" || fail "--add-dir was dropped"
 grep -q 'ANTHROPIC_API_KEY' <<<"$cmd" && fail "ANTHROPIC_API_KEY must be left alone — it is a legitimate way to authenticate"
 
 cmd="$("$BIN" --brief "$BRIEF" --out "$WORK/dry.out" --cd "$WORK" \
-  --tools Read --model some-model --dry-run 2>&1 >/dev/null)"
+  --tools Read --profile judgment --model some-model --effort high --dry-run 2>&1 >/dev/null)"
 grep -q -- '--tools Read ' <<<"$cmd" || fail "--tools was not honored"
 grep -q -- '--model some-model' <<<"$cmd" || fail "--model was not passed through"
+grep -q -- '--effort high' <<<"$cmd" || fail "--effort was not passed through"
 
 # --- usage errors write nothing and exit 2 -----------------------------------
 printf '' > "$WORK/blank.md"
@@ -142,6 +146,8 @@ guard "a brief that does not exist" --brief "$WORK/nope.md" --out "$WORK/x.out"
 guard "an empty brief" --brief "$WORK/blank.md" --out "$WORK/x.out"
 guard "a non-numeric timeout" --brief "$BRIEF" --out "$WORK/x.out" --timeout soon
 guard "an unknown argument" --brief "$BRIEF" --out "$WORK/x.out" --turbo
+guard "an unknown profile" --brief "$BRIEF" --out "$WORK/x.out" --profile guess
+guard "an unknown effort" --brief "$BRIEF" --out "$WORK/x.out" --effort enormous
 [ -e "$WORK/x.out" ] && fail "a usage error still created the output file"
 
 # A working root that does not exist is refused too, but that check runs after

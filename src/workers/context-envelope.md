@@ -9,6 +9,11 @@ The envelope has this exact top-level shape:
 ```text
 STATUS: <complete or blocked>
 SCOPE: <the exact question or item investigated>
+REQUESTED_PROFILE: <inherit, judgment, or evidence>
+ACTUAL_PROFILE: <profile that actually ran>
+ACTUAL_MODEL: <host-reported model, or selected alias plus "underlying unreported">
+ACTUAL_EFFORT: <host-reported effort, or unreported>
+ROUTING_FALLBACK: <fallback/escalation, or none>
 
 SUMMARY:
 <decision-relevant findings only>
@@ -31,6 +36,7 @@ EVIDENCE_FILE: <plan-directory-relative path to the detailed notes>
 Rules:
 
 - Use `STATUS: complete` only after investigating the whole assigned scope. If blocked, use `STATUS: blocked` and explain the blocker under `UNCERTAINTY`; do not manufacture a successful result.
+- Copy routing attribution from the assignment and update it from host-reported runtime metadata when available. Never turn a requested alias into an invented underlying model. If routing fell back or escalated, name why.
 - Every factual claim that could change the plan needs an exact durable reference. Use line numbers where the source format supports them.
 - Keep raw command output, long excerpts, exhaustive file lists, and discarded paths in the evidence file, never the envelope.
 - Do not implement, edit product files, commit, or broaden the assigned scope.

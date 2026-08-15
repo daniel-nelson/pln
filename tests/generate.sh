@@ -427,7 +427,20 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   has "$f" '## Consulting a peer model' "$f carries no peer section"
   has "$f" 'pln-peer' "$f does not reach the peer through the picker"
   has "$f" 'peer_consent' "$f names no consent key in front of the peer"
+  has "$f" '## Model and effort routing' "$f lost semantic model routing"
+  has "$f" '`inherit`' "$f lost the ordinary inherited profile"
+  has "$f" '`judgment`' "$f lost the frontier capability floor"
+  has "$f" '`evidence`' "$f lost the bounded evidence profile"
+  has "$f" 'actual profile, model, and effort' "$f does not require actual routing attribution"
 done
+has "$real_c/SKILL.md" '`fable`' "the Claude build lost its current frontier alias"
+has "$real_c/SKILL.md" '`sonnet`' "the Claude build lost its economy alias"
+hasnt "$real_c/SKILL.md" 'gpt-5.6-sol' "the Claude build contains Codex model mechanics"
+has "$real_x/SKILL.md" '`gpt-5.6-sol`' "the Codex build lost its current frontier model"
+has "$real_x/SKILL.md" '`gpt-5.6-luna`' "the Codex build lost its economy model"
+hasnt "$real_x/SKILL.md" '`fable`' "the Codex build contains Claude model mechanics"
+hasnt "$REPO_DIR/src/SKILL.core.md" 'gpt-5.6-sol' "the shared /pln core hardcodes an aging Codex model"
+hasnt "$REPO_DIR/src/pln-pr/SKILL.core.md" 'gpt-5.6-sol' "the shared /pln-pr core hardcodes an aging Codex model"
 # The line 1.15.0 shipped on the Codex side — that there is no second model to
 # consult from here — was replaced, not kept: rung 2 reaches for `claude` from
 # Codex exactly as it reaches for `codex` from Claude.

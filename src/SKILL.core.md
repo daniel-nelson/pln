@@ -157,6 +157,10 @@ Print the list, then offer to walk it the way Step 4 offers to walk its triaged 
 
 Nothing waives that list, including a spoken "just go, don't check with me" — that instruction is what entering the mode already means, and the list is what it was traded against. A run with nothing on the list says so in one line and proceeds. Everything else runs without interruption, which is the point of the mode.
 
+<!-- pln:include model-routing-policy -->
+
+<!-- pln:include model-routing-host -->
+
 ## Spawning a fresh-context agent
 
 Several steps below hand work to a **fresh-context agent**: a blank-slate worker that gets one prompt, does the work, and returns one final text message. The contract is the same everywhere in this skill, and it is a text convention, not a schema:

@@ -34,6 +34,11 @@ has "$merge" 'never repair over a user-made decision' 'merge contract lost user-
 has "$merge" '4096-byte budget' 'merge contract lost its bounded envelope'
 
 implementation="$REPO_DIR/src/workers/item-implementation.md"
+envelope="$REPO_DIR/src/workers/context-envelope.md"
+has "$envelope" 'REQUESTED_PROFILE:' 'result envelopes do not attribute the requested profile'
+has "$envelope" 'ACTUAL_PROFILE:' 'result envelopes do not attribute the actual profile'
+has "$envelope" 'ACTUAL_MODEL:' 'result envelopes do not attribute the actual model'
+has "$envelope" 'ACTUAL_EFFORT:' 'result envelopes do not attribute the actual effort'
 has "$implementation" 'When it says `worker`' 'implementation contract lost worker commit ownership'
 has "$implementation" 'When it says `coordinator`' 'implementation contract lost coordinator commit ownership'
 has "$implementation" 'host assignment owns which value applies' \

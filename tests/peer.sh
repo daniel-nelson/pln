@@ -24,7 +24,7 @@
 #   - a peer that is absent, unauthenticated, empty, failed, timed out, or
 #     answering with malformed output is a fallback or a failed run, never a
 #     review.
-#   - the five-line stdout contract, whatever happened underneath.
+#   - the eight-line stdout contract, including truthful routing attribution.
 #
 # Prints OK and exits 0 on success; any failed assertion aborts with a message.
 #
@@ -155,7 +155,7 @@ expect() { # expect <rung> <peer> <status> <rc> <description>
   [ "$(field RUNG)" = "$1" ] || fail "$5 — RUNG=$(field RUNG) (expected $1)"
   [ "$(field PEER)" = "$2" ] || fail "$5 — PEER=$(field PEER) (expected $2)"
   [ "$(field STATUS)" = "$3" ] || fail "$5 — STATUS=$(field STATUS) (expected $3)"
-  [ "$(wc -l <<<"$OUT")" -eq 5 ] || fail "$5 — printed $(wc -l <<<"$OUT") lines, not the five-line contract"
+  [ "$(wc -l <<<"$OUT")" -eq 8 ] || fail "$5 — printed $(wc -l <<<"$OUT") lines, not the eight-line contract"
 }
 
 fresh() { # fresh — forget every recorded run
@@ -287,6 +287,8 @@ expect 1 fakepeer ready 0 "a configured command outranking an installed peer"
 
 peer "$BOTH" --host codex --brief "$BRIEF" --out "$WORK/run.out"
 expect 1 fakepeer ok 0 "a configured peer that answered"
+[ "$(field ACTUAL_PROFILE)" = "judgment" ] || fail "a configured peer was not attributed as judgment"
+[ "$(field ACTUAL_MODEL)" = "configured-peer-unreported" ] || fail "a configured peer invented an actual model"
 [ "$(field RESULT_FILE)" = "$WORK/run.out" ] || fail "rung 1 did not name its result file"
 [ "$(field LOG_FILE)" = "$WORK/run.out.log" ] || fail "rung 1 did not default the log to <out>.log"
 [ "$(cat "$WORK/run.out")" = "the configured peer reviewed the plan" ] \
@@ -323,6 +325,8 @@ cfg peer_command -
 fresh
 peer "$BOTH" --host codex --brief "$BRIEF" --out "$WORK/run.out" --model some-model
 expect 2 claude ok 0 "a claude peer that answered"
+[ "$(field ACTUAL_PROFILE)" = "judgment" ] || fail "a Claude peer was not attributed as judgment"
+[ "$(field ACTUAL_EFFORT)" = "high" ] || fail "a Claude peer did not use judgment effort"
 [ "$(cat "$WORK/run.out")" = "claude reviewed the plan" ] \
   || fail "the claude peer's answer did not reach the result file"
 cmp -s "$BRIEF" "$WORK/claude.stdin" || fail "the brief did not reach the claude peer on stdin"
@@ -333,6 +337,9 @@ grep -q -- '--tools' "$WORK/claude.args" || fail "the claude peer was not restri
 fresh
 peer "$BOTH" --host claude --brief "$BRIEF" --out "$WORK/run.out" --add-dir "$WORK"
 expect 2 codex ok 0 "a codex peer that answered"
+[ "$(field ACTUAL_PROFILE)" = "judgment" ] || fail "a Codex peer was not attributed as judgment"
+[ "$(field ACTUAL_MODEL)" = "gpt-5.6-sol" ] || fail "a Codex peer did not resolve the frontier judgment model"
+grep -q -- 'model_reasoning_effort=.high.' "$WORK/codex.args" || fail "a Codex peer did not request high effort"
 [ "$(cat "$WORK/run.out")" = "codex reviewed the plan" ] \
   || fail "the codex peer's answer did not reach the result file"
 cmp -s "$BRIEF" "$WORK/codex.stdin" || fail "the brief did not reach the codex peer on stdin"
@@ -359,7 +366,10 @@ rung2_fails PLN_TEST_CODEX_RUN=timeout claude codex timeout "a codex peer that w
 # in a bin directory that is missing one of them.
 COPY="$WORK/copybin"
 mkdir -p "$COPY"
-cp "$REPO_BIN/pln-peer" "$REPO_BIN/pln-config" "$COPY/"
+cp "$REPO_BIN/pln-peer" "$REPO_BIN/pln-config" "$REPO_BIN/pln-model-route" "$COPY/"
+mkdir -p "$WORK/src/hosts/claude" "$WORK/src/hosts/codex"
+cp "$SCRIPT_DIR/../src/hosts/claude/model-profiles" "$WORK/src/hosts/claude/"
+cp "$SCRIPT_DIR/../src/hosts/codex/model-profiles" "$WORK/src/hosts/codex/"
 RC=0
 OUT="$(env PATH="$BOTH:$BASE_PATH" "$COPY/pln-peer" --host codex \
   --brief "$BRIEF" --out "$WORK/run.out" 2>"$WORK/stderr")" || RC=$?
@@ -379,7 +389,7 @@ OUT="$(env PATH="$BOTH:$BASE_PATH" "$COPY/pln-peer" --host codex \
   --brief "$BRIEF" --out "$WORK/run.out" 2>"$WORK/stderr")" || RC=$?
 [ "$(field RUNG)" = "2" ] || fail "a malformed helper answer changed the rung"
 [ "$(field STATUS)" = "ok" ] && fail "malformed helper output was reported as a review"
-[ "$(wc -l <<<"$OUT")" -eq 5 ] || fail "a malformed helper answer broke the five-line contract"
+[ "$(wc -l <<<"$OUT")" -eq 8 ] || fail "a malformed helper answer broke the eight-line contract"
 grep -q 'chatter' <<<"$OUT" && fail "the helper's own output leaked into pln-peer's stdout"
 
 echo "OK"

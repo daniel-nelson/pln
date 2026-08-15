@@ -12,27 +12,27 @@ The peer brief is file-first and self-contained. A peer may be prompt-in/text-ou
 
 The helper reports eight fixed metadata lines: rung, peer, status, result/log paths, and actual judgment profile/model/effort. Rung 1 is the configured `peer_command`; rung 2 is an authenticated supported CLI other than the host; rung 3 sends nothing. Read no result unless exit 0 and `STATUS=ok`.
 
-## Two separate first-use decisions
+## Two separate one-time decisions
 
-`peer_consent` authorizes cross-provider use at all. `peer_egress` then controls material without explicit peer-egress approval, treating supported providers equivalently:
+`peer_consent` is remembered global authorization for cross-provider use. `peer_egress` is a separate remembered standing policy, treating supported providers equivalently:
 
-- `consent` permits material whose approval status is unknown after cross-provider consent.
-- `approved-only` permits only material explicitly approved for peer egress; unknown material stays local.
+- `consent` sends material not marked sensitive/local-only without asking again.
+- `approved-only` sends only material explicitly approved for peer egress; other material stays local without prompting.
 
 The helper asks neither question itself and sends nothing in either pending state. If both are unset, the ordering is mandatory:
 
 1. Exit 5 / `STATUS=consent`: ask the existing cross-provider question in its own turn, naming the selected peer, the material, external quota, and that the answer applies across repositories. Store `peer_consent true|false`.
-2. Only after consent is true, exit 6 / `STATUS=egress`: ask in a separate turn whether to permit material with unknown approval status (`consent`) or require explicit peer-egress approval (`approved-only`). Store the exact answer with `pln-config set peer_egress consent|approved-only`.
+2. Only after consent is true, exit 6 / `STATUS=egress`: ask in a separate turn whether to send eligible material automatically without asking again (`consent`) or require explicit peer-egress approval (`approved-only`). Explain that both are standing policies, then store the exact answer with `pln-config set peer_egress consent|approved-only`.
 3. Re-run the same command. Never combine the questions, infer the policy from consent, or send between the two answers. An upgraded install with `peer_consent: true` and no `peer_egress` starts at step 2.
 
 The egress question must say what each answer changes and give the exact later commands. A concise shape is:
 
 ```
-Cross-provider use is allowed, but pln has not recorded what material may leave this machine.
+Cross-provider use is allowed, but pln has not recorded the standing egress policy.
 
-Permit material with unknown approval status, or require explicit peer-egress approval?
+Send eligible material automatically, or require explicit peer-egress approval?
 
-`consent` lets pln send material unless this session or repository marks it sensitive/local-only. `approved-only` sends only material explicitly approved for peer egress. Either answer is remembered in `~/.pln/config.yaml`; `pln-config set peer_egress consent` or `approved-only` changes it later.
+`consent` sends material not marked sensitive/local-only without asking again. `approved-only` sends only material explicitly approved for peer egress; other material stays local without prompting. Either standing policy is remembered in `~/.pln/config.yaml`; `pln-config set peer_egress consent` or `approved-only` changes it later.
 ```
 
 Other outcomes:

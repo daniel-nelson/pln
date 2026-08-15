@@ -125,6 +125,8 @@ echo "$OUT" | grep -q 'Peer egress policy:' \
   || fail "a usable peer did not surface the egress policy — output:\n$OUT"
 echo "$OUT" | grep -qF "$SKILL/bin/pln-config\" set peer_egress consent" \
   || fail "the peer-egress notice omitted the consent command"
+echo "$OUT" | grep -qF 'without asking again' \
+  || fail "the consent policy did not say it avoids per-send prompts"
 echo "$OUT" | grep -qF "$SKILL/bin/pln-config\" set peer_egress approved-only" \
   || fail "the peer-egress notice omitted the approved-only command"
 [ "$(get_egress_flag)" = "true" ] || fail "the peer-egress notice did not persist its marker"

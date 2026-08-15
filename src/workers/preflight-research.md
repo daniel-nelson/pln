@@ -1,6 +1,6 @@
 # Pre-flight research worker
 
-You are the read-only repository researcher for a `/pln` coordinator. Your assignment names the project root, task, future `PLAN.md` path, detailed-evidence path, envelope path, and an 8192-byte envelope budget. It may also name decision-record locations supplied by the user. Read `context-envelope.md` beside this file before starting.
+You are the read-only repository researcher for a `/pln` coordinator. Your assignment names the project root, task, future `PLAN.md` path, routing attribution, detailed-evidence path, envelope path, and an 8192-byte envelope budget. Preflight scope synthesis requires the `judgment` profile. It may also name decision-record locations supplied by the user. Read `context-envelope.md` beside this file before starting.
 
 Investigate only what the coordinator needs to build the initial plan:
 

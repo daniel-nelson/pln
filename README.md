@@ -58,11 +58,11 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 
 ## How it works
 
-**`/pln`** runs a complete interview phase before writing a single line of code. For each item it proposes an approach, asks one question at a time, and records every decision into a `PLAN.md`. Once you approve the master plan, the main session becomes a thin orchestrator and implements the whole plan autonomously: it spawns a fresh subagent for each item in turn, with `PLAN.md` as the spec, so the plan runs to completion without per-item intervention. If a subagent hits something the plan didn't settle, it hands off — leaving its work uncommitted with a handoff note — and the orchestrator surfaces a single question, records your answer, and resumes from where it stopped. Plans are saved to `./plans/<date>-<slug>/PLAN.md` relative to wherever you launched your agent.
+**`/pln`** runs a complete interview phase before writing a single line of code. It first shows an editable chapter-outline view, then asks one question at a time and records every decision into `PLAN.md`. Once you approve the master plan, the main session becomes a thin orchestrator: it derives a conservative dependency graph, runs independent items in isolated worktrees in waves of at most three, and keeps uncertain or overlapping work serial. A durable manifest, item-level checkpoints, and retained blocker worktrees let a restarted session continue without trusting conversational memory or a surviving agent handle. Plans are saved to `./plans/<date>-<slug>/PLAN.md` relative to wherever you launched your agent.
 
 The peer posture is built in: during the interview phase, pln will disagree with your framing if it sees a problem, bring up considerations you didn't name, and stop after one question rather than overwhelming you with options. The goal is a plan *you* shaped, not one that was handed to you.
 
-**`/pln-pr`** is the ship half of a plan. After a `/pln` run (or on any branch ahead of its base), it reviews the diff, fixes what the review finds, verifies once, and opens the pull request. A review army of fresh-context agents covers six lenses (correctness, security, data, testing, maintainability, performance) plus an adversarial pass. On Claude Code they all run in parallel; on Codex the army is `codex review` for the broad ground followed by the lenses it underweights, one at a time (see [Hosts](#hosts)). Either way there is one more pass from a *different* model, whenever you have a second agent CLI on your machine (see [Second opinions](#second-opinions)). Every finding has to quote the exact line that proves it, which keeps false positives out. Findings land in a durable `REVIEW.md` beside the plan, fixes run as agents clustered by file so they never collide, decisions come to you one at a time, and the full test suite runs **once** at the end instead of after every fix — the loop that makes a naive review-and-fix pass thrash. It depends only on git, your agent's own tools, and optionally the GitHub/GitLab CLI; there's no external service and nothing to configure. A `/pln` run hands off to it once the plan's gauntlet is green — it asks first, and stops there if you say no — so shipping is the last step of the same flow rather than a separate thing you have to remember to ask for.
+**`/pln-pr`** is the ship half of a plan. After a `/pln` run (or on any branch ahead of its base), it classifies semantic risk, reviews the exact candidate, fixes verified findings, verifies the final tree once, and opens the pull request. R1 routine work gets a fresh broad reviewer; R2 adds up to two applicable specialists; R3 adds an adversarial slot, filled by a permitted cross-model peer or a truthfully attributed same-model substitute. Findings cite exact evidence and are recorded as verified, unverified, or disproved in a durable `REVIEW.md`. Disjoint fix clusters may run in isolated worktrees, while the coordinator alone owns the ledger, commits, and integration. Any fix creates a new candidate fingerprint, so stale gauntlet evidence is never reused. It depends only on git, native host agents, and optionally the GitHub/GitLab CLI and a peer CLI.
 
 ## Hosts
 
@@ -72,15 +72,21 @@ The plan is the same on both hosts, and so is the `PLAN.md` and the review ledge
 
 | | Claude Code | Codex |
 |---|---|---|
-| Fresh-context agents | the harness `Workflow` / `Agent` tools | `codex exec`, one process per agent |
-| `/pln` implementation loop | one Workflow script drives every item | the orchestrator drives the loop from the shell |
-| Resuming a blocked item | `resumeFromRunId` | `codex exec resume <thread-id>` |
-| Who commits | the item agent | the orchestrator — a sandboxed Codex agent has `.git` read-only |
-| `/pln-pr` review army | seven reviewers in parallel | `codex review`, then a subset of lenses one at a time |
+| Fresh-context agents | native `Agent`; `Workflow` for genuine fan-out | native multi-agent collaboration tools |
+| `/pln` implementation | coordinator-scheduled isolated Agent worktrees | coordinator-created git worktrees plus native agents |
+| Continuing a blocked item | named Agent + `SendMessage` | durable manifest + `followup_task`, or a fresh recovery agent |
+| Who commits and integrates | the coordinator | the coordinator |
+| `/pln-pr` review | risk-capped Workflow fan-out | risk-capped native reviewer fan-out |
 | Cross-model pass | reaches for `codex`, or whatever `peer_command` names | reaches for `claude`, or whatever `peer_command` names |
 | Notifications | phone push + desktop | desktop |
 
-Two of those need a sentence. Codex reviewers run one at a time because concurrent `codex` processes race on the shared OAuth token file; that costs wall-clock and buys correctness. And a Codex agent runs sandboxed with `.git` read-only, so it writes files and reports back while the session that spawned it does the committing. The invariant is the same on both hosts: no partial item is ever committed.
+Both hosts preserve the same invariants: uncertainty serializes, write leases cannot overlap, no partial item is integrated, and `PLAN.md` / `REVIEW.md` stay coordinator-owned. Nested `claude` or `codex exec` processes are guarded fallbacks for older or policy-disabled hosts, not the normal orchestration path.
+
+## Model routing and behavioral evals
+
+Ordinary same-host workers inherit the model you selected. Judgment-bearing work—planning synthesis, implementation, review, concurrency, privacy, migrations, external effects, and user-facing decisions—has a frontier-capability floor. An optional `evidence_profile: economy` lane is limited to mechanically closed facts and citations; anything requiring interpretation escalates before it can recommend or decide.
+
+The release corpus under `evals/corpus/` is synthetic and sanitized. `bin/pln-eval validate` and `bash tests/evals.sh` are deterministic, offline checks; they never call an agent CLI. Real comparisons are explicit through `bin/pln-eval run-live`, record the actual selected profile/model/effort, CLI and skill versions, commit and fixture hashes, reported tokens/cost where available, latency, fallbacks, and artifacts, and keep the untouched holdout sealed until calibration freezes a variance-derived benefit threshold. A failing or undersized host/class result disables that economy route in `evals/economy-qualification.tsv` rather than weakening a correctness or privacy floor; an opted-in but unqualified route falls back to the inherited model with the reason recorded.
 
 ## The plan review
 
@@ -111,12 +117,13 @@ Where a second model is worth more than another run of the same one — the plan
 2. **A known CLI on your `PATH`** — `claude` or `codex`, whichever isn't hosting the session, and only when it is signed in. Under Codex it asks Claude; under Claude it asks Codex. Probes ship only for CLIs whose invocation pln has actually reproduced; anything else goes through the first rung, where you supply the invocation.
 3. **Nothing at all**, which is a supported answer and not a broken install. The work still happens — on a fresh same-model agent where a fresh reading is the point, or skipped with a note where a different model was the whole point.
 
-The first two rungs hand the material to another vendor's CLI: it leaves your machine, and the call can spend your quota there. So pln asks you once — the first time anything would be sent, naming the CLI it found — and remembers the answer for every repo and every pln skill after that. Say no and nothing is ever sent: the work runs on a fresh agent of the same model, or is skipped with a note. Nothing is asked at all on a machine where there is no second CLI to reach for.
+The first two rungs hand the material to another vendor's CLI: it leaves your machine, and the call can spend your quota there. pln first asks once for cross-provider consent. It separately asks for an egress policy on first actual use: `consent` allows unclassified material after consent, while `classified-only` keeps unknown material local. Repository/session local-only or sensitive instructions always suppress sending under either policy. A suppressed, unavailable, malformed, or failed R3 peer is replaced by one fresh same-model adversarial reader and attributed as such; it is never counted as a clean peer result.
 
 Change your mind later, in either direction:
 
 ```bash
 ~/.claude/skills/pln/bin/pln-config set peer_consent false
+~/.claude/skills/pln/bin/pln-config set peer_egress classified-only
 ```
 
 ## Upgrading

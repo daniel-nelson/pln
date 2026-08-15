@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# pln-route-ledger — append one bounded routing decision beneath a plan root.
+set -euo pipefail
+
+ROOT=""
+LEDGER=""
+SCOPE=""
+TIER=""
+REASON=""
+RISK_FLAGS=""
+REQUESTED_PROFILE=""
+ACTUAL_PROFILE=""
+ACTUAL_MODEL=""
+ACTUAL_EFFORT=""
+FALLBACK=""
+SOURCE_STATE=""
+STATUS=""
+ARTIFACTS=""
+
+usage() {
+  echo "Usage: pln-route-ledger --root DIR --ledger FILE --scope TEXT --tier direct|evidence|judgment --reason TEXT --risk-flags TEXT --requested-profile PROFILE --actual-profile PROFILE --actual-model MODEL --actual-effort EFFORT --fallback TEXT --source-state TEXT --status TEXT --artifacts TEXT" >&2
+  exit 2
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --root) ROOT="${2:-}"; shift 2 ;;
+    --ledger) LEDGER="${2:-}"; shift 2 ;;
+    --scope) SCOPE="${2:-}"; shift 2 ;;
+    --tier) TIER="${2:-}"; shift 2 ;;
+    --reason) REASON="${2:-}"; shift 2 ;;
+    --risk-flags) RISK_FLAGS="${2:-}"; shift 2 ;;
+    --requested-profile) REQUESTED_PROFILE="${2:-}"; shift 2 ;;
+    --actual-profile) ACTUAL_PROFILE="${2:-}"; shift 2 ;;
+    --actual-model) ACTUAL_MODEL="${2:-}"; shift 2 ;;
+    --actual-effort) ACTUAL_EFFORT="${2:-}"; shift 2 ;;
+    --fallback) FALLBACK="${2:-}"; shift 2 ;;
+    --source-state) SOURCE_STATE="${2:-}"; shift 2 ;;
+    --status) STATUS="${2:-}"; shift 2 ;;
+    --artifacts) ARTIFACTS="${2:-}"; shift 2 ;;
+    -h | --help) usage ;;
+    *) echo "pln-route-ledger: unknown argument '$1'" >&2; usage ;;
+  esac
+done
+
+fail() { echo "pln-route-ledger: $*" >&2; exit 2; }
+
+for pair in \
+  "root:$ROOT" "ledger:$LEDGER" "scope:$SCOPE" "tier:$TIER" \
+  "reason:$REASON" "risk-flags:$RISK_FLAGS" \
+  "requested-profile:$REQUESTED_PROFILE" "actual-profile:$ACTUAL_PROFILE" \
+  "actual-model:$ACTUAL_MODEL" "actual-effort:$ACTUAL_EFFORT" \
+  "fallback:$FALLBACK" "source-state:$SOURCE_STATE" "status:$STATUS" \
+  "artifacts:$ARTIFACTS"; do
+  [ -n "${pair#*:}" ] || fail "--${pair%%:*} must not be empty"
+done
+
+case "$TIER" in direct | evidence | judgment) ;; *) fail "--tier must be direct, evidence, or judgment" ;; esac
+[ -d "$ROOT" ] || fail "root is not a directory: $ROOT"
+[ ! -L "$LEDGER" ] || fail "ledger must not be a symlink: $LEDGER"
+
+ROOT_REAL="$(cd "$ROOT" && pwd -P)"
+LEDGER_DIR="$(dirname "$LEDGER")"
+[ -d "$LEDGER_DIR" ] || fail "ledger directory does not exist: $LEDGER_DIR"
+LEDGER_DIR_REAL="$(cd "$LEDGER_DIR" && pwd -P)"
+case "$LEDGER_DIR_REAL/$(basename "$LEDGER")" in
+  "$ROOT_REAL"/*) ;;
+  *) fail "ledger is outside the plan root: $LEDGER" ;;
+esac
+
+for value in "$SCOPE" "$TIER" "$REASON" "$RISK_FLAGS" "$REQUESTED_PROFILE" \
+  "$ACTUAL_PROFILE" "$ACTUAL_MODEL" "$ACTUAL_EFFORT" "$FALLBACK" \
+  "$SOURCE_STATE" "$STATUS" "$ARTIFACTS"; do
+  case "$value" in *$'\t'* | *$'\n'* | *$'\r'*) fail "fields must be single-line and tab-free" ;; esac
+done
+
+HEADER=$'SCOPE\tTIER\tREASON\tRISK_FLAGS\tREQUESTED_PROFILE\tACTUAL_PROFILE\tACTUAL_MODEL\tACTUAL_EFFORT\tFALLBACK\tSOURCE_STATE\tSTATUS\tARTIFACT_PATHS'
+if [ -e "$LEDGER" ]; then
+  [ -f "$LEDGER" ] || fail "ledger path is not a regular file: $LEDGER"
+  [ "$(head -n 1 "$LEDGER")" = "$HEADER" ] || fail "existing ledger has an unknown header"
+fi
+
+TMP="$(mktemp "$LEDGER_DIR_REAL/.pln-routing.XXXXXX")"
+trap 'rm -f "$TMP"' EXIT
+if [ -e "$LEDGER" ]; then
+  cp "$LEDGER" "$TMP"
+else
+  printf '%s\n' "$HEADER" > "$TMP"
+fi
+printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+  "$SCOPE" "$TIER" "$REASON" "$RISK_FLAGS" "$REQUESTED_PROFILE" \
+  "$ACTUAL_PROFILE" "$ACTUAL_MODEL" "$ACTUAL_EFFORT" "$FALLBACK" \
+  "$SOURCE_STATE" "$STATUS" "$ARTIFACTS" >> "$TMP"
+mv "$TMP" "$LEDGER"
+trap - EXIT
+
+ENTRY_COUNT="$(( $(wc -l < "$LEDGER") - 1 ))"
+printf 'LEDGER_FILE=%s\nENTRY_COUNT=%s\n' "$LEDGER" "$ENTRY_COUNT"

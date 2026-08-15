@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# pln-assurance — deterministic assurance-tier, roster, and candidate identity.
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'USAGE'
+Usage:
+  pln-assurance classify --signals CSV --substantive-files N --non-generated-lines N
+  pln-assurance roster --risk R1|R2|R3 --areas CSV --adversary peer|local
+  pln-assurance fingerprint --root DIR --commands FILE --environment FILE
+USAGE
+  exit 2
+}
+
+whole_number() {
+  case "$1" in '' | *[!0-9]*) return 1 ;; *) return 0 ;; esac
+}
+
+sha256_file() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    echo 'pln-assurance: no SHA-256 implementation (shasum or sha256sum)' >&2
+    exit 2
+  fi
+}
+
+command="${1:-}"
+[ -n "$command" ] || usage
+shift
+
+case "$command" in
+  classify)
+    signals=""
+    files=""
+    lines=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --signals) signals="${2:-}"; shift 2 ;;
+        --substantive-files) files="${2:-}"; shift 2 ;;
+        --non-generated-lines) lines="${2:-}"; shift 2 ;;
+        *) usage ;;
+      esac
+    done
+    [ -n "$signals" ] && whole_number "$files" && whole_number "$lines" || usage
+
+    risk="R1"
+    reason="routine"
+    IFS=',' read -r -a signal_list <<< "$signals"
+    for raw in "${signal_list[@]}"; do
+      signal="$(printf '%s' "$raw" | tr '[:upper:]_' '[:lower:]-')"
+      case "$signal" in
+        '' | routine) ;;
+        dependencies | builds | configuration | generators | public-contracts | public-contract | missing-coverage | multiple-subsystems)
+          if [ "$risk" = "R1" ]; then risk="R2"; reason="$signal"; fi
+          ;;
+        authentication | auth | trust | secrets | privacy | production-data | money | external-effects | destructive-migrations | destructive-migration | concurrency | transactions | iac | ci-security | compatibility | ai-safety | eval-safety | critical-conflict | unresolved-critical-conflict | unknown)
+          risk="R3"; reason="$signal"
+          ;;
+        *)
+          risk="R3"; reason="unknown:$signal"
+          ;;
+      esac
+    done
+    if [ "$risk" = "R1" ] && { [ "$files" -gt 10 ] || [ "$lines" -gt 500 ]; }; then
+      risk="R2"
+      reason="provisional-size-threshold"
+    fi
+    printf 'RISK=%s\nREASON=%s\n' "$risk" "$reason"
+    ;;
+
+  roster)
+    risk=""
+    areas=""
+    adversary=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --risk) risk="${2:-}"; shift 2 ;;
+        --areas) areas="${2:-}"; shift 2 ;;
+        --adversary) adversary="${2:-}"; shift 2 ;;
+        *) usage ;;
+      esac
+    done
+    case "$risk" in R1 | R2 | R3) ;; *) usage ;; esac
+    case "$adversary" in peer | local) ;; *) usage ;; esac
+
+    printf 'RISK=%s\n' "$risk"
+    printf 'SLOT\tbroad\tsame-model\n'
+    if [ "$risk" = "R2" ] || [ "$risk" = "R3" ]; then
+      IFS=',' read -r -a area_list <<< "$areas"
+      declared="|"
+      count=0
+      for raw in "${area_list[@]}"; do
+        area="$(printf '%s' "$raw" | tr '[:upper:]_ ' '[:lower:]--')"
+        [ -n "$area" ] || continue
+        case "$declared" in *"|$area|"*) continue ;; esac
+        printf 'SLOT\trisk-%s\tsame-model\n' "$area"
+        declared="${declared}${area}|"
+        count=$((count + 1))
+        [ "$count" -eq 2 ] && break
+      done
+    fi
+    if [ "$risk" = "R3" ]; then
+      if [ "$adversary" = "peer" ]; then
+        printf 'SLOT\tadversarial\tpeer\n'
+      else
+        printf 'SLOT\tadversarial\tsame-model\n'
+      fi
+    fi
+    ;;
+
+  fingerprint)
+    root=""
+    commands_file=""
+    environment_file=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --root) root="${2:-}"; shift 2 ;;
+        --commands) commands_file="${2:-}"; shift 2 ;;
+        --environment) environment_file="${2:-}"; shift 2 ;;
+        *) usage ;;
+      esac
+    done
+    [ -d "$root" ] && [ -f "$commands_file" ] && [ -f "$environment_file" ] || usage
+    git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+      echo "pln-assurance: fingerprint root is not a git worktree: $root" >&2
+      exit 2
+    }
+
+    root="$(cd "$root" && pwd -P)"
+    manifest="$(mktemp "${TMPDIR:-/tmp}/pln-assurance-tree.XXXXXX")"
+    status_file="$(mktemp "${TMPDIR:-/tmp}/pln-assurance-status.XXXXXX")"
+    trap 'rm -f "$manifest" "$status_file"' EXIT
+    head="$(git -C "$root" rev-parse HEAD)"
+    git -C "$root" status --porcelain=v2 -z > "$status_file"
+    {
+      printf 'HEAD\0%s\0STATUS\0' "$head"
+      cat "$status_file"
+      printf '\0FILES\0'
+    } > "$manifest"
+    while IFS= read -r -d '' path; do
+      printf '%s\0' "$path" >> "$manifest"
+      if [ -e "$root/$path" ] || [ -L "$root/$path" ]; then
+        if [ -x "$root/$path" ]; then mode="x"; else mode="-"; fi
+        blob="$(git -C "$root" hash-object --no-filters -- "$path")"
+        printf '%s\0%s\0' "$mode" "$blob" >> "$manifest"
+      else
+        printf 'missing\0missing\0' >> "$manifest"
+      fi
+    done < <(git -C "$root" ls-files -z --cached --others --exclude-standard)
+
+    tree_hash="$(sha256_file "$manifest")"
+    command_hash="$(sha256_file "$commands_file")"
+    environment_hash="$(sha256_file "$environment_file")"
+    printf '%s\0%s\0%s\0' "$tree_hash" "$command_hash" "$environment_hash" > "$manifest"
+    candidate_hash="$(sha256_file "$manifest")"
+    printf 'TREE_SHA256=%s\nCOMMAND_SHA256=%s\nENVIRONMENT_SHA256=%s\nCANDIDATE_SHA256=%s\n' \
+      "$tree_hash" "$command_hash" "$environment_hash" "$candidate_hash"
+    ;;
+
+  *) usage ;;
+esac

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # pln-claude-agent — run one fresh-context Claude Code agent and hand back its
 # result. The mirror image of pln-codex-agent, for the other direction: it is
-# what a session running under Codex (or any host) uses to consult Claude.
+# what a session running under Codex uses to consult Claude, and the guarded
+# one-shot fallback for an older/disabled Claude host with no native Agent.
 #
 # `claude -p` is a different shape from `codex exec`, so it needs its own set of
 # guards. Each one below is here because its absence fails *silently* or fails
@@ -17,11 +18,12 @@
 #     `--model` exits 1 having written a sentence of prose to stdout; reading
 #     the file without checking the exit code turns that into a "review".
 #   - an empty result is a failure, not an agent that found nothing to say.
-#   - the tool set is restricted, not merely permission-gated. `--allowedTools`
+#   - the default tool set is restricted, not merely permission-gated. `--allowedTools`
 #     only *adds* permissions — it cannot take away what the user's own
 #     settings already allow, so it is no way to make a reviewer read-only.
-#     `--tools` is: the default `Read,Grep,Glob` leaves the agent no shell and
-#     no writer, which is what a peer reviewing someone's repo should have.
+#     `--tools` is: the default `Read,Grep,Glob` leaves a peer no shell and no
+#     writer. A disclosed legacy-host implementation fallback widens this
+#     explicitly; native same-provider Agent remains preferred.
 #   - MCP servers are not loaded (`--strict-mcp-config` with no `--mcp-config`).
 #     A reviewer with the caller's MCP surface can reach the network and other
 #     people's systems, and every server it loads is startup latency for a run
@@ -34,9 +36,10 @@
 #     break the very users it pretended to protect. The auth probe in pln-peer
 #     and the run see the same environment, so they agree.
 #
-# Deliberately absent: `--resume`. This helper exists for one-shot peer
-# consultation — a review, a second opinion — not for pln's per-item loop, which
-# is the host's own job. Nothing here needs to continue a thread.
+# Deliberately absent: `--resume`. The helper is one-shot and nonpersistent.
+# Cross-provider peer work needs no continuation; a rare legacy-host item
+# blocker continues through a fresh run pointed at its handoff and existing
+# diff. Current Claude hosts use named native Agents and SendMessage instead.
 #
 # Usage:
 #   pln-claude-agent --brief <file> --out <file> [options]
@@ -54,13 +57,18 @@
 #                    gives the peer a way to change the caller's machine.
 #   --timeout SECS   ceiling on a hung run (default 1800; 0 disables).
 #   --model NAME     override the model for this run.
+#   --effort LEVEL   override effort for this run.
+#   --profile NAME   semantic attribution: inherit | judgment | evidence.
 #   --dry-run        print the command that would run and exit 0.
 #
-# Prints exactly three KEY=VALUE lines on stdout and nothing else:
+# Prints exactly six KEY=VALUE lines on stdout and nothing else:
 #
 #   STATUS=ok|empty|timeout|error
 #   RESULT_FILE=<path>
 #   LOG_FILE=<path>
+#   ACTUAL_PROFILE=<inherit|judgment|evidence>
+#   ACTUAL_MODEL=<selected model or inherited-unreported>
+#   ACTUAL_EFFORT=<selected effort or inherited-unreported>
 #
 # Exit codes: 0 the agent ran and wrote a result · 2 usage error · 3 the Claude
 # CLI is not installed · 4 the run failed (timed out, exited non-zero, or wrote
@@ -74,6 +82,8 @@ CD_DIR=""
 TOOLS="Read,Grep,Glob"
 TIMEOUT_SECS="1800"
 MODEL=""
+EFFORT=""
+PROFILE="inherit"
 DRY_RUN=0
 ADD_DIRS=()
 
@@ -89,6 +99,8 @@ Usage: pln-claude-agent --brief <file> --out <file> [options]
   --tools LIST     comma-separated built-in tools (default: Read,Grep,Glob)
   --timeout SECS   ceiling on a hung run (default 1800; 0 disables)
   --model NAME     model override
+  --effort LEVEL   effort override
+  --profile NAME   inherit | judgment | evidence (default: inherit)
   --dry-run        print the command and exit
 USAGE
   exit 2
@@ -104,6 +116,8 @@ while [ $# -gt 0 ]; do
     --tools) TOOLS="${2:-}"; shift 2 ;;
     --timeout) TIMEOUT_SECS="${2:-}"; shift 2 ;;
     --model) MODEL="${2:-}"; shift 2 ;;
+    --effort) EFFORT="${2:-}"; shift 2 ;;
+    --profile) PROFILE="${2:-}"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h | --help) usage ;;
     *) echo "pln-claude-agent: unknown argument '$1'" >&2; usage ;;
@@ -116,6 +130,8 @@ done
 case "$TIMEOUT_SECS" in
   '' | *[!0-9]*) echo "pln-claude-agent: --timeout must be a whole number of seconds" >&2; exit 2 ;;
 esac
+case "$PROFILE" in inherit | judgment | evidence) ;; *) echo "pln-claude-agent: --profile must be inherit, judgment, or evidence" >&2; exit 2 ;; esac
+case "$EFFORT" in '' | low | medium | high | xhigh | max) ;; *) echo "pln-claude-agent: unknown --effort '$EFFORT'" >&2; exit 2 ;; esac
 
 command -v claude >/dev/null 2>&1 || {
   echo "pln-claude-agent: the Claude CLI is not on PATH — cannot run an agent." >&2
@@ -165,6 +181,7 @@ for d in ${ADD_DIRS+"${ADD_DIRS[@]}"}; do
   [ -n "$d" ] && CMD+=(--add-dir "$d")
 done
 [ -n "$MODEL" ] && CMD+=(--model "$MODEL")
+[ -n "$EFFORT" ] && CMD+=(--effort "$EFFORT")
 
 if [ "$DRY_RUN" = "1" ]; then
   printf 'cd %q && ' "$CD_DIR" >&2
@@ -173,6 +190,9 @@ if [ "$DRY_RUN" = "1" ]; then
   echo "STATUS=ok"
   echo "RESULT_FILE=$OUT"
   echo "LOG_FILE=$LOG"
+  echo "ACTUAL_PROFILE=$PROFILE"
+  echo "ACTUAL_MODEL=${MODEL:-inherited-unreported}"
+  echo "ACTUAL_EFFORT=${EFFORT:-inherited-unreported}"
   exit 0
 fi
 
@@ -200,4 +220,7 @@ fi
 echo "STATUS=$STATUS"
 echo "RESULT_FILE=$OUT"
 echo "LOG_FILE=$LOG"
+echo "ACTUAL_PROFILE=$PROFILE"
+echo "ACTUAL_MODEL=${MODEL:-inherited-unreported}"
+echo "ACTUAL_EFFORT=${EFFORT:-inherited-unreported}"
 exit "$EXIT"

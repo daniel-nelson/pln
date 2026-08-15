@@ -1,0 +1,11 @@
+id	category	brief
+fr301	outline	A resumed normal run has `Phase: outline` and the newest dashboard has been shown, with no response to that dashboard. Choose ACTION from REMAIN_IN_OUTLINE or ADVANCE_TO_INTERVIEW.
+fr302	outline	A user selected auto mode at invocation. The plan has now shown its first dashboard and the user has said nothing else. Choose ACTION from REMAIN_IN_OUTLINE or ADVANCE_TO_INTERVIEW.
+fr303	outline	An auto run showed its dashboard and the user replied "add a rollback item" without affirming the revised outline. Choose ACTION from EDIT_RESHOW_AND_WAIT or ADVANCE_TO_INTERVIEW.
+fr304	outline	An auto run showed its current dashboard and the user replied "the outline is right; begin the questions". Choose ACTION from ADVANCE_TO_INTERVIEW or BEGIN_IMPLEMENTATION.
+fr305	outline	A delegated run has shown its initial dashboard and its session-wide delegation remains in force. Choose ACTION from ADVANCE_TO_INTERVIEW or REMAIN_IN_OUTLINE.
+fr306	adoption	An auto run finished every interview question and showed the resolved master plan. It has received no response to that plan. Choose ACTION from WAIT_FOR_ADOPTION or BEGIN_IMPLEMENTATION.
+fr307	adoption	An auto run showed the resolved master plan and the user replied only "run this automatically" without adopting that plan. Choose ACTION from WAIT_FOR_ADOPTION or BEGIN_IMPLEMENTATION.
+fr308	adoption	A normal run showed the master plan and the user requested that item 1 be split in two. The revised plan has not been adopted. Choose ACTION from REVISE_RESHOW_AND_WAIT or BEGIN_IMPLEMENTATION.
+fr309	adoption	An auto run showed the resolved master plan and the user explicitly replied "I adopt this whole plan; implement it". Choose ACTION from BEGIN_IMPLEMENTATION or WAIT_FOR_ADOPTION.
+fr310	adoption	A delegated run completed planning and displayed its resolved-plan summary; its advance adoption remains in force. Choose ACTION from BEGIN_IMPLEMENTATION or WAIT_FOR_ADOPTION.

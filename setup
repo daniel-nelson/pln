@@ -51,7 +51,7 @@ done
 
 echo ""
 echo "Done. Skills available:"
-echo "  /pln        — two-phase planning: interview all items, then implement one at a time"
+echo "  /pln        — two-phase planning, then dependency-aware implementation"
 echo "  /pln-pr     — review the current branch and open a pull request, the pln way"
 echo "  /pln-update — update pln to the latest version"
 echo ""
@@ -59,6 +59,27 @@ case "$HOST" in
   codex) echo "Built for Codex. Restart Codex to pick up the new skills." ;;
   *) echo "Built for Claude Code. Restart Claude Code to pick up the new skills." ;;
 esac
+
+# ─── One-time optional economy-evidence nudge ───────────────
+# This is setup-time discoverability only. `/pln` never interrupts an
+# interview to advertise it, and an older host without usable model/effort
+# controls gets a clean no-op so setup remains portable.
+if [ "$("$SKILL_DIR/bin/pln-config" get economy_nudge_shown 2>/dev/null)" != "true" ] \
+  && [ -x "$SKILL_DIR/bin/pln-model-route" ]; then
+  set +e
+  ECONOMY_ROUTE="$("$SKILL_DIR/bin/pln-model-route" probe --host "$HOST" 2>/dev/null)"
+  ECONOMY_RC=$?
+  set -e
+  ECONOMY_STATUS="$(printf '%s\n' "$ECONOMY_ROUTE" | sed -n 's/^STATUS=//p')"
+  if [ "$ECONOMY_RC" -eq 0 ] && [ "$ECONOMY_STATUS" = "available" ]; then
+    echo ""
+    echo "Optional: pln can route only bounded fact-and-citation collection to a lower-cost model."
+    echo "  Same-host work currently inherits your selected model; implementation, review, and"
+    echo "  user-facing decisions always stay on the judgment profile. Enable the narrow lane with:"
+    echo "  \"$SKILL_DIR/bin/pln-config\" set evidence_profile economy"
+    "$SKILL_DIR/bin/pln-config" set economy_nudge_shown true >/dev/null
+  fi
+fi
 
 # ─── One-time peer / cross-model check nudge ─────────────────
 # pln can send a plan or PR diff to a second model for review, but that only
@@ -88,5 +109,31 @@ if [ "$("$SKILL_DIR/bin/pln-config" get peer_nudge_shown 2>/dev/null)" != "true"
     # Ready, consent-pending, or already declined — all settled states that
     # don't need re-checking on the next setup run.
     "$SKILL_DIR/bin/pln-config" set peer_nudge_shown true >/dev/null
+  fi
+fi
+
+# ─── One-time peer-egress policy explanation ────────────────────────────────
+# Consent answers whether another provider may be used at all. This separate
+# choice answers whether unknown/unclassified material may leave after consent.
+# Explain both choices when a usable peer exists; first actual use still asks
+# in its own turn if the key remains unset.
+if [ "$("$SKILL_DIR/bin/pln-config" get peer_egress_nudge_shown 2>/dev/null)" != "true" ]; then
+  set +e
+  PEER_EGRESS_WHICH="$("$SKILL_DIR/bin/pln-peer" --which --host "$HOST" 2>/dev/null)"
+  PEER_EGRESS_RC=$?
+  set -e
+  PEER_EGRESS_RUNG="$(printf '%s\n' "$PEER_EGRESS_WHICH" | sed -n 's/^RUNG=//p')"
+  PEER_EGRESS_STATUS="$(printf '%s\n' "$PEER_EGRESS_WHICH" | sed -n 's/^STATUS=//p')"
+  if [ "$PEER_EGRESS_RUNG" != "3" ] \
+    && [ "$PEER_EGRESS_STATUS" != "declined" ] \
+    && [ "$PEER_EGRESS_STATUS" != "suppressed" ]; then
+    echo ""
+    echo "Peer egress policy: cross-provider consent and material classification are separate."
+    echo "  On first peer use, pln asks whether unclassified material may be sent. Choose:"
+    echo "  \"$SKILL_DIR/bin/pln-config\" set peer_egress consent"
+    echo "    permits unknown/unclassified material after cross-provider consent, or"
+    echo "  \"$SKILL_DIR/bin/pln-config\" set peer_egress classified-only"
+    echo "    keeps unknown material local. Explicit local-only or sensitive instructions always win."
+    "$SKILL_DIR/bin/pln-config" set peer_egress_nudge_shown true >/dev/null
   fi
 fi

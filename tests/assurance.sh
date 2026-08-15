@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ASSURANCE="$REPO_DIR/bin/pln-assurance"
+
+fail() { echo "FAIL: $*" >&2; exit 1; }
+has_line() { printf '%s\n' "$1" | grep -Fqx "$2" || fail "$3"; }
+
+[ -x "$ASSURANCE" ] || fail "missing executable assurance helper: $ASSURANCE"
+
+# Semantic signals decide the floor. Numeric size can raise R1 to R2 but can
+# never lower an R3 change.
+out="$($ASSURANCE classify --signals routine --substantive-files 2 --non-generated-lines 18)"
+has_line "$out" 'RISK=R1' 'routine work did not classify as R1'
+
+out="$($ASSURANCE classify --signals routine --substantive-files 11 --non-generated-lines 18)"
+has_line "$out" 'RISK=R2' 'file threshold did not raise routine work to R2'
+
+out="$($ASSURANCE classify --signals auth --substantive-files 1 --non-generated-lines 1)"
+has_line "$out" 'RISK=R3' 'tiny authentication change was lowered by line count'
+
+out="$($ASSURANCE classify --signals unknown --substantive-files 0 --non-generated-lines 0)"
+has_line "$out" 'RISK=R3' 'unknown risk did not fail closed to R3'
+
+if "$ASSURANCE" classify --signals routine,auth --substantive-files nope --non-generated-lines 1 >/dev/null 2>&1; then
+  fail 'non-numeric substantive-file count was accepted'
+fi
+
+# R3 has exactly one broad slot, at most two risk-specific slots, and one
+# adversarial slot. A peer substitutes in that slot rather than adding a fifth.
+out="$($ASSURANCE roster --risk R3 --areas security,data,compatibility --adversary peer)"
+has_line "$out" $'SLOT\tbroad\tsame-model' 'R3 roster lost the broad reader'
+has_line "$out" $'SLOT\trisk-security\tsame-model' 'R3 roster lost first risk reader'
+has_line "$out" $'SLOT\trisk-data\tsame-model' 'R3 roster lost second risk reader'
+has_line "$out" $'SLOT\tadversarial\tpeer' 'peer did not fill the adversarial slot'
+[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 4 ] || fail 'R3 pre-fix roster exceeded four slots'
+
+out="$($ASSURANCE roster --risk R3 --areas security --adversary local)"
+has_line "$out" $'SLOT\tadversarial\tsame-model' 'local adversarial substitute was not attributed'
+
+out="$($ASSURANCE roster --risk R2 --areas data,testing,security --adversary local)"
+[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 3 ] || fail 'R2 roster did not cap specialists at two'
+
+out="$($ASSURANCE roster --risk R1 --areas security --adversary peer)"
+[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 1 ] || fail 'R1 roster was not broad-only'
+
+# Fingerprints bind verification to the exact candidate tree, command set, and
+# relevant environment. Any one changing invalidates reuse.
+FIXTURE="$(mktemp -d "${TMPDIR:-/tmp}/pln-assurance-test.XXXXXX")"
+trap 'rm -rf "$FIXTURE"' EXIT
+git -C "$FIXTURE" init -q
+git -C "$FIXTURE" config user.email test@example.com
+git -C "$FIXTURE" config user.name Test
+printf 'one\n' > "$FIXTURE/source.txt"
+git -C "$FIXTURE" add source.txt
+git -C "$FIXTURE" commit -qm initial
+printf 'bash tests/a.sh\n' > "$FIXTURE/commands.txt"
+printf 'runtime=node-24\ntimezone=UTC\n' > "$FIXTURE/environment.txt"
+
+first="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt")"
+second="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt")"
+[ "$first" = "$second" ] || fail 'unchanged candidate fingerprint was not deterministic'
+
+printf 'two\n' > "$FIXTURE/source.txt"
+tree_changed="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt")"
+[ "$tree_changed" != "$first" ] || fail 'working-tree edit did not invalidate fingerprint'
+
+printf 'one\n' > "$FIXTURE/source.txt"
+printf 'bash tests/b.sh\n' > "$FIXTURE/commands.txt"
+commands_changed="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt")"
+[ "$commands_changed" != "$first" ] || fail 'command-set edit did not invalidate fingerprint'
+
+printf 'bash tests/a.sh\n' > "$FIXTURE/commands.txt"
+printf 'runtime=node-24\ntimezone=America/Los_Angeles\n' > "$FIXTURE/environment.txt"
+environment_changed="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt")"
+[ "$environment_changed" != "$first" ] || fail 'environment edit did not invalidate fingerprint'
+
+echo "assurance tests: OK"

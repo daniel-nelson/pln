@@ -1,0 +1,506 @@
+#!/usr/bin/env bash
+# pln-scheduler — validate conservative execution graphs and persist lifecycle state.
+set -euo pipefail
+
+fail() { echo "pln-scheduler: $*" >&2; exit 2; }
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  pln-scheduler snapshot --repo DIR --out FILE
+  pln-scheduler build --root DIR --nodes FILE --manifest FILE --source-root DIR --source-head TEXT --dirty-snapshot FILE --repo-mode git|non-git
+  pln-scheduler ready --manifest FILE
+  pln-scheduler claim --manifest FILE --item N --handle TEXT --worktree PATH
+  pln-scheduler checkpoint --manifest FILE --item N --result PATH --commit HASH|none --actual-profile PROFILE --actual-model MODEL --actual-effort EFFORT
+  pln-scheduler integrate --manifest FILE --item N --commit HASH|none
+  pln-scheduler block --manifest FILE --item N --handoff PATH
+  pln-scheduler wait --manifest FILE --item N
+  pln-scheduler interrupt --manifest FILE --item N
+  pln-scheduler set-handle --manifest FILE --item N --handle TEXT
+  pln-scheduler recover --manifest FILE --item N
+  pln-scheduler check-dirty --repo DIR --snapshot FILE --manifest FILE --allow-items CSV|-
+  pln-scheduler verify --manifest FILE
+EOF
+  exit 2
+}
+
+single_line() {
+  case "$2" in *$'\t'* | *$'\n'* | *$'\r'*) fail "$1 must be single-line and tab-free" ;; esac
+}
+
+real_dir() {
+  [ -d "$1" ] || fail "directory does not exist: $1"
+  (cd "$1" && pwd -P)
+}
+
+validate_output_path() {
+  local root_real="$1" path="$2" dir_real
+  [ ! -L "$path" ] || fail "output must not be a symlink: $path"
+  dir_real="$(real_dir "$(dirname "$path")")"
+  case "$dir_real/$(basename "$path")" in
+    "$root_real"/*) ;;
+    *) fail "output is outside the run root: $path" ;;
+  esac
+}
+
+snapshot_tree() {
+  local repo="$1" out="$2" repo_real out_dir paths tmp path hash
+  repo_real="$(real_dir "$repo")"
+  git -C "$repo_real" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+    || fail "snapshot requires a git worktree: $repo"
+  out_dir="$(real_dir "$(dirname "$out")")"
+  [ ! -L "$out" ] || fail "snapshot must not be a symlink: $out"
+  paths="$(mktemp "${TMPDIR:-/tmp}/pln-snapshot-paths.XXXXXX")"
+  tmp="$(mktemp "$out_dir/.pln-dirty.XXXXXX")"
+  trap 'rm -f "$paths" "$tmp"' RETURN
+
+  while IFS= read -r -d '' path; do
+    single_line "dirty path" "$path"
+    printf '%s\n' "$path" >> "$paths"
+  done < <(git -C "$repo_real" diff --name-only -z HEAD --)
+  while IFS= read -r -d '' path; do
+    single_line "dirty path" "$path"
+    printf '%s\n' "$path" >> "$paths"
+  done < <(git -C "$repo_real" ls-files -o --exclude-standard -z)
+
+  printf 'PATH\tHASH\n' > "$tmp"
+  if [ -s "$paths" ]; then
+    LC_ALL=C sort -u "$paths" | while IFS= read -r path; do
+      if [ -e "$repo_real/$path" ] || [ -L "$repo_real/$path" ]; then
+        hash="$(git -C "$repo_real" hash-object -- "$path")" \
+          || fail "could not hash dirty path: $path"
+      else
+        hash="MISSING"
+      fi
+      printf '%s\t%s\n' "$path" "$hash"
+    done >> "$tmp"
+  fi
+  mv "$tmp" "$out"
+  rm -f "$paths"
+  trap - RETURN
+}
+
+manifest_header=$'ITEM\tDEPS\tLEASES\tCOHORT\tCONTEXT\tDIRTY_STATE\tWAVE\tEXECUTION\tWORKTREE\tREQUESTED_PROFILE\tACTUAL_PROFILE\tACTUAL_MODEL\tACTUAL_EFFORT\tHANDLE\tSTATUS\tHANDOFF\tRESULT\tCOMMIT\tINTEGRATION_ORDER'
+
+verify_manifest() {
+  local manifest="$1"
+  [ -f "$manifest" ] || fail "manifest is not a regular file: $manifest"
+  [ ! -L "$manifest" ] || fail "manifest must not be a symlink: $manifest"
+  awk -F '\t' -v header="$manifest_header" '
+    NR == 1 { if ($0 != "PLN_RUN_MANIFEST\t1") exit 10; next }
+    $1 == "META" { if (NF != 3 || $2 == "" || $3 == "") exit 11; meta[$2]++; next }
+    !seen_header { if ($0 != header) exit 12; seen_header=1; next }
+    {
+      if (NF != 19 || $1 !~ /^[1-9][0-9]*$/ || seen[$1]++) exit 13
+      if ($10 != "judgment") exit 14
+      if ($15 !~ /^(pending|running|checkpointed|integrated|blocked|waiting|interrupted|failed)$/) exit 15
+      count++
+    }
+    END {
+      if (!seen_header || !count || meta["SOURCE_ROOT"] != 1 || meta["SOURCE_HEAD"] != 1 ||
+          meta["DIRTY_SNAPSHOT"] != 1 || meta["REPO_MODE"] != 1) exit 16
+    }
+  ' "$manifest" || fail "manifest is malformed or incomplete: $manifest"
+}
+
+manifest_meta() {
+  awk -F '\t' -v key="$2" '$1 == "META" && $2 == key { print $3; found=1 } END { if (!found) exit 1 }' "$1"
+}
+
+manifest_update() {
+  local manifest="$1" item="$2" mode="$3" arg1="${4:--}" arg2="${5:--}" arg3="${6:--}" arg4="${7:--}" arg5="${8:--}" tmp
+  verify_manifest "$manifest"
+  tmp="$(mktemp "$(dirname "$manifest")/.pln-manifest.XXXXXX")"
+  if ! awk -F '\t' -v OFS='\t' -v item="$item" -v mode="$mode" \
+      -v a1="$arg1" -v a2="$arg2" -v a3="$arg3" -v a4="$arg4" -v a5="$arg5" '
+    BEGIN { found=0 }
+    $1 == item && NF == 19 {
+      found=1
+      if (mode == "claim") {
+        if ($15 !~ /^(pending|waiting|blocked|interrupted)$/) exit 21
+        $14=a1; $9=a2; $15="running"
+      } else if (mode == "checkpoint") {
+        if ($15 != "running") exit 22
+        $17=a1; $18=a2; $11=a3; $12=a4; $13=a5; $15="checkpointed"
+      } else if (mode == "integrate") {
+        if ($15 != "checkpointed") exit 23
+        $18=a1; $15="integrated"
+      } else if (mode == "block") {
+        if ($15 != "running") exit 24
+        $16=a1; $15="blocked"
+      } else if (mode == "interrupt") {
+        if ($15 !~ /^(running|pending|waiting)$/) exit 25
+        $15="interrupted"
+      } else if (mode == "wait") {
+        if ($15 != "pending") exit 26
+        $15="waiting"
+      } else if (mode == "handle") {
+        $14=a1
+      }
+    }
+    { print }
+    END { if (!found) exit 20 }
+  ' "$manifest" > "$tmp"; then
+    rm -f "$tmp"
+    fail "invalid $mode transition for item $item"
+  fi
+  mv "$tmp" "$manifest"
+}
+
+command="${1:-}"
+[ -n "$command" ] || usage
+shift
+
+case "$command" in
+  snapshot)
+    repo=""; out=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --repo) repo="${2:-}"; shift 2 ;;
+        --out) out="${2:-}"; shift 2 ;;
+        *) usage ;;
+      esac
+    done
+    [ -n "$repo" ] && [ -n "$out" ] || usage
+    snapshot_tree "$repo" "$out"
+    printf 'SNAPSHOT=%s\n' "$out"
+    ;;
+
+  build)
+    root=""; nodes=""; manifest=""; source_root=""; source_head=""; dirty_snapshot=""; repo_mode=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --root) root="${2:-}"; shift 2 ;;
+        --nodes) nodes="${2:-}"; shift 2 ;;
+        --manifest) manifest="${2:-}"; shift 2 ;;
+        --source-root) source_root="${2:-}"; shift 2 ;;
+        --source-head) source_head="${2:-}"; shift 2 ;;
+        --dirty-snapshot) dirty_snapshot="${2:-}"; shift 2 ;;
+        --repo-mode) repo_mode="${2:-}"; shift 2 ;;
+        *) usage ;;
+      esac
+    done
+    for value in "$root" "$nodes" "$manifest" "$source_root" "$source_head" "$dirty_snapshot" "$repo_mode"; do
+      [ -n "$value" ] || usage
+      single_line "build field" "$value"
+    done
+    case "$repo_mode" in git | non-git) ;; *) fail "--repo-mode must be git or non-git" ;; esac
+    root_real="$(real_dir "$root")"
+    source_root_real="$(real_dir "$source_root")"
+    validate_output_path "$root_real" "$manifest"
+    [ -f "$nodes" ] && [ ! -L "$nodes" ] || fail "nodes file is missing or a symlink: $nodes"
+    [ -f "$dirty_snapshot" ] && [ ! -L "$dirty_snapshot" ] || fail "dirty snapshot is missing or a symlink: $dirty_snapshot"
+    tmp="$(mktemp "$(dirname "$manifest")/.pln-manifest.XXXXXX")"
+    if ! awk -F '\t' -v OFS='\t' -v mode="$repo_mode" -v source_root="$source_root_real" '
+      function die(msg) { print "pln-scheduler: " msg > "/dev/stderr"; exit 2 }
+      function hasdep(s, d,    a,n,k) {
+        if (s == "-") return 0
+        n=split(s,a,","); for (k=1;k<=n;k++) if (a[k] == d) return 1
+        return 0
+      }
+      function adddep(s, d) { return hasdep(s,d) ? s : (s == "-" ? d : s "," d) }
+      function validpath(p) { return p != "" && p !~ /^\// && p !~ /(^|\/)\.\.(\/|$)/ && p !~ /[[:space:]*?\[]/ }
+      function overlap_one(a,b) { return a == b || index(a,b "/") == 1 || index(b,a "/") == 1 }
+      function leases_overlap(a,b,    aa,bb,na,nb,x,y) {
+        if (a == "UNKNOWN" || b == "UNKNOWN") return 1
+        na=split(a,aa,","); nb=split(b,bb,",")
+        for (x=1;x<=na;x++) for (y=1;y<=nb;y++) if (overlap_one(aa[x],bb[y])) return 1
+        return 0
+      }
+      function deps_done(s,    a,n,k) {
+        if (s == "-") return 1
+        n=split(s,a,","); for (k=1;k<=n;k++) if (!done[a[k]]) return 0
+        return 1
+      }
+      function can_pair(idx, selected, count,    k) {
+        for (k=1;k<=count;k++) if (leases_overlap(leases[idx],leases[selected[k]])) return 0
+        return 1
+      }
+      NR == 1 {
+        if ($0 != "ITEM\tDEPS\tLEASES\tCOHORT\tCONTEXT\tDIRTY_STATE") die("nodes file has an unknown header")
+        next
+      }
+      {
+        if (NF != 6 || $1 !~ /^[1-9][0-9]*$/) die("node rows must have six fields and a positive numeric item")
+        if (seen[$1]++) die("duplicate item " $1)
+        if (n && $1 <= item[n]) die("items must be in strictly increasing plan order")
+        n++; item[n]=$1; deps[n]=$2; leases[n]=$3; cohort[n]=$4; context[n]=$5; dirty[n]=$6; pos[$1]=n
+        if ($2 != "-" && $2 !~ /^[1-9][0-9]*(,[1-9][0-9]*)*$/) die("invalid dependency list for item " $1)
+        if ($3 != "UNKNOWN") {
+          count=split($3,paths,","); for (p=1;p<=count;p++) if (!validpath(paths[p])) die("invalid write lease for item " $1)
+        }
+        if ($4 != "-" && $4 !~ /^[A-Za-z0-9_.-]+$/) die("invalid cohort for item " $1)
+        if ($5 !~ /^(fresh|reuse)$/) die("invalid context policy for item " $1)
+        if ($6 !~ /^(clean|overlap|unknown)$/) die("invalid dirty-state policy for item " $1)
+      }
+      END {
+        if (!n) die("nodes file contains no nodes")
+        for (i=1;i<=n;i++) {
+          if (deps[i] != "-") {
+            c=split(deps[i],a,","); for (k=1;k<=c;k++) {
+              if (!pos[a[k]]) die("item " item[i] " depends on missing item " a[k])
+              if (pos[a[k]] >= i) die("dependencies must point to an earlier plan item")
+            }
+          }
+        }
+        for (i=1;i<=n;i++) for (j=i+1;j<=n;j++) {
+          if (leases[i] == "UNKNOWN" || leases[j] == "UNKNOWN" || leases_overlap(leases[i],leases[j]))
+            deps[j]=adddep(deps[j],item[i])
+        }
+        for (i=1;i<=n;i++) {
+          if (cohort[i] == "-") {
+            if (context[i] != "fresh") die("item " item[i] " requests reuse without a cohort")
+            continue
+          }
+          cohort_count[cohort[i]]++
+          if (cohort_count[cohort[i]] > 3) die("cohort exceeds the three-node cap: " cohort[i])
+          if (cohort_count[cohort[i]] == 1) {
+            if (context[i] != "fresh") die("cohort must begin with fresh context: " cohort[i])
+          } else {
+            if (i == 1 || cohort[i-1] != cohort[i] || context[i] != "reuse" || !hasdep(deps[i],item[i-1]))
+              die("cohort reuse must be a contiguous direct-dependency chain: " cohort[i])
+          }
+        }
+        remaining=n; wave_no=0
+        while (remaining) {
+          ready_count=0
+          for (i=1;i<=n;i++) if (!done[item[i]] && deps_done(deps[i])) ready[++ready_count]=i
+          if (!ready_count) die("dependency graph contains a cycle")
+          first=ready[1]; selected_count=0; force=""
+          if (mode == "non-git" || dirty[first] != "clean" || leases[first] == "UNKNOWN") force="original"
+          if (context[first] == "reuse") force=execution[first-1]
+          if (force == "isolated") {
+            selected[++selected_count]=first
+            for (r=2;r<=ready_count;r++) {
+              idx=ready[r]
+              if (dirty[idx] == "clean" && leases[idx] != "UNKNOWN" && context[idx] == "fresh" && can_pair(idx,selected,selected_count))
+                selected[++selected_count]=idx
+            }
+          } else if (force == "") {
+            selected[++selected_count]=first
+            for (r=2;r<=ready_count;r++) {
+              idx=ready[r]
+              if (dirty[idx] == "clean" && leases[idx] != "UNKNOWN" && context[idx] == "fresh" && can_pair(idx,selected,selected_count))
+                selected[++selected_count]=idx
+            }
+            if (selected_count < 2) force="original"; else force="isolated"
+          } else selected[++selected_count]=first
+          wave_no++
+          for (s=1;s<=selected_count;s++) {
+            idx=selected[s]; wave[idx]=wave_no; execution[idx]=force
+            if (context[idx] == "reuse") execution[idx]=execution[idx-1]
+            done[item[idx]]=1; remaining--
+          }
+        }
+        print "PLN_RUN_MANIFEST", "1"
+        print "META", "SOURCE_ROOT", source_root
+        print "META", "SOURCE_HEAD", "PENDING"
+        print "META", "DIRTY_SNAPSHOT", "PENDING"
+        print "META", "REPO_MODE", mode
+        print "ITEM", "DEPS", "LEASES", "COHORT", "CONTEXT", "DIRTY_STATE", "WAVE", "EXECUTION", "WORKTREE", "REQUESTED_PROFILE", "ACTUAL_PROFILE", "ACTUAL_MODEL", "ACTUAL_EFFORT", "HANDLE", "STATUS", "HANDOFF", "RESULT", "COMMIT", "INTEGRATION_ORDER"
+        for (i=1;i<=n;i++) {
+          wt=(execution[i] == "original" ? source_root : "-")
+          print item[i],deps[i],leases[i],cohort[i],context[i],dirty[i],wave[i],execution[i],wt,"judgment","-","-","-","-","pending","-","-","-",i
+        }
+      }
+    ' "$nodes" > "$tmp" 2>"$tmp.meta"; then
+      cat "$tmp.meta" >&2
+      rm -f "$tmp" "$tmp.meta"
+      exit 2
+    fi
+    # awk environment assignments must precede the command; patch metadata in
+    # explicitly so the helper behaves the same under macOS and Linux awk.
+    awk -F '\t' -v OFS='\t' -v head="$source_head" -v snap="$dirty_snapshot" '
+      $1 == "META" && $2 == "SOURCE_HEAD" { $3=head }
+      $1 == "META" && $2 == "DIRTY_SNAPSHOT" { $3=snap }
+      { print }
+    ' "$tmp" > "$tmp.fixed"
+    mv "$tmp.fixed" "$tmp"
+    node_count="$(awk -F '\t' '$1 ~ /^[1-9][0-9]*$/ { n++ } END { print n+0 }' "$tmp")"
+    wave_count="$(awk -F '\t' '$1 ~ /^[1-9][0-9]*$/ && $7 > max { max=$7 } END { print max+0 }' "$tmp")"
+    rm -f "$tmp.meta"
+    mv "$tmp" "$manifest"
+    verify_manifest "$manifest"
+    printf 'MANIFEST=%s\nNODE_COUNT=%s\nWAVE_COUNT=%s\n' "$manifest" "$node_count" "$wave_count"
+    ;;
+
+  ready)
+    manifest=""
+    while [ $# -gt 0 ]; do case "$1" in --manifest) manifest="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$manifest" ] || usage
+    verify_manifest "$manifest"
+    awk -F '\t' -v OFS='\t' '
+      $1 ~ /^[1-9][0-9]*$/ { n++; id[n]=$1; deps[n]=$2; cohort[n]=$4; context[n]=$5; wave[n]=$7; execution[n]=$8; status[$1]=$15 }
+      END {
+        for (i=1;i<=n;i++) {
+          if (status[id[i]] !~ /^(pending|waiting|interrupted)$/) continue
+          ok=1
+          if (deps[i] != "-") {
+            c=split(deps[i],a,","); for (k=1;k<=c;k++) {
+              needed="integrated"
+              if (context[i] == "reuse" && i > 1 && cohort[i] != "-" && cohort[i-1] == cohort[i] && a[k] == id[i-1])
+                needed="checkpoint-or-integrated"
+              if (needed == "integrated" && status[a[k]] != "integrated") ok=0
+              if (needed != "integrated" && status[a[k]] !~ /^(checkpointed|integrated)$/) ok=0
+            }
+          }
+          if (ok) print "READY",id[i],wave[i],execution[i],context[i]
+        }
+      }
+    ' "$manifest"
+    ;;
+
+  claim)
+    manifest=""; item=""; handle=""; worktree=""
+    while [ $# -gt 0 ]; do case "$1" in
+      --manifest) manifest="${2:-}"; shift 2 ;; --item) item="${2:-}"; shift 2 ;;
+      --handle) handle="${2:-}"; shift 2 ;; --worktree) worktree="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$manifest" ] && [ -n "$item" ] && [ -n "$handle" ] && [ -n "$worktree" ] || usage
+    ready_line="$("$0" ready --manifest "$manifest" | awk -F '\t' -v item="$item" '$2 == item { print; exit }')"
+    current_status="$(awk -F '\t' -v item="$item" '$1 == item { print $15 }' "$manifest")"
+    if [ "$current_status" != "blocked" ] && [ -z "$ready_line" ]; then fail "item $item is not dependency-ready"; fi
+    manifest_update "$manifest" "$item" claim "$handle" "$worktree"
+    printf 'ITEM=%s\nSTATUS=running\n' "$item"
+    ;;
+
+  checkpoint)
+    manifest=""; item=""; result=""; commit=""; profile=""; model=""; effort=""
+    while [ $# -gt 0 ]; do case "$1" in
+      --manifest) manifest="${2:-}"; shift 2 ;; --item) item="${2:-}"; shift 2 ;;
+      --result) result="${2:-}"; shift 2 ;; --commit) commit="${2:-}"; shift 2 ;;
+      --actual-profile) profile="${2:-}"; shift 2 ;; --actual-model) model="${2:-}"; shift 2 ;;
+      --actual-effort) effort="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    for value in "$manifest" "$item" "$result" "$commit" "$profile" "$model" "$effort"; do [ -n "$value" ] || usage; done
+    manifest_update "$manifest" "$item" checkpoint "$result" "$commit" "$profile" "$model" "$effort"
+    printf 'ITEM=%s\nSTATUS=checkpointed\n' "$item"
+    ;;
+
+  integrate)
+    manifest=""; item=""; commit=""
+    while [ $# -gt 0 ]; do case "$1" in --manifest) manifest="${2:-}"; shift 2 ;; --item) item="${2:-}"; shift 2 ;; --commit) commit="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$manifest" ] && [ -n "$item" ] && [ -n "$commit" ] || usage
+    verify_manifest "$manifest"
+    order="$(awk -F '\t' -v item="$item" '$1 == item { print $19 }' "$manifest")"
+    [ -n "$order" ] || fail "unknown item: $item"
+    if awk -F '\t' -v order="$order" '$1 ~ /^[1-9][0-9]*$/ && $19 < order && $15 != "integrated" { bad=1 } END { exit bad ? 0 : 1 }' "$manifest"; then
+      fail "earlier integration order is not complete for item $item"
+    fi
+    manifest_update "$manifest" "$item" integrate "$commit"
+    printf 'ITEM=%s\nSTATUS=integrated\n' "$item"
+    ;;
+
+  block)
+    manifest=""; item=""; handoff=""
+    while [ $# -gt 0 ]; do case "$1" in --manifest) manifest="${2:-}"; shift 2 ;; --item) item="${2:-}"; shift 2 ;; --handoff) handoff="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$manifest" ] && [ -n "$item" ] && [ -n "$handoff" ] || usage
+    manifest_update "$manifest" "$item" block "$handoff"
+    printf 'ITEM=%s\nSTATUS=blocked\n' "$item"
+    ;;
+
+  interrupt)
+    manifest=""; item=""
+    while [ $# -gt 0 ]; do case "$1" in --manifest) manifest="${2:-}"; shift 2 ;; --item) item="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$manifest" ] && [ -n "$item" ] || usage
+    manifest_update "$manifest" "$item" interrupt
+    printf 'ITEM=%s\nSTATUS=interrupted\n' "$item"
+    ;;
+
+  wait)
+    manifest=""; item=""
+    while [ $# -gt 0 ]; do case "$1" in --manifest) manifest="${2:-}"; shift 2 ;; --item) item="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$manifest" ] && [ -n "$item" ] || usage
+    manifest_update "$manifest" "$item" wait
+    printf 'ITEM=%s\nSTATUS=waiting\n' "$item"
+    ;;
+
+  set-handle)
+    manifest=""; item=""; handle=""
+    while [ $# -gt 0 ]; do case "$1" in --manifest) manifest="${2:-}"; shift 2 ;; --item) item="${2:-}"; shift 2 ;; --handle) handle="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$manifest" ] && [ -n "$item" ] && [ -n "$handle" ] || usage
+    manifest_update "$manifest" "$item" handle "$handle"
+    ;;
+
+  recover)
+    manifest=""; item=""
+    while [ $# -gt 0 ]; do case "$1" in --manifest) manifest="${2:-}"; shift 2 ;; --item) item="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$manifest" ] && [ -n "$item" ] || usage
+    verify_manifest "$manifest"
+    row="$(awk -F '\t' -v item="$item" '$1 == item { print $14 "\t" $15 "\t" $16 "\t" $9 "\t" $17 "\t" $18; found=1 } END { if (!found) exit 1 }' "$manifest")" \
+      || fail "unknown item: $item"
+    IFS=$'\t' read -r handle status handoff worktree result commit <<< "$row"
+    case "$status" in
+      blocked)
+        [ "$handoff" != "-" ] && [ "$worktree" != "-" ] || fail "blocked item lacks handoff or worktree recovery state"
+        if [ "$handle" = "-" ]; then recovery="fresh-worker"; else recovery="continue-handle"; fi
+        ;;
+      interrupted)
+        [ "$worktree" != "-" ] || fail "interrupted item lacks a retained worktree"
+        recovery="fresh-worker"
+        ;;
+      running) fail "running item has conflicting recovery state; interrupt or reconcile it first" ;;
+      checkpointed) recovery="integrate" ;;
+      integrated) recovery="complete" ;;
+      pending | waiting) recovery="dispatch" ;;
+      failed) recovery="fresh-worker" ;;
+      *) fail "unknown status for item $item" ;;
+    esac
+    printf 'ITEM=%s\nSTATUS=%s\nRECOVERY=%s\nHANDLE=%s\nHANDOFF=%s\nWORKTREE=%s\nRESULT=%s\nCOMMIT=%s\n' \
+      "$item" "$status" "$recovery" "$handle" "$handoff" "$worktree" "$result" "$commit"
+    ;;
+
+  check-dirty)
+    repo=""; snapshot=""; manifest=""; allow_items=""
+    while [ $# -gt 0 ]; do case "$1" in
+      --repo) repo="${2:-}"; shift 2 ;; --snapshot) snapshot="${2:-}"; shift 2 ;;
+      --manifest) manifest="${2:-}"; shift 2 ;; --allow-items) allow_items="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    for value in "$repo" "$snapshot" "$manifest" "$allow_items"; do [ -n "$value" ] || usage; done
+    verify_manifest "$manifest"
+    current="$(mktemp "${TMPDIR:-/tmp}/pln-current-dirty.XXXXXX")"
+    trap 'rm -f "$current"' EXIT
+    snapshot_tree "$repo" "$current"
+    if ! awk -F '\t' -v manifest="$manifest" -v allow="$allow_items" '
+      function path_allowed(path,    i,l) {
+        for (i in lease) {
+          l=lease[i]
+          if (path == l || index(path,l "/") == 1 || index(l,path "/") == 1) return 1
+        }
+        return 0
+      }
+      BEGIN {
+        if (allow != "-") { n=split(allow,a,","); for (i=1;i<=n;i++) allowed_item[a[i]]=1 }
+        while ((getline line < manifest) > 0) {
+          split(line,m,"\t")
+          if (allowed_item[m[1]]) {
+            if (m[3] == "UNKNOWN") { print "pln-scheduler: cannot validate dirty state against an unknown lease" > "/dev/stderr"; exit 3 }
+            c=split(m[3],ls,","); for (j=1;j<=c;j++) lease[ls[j]]=1
+          }
+        }
+        close(manifest)
+      }
+      FNR == NR { if (FNR > 1) before[$1]=$2; next }
+      FNR > 1 { after[$1]=$2 }
+      END {
+        if (exit_code) exit exit_code
+        for (p in before) if (!path_allowed(p) && (!(p in after) || after[p] != before[p])) bad=1
+        for (p in after) if (!path_allowed(p) && (!(p in before) || before[p] != after[p])) bad=1
+        if (bad) exit 4
+      }
+    ' "$snapshot" "$current"; then
+      rm -f "$current"
+      trap - EXIT
+      fail "user-owned dirty state changed outside allowed leases"
+    fi
+    rm -f "$current"
+    trap - EXIT
+    printf 'DIRTY_STATE=unchanged\n'
+    ;;
+
+  verify)
+    manifest=""
+    while [ $# -gt 0 ]; do case "$1" in --manifest) manifest="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$manifest" ] || usage
+    verify_manifest "$manifest"
+    printf 'STATUS=valid\n'
+    ;;
+
+  *) usage ;;
+esac

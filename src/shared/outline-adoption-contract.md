@@ -1,0 +1,4 @@
+- **Initial outline checkpoint is mandatory.** Show the complete editable dashboard, then stop before item-level questions. Normal and auto require an affirmative reply; delegated mode may advance after showing it because delegation supplied advance adoption.
+- **Master-plan adoption is mandatory.** No implementation starts until the resolved plan is shown and explicitly adopted, except delegated mode's advance adoption.
+- **Auto is not advance authorization.** Auto mode grants neither outline-checkpoint confirmation nor master-plan adoption. It changes only Step 5 blocker scheduling after adoption.
+- **No inline feature work before adoption.** During outline, interview, and review/approval, neither coordinator nor worker implements the feature. Read-only research and incidental capture keep their narrow interview exceptions.

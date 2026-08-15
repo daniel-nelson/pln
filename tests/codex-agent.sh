@@ -73,8 +73,11 @@ grep -q '^STATUS=ok$' <<<"$res" || fail "success did not report STATUS=ok"
 grep -q '^THREAD_ID=tid-abc-123$' <<<"$res" || fail "thread id not read from the event stream"
 grep -q "^RESULT_FILE=$out\$" <<<"$res" || fail "RESULT_FILE line missing or wrong"
 grep -q "^EVENTS_FILE=$out.events\$" <<<"$res" || fail "EVENTS_FILE did not default to <out>.events"
+grep -q '^ACTUAL_PROFILE=inherit$' <<<"$res" || fail "default semantic profile was not attributed"
+grep -q '^ACTUAL_MODEL=inherited-unreported$' <<<"$res" || fail "default inherited model was not attributed truthfully"
+grep -q '^ACTUAL_EFFORT=inherited-unreported$' <<<"$res" || fail "default inherited effort was not attributed truthfully"
 [ "$(cat "$out")" = "the agent said this" ] || fail "result file does not hold the agent's message"
-[ "$(wc -l <<<"$res")" -eq 4 ] || fail "helper printed something other than its four lines"
+[ "$(wc -l <<<"$res")" -eq 7 ] || fail "helper printed something other than its seven lines"
 grep -q 'thread.started' "$out.events" || fail "event stream was not captured to the events file"
 
 # --- the brief travels on stdin, not argv ------------------------------------
@@ -118,6 +121,11 @@ grep -q -- '--json' <<<"$cmd" || fail "the event stream is not requested"
 grep -q -- '-s workspace-write' <<<"$cmd" || fail "default sandbox is not workspace-write"
 grep -q -- '--add-dir' <<<"$cmd" || fail "--add-dir was dropped"
 
+cmd="$("$BIN" --brief "$BRIEF" --out "$WORK/dry.out" --profile judgment \
+  --model gpt-5.6-sol --effort high --dry-run 2>&1 >/dev/null)"
+grep -q -- '-m gpt-5.6-sol' <<<"$cmd" || fail "the routed model was not passed through"
+grep -qF -- 'model_reasoning_effort=\"high\"' <<<"$cmd" || fail "the routed reasoning effort was not passed through"
+
 cmd="$("$BIN" --brief "$BRIEF" --out "$WORK/dry.out" --resume tid-9 --sandbox read-only \
   --add-dir "$WORK" --dry-run 2>&1 >/dev/null)"
 grep -q 'resume tid-9' <<<"$cmd" || fail "resume id not passed"
@@ -140,6 +148,8 @@ guard "an empty brief" --brief "$WORK/blank.md" --out "$WORK/x.out"
 guard "an unknown sandbox" --brief "$BRIEF" --out "$WORK/x.out" --sandbox wide-open
 guard "a non-numeric timeout" --brief "$BRIEF" --out "$WORK/x.out" --timeout soon
 guard "an unknown argument" --brief "$BRIEF" --out "$WORK/x.out" --turbo
+guard "an unknown profile" --brief "$BRIEF" --out "$WORK/x.out" --profile guess
+guard "an unknown effort" --brief "$BRIEF" --out "$WORK/x.out" --effort enormous
 guard "an empty --resume id" --brief "$BRIEF" --out "$WORK/x.out" --resume ""
 [ -e "$WORK/x.out" ] && fail "a usage error still created the output file"
 

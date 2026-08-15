@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "suite": "outline-checkpoint",
+  "purpose": "Exercise the user-visible turn boundary between writing a plan skeleton and beginning the item interview.",
+  "cases": [
+    {
+      "id": "outline-normal-edit-before-interview",
+      "mode": "normal",
+      "initial_prompt": "Make a plan to add account export, deletion, and retention controls to this synthetic project.",
+      "turns": [
+        {
+          "checkpoint": "first-post-skeleton-turn",
+          "expect": [
+            "shows the complete dashboard containing every proposed item",
+            "asks whether to start the interview",
+            "asks no item-level question",
+            "performs no implementation"
+          ]
+        },
+        {
+          "user_reply": "Remove retention controls and add an audit-log item before we start.",
+          "checkpoint": "scope-edit-turn",
+          "expect": [
+            "updates the durable skeleton before interviewing",
+            "re-shows the complete dashboard without retention controls and with audit logging",
+            "asks whether to start the interview again",
+            "asks no item-level question",
+            "performs no implementation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "outline-delegated-shows-then-proceeds",
+      "mode": "delegated",
+      "initial_prompt": "Plan account export and deletion. Decide the remaining plan questions yourself and build it.",
+      "expect": [
+        "shows the complete initial dashboard",
+        "does not wait for checkpoint confirmation",
+        "proceeds into the interview under delegated-mode authority"
+      ]
+    },
+    {
+      "id": "outline-auto-still-waits",
+      "mode": "auto",
+      "initial_prompt": "In auto mode, make a plan to add account export and deletion.",
+      "expect": [
+        "shows the complete initial dashboard",
+        "asks whether to start the interview",
+        "asks no item-level question",
+        "performs no implementation"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+# Runtime aliases, kept host-local so shared policy never ages with model IDs.
+FRONTIER_MODEL='fable'
+ECONOMY_MODEL='sonnet'
+FRONTIER_PATTERN='(^|[-_/])(fable|opus)([-_/]|$)'
+BELOW_FLOOR_PATTERN='(^|[-_/])(sonnet|haiku)([-_/]|$)'
+JUDGMENT_EFFORT='high'
+EVIDENCE_EFFORT='low'

@@ -1,0 +1,13 @@
+## Model and effort routing
+
+Route workers by the judgment their result carries, never by plan length or the generic word “research”:
+
+- **`inherit`** is ordinary same-host work. Omit a model override so the worker keeps the hosting model the user selected; inherit effort unless the task has another profile below.
+- **`judgment`** is a frontier-capability floor. It owns preflight scope synthesis, premise reversals, contradictory-record reconciliation, recommendations, interview forks, scheduling and architecture, implementation, verification sufficiency, every review/finding merge, and user-facing synthesis. Concurrency, transactions, migrations, security/privacy, data retention, AI/eval semantics, external effects, and architectural seams always route here. This is a minimum, not a preference: preserve a hosting model already recognized as frontier-capable, and upgrade only a model known to be below the floor.
+- **`evidence`** is limited to mechanically closed facts and citations: instruction discovery, git/version/migration state, exact symbol/caller inventories, prior-record retrieval, enumerated reader/writer maps, and citation refreshes. It must not recommend, decide applicability, create a user-facing fork, reconcile conflicting records, or reverse a premise. Any such discovery escalates to `judgment` before interpretation.
+
+Read `{{SKILL_DIR}}/bin/pln-config get evidence_profile` when an evidence task is dispatched. Missing and `inherit` keep the hosting model; `economy` selects the host's economy model only for eligible evidence work when that exact host/model has an enabled release qualification in `evals/economy-qualification.tsv`. A failed or undersized live-eval stratum disables only that affected route; an unavailable or unqualified selection falls back to inherited evidence work and attributes the reason. Never advertise a disabled route or interrupt an interview; setup owns the one-time notice for a qualified, usable route.
+
+Implementation, review, final finding merges, and user-facing synthesis never use the economy route. `pln-peer` is a cross-provider `judgment` path and retains its existing consent, authentication, timeout, malformed/empty result, and fallback boundaries.
+
+Every worker assignment carries the requested profile and the resolved host controls. Every result/ledger entry records the actual profile, model, and effort reported by the host, plus any fallback or escalation. If the host reports only a selected alias, record that alias as selected and the underlying model as unreported; never invent attribution.

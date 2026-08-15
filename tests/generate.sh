@@ -402,6 +402,9 @@ done
 for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
   has "$f" 'Initial outline checkpoint is mandatory' "$f lost the outline invariant"
   has "$f" 'Master-plan adoption is mandatory' "$f lost the adoption invariant"
+  has "$f" 'Auto is not advance authorization' "$f lets auto imply advance authorization"
+  has "$f" 'grants neither outline-checkpoint confirmation nor master-plan adoption' \
+    "$f does not define the narrow meaning of auto mode"
   has "$f" 'No inline feature work before adoption' "$f lost the no-inline invariant"
   has "$f" "before the phase's first action" "$f does not require first-action phase loading"
   has "$f" 'write durable state first, then advance `Phase`, then read the new phase file' \
@@ -565,8 +568,12 @@ for f in "$real_c/phases/pln/outline.md" "$real_x/phases/pln/outline.md"; do
     "$f does not apply checkpoint edits before the interview"
   has "$f" 'In delegated mode there is nothing to ask: show the dashboard and go straight into Step 3' \
     "$f lost the delegated-mode outline display and advance adoption"
-  has "$f" 'Auto mode does not bypass this checkpoint' \
+  has "$f" 'Auto mode is not advance authorization' \
     "$f lets auto mode bypass the initial outline checkpoint"
+  has "$f" 'missing confirmation leaves `Phase: outline`' \
+    "$f does not keep auto/normal runs durably in outline without confirmation"
+  has "$f" 'do not infer confirmation from auto mode or start the interview, review, scheduling, or implementation' \
+    "$f does not enumerate the forbidden pre-confirmation transitions"
 done
 
 # ─── the plan review, as skill text ───────────────────────────────────────────

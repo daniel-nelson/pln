@@ -6,7 +6,7 @@ name: pln-phase-outline
 
 Read this file in full before the first outline action. It owns pre-flight, plan allocation, skeleton creation, the editable outline checkpoint, and the transition into interview. It does not own any item-level interview question or implementation.
 
-Create `PLAN.md` with `Phase: outline` in its own top-level `## Phase` section before showing the dashboard. If the user edits scope, update the skeleton and keep `Phase: outline`. After the user accepts the displayed outline—or after delegated mode displays it—finish all outline writes, set `Phase: interview`, then read the mapped interview phase in full before its first action.
+Create `PLAN.md` with `Phase: outline` in its own top-level `## Phase` section before showing the dashboard. If the user edits scope, update the skeleton and keep `Phase: outline`. In normal and auto modes, missing confirmation leaves `Phase: outline`: do not infer confirmation from auto mode or start the interview, review, scheduling, or implementation. After the user accepts the displayed outline—or after delegated mode displays it—finish all outline writes, set `Phase: interview`, then read the mapped interview phase in full before its first action.
 
 ## The workflow (sequential steps)
 
@@ -126,7 +126,7 @@ This checkpoint is the user's scope-editing surface: a chapter-outline view for 
 
 After writing the skeleton, **stop**. In normal mode, show the user the complete dashboard (not the whole file), ask no item-level interview question in that turn, and perform no implementation. Prompt: "Plan written to `<path>`. Ready to start the interview?" Only an affirmative answer to the current outline begins the interview phase (Step 3). If the user changes the outline instead, update the skeleton before the interview starts, re-show the complete dashboard, and ask again.
 
-In delegated mode there is nothing to ask: show the dashboard and go straight into Step 3 (see Delegated mode). Auto mode does not bypass this checkpoint; it changes only Step 5 blocker handling (see Auto-mode behavior).
+In delegated mode there is nothing to ask: show the dashboard and go straight into Step 3 (see Delegated mode). Auto mode is not advance authorization: it grants neither this checkpoint confirmation nor master-plan adoption, and changes only Step 5 blocker handling after adoption (see Auto-mode behavior).
 ## Plan file conventions
 
 - In a git worktree, the directory is `./plans/<YYYY-MM-DD>-<slug>/`, relative to the session CWD rather than the git root. Outside a git worktree, use the external temporary run directory allocated in Step 1; do not create a local `plans/` directory.

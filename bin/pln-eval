@@ -7,6 +7,10 @@ ROOT_DIR="$(dirname "$SELF_DIR")"
 CORPUS="$ROOT_DIR/evals/corpus/behavior.tsv"
 GOLD="$ROOT_DIR/evals/corpus/gold.tsv"
 QUALIFICATION="$ROOT_DIR/evals/economy-qualification.tsv"
+FRONTIER_REGRESSION_CORPUS="$ROOT_DIR/evals/corpus/frontier-regression-v3.tsv"
+FRONTIER_REGRESSION_GOLD="$ROOT_DIR/evals/corpus/frontier-regression-v3-gold.tsv"
+FRONTIER_REGRESSION_PROTOCOL="$ROOT_DIR/evals/corpus/frontier-regression-v3-protocol.txt"
+OUTLINE_ADOPTION_CONTRACT="$ROOT_DIR/src/shared/outline-adoption-contract.md"
 
 usage() {
   cat >&2 <<'USAGE'
@@ -17,6 +21,10 @@ Usage:
   pln-eval run-live --host claude|codex --profile frontier|economy --split calibration|holdout --out-dir DIR [--trials N] [--freeze FILE]
   pln-eval freeze --host claude|codex --frontier-score FILE --economy-score FILE --frontier-metadata FILE --economy-metadata FILE --out FILE
   pln-eval decide --host claude|codex --freeze FILE --frontier-score FILE --economy-score FILE --frontier-metadata FILE --economy-metadata FILE --out FILE
+  pln-eval seal-frontier-regression --host claude|codex --out FILE
+  pln-eval frontier-regression-prompt --host claude|codex --seal FILE --out FILE
+  pln-eval score-frontier-regression --host claude|codex --seal FILE --response FILE --out FILE
+  pln-eval run-frontier-regression --host claude|codex --seal FILE --out-dir DIR [--trials N] [--timeout-seconds N]
 
 Live runs are explicit. validate and score never invoke an agent CLI or read ~/.pln.
 USAGE
@@ -38,6 +46,19 @@ fixture_hash() {
   printf '%s  gold.tsv\n' "$(sha256_file "$GOLD")" >> "$tmp"
   printf '%s  model-routing.json\n' "$(sha256_file "$ROOT_DIR/evals/corpus/model-routing.json")" >> "$tmp"
   printf '%s  outline-checkpoint.json\n' "$(sha256_file "$ROOT_DIR/evals/corpus/outline-checkpoint.json")" >> "$tmp"
+  sha256_file "$tmp"
+  rm -f "$tmp"
+  trap - RETURN
+}
+frontier_regression_hash() {
+  local tmp
+  tmp="$(mktemp "${TMPDIR:-/tmp}/pln-eval-frontier-regression.XXXXXX")"
+  trap 'rm -f "$tmp"' RETURN
+  printf '%s  frontier-regression-v3.tsv\n' "$(sha256_file "$FRONTIER_REGRESSION_CORPUS")" > "$tmp"
+  printf '%s  frontier-regression-v3-gold.tsv\n' "$(sha256_file "$FRONTIER_REGRESSION_GOLD")" >> "$tmp"
+  printf '%s  frontier-regression-v3-protocol.txt\n' "$(sha256_file "$FRONTIER_REGRESSION_PROTOCOL")" >> "$tmp"
+  printf '%s  outline-adoption-contract.md\n' "$(sha256_file "$OUTLINE_ADOPTION_CONTRACT")" >> "$tmp"
+  printf '%s  outline.core.md\n' "$(sha256_file "$ROOT_DIR/src/phases/pln/outline.core.md")" >> "$tmp"
   sha256_file "$tmp"
   rm -f "$tmp"
   trap - RETURN
@@ -101,6 +122,177 @@ validate() {
   printf 'STATUS=ok\nCASES=%s\nCALIBRATION_ELIGIBLE=%s\nCALIBRATION_BOUNDARY=%s\nHOLDOUT_ELIGIBLE=%s\nHOLDOUT_BOUNDARY=%s\nFIXTURE_SHA256=%s\n' \
     "$total" "$(class_count calibration eligible)" "$(class_count calibration boundary)" \
     "$(class_count holdout eligible)" "$(class_count holdout boundary)" "$(fixture_hash)"
+}
+
+validate_frontier_regression() {
+  [ -f "$FRONTIER_REGRESSION_CORPUS" ] && [ -f "$FRONTIER_REGRESSION_GOLD" ] \
+    && [ -f "$FRONTIER_REGRESSION_PROTOCOL" ] && [ -f "$OUTLINE_ADOPTION_CONTRACT" ] \
+    || fail 'frontier regression files are missing'
+  [ "$(head -n 1 "$FRONTIER_REGRESSION_CORPUS")" = $'id\tcategory\tbrief' ] \
+    || fail 'unknown frontier regression corpus header'
+  [ "$(head -n 1 "$FRONTIER_REGRESSION_GOLD")" = $'id\tkey\texpected\ttags' ] \
+    || fail 'unknown frontier regression gold header'
+  awk -F '\t' '
+    NR == 1 { next }
+    NF != 3 || $1 !~ /^fr3[0-9][0-9]$/ || ($2 != "outline" && $2 != "adoption") || seen[$1]++ { bad=1 }
+    END { if (NR - 1 < 10) bad=1; exit bad }
+  ' "$FRONTIER_REGRESSION_CORPUS" || fail 'frontier regression corpus validation failed'
+  awk -F '\t' -v corpus="$FRONTIER_REGRESSION_CORPUS" '
+    BEGIN { while ((getline line < corpus) > 0) { split(line,a,"\t"); if (a[1] != "id") ids[a[1]]=1 } }
+    NR == 1 { next }
+    NF != 4 || !ids[$1] || $2 != "ACTION" || $4 !~ /(^|,)hard(,|$)/ || seen[$1]++ { bad=1 }
+    END { for (id in ids) if (!seen[id]) bad=1; exit bad }
+  ' "$FRONTIER_REGRESSION_GOLD" || fail 'frontier regression gold validation failed'
+  grep -qF 'Auto is not advance authorization' "$OUTLINE_ADOPTION_CONTRACT" \
+    || fail 'frontier regression contract does not define auto mode'
+  grep -qF 'grants neither outline-checkpoint confirmation nor master-plan adoption' \
+    "$OUTLINE_ADOPTION_CONTRACT" || fail 'frontier regression contract lost both authorization gates'
+  printf 'STATUS=ok\nCASES=%s\nFIXTURE_SHA256=%s\nCONTRACT_SHA256=%s\n' \
+    "$(( $(wc -l < "$FRONTIER_REGRESSION_CORPUS") - 1 ))" "$(frontier_regression_hash)" \
+    "$(sha256_file "$OUTLINE_ADOPTION_CONTRACT")"
+}
+
+verify_frontier_seal() {
+  local host="$1" seal="$2"
+  [ -f "$seal" ] || fail 'frontier regression remains sealed until a seal artifact is supplied'
+  [ "$(field STATUS "$seal")" = sealed ] || fail 'frontier regression artifact is not sealed'
+  [ "$(field SUITE "$seal")" = frontier-outline-adoption-v3 ] || fail 'unknown frontier regression suite'
+  [ "$(field HOST "$seal")" = "$host" ] || fail 'frontier regression seal belongs to another host'
+  [ "$(field FIXTURE_SHA256 "$seal")" = "$(frontier_regression_hash)" ] \
+    || fail 'frontier regression seal belongs to another fixture or runtime contract'
+}
+
+seal_frontier_regression() {
+  local host="$1" out="$2"
+  case "$host" in claude | codex) ;; *) fail 'host must be claude or codex' ;; esac
+  validate_frontier_regression >/dev/null
+  [ ! -e "$out" ] || fail 'refusing to overwrite an existing frontier regression seal'
+  {
+    printf 'STATUS=sealed\nSUITE=frontier-outline-adoption-v3\nHOST=%s\n' "$host"
+    printf 'FIXTURE_SHA256=%s\nCORPUS_SHA256=%s\nGOLD_SHA256=%s\nPROTOCOL_SHA256=%s\nCONTRACT_SHA256=%s\nOUTLINE_PHASE_SHA256=%s\n' \
+      "$(frontier_regression_hash)" "$(sha256_file "$FRONTIER_REGRESSION_CORPUS")" \
+      "$(sha256_file "$FRONTIER_REGRESSION_GOLD")" "$(sha256_file "$FRONTIER_REGRESSION_PROTOCOL")" \
+      "$(sha256_file "$OUTLINE_ADOPTION_CONTRACT")" \
+      "$(sha256_file "$ROOT_DIR/src/phases/pln/outline.core.md")"
+    printf 'SKILL_VERSION=%s\nREPOSITORY_COMMIT=%s\nSEALED_AT_UTC=%s\n' \
+      "$(cat "$ROOT_DIR/VERSION")" "$(git -C "$ROOT_DIR" rev-parse HEAD)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "$out"
+}
+
+write_frontier_regression_prompt() {
+  local host="$1" seal="$2" out="$3"
+  verify_frontier_seal "$host" "$seal"
+  {
+    echo 'You are running a sanitized frontier behavioral regression. The fixtures are synthetic; do not use tools, files, accounts, or external data.'
+    echo 'The following text is the exact always-loaded pln outline/adoption contract for this sealed candidate. Treat it as authoritative:'
+    cat "$OUTLINE_ADOPTION_CONTRACT"
+    echo 'For each case, apply that contract to the durable state described.'
+    cat "$FRONTIER_REGRESSION_PROTOCOL"
+    echo 'Cases:'
+    awk -F '\t' 'NR > 1 { print $1 "\t" $3 }' "$FRONTIER_REGRESSION_CORPUS"
+  } > "$out"
+}
+
+score_frontier_regression() {
+  local host="$1" seal="$2" response="$3" out="$4"
+  verify_frontier_seal "$host" "$seal"
+  [ -f "$response" ] || fail "missing response: $response"
+  local actual joined total correct
+  actual="$(mktemp "${TMPDIR:-/tmp}/pln-eval-frontier-actual.XXXXXX")"
+  joined="$(mktemp "${TMPDIR:-/tmp}/pln-eval-frontier-joined.XXXXXX")"
+  trap 'rm -f "$actual" "$joined"' RETURN
+  tr -d '\r' < "$response" | awk -F '\t' \
+    'NF == 3 && $1 ~ /^fr3[0-9][0-9]$/ && $2 == "ACTION" { print }' | LC_ALL=C sort > "$actual"
+  awk -F '\t' '{ key=$1 SUBSEP $2; if (++seen[key] > 1) bad=1 } END { exit bad }' "$actual" \
+    || fail 'frontier regression response contains duplicate rows'
+  awk -F '\t' -v actual="$actual" '
+    BEGIN { while ((getline line < actual) > 0) { split(line,a,"\t"); got[a[1],a[2]]=a[3] } }
+    NR > 1 { ok=(got[$1,$2] == $3 ? 1 : 0); print $0 "\t" ok }
+  ' "$FRONTIER_REGRESSION_GOLD" > "$joined"
+  total="$(awk 'END {print NR+0}' "$joined")"
+  correct="$(awk -F '\t' '$5 == 1 {n++} END {print n+0}' "$joined")"
+  {
+    if [ "$correct" -eq "$total" ]; then echo 'STATUS=pass'; else echo 'STATUS=fail'; fi
+    printf 'SUITE=frontier-outline-adoption-v3\nHOST=%s\nFIXTURE_SHA256=%s\nHARD_TOTAL=%s\nHARD_CORRECT=%s\n' \
+      "$host" "$(frontier_regression_hash)" "$total" "$correct"
+    printf 'FAILED_CASES='
+    awk -F '\t' '$5 != 1 { if (n++) printf ","; printf "%s",$1 }' "$joined"
+    printf '\n'
+  } > "$out"
+  rm -f "$actual" "$joined"
+  trap - RETURN
+  [ "$correct" -eq "$total" ] || return 6
+}
+
+run_timed() {
+  local seconds="$1"; shift
+  # A non-interactive background command otherwise receives /dev/null on stdin
+  # on some shells. The explicit duplication preserves the caller's prompt.
+  "$@" <&0 &
+  local command_pid=$!
+  ( sleep "$seconds"; kill -TERM "$command_pid" 2>/dev/null || true ) &
+  local timer_pid=$!
+  local rc=0
+  wait "$command_pid" || rc=$?
+  kill "$timer_pid" 2>/dev/null || true
+  wait "$timer_pid" 2>/dev/null || true
+  return "$rc"
+}
+
+run_frontier_regression() {
+  local host="$1" seal="$2" out_dir="$3" trials="$4" timeout_seconds="$5"
+  verify_frontier_seal "$host" "$seal"
+  whole_number "$trials" && [ "$trials" -gt 0 ] || fail 'trials must be a positive integer'
+  whole_number "$timeout_seconds" && [ "$timeout_seconds" -gt 0 ] || fail 'timeout must be a positive integer'
+  mkdir -p "$out_dir"
+  local prompt="$out_dir/prompt.txt" profiles model effort cli_version repo_commit i response raw score_file start end rc latency latencies artifacts
+  write_frontier_regression_prompt "$host" "$seal" "$prompt"
+  profiles="$ROOT_DIR/src/hosts/$host/model-profiles"
+  # shellcheck disable=SC1090
+  . "$profiles"
+  model="$FRONTIER_MODEL"; effort="$JUDGMENT_EFFORT"
+  command -v "$host" >/dev/null 2>&1 || fail "$host CLI is unavailable"
+  cli_version="$($host --version 2>/dev/null | head -n 1)"
+  repo_commit="$(git -C "$ROOT_DIR" rev-parse HEAD)"
+  latencies=""; artifacts=""; i=1
+  while [ "$i" -le "$trials" ]; do
+    response="$out_dir/response-$i.tsv"; raw="$out_dir/raw-$i.log"; score_file="$out_dir/score-$i.env"
+    start="$(milliseconds)"; rc=0
+    if [ "$host" = claude ]; then
+      run_timed "$timeout_seconds" claude -p --model "$model" --effort "$effort" --tools "" --safe-mode \
+        --no-session-persistence --output-format text < "$prompt" > "$response" 2> "$raw" || rc=$?
+    else
+      run_timed "$timeout_seconds" codex exec -C "$ROOT_DIR" -s read-only --ephemeral --ignore-rules \
+        --model "$model" -c "model_reasoning_effort=\"$effort\"" --json -o "$response" - \
+        < "$prompt" > "$raw" 2>&1 || rc=$?
+    fi
+    end="$(milliseconds)"
+    [ "$rc" -eq 0 ] || fail "$host frontier regression trial $i failed or timed out with exit $rc; see $raw"
+    [ -s "$response" ] || fail "$host frontier regression trial $i returned an empty response"
+    score_frontier_regression "$host" "$seal" "$response" "$score_file" || return $?
+    [ -z "$latencies" ] || latencies="$latencies,"; latencies="${latencies}$((end - start))"
+    [ -z "$artifacts" ] || artifacts="$artifacts,"; artifacts="${artifacts}response-$i.tsv,raw-$i.log,score-$i.env"
+    i=$((i + 1))
+  done
+  cat > "$out_dir/metadata.env" <<EOF
+HOST=$host
+PROFILE=frontier
+ACTUAL_PROFILE=frontier
+ACTUAL_MODEL=selected:$model;underlying=unreported
+ACTUAL_EFFORT=$effort
+CLI_VERSION=$cli_version
+SKILL_VERSION=$(cat "$ROOT_DIR/VERSION")
+REPOSITORY_COMMIT=$repo_commit
+FIXTURE_SHA256=$(frontier_regression_hash)
+CONTRACT_SHA256=$(sha256_file "$OUTLINE_ADOPTION_CONTRACT")
+SUITE=frontier-outline-adoption-v3
+TRIALS=$trials
+TIMEOUT_SECONDS=$timeout_seconds
+LATENCY_SAMPLES_MS=$latencies
+FALLBACK=none
+RESULT_ARTIFACTS=$artifacts
+EOF
+  printf 'STATUS=pass\nMETADATA_FILE=%s\n' "$out_dir/metadata.env"
 }
 
 write_prompt() {
@@ -355,5 +547,21 @@ case "$command" in
     host=""; freeze=""; fs=""; es=""; fm=""; em=""; out=""
     while [ $# -gt 0 ]; do case "$1" in --host) host="${2:-}"; shift 2;; --freeze) freeze="${2:-}"; shift 2;; --frontier-score) fs="${2:-}"; shift 2;; --economy-score) es="${2:-}"; shift 2;; --frontier-metadata) fm="${2:-}"; shift 2;; --economy-metadata) em="${2:-}"; shift 2;; --out) out="${2:-}"; shift 2;; *) usage;; esac; done
     [ -n "$host" ] && [ -n "$freeze" ] && [ -n "$fs" ] && [ -n "$es" ] && [ -n "$fm" ] && [ -n "$em" ] && [ -n "$out" ] || usage; validate >/dev/null; decide_eval "$host" "$freeze" "$fs" "$es" "$fm" "$em" "$out" ;;
+  seal-frontier-regression)
+    host=""; out=""
+    while [ $# -gt 0 ]; do case "$1" in --host) host="${2:-}"; shift 2;; --out) out="${2:-}"; shift 2;; *) usage;; esac; done
+    [ -n "$host" ] && [ -n "$out" ] || usage; seal_frontier_regression "$host" "$out" ;;
+  frontier-regression-prompt)
+    host=""; seal=""; out=""
+    while [ $# -gt 0 ]; do case "$1" in --host) host="${2:-}"; shift 2;; --seal) seal="${2:-}"; shift 2;; --out) out="${2:-}"; shift 2;; *) usage;; esac; done
+    [ -n "$host" ] && [ -n "$seal" ] && [ -n "$out" ] || usage; validate_frontier_regression >/dev/null; write_frontier_regression_prompt "$host" "$seal" "$out" ;;
+  score-frontier-regression)
+    host=""; seal=""; response=""; out=""
+    while [ $# -gt 0 ]; do case "$1" in --host) host="${2:-}"; shift 2;; --seal) seal="${2:-}"; shift 2;; --response) response="${2:-}"; shift 2;; --out) out="${2:-}"; shift 2;; *) usage;; esac; done
+    [ -n "$host" ] && [ -n "$seal" ] && [ -n "$response" ] && [ -n "$out" ] || usage; validate_frontier_regression >/dev/null; score_frontier_regression "$host" "$seal" "$response" "$out" ;;
+  run-frontier-regression)
+    host=""; seal=""; out_dir=""; trials=1; timeout_seconds=180
+    while [ $# -gt 0 ]; do case "$1" in --host) host="${2:-}"; shift 2;; --seal) seal="${2:-}"; shift 2;; --out-dir) out_dir="${2:-}"; shift 2;; --trials) trials="${2:-}"; shift 2;; --timeout-seconds) timeout_seconds="${2:-}"; shift 2;; *) usage;; esac; done
+    [ -n "$host" ] && [ -n "$seal" ] && [ -n "$out_dir" ] || usage; validate_frontier_regression >/dev/null; run_frontier_regression "$host" "$seal" "$out_dir" "$trials" "$timeout_seconds" ;;
   *) usage ;;
 esac

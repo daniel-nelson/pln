@@ -27,3 +27,15 @@ bin/pln-eval decide --host claude --freeze <freeze.env> \
 ```
 
 `decide` is mechanical: any hard-floor failure, benefit below the frozen threshold, or host × class holdout smaller than the calculated requirement exits nonzero and records `STATUS=disabled`. Do not tune against an opened holdout. Each live run records selected/actual attribution, CLI and skill versions, repository and fixture hashes, latency samples, reported tokens/cost when the CLI exposes them, fallbacks, and artifact paths. Keep these nondeterministic outputs outside the committed corpus (the local plan's `evidence/` directory is the normal location).
+
+## Frontier invariant regressions after an opened holdout
+
+Never edit, tune, or reuse an opened holdout to clear a failed hard invariant. Fix the runtime contract, create a new sanitized suite and gold file, and seal their hashes together with the exact runtime contract before the first model call. The v3 outline/adoption regression does that through:
+
+```bash
+bin/pln-eval seal-frontier-regression --host claude --out <seal.env>
+bin/pln-eval run-frontier-regression --host claude --seal <seal.env> \
+  --trials 3 --timeout-seconds 180 --out-dir <artifact-dir>
+```
+
+The prompt cannot render without the host-specific seal. A changed case, gold answer, output protocol, always-loaded contract, or outline phase invalidates that seal, and the runner requires 100% hard-case accuracy on every trial. This replacement suite proves only the named frontier invariant; it does not requalify an economy route or substitute for an undersized host/class comparison.

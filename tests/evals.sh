@@ -21,6 +21,43 @@ done
 fixture="$(printf '%s\n' "$validation" | sed -n 's/^FIXTURE_SHA256=//p')"
 [ "${#fixture}" -eq 64 ] || fail 'fixture hash is not SHA-256 sized'
 
+# The replacement frontier suite is distinct from the opened 40-case holdout,
+# binds the exact always-loaded runtime contract, and cannot be rendered before
+# a host-specific immutable seal is written.
+regression_validation="$($EVAL seal-frontier-regression --host claude --out "$WORK/frontier-regression.seal" && $EVAL frontier-regression-prompt --host claude --seal "$WORK/frontier-regression.seal" --out "$WORK/frontier-regression.prompt" && $EVAL validate)"
+[ -s "$WORK/frontier-regression.seal" ] || fail 'frontier regression seal was not created'
+grep -q '^SUITE=frontier-outline-adoption-v3$' "$WORK/frontier-regression.seal" \
+  || fail 'frontier regression seal lost suite attribution'
+[ "$(field FIXTURE_SHA256 "$WORK/frontier-regression.seal" | wc -c | tr -d ' ')" -eq 65 ] \
+  || fail 'frontier regression seal lost its SHA-256 fixture binding'
+grep -qF 'Auto is not advance authorization' "$WORK/frontier-regression.prompt" \
+  || fail 'frontier regression prompt did not carry the exact runtime contract'
+grep -q '^fr301' "$WORK/frontier-regression.prompt" || fail 'frontier regression prompt lost its new cases'
+grep -q $'^fr301\toutline\t' "$WORK/frontier-regression.prompt" \
+  && fail 'frontier regression prompt exposed a category column as an output-key decoy'
+grep -qF 'the literal word ACTION' "$WORK/frontier-regression.prompt" \
+  || fail 'frontier regression prompt lost its sealed output protocol'
+grep -q '^hb10' "$WORK/frontier-regression.prompt" && fail 'frontier regression reused the opened holdout'
+if $EVAL frontier-regression-prompt --host claude --seal "$WORK/missing.seal" \
+  --out "$WORK/unsealed-regression.prompt" >/dev/null 2>&1; then
+  fail 'frontier regression prompt opened without a seal'
+fi
+if $EVAL seal-frontier-regression --host claude --out "$WORK/frontier-regression.seal" >/dev/null 2>&1; then
+  fail 'frontier regression seal was overwritten'
+fi
+awk -F '\t' 'NR>1 {print $1 "\t" $2 "\t" $3}' \
+  "$REPO_DIR/evals/corpus/frontier-regression-v3-gold.tsv" > "$WORK/frontier-regression.answers"
+$EVAL score-frontier-regression --host claude --seal "$WORK/frontier-regression.seal" \
+  --response "$WORK/frontier-regression.answers" --out "$WORK/frontier-regression.score"
+[ "$(field HARD_CORRECT "$WORK/frontier-regression.score")" -eq 10 ] \
+  || fail 'perfect frontier regression answers did not clear all ten hard cases'
+sed 's/fr302\tACTION\tREMAIN_IN_OUTLINE/fr302\tACTION\tADVANCE_TO_INTERVIEW/' \
+  "$WORK/frontier-regression.answers" > "$WORK/frontier-regression-broken.answers"
+rc=0
+$EVAL score-frontier-regression --host claude --seal "$WORK/frontier-regression.seal" \
+  --response "$WORK/frontier-regression-broken.answers" --out "$WORK/frontier-regression-broken.score" || rc=$?
+[ "$rc" -eq 6 ] || fail 'frontier regression weakened its 100% hard floor'
+
 # The calibration prompt contains calibration cases only. The untouched
 # holdout cannot even be rendered until a fixture-bound freeze exists.
 $EVAL prompt --profile economy --split calibration --out "$WORK/calibration.prompt"
@@ -112,7 +149,10 @@ mkdir -p "$WORK/fake-bin"
 cat > "$WORK/fake-bin/claude" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then echo 'fake-claude 1.0'; exit 0; fi
-cat >/dev/null
+input="$(mktemp "${TMPDIR:-/tmp}/fake-claude-input.XXXXXX")"
+trap 'rm -f "$input"' EXIT
+cat > "$input"
+[ -s "$input" ] || { echo 'missing stdin prompt' >&2; exit 9; }
 cat "$FAKE_RESPONSE"
 SH
 cat > "$WORK/fake-bin/codex" <<'SH'
@@ -131,12 +171,19 @@ PATH="$WORK/fake-bin:$PATH" FAKE_RESPONSE="$WORK/frontier.answers" \
   $EVAL run-live --host claude --profile frontier --split calibration --out-dir "$WORK/live-claude" --trials 1 >/dev/null
 PATH="$WORK/fake-bin:$PATH" FAKE_RESPONSE="$WORK/economy.answers" \
   $EVAL run-live --host codex --profile economy --split calibration --out-dir "$WORK/live-codex" --trials 1 >/dev/null
+PATH="$WORK/fake-bin:$PATH" FAKE_RESPONSE="$WORK/frontier-regression.answers" \
+  $EVAL run-frontier-regression --host claude --seal "$WORK/frontier-regression.seal" \
+    --out-dir "$WORK/live-frontier-regression" --trials 1 --timeout-seconds 5 >/dev/null
 grep -q '^ACTUAL_MODEL=selected:fable;underlying=unreported$' "$WORK/live-claude/metadata.env" \
   || fail 'Claude live metadata lost selected model attribution'
 grep -q '^ACTUAL_MODEL=selected:gpt-5.6-luna;underlying=unreported$' "$WORK/live-codex/metadata.env" \
   || fail 'Codex live metadata lost selected model attribution'
 grep -q '^REPORTED_TOKEN_SAMPLES=321$' "$WORK/live-codex/metadata.env" \
   || fail 'Codex live metadata lost reported tokens'
+grep -q '^TIMEOUT_SECONDS=5$' "$WORK/live-frontier-regression/metadata.env" \
+  || fail 'frontier regression live metadata lost its time box'
+grep -q '^CONTRACT_SHA256=' "$WORK/live-frontier-regression/metadata.env" \
+  || fail 'frontier regression live metadata lost runtime-contract attribution'
 
 # Required scenario families remain present in the sanitized corpus.
 for category in outline phases cursor routing scheduler blockers assurance-r1 assurance-r2 assurance-r3 exact-tree pr-resume pr-ci peer r3-recall review-precision; do

@@ -1,0 +1,1 @@
+For each case, output exactly one tab-separated row with three fields: CASE_ID, the literal word ACTION, and the chosen value. The second field is always ACTION; it is never the case category. Example shape: example-id<TAB>ACTION<TAB>CHOSEN_VALUE. Output no prose, headings, code fences, questions, or omitted-case explanations.

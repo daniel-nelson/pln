@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **The initial outline checkpoint is now an explicit, protected scope-editing boundary.** Normal and auto runs show the complete dashboard and wait before any item-level interview question; delegated mode shows the same overview and proceeds only because its session-wide instruction already supplied authority. Both generated hosts and behavioral cases pin the distinction between the editable chapter outline and the later fully resolved master-plan adoption gate.
+- **The initial outline checkpoint is now an explicit, protected scope-editing boundary.** Normal and auto runs show the complete dashboard and wait before any item-level interview question; delegated mode shows the same overview and proceeds only because its session-wide instruction already supplied authority. Auto changes post-adoption blocker scheduling only: it supplies neither outline confirmation nor master-plan adoption. Both generated hosts and a separately sealed frontier regression holdout pin the distinction between the editable chapter outline and the later fully resolved master-plan adoption gate.
 
 - **Claude Code and Codex now use their current native orchestration surfaces while preserving durable checkpoints and truthful recovery.** Claude uses directly addressable Agents for interruptible item/fix work and Workflow only for genuine independent fan-out. Codex uses native collaboration tools, including `followup_task` for another turn on an idle blocked agent. Nested CLIs remain guarded fallbacks and the cross-provider peer boundary; coordinator-owned manifests, ledgers, commits, and integration replace host-specific accidental ownership.
 

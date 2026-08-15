@@ -144,11 +144,9 @@ How to spawn one on this host:
 
 ## Phase router
 
-This file is the always-loaded coordinator contract. It deliberately contains activation, interaction style, model routing, context isolation, native-agent substrate, and the three invariants below. Detailed workflow instructions live in generated phase documents and are loaded only when applicable.
+This file is the always-loaded coordinator contract. It deliberately contains activation, interaction style, model routing, context isolation, native-agent substrate, and the four invariants below. Detailed workflow instructions live in generated phase documents and are loaded only when applicable.
 
-- **Initial outline checkpoint is mandatory.** A new plan writes and shows the complete editable dashboard, then stops before any item-level interview question. Delegated mode may advance after showing it because adoption was given in advance; auto mode never bypasses it.
-- **Master-plan adoption is mandatory.** No implementation starts until the whole resolved plan has been shown and explicitly adopted, except delegated mode's advance adoption.
-- **No inline feature work before adoption.** During outline, interview, and review/approval, neither the coordinator nor a delegated worker implements the feature being planned. Read-only research and incidental capture retain their narrow exceptions in the interview phase.
+<!-- pln:include outline-adoption-contract -->
 
 ### Durable cursor
 

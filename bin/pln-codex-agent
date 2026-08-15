@@ -55,14 +55,19 @@
 #   --resume ID      continue thread ID instead of starting a new session. An
 #                    empty ID is a usage error, never a silent fresh session.
 #   --model NAME     override the model for this spawn.
+#   --effort LEVEL   override reasoning effort for this spawn.
+#   --profile NAME   semantic attribution: inherit | judgment | evidence.
 #   --dry-run        print the command that would run and exit 0.
 #
-# Prints exactly four KEY=VALUE lines on stdout and nothing else:
+# Prints exactly seven KEY=VALUE lines on stdout and nothing else:
 #
 #   STATUS=ok|empty|timeout|error
 #   THREAD_ID=<id, or empty if the run never got that far>
 #   RESULT_FILE=<path>
 #   EVENTS_FILE=<path>
+#   ACTUAL_PROFILE=<inherit|judgment|evidence>
+#   ACTUAL_MODEL=<selected model or inherited-unreported>
+#   ACTUAL_EFFORT=<selected effort or inherited-unreported>
 #
 # Exit codes: 0 the agent ran and wrote a result · 2 usage error · 3 the Codex
 # CLI is not installed · 4 the run failed (timed out, exited non-zero, or wrote
@@ -78,6 +83,8 @@ TIMEOUT_SECS="3600"
 RESUME_ID=""
 RESUME_GIVEN=0
 MODEL=""
+EFFORT=""
+PROFILE="inherit"
 DRY_RUN=0
 ADD_DIRS=()
 
@@ -94,6 +101,8 @@ Usage: pln-codex-agent --brief <file> --out <file> [options]
   --timeout SECS   ceiling on a hung run (default 3600; 0 disables)
   --resume ID      continue an existing thread instead of starting one
   --model NAME     model override
+  --effort LEVEL   reasoning effort override
+  --profile NAME   inherit | judgment | evidence (default: inherit)
   --dry-run        print the command and exit
 USAGE
   exit 2
@@ -110,6 +119,8 @@ while [ $# -gt 0 ]; do
     --timeout) TIMEOUT_SECS="${2:-}"; shift 2 ;;
     --resume) RESUME_ID="${2:-}"; RESUME_GIVEN=1; shift 2 ;;
     --model) MODEL="${2:-}"; shift 2 ;;
+    --effort) EFFORT="${2:-}"; shift 2 ;;
+    --profile) PROFILE="${2:-}"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h | --help) usage ;;
     *) echo "pln-codex-agent: unknown argument '$1'" >&2; usage ;;
@@ -126,6 +137,8 @@ esac
 case "$TIMEOUT_SECS" in
   '' | *[!0-9]*) echo "pln-codex-agent: --timeout must be a whole number of seconds" >&2; exit 2 ;;
 esac
+case "$PROFILE" in inherit | judgment | evidence) ;; *) echo "pln-codex-agent: --profile must be inherit, judgment, or evidence" >&2; exit 2 ;; esac
+case "$EFFORT" in '' | none | low | medium | high | xhigh | max) ;; *) echo "pln-codex-agent: unknown --effort '$EFFORT'" >&2; exit 2 ;; esac
 # `--resume ""` — a caller passing a thread id it never captured. Silently
 # starting a fresh session there is the worst answer available: the resume brief
 # says "here is the answer, carry on", and an agent with no memory of the first
@@ -183,7 +196,10 @@ else
     [ -n "$d" ] && CMD+=(--add-dir "$d")
   done
 fi
-[ -n "$MODEL" ] && CMD+=(-m "$MODEL")
+if [ -z "$RESUME_ID" ]; then
+  [ -n "$MODEL" ] && CMD+=(-m "$MODEL")
+  [ -n "$EFFORT" ] && CMD+=(-c "model_reasoning_effort=\"$EFFORT\"")
+fi
 # `-` is the prompt: read it from stdin. Keeps arbitrary text out of argv.
 CMD+=(--json -o "$OUT" -)
 
@@ -194,6 +210,9 @@ if [ "$DRY_RUN" = "1" ]; then
   echo "THREAD_ID="
   echo "RESULT_FILE=$OUT"
   echo "EVENTS_FILE=$EVENTS"
+  echo "ACTUAL_PROFILE=$PROFILE"
+  echo "ACTUAL_MODEL=${MODEL:-inherited-unreported}"
+  echo "ACTUAL_EFFORT=${EFFORT:-inherited-unreported}"
   exit 0
 fi
 
@@ -226,4 +245,7 @@ echo "STATUS=$STATUS"
 echo "THREAD_ID=$THREAD_ID"
 echo "RESULT_FILE=$OUT"
 echo "EVENTS_FILE=$EVENTS"
+echo "ACTUAL_PROFILE=$PROFILE"
+echo "ACTUAL_MODEL=${MODEL:-inherited-unreported}"
+echo "ACTUAL_EFFORT=${EFFORT:-inherited-unreported}"
 exit "$EXIT"

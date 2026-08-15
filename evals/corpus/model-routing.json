@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "suite": "model-routing",
+  "purpose": "Exercise semantic profile selection and the boundary around optional economy evidence work.",
+  "cases": [
+    {
+      "id": "ordinary-inherits-selected-host-model",
+      "profile": "inherit",
+      "expect": ["no model override", "same-host model and effort are attributed"]
+    },
+    {
+      "id": "judgment-preserves-opus",
+      "profile": "judgment",
+      "host": "claude",
+      "current_model": "opus",
+      "expect": ["model remains inherited", "high judgment effort"]
+    },
+    {
+      "id": "judgment-preserves-fable",
+      "profile": "judgment",
+      "host": "claude",
+      "current_model": "fable",
+      "expect": ["model remains inherited", "high judgment effort"]
+    },
+    {
+      "id": "unknown-judgment-requires-deliberate-fallback",
+      "profile": "judgment",
+      "current_model": "custom-gateway-model",
+      "expect": ["no worker dispatch", "asks before inherited per-run fallback", "does not claim the frontier floor"]
+    },
+    {
+      "id": "evidence-default-inherits",
+      "profile": "evidence",
+      "evidence_profile": "inherit",
+      "expect": ["same-host model", "low evidence effort", "no recommendation or user-facing fork"]
+    },
+    {
+      "id": "economy-bounded-evidence",
+      "profile": "evidence",
+      "evidence_profile": "economy",
+      "task": "Return the exact callers of a named symbol with file:line citations.",
+      "expect": ["economy model when available", "facts and citations only", "actual route attribution"]
+    },
+    {
+      "id": "economy-escalates-risk",
+      "profile": "evidence",
+      "evidence_profile": "economy",
+      "task": "Interpret whether two transaction paths can race and recommend a fix.",
+      "expect": ["escalates before interpretation", "judgment profile", "no economy recommendation"]
+    },
+    {
+      "id": "peer-is-judgment-not-economy",
+      "profile": "judgment",
+      "path": "pln-peer",
+      "expect": ["frontier peer selection", "consent and authentication precede sending", "failure remains no review", "actual profile model and effort attribution"]
+    }
+  ]
+}

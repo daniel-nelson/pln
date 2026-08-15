@@ -24,15 +24,17 @@
 # through to the next rung rather than failing the run.
 #
 # Rungs 1 and 2 send the brief to another vendor's CLI: it leaves the machine
-# and it may spend the user's quota. So they are gated on a one-time consent,
-# `peer_consent` in config, which this script enforces and never asks for —
-# only the session talking to the user can ask:
+# and it may spend the user's quota. Two independent gates apply. The one-time
+# `peer_consent` authorizes cross-provider use. The one-time `peer_egress`
+# policy says whether unknown/unclassified material may leave after consent:
+# `consent` permits it; `classified-only` requires `--material classified`.
+# Explicit sensitive/local-only material never leaves under either policy.
 #
 #   unset  → nothing is sent. STATUS=consent, exit 5, with RUNG/PEER naming who
 #            it would have gone to so the caller's question can name them too.
 #   false  → nothing is ever sent. Reported as rung 3 with STATUS=declined, so a
 #            caller that already handles "no peer" needs no new branch.
-#   true   → rungs 1 and 2 run.
+#   true   → peer_egress is checked separately before rungs 1 and 2 run.
 #
 # The question is only reachable when a peer actually exists: a machine with no
 # second CLI and no `peer_command` falls to rung 3 before consent is consulted,
@@ -59,6 +61,7 @@
 #   --model NAME     model override, where the peer takes one. Ignored on rung
 #                    1: a configured command is complete as written.
 #   --host NAME      override host detection (claude|codex). Mostly for tests.
+#   --material CLASS classified|unknown|sensitive|local-only (default unknown).
 #   --dry-run        report the selection and print the command, run nothing.
 #
 # The rung-1 contract, which is also what a user configuring `peer_command` is
@@ -67,19 +70,21 @@
 #
 #   pln-config set peer_command "gemini -p"
 #
-# Prints exactly five KEY=VALUE lines on stdout and nothing else:
+# Prints exactly eight KEY=VALUE lines on stdout and nothing else:
 #
 #   RUNG=1|2|3
 #   PEER=<the command that ran, or 'none' on rung 3>
-#   STATUS=ok|ready|empty|timeout|error|none|consent|declined
+#   STATUS=ok|ready|empty|timeout|error|none|consent|egress|declined|suppressed
 #   RESULT_FILE=<path, empty on rung 3>
 #   LOG_FILE=<path, empty on rung 3>
+#   ACTUAL_PROFILE=judgment|none
+#   ACTUAL_MODEL=<selected model, or a truthful unreported/unavailable value>
+#   ACTUAL_EFFORT=<selected effort, or a truthful unreported/unavailable value>
 #
 # Exit codes: 0 a peer ran and wrote a result · 2 usage error · 3 no peer is
 # available, so the caller falls back to a fresh same-model agent (rung 3) ·
-# 4 a peer was selected, ran, and failed · 5 a peer is available but nothing was
-# sent, because consent has not been recorded yet — ask, store the answer with
-# `pln-config set peer_consent true|false`, and call again.
+# 4 a peer was selected, ran, and failed · 5 consent must be answered first ·
+# 6 peer_egress must then be answered in its own turn. No non-zero state sends.
 set -uo pipefail
 
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -91,6 +96,7 @@ CD_DIR=""
 TIMEOUT_SECS="1800"
 MODEL=""
 HOST=""
+MATERIAL="unknown"
 WHICH=0
 DRY_RUN=0
 ADD_DIRS=()
@@ -108,6 +114,7 @@ Usage: pln-peer --brief <file> --out <file> [options]
   --timeout SECS   ceiling on a hung run (default 1800; 0 disables)
   --model NAME     model override where the peer takes one
   --host NAME      override host detection (claude|codex)
+  --material CLASS classified|unknown|sensitive|local-only (default unknown)
   --which          report the selection and exit without running anything
   --dry-run        report the selection and print the command, run nothing
 USAGE
@@ -124,6 +131,7 @@ while [ $# -gt 0 ]; do
     --timeout) TIMEOUT_SECS="${2:-}"; shift 2 ;;
     --model) MODEL="${2:-}"; shift 2 ;;
     --host) HOST="${2:-}"; shift 2 ;;
+    --material) MATERIAL="${2:-}"; shift 2 ;;
     --which) WHICH=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h | --help) usage ;;
@@ -143,6 +151,14 @@ case "$HOST" in
   '' | claude | codex) ;;
   *) echo "pln-peer: --host must be claude or codex" >&2; exit 2 ;;
 esac
+case "$MATERIAL" in
+  classified | unknown | sensitive | local-only) ;;
+  *) echo "pln-peer: --material must be classified, unknown, sensitive, or local-only" >&2; exit 2 ;;
+esac
+
+ACTUAL_PROFILE="none"
+ACTUAL_MODEL="unavailable"
+ACTUAL_EFFORT="unavailable"
 
 report() { # report <rung> <peer> <status> <result-file> <log-file>
   echo "RUNG=$1"
@@ -150,6 +166,9 @@ report() { # report <rung> <peer> <status> <result-file> <log-file>
   echo "STATUS=$3"
   echo "RESULT_FILE=$4"
   echo "LOG_FILE=$5"
+  echo "ACTUAL_PROFILE=$ACTUAL_PROFILE"
+  echo "ACTUAL_MODEL=$ACTUAL_MODEL"
+  echo "ACTUAL_EFFORT=$ACTUAL_EFFORT"
 }
 
 # Same fallback the agent helpers use: coreutils installs timeout(1) as
@@ -226,6 +245,50 @@ if [ -n "$PEER_COMMAND" ]; then
   PEER_LABEL="$(basename "${1:-peer_command}")"
 fi
 
+# A peer is a judgment path, never the economy lane. Known peers resolve the
+# current frontier target and high effort before consent is checked; this is a
+# local metadata operation and sends no material. A configured command is the
+# user's complete invocation, so its underlying model remains unreported.
+ROUTED_MODEL=""
+ROUTED_EFFORT=""
+if [ "$RUNG" = "1" ]; then
+  ACTUAL_PROFILE="judgment"
+  ACTUAL_MODEL="configured-peer-unreported"
+  ACTUAL_EFFORT="configured-peer-unreported"
+else
+  if [ -n "$MODEL" ]; then
+    ROUTED_MODEL="$MODEL"
+    ROUTED_EFFORT="high"
+  elif [ -x "$SELF_DIR/pln-model-route" ]; then
+    route_out="$($SELF_DIR/pln-model-route resolve --host "$PEER" --profile judgment \
+      --current-capability below 2>/dev/null)" || {
+        report 3 none none "" ""
+        exit 3
+      }
+    ROUTED_MODEL="$(printf '%s\n' "$route_out" | sed -n 's/^MODEL_ARGUMENT=//p')"
+    ROUTED_EFFORT="$(printf '%s\n' "$route_out" | sed -n 's/^EFFORT=//p')"
+  else
+    report 3 none none "" ""
+    exit 3
+  fi
+  [ -n "$ROUTED_MODEL" ] && [ "$ROUTED_MODEL" != "none" ] || {
+    report 3 none none "" ""
+    exit 3
+  }
+  ACTUAL_PROFILE="judgment"
+  ACTUAL_MODEL="$ROUTED_MODEL"
+  ACTUAL_EFFORT="${ROUTED_EFFORT:-high}"
+fi
+
+# Explicit local-only/sensitive instructions outrank machine-wide consent and
+# policy. They suppress the send without prompting because no peer use occurs.
+case "$MATERIAL" in
+  sensitive | local-only)
+    report 3 none suppressed "" ""
+    exit 3
+    ;;
+esac
+
 # ── the one-time consent, checked once a peer is actually in hand ────────────
 # Deliberately after the selection and before everything else, --which and
 # --dry-run included: both of those name another vendor's CLI as the destination,
@@ -246,6 +309,29 @@ case "$(printf '%s' "$CONSENT" | tr '[:upper:]' '[:lower:]')" in
     # the only thing here that can talk to the user.
     report "$RUNG" "$PEER_LABEL" consent "" ""
     exit 5
+    ;;
+esac
+
+# ── the separate one-time egress policy ─────────────────────────────────────
+# This is deliberately after consent: a fresh install asks whether any
+# cross-provider use is allowed first, then asks what may be sent. The helper
+# cannot ask either question; exit 6 is the caller's separate-turn prompt.
+EGRESS=""
+if [ -x "$SELF_DIR/pln-config" ]; then
+  EGRESS="$("$SELF_DIR/pln-config" get peer_egress 2>/dev/null || true)"
+fi
+case "$(printf '%s' "$EGRESS" | tr '[:upper:]' '[:lower:]')" in
+  consent)
+    ;;
+  classified-only)
+    if [ "$MATERIAL" != "classified" ]; then
+      report 3 none suppressed "" ""
+      exit 3
+    fi
+    ;;
+  *)
+    report "$RUNG" "$PEER_LABEL" egress "" ""
+    exit 6
     ;;
 esac
 
@@ -309,18 +395,21 @@ fi
 # Rung 2 goes through the helper that owns that CLI's guards, so this script
 # never reproduces an invocation a second time.
 HELPER_ARGS=(--brief "$BRIEF" --out "$OUT" --cd "$CD_DIR" --timeout "$TIMEOUT_SECS")
+[ "$RUNG" = "2" ] && HELPER_ARGS+=(--profile judgment)
 [ "$DRY_RUN" = "1" ] && HELPER_ARGS+=(--dry-run)
 case "$PEER" in
   claude)
     HELPER="$SELF_DIR/pln-claude-agent"
     HELPER_ARGS+=(--log "$LOG")
-    [ -n "$MODEL" ] && HELPER_ARGS+=(--model "$MODEL")
+    [ -n "$ROUTED_MODEL" ] && HELPER_ARGS+=(--model "$ROUTED_MODEL")
+    [ -n "$ROUTED_EFFORT" ] && HELPER_ARGS+=(--effort "$ROUTED_EFFORT")
     ;;
   codex)
     HELPER="$SELF_DIR/pln-codex-agent"
     # A peer only reads; the events file is that helper's log.
     HELPER_ARGS+=(--events "$LOG" --sandbox read-only)
-    [ -n "$MODEL" ] && HELPER_ARGS+=(--model "$MODEL")
+    [ -n "$ROUTED_MODEL" ] && HELPER_ARGS+=(--model "$ROUTED_MODEL")
+    [ -n "$ROUTED_EFFORT" ] && HELPER_ARGS+=(--effort "$ROUTED_EFFORT")
     ;;
 esac
 HELPER_ARGS+=(${ADD_ARGS[@]+"${ADD_ARGS[@]}"})

@@ -3,6 +3,6 @@
 When the monitor's terminal line arrives:
 
 - **Green** — undraft and record the duration as described above, then fire the completion notification.
-- **Red** — build the finding, write it into `REVIEW.md`, then dispatch the one fix cluster the same way Step 4 already does: a single `agent()` call (or a one-cluster Workflow script) per Spawning a fresh-context agent, invoked and awaited exactly as `pr-fix-invoke` describes, including its own `BLOCKED:` handling. Once it returns and its commit is pushed, start a fresh `Monitor` call for the next round — the loop is a new tool call each round, not one script trying to survive across fix commits.
+- **Red** — build the finding, write it into `REVIEW.md`, then dispatch the one fix cluster as a fresh named background `Agent`, invoked and awaited exactly as `pr-fix-invoke` describes, including `SendMessage` blocker handling. Once it returns and its commit is pushed, start a fresh `Monitor` call for the next round — the loop is a new tool call each round, not one script trying to survive across fix commits.
 
 Track the same-check streak and the `BLOCKED:` case across rounds in the orchestrator's own context (this session, not the monitor script) — that bookkeeping is what decides when to stop instead of starting another round.

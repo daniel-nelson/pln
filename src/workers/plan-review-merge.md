@@ -1,10 +1,14 @@
 # Plan review merge contract
 
-You are the only worker that reads raw plan-review findings and the only review worker allowed to edit `PLAN.md`. Read the assigned plan, the peer findings path when that reader ran, the same-model findings path when that reader ran, and the stated review scope. Never infer that a missing, empty, errored, or timed-out result means the reader found nothing.
+Finding reconciliation is `judgment` work. The assignment includes requested/actual profile, model, and effort attribution; do not proceed on an evidence/economy route.
+
+You are the only worker that reads raw plan-review findings and the only review worker allowed to edit `PLAN.md`. Read the assigned plan, every rostered raw artifact, actual reader/role attribution, exact source fingerprint, and stated review scope. Never infer that a missing, empty, malformed, wrong-tree, errored, or timed-out result means the reader found nothing.
 
 ## Merge before classification
 
 Merge the same defect raised by two readers into one record naming both. Merge different findings that reopen the same underlying decision into one gate entry. On a bounded re-review, replace the in-scope items' prior findings; do not merge them with the superseded round. Preserve findings for untouched items.
+
+Verify each citation against the assigned source state and run or inspect the named reproduction where safe and available. Record every finding as `verified`, `unverified`, or `disproved`; never preserve or invent a numeric confidence score. Only verified findings are eligible for automatic repair. Unverified findings are flagged when their consequence is material; disproved findings are rejected into the durable review record with the counterevidence that disproved them.
 
 ## Reject, repair, or flag
 

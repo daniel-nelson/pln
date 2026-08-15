@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.32.0 — 2026-08-14
+
+### Changed
+
+- **The initial outline checkpoint is now an explicit, protected scope-editing boundary.** Normal and auto runs show the complete dashboard and wait before any item-level interview question; delegated mode shows the same overview and proceeds only because its session-wide instruction already supplied authority. Auto changes post-adoption blocker scheduling only: it supplies neither outline confirmation nor master-plan adoption. Both generated hosts and a separately sealed frontier regression holdout pin the distinction between the editable chapter outline and the later fully resolved master-plan adoption gate.
+
+- **Claude Code and Codex now use their current native orchestration surfaces while preserving durable checkpoints and truthful recovery.** Claude uses directly addressable Agents for interruptible item/fix work and Workflow only for genuine independent fan-out. Codex uses native collaboration tools, including `followup_task` for another turn on an idle blocked agent. Nested CLIs remain guarded fallbacks and the cross-provider peer boundary; coordinator-owned manifests, ledgers, commits, and integration replace host-specific accidental ownership.
+
+- **The public skills are phase-loaded routers backed by durable cursors.** Generated `/pln` and `/pln-pr` entry points load only the current outline/interview/review/implementation/blocker/ship phase, fail closed on conflicting recovery state, and preserve every always-active consent, adoption, and no-inline-implementation invariant. Setup still generates host-pure output and `--clean` restores all tracked placeholders.
+
+- **Repository research and implementation concurrency now scale with semantic shape rather than plan length.** Tiny direct lookups stay in the coordinator; mechanically closed fact/citation work may use the bounded evidence contract; judgment and high-risk semantics stay on the frontier floor. A conservative scheduler derives dependencies and write leases, caps same-context cohorts at three, runs only proven-independent work in isolated worktrees, protects user-owned dirty bytes, freezes integration on blockers, and recovers from durable state without a surviving agent handle.
+
+- **Plan review, PR review, verification, and peers form one risk-calibrated assurance system.** R1 gets a fresh broad reviewer, R2 adds at most two applicable specialists, and R3 adds one adversarial slot (a permitted peer or a truthfully attributed same-model substitute) within a four-reader pre-fix cap. Findings carry verified/unverified/disproved evidence state; any fix invalidates exact-tree gauntlet evidence; peer egress has a separate first-use policy and local-only/sensitive material never leaves the machine.
+
+- **The README host matrix and repository manual-verification contract now match current behavior.** Normal Step 8-to-`/pln-pr` handoff is exercised in a non-`pln` scratch repository, while this repository's self-hosting exception is checked separately through the complete offline gauntlet, manual install, and direct ship path.
+
+### Added
+
+- **A sanitized 40-case behavioral corpus and explicit live-eval runner gate the optional economy evidence route.** Calibration and untouched holdout each contain ten economy-eligible and ten judgment-boundary cases spanning outline/adoption, phase/cursor recovery, routing, scheduling, blockers, R1–R3 assurance, exact-tree invalidation, PR recovery, and peer consent/egress/failure. `bin/pln-eval` validates and hashes fixtures, seals holdout prompts until calibration freezes a variance-derived practical-benefit threshold, scores hard correctness/privacy/fail-closed floors, records actual model/effort/version/hash/token/cost/latency attribution, and disables failing or undersized host strata. `tests/evals.sh` exercises the entire boundary offline with fake CLIs; live model calls remain explicit and never use production or customer data.
+
 ## 1.31.0 — 2026-08-12
 
 ### Changed

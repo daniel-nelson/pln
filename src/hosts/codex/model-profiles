@@ -1,7 +1,5 @@
 # Current OpenAI host targets. These age here, never in shared coordinator text.
 FRONTIER_MODEL='gpt-5.6-sol'
 ECONOMY_MODEL='gpt-5.6-luna'
-FRONTIER_PATTERN='^gpt-5[.]6(-sol)?$'
-BELOW_FLOOR_PATTERN='(^|[-_/])(terra|luna|mini|nano)([-_/]|$)'
 JUDGMENT_EFFORT='high'
 EVIDENCE_EFFORT='low'

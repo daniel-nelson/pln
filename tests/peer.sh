@@ -374,7 +374,8 @@ fresh
 peer "$BOTH" --host claude --brief "$BRIEF" --out "$WORK/run.out" --add-dir "$WORK"
 expect 2 codex ok 0 "a codex peer that answered"
 [ "$(field ACTUAL_PROFILE)" = "judgment" ] || fail "a Codex peer was not attributed as judgment"
-[ "$(field ACTUAL_MODEL)" = "gpt-5.6-sol" ] || fail "a Codex peer did not resolve the frontier judgment model"
+[ "$(field ACTUAL_MODEL)" = "peer-default-unreported" ] || fail "a Codex peer invented its default model"
+grep -q -- '--model' "$WORK/codex.args" && fail "a Codex peer forced an aging model alias"
 grep -q -- 'model_reasoning_effort=.high.' "$WORK/codex.args" || fail "a Codex peer did not request high effort"
 [ "$(cat "$WORK/run.out")" = "codex reviewed the plan" ] \
   || fail "the codex peer's answer did not reach the result file"

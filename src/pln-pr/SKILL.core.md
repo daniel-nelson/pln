@@ -31,6 +31,8 @@ If `PLN_DIR` is `none`, the helpers aren't found: skip the config-gated notifica
 
 <!-- pln:include pr-notify-setup -->
 
+<!-- pln:include readiness -->
+
 ## When to engage
 
 Engage when the user types `/pln-pr`, or asks to put up / open / create / make a PR or "ship it", on a branch that has commits ahead of its base. Most often this comes right after a `/pln` run completed its own gauntlet; it also works standalone on any feature branch.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.34.0 — 2026-08-15
+
+### Changed
+
+- **Judgment workers now always inherit the model selected for the hosting session.** Model aliases are release metadata, not a durable capability test, so pln no longer silently replaces a recognized lower-tier selection or stops an unattended run to ask whether an unfamiliar/unreported model may be inherited. `judgment` remains the semantic high-effort profile for decision-bearing work. A known cross-provider peer likewise inherits that CLI's configured default unless the user explicitly supplies a peer model; the optional economy-evidence lane remains the only route that deliberately selects a version-qualified model.
+- **Predictable peer configuration is resolved at the start of every `/pln` and `/pln-pr` invocation.** The always-loaded readiness sweep runs before repository research or phase work, asks at most one of the remembered consent/egress questions per turn, and sends no material while probing. If configuration unexpectedly becomes pending later, the run uses its same-host substitute and defers the question to the next invocation instead of parking hours of unattended work behind a surprise prompt.
+- **Notifications now fire before every user-input wait, not only interview questions and implementation blockers.** First-use configuration, outline and adoption gates, trust/recovery conflicts, and other questions use the same notify-before-text invariant; completion still notifies once. Claude Code uses push plus desktop when enabled. Codex uses desktop because its skill surface still has no targeted mobile-push primitive.
+- **Peer material guidance consistently uses the `approved` marker.** One stale sentence retained the retired `classified` term even though the helper and policy had already moved to `approved`; the source now matches the executable contract.
+
 ## 1.33.0 — 2026-08-15
 
 ### Changed

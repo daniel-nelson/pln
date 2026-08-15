@@ -246,10 +246,10 @@ if [ -n "$PEER_COMMAND" ]; then
   PEER_LABEL="$(basename "${1:-peer_command}")"
 fi
 
-# A peer is a judgment path, never the economy lane. Known peers resolve the
-# current frontier target and high effort before consent is checked; this is a
-# local metadata operation and sends no material. A configured command is the
-# user's complete invocation, so its underlying model remains unreported.
+# A peer is a judgment path, never the economy lane. A known peer CLI inherits
+# that CLI's configured default model and requests judgment effort; model names
+# are not used as a capability oracle. A configured command is the user's
+# complete invocation, so its underlying model remains unreported.
 ROUTED_MODEL=""
 ROUTED_EFFORT=""
 if [ "$RUNG" = "1" ]; then
@@ -260,24 +260,24 @@ else
   if [ -n "$MODEL" ]; then
     ROUTED_MODEL="$MODEL"
     ROUTED_EFFORT="high"
+    ACTUAL_MODEL="$MODEL"
   elif [ -x "$SELF_DIR/pln-model-route" ]; then
-    route_out="$($SELF_DIR/pln-model-route resolve --host "$PEER" --profile judgment \
-      --current-capability below 2>/dev/null)" || {
+    route_out="$($SELF_DIR/pln-model-route resolve --host "$PEER" --profile judgment 2>/dev/null)" || {
         report 3 none none "" ""
         exit 3
       }
     ROUTED_MODEL="$(printf '%s\n' "$route_out" | sed -n 's/^MODEL_ARGUMENT=//p')"
     ROUTED_EFFORT="$(printf '%s\n' "$route_out" | sed -n 's/^EFFORT=//p')"
+    if [ "$ROUTED_MODEL" = "inherit" ]; then
+      ROUTED_MODEL=""
+      ACTUAL_MODEL="peer-default-unreported"
+    fi
   else
     report 3 none none "" ""
     exit 3
   fi
-  [ -n "$ROUTED_MODEL" ] && [ "$ROUTED_MODEL" != "none" ] || {
-    report 3 none none "" ""
-    exit 3
-  }
   ACTUAL_PROFILE="judgment"
-  ACTUAL_MODEL="$ROUTED_MODEL"
+  [ "$ACTUAL_MODEL" != "unavailable" ] || ACTUAL_MODEL="peer-default-unreported"
   ACTUAL_EFFORT="${ROUTED_EFFORT:-high}"
 fi
 

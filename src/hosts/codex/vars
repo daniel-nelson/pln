@@ -6,6 +6,7 @@
 # has no equivalent of Claude Code's CLAUDE_SKILL_DIR.
 SKILL_DIR=$_PLN_DIR
 HOST_NAME=Codex
+HOST_CLI=codex
 NOTIFY_CALL=run `<resolved _PLN_DIR>/bin/pln-notify-desktop "<message>"`
 ORCH_TOOLS=Codex's native multi-agent tools
 REVIEW_ARMY_SHORT=A semantic R1–R3 roster runs one broad reviewer, up to two risk specialists, and for R3 one local-or-peer adversarial slot

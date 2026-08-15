@@ -148,25 +148,32 @@ route_field() { sed -n "s/^$1=//p" <<<"$2"; }
 
 route="$("$ROUTER" resolve --host claude --profile judgment \
   --current-model claude-opus-5 --current-effort xhigh)"
-eq "$(route_field ACTUAL_PROFILE "$route")" "judgment" "Opus did not satisfy the judgment floor"
-eq "$(route_field MODEL "$route")" "claude-opus-5" "Opus was replaced instead of inherited"
-eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "Opus was forced through an override"
-eq "$(route_field EFFORT "$route")" "xhigh" "judgment routing downgraded an inherited frontier effort"
+eq "$(route_field ACTUAL_PROFILE "$route")" "judgment" "judgment routing lost its semantic profile"
+eq "$(route_field MODEL "$route")" "claude-opus-5" "judgment routing replaced the hosting model"
+eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "judgment routing forced a model override"
+eq "$(route_field EFFORT "$route")" "xhigh" "judgment routing downgraded an inherited high effort"
 
-route="$("$ROUTER" resolve --host claude --profile judgment \
-  --current-model claude-fable-5 --current-effort high)"
-eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "Fable was replaced instead of inherited"
-
+# Model names are release metadata, not a durable capability test. Judgment
+# therefore inherits every same-host selection, including known economy aliases,
+# custom gateways, and an unreported current model, without a confirmation gate.
 route="$("$ROUTER" resolve --host claude --profile judgment \
   --current-model claude-sonnet-5 --current-effort medium)"
-eq "$(route_field MODEL_ARGUMENT "$route")" "fable" "a known-below-floor Claude model did not route to frontier"
+eq "$(route_field STATUS "$route")" "ok" "a named hosting model blocked judgment dispatch"
+eq "$(route_field MODEL "$route")" "claude-sonnet-5" "a named hosting model was silently upgraded"
+eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "a named hosting model was overridden"
 eq "$(route_field EFFORT "$route")" "high" "Claude judgment did not request high effort"
 
-rc=0
 route="$("$ROUTER" resolve --host codex --profile judgment \
-  --current-model custom-gateway-model 2>/dev/null)" || rc=$?
-eq "$rc" "5" "unknown judgment capability did not require a deliberate fallback"
-eq "$(route_field STATUS "$route")" "confirmation" "unknown judgment capability reported the wrong status"
+  --current-model custom-gateway-model)"
+eq "$(route_field STATUS "$route")" "ok" "a custom hosting model required confirmation"
+eq "$(route_field MODEL "$route")" "custom-gateway-model" "a custom hosting model was replaced"
+eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "a custom hosting model was overridden"
+eq "$(route_field FALLBACK "$route")" "none" "a custom hosting model invented a fallback"
+
+route="$("$ROUTER" resolve --host codex --profile judgment)"
+eq "$(route_field STATUS "$route")" "ok" "an unreported hosting model required confirmation"
+eq "$(route_field MODEL "$route")" "inherited-unreported" "an unreported hosting model was misattributed"
+eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "an unreported hosting model was overridden"
 
 "$BIN" set evidence_profile inherit
 route="$(PLN_STATE_DIR="$PLN_STATE_DIR" "$ROUTER" resolve --host codex --profile evidence \

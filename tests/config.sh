@@ -50,10 +50,10 @@ eq "$("$BIN" list | grep '^evidence_profile:' | wc -l | tr -d ' ')" "1" \
   "list printed the evidence profile more than once"
 
 # --- peer egress is a separate, validated choice from provider consent ------
-"$BIN" set peer_egress classified-only
-eq "$("$BIN" get peer_egress)" "classified-only" "classified-only peer egress did not round-trip"
+"$BIN" set peer_egress approved-only
+eq "$("$BIN" get peer_egress)" "approved-only" "approved-only peer egress did not round-trip"
 "$BIN" set peer_egress consent
-eq "$("$BIN" get peer_egress)" "consent" "consent peer egress did not overwrite classified-only"
+eq "$("$BIN" get peer_egress)" "consent" "consent peer egress did not overwrite approved-only"
 eq "$("$BIN" list | grep '^peer_egress:' | wc -l | tr -d ' ')" "1" \
   "list printed peer_egress more than once"
 
@@ -140,6 +140,7 @@ guard "set with no value" set lonely
 guard "set with an empty value" set peer_consent ""
 guard "an unknown evidence profile" set evidence_profile turbo
 guard "an unknown peer-egress policy" set peer_egress public
+guard "the retired classified-only peer-egress policy" set peer_egress classified-only
 eq "$("$BIN" get peer_command)" "$CMD" "a rejected write still altered the file"
 
 # --- semantic model routing --------------------------------------------------

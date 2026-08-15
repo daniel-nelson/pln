@@ -15,7 +15,7 @@
 #     Codex, under Codex for Claude, and it never consults the host itself —
 #     which is the whole reason a "second opinion" is worth having.
 #   - cross-provider consent is asked before the separate peer-egress policy;
-#     neither unanswered gate sends anything. `classified-only` suppresses
+#     neither unanswered gate sends anything. `approved-only` suppresses
 #     unknown material, while explicit sensitive/local-only always suppresses.
 #   - `--which` reporting a selection (`STATUS=ready`) and an empty ladder
 #     (rung 3, `STATUS=none`) as two different things, so neither can be read
@@ -187,6 +187,7 @@ guard "an empty brief" --brief "$WORK/blank.md" --out "$WORK/run.out"
 guard "a non-numeric timeout" --brief "$BRIEF" --out "$WORK/run.out" --timeout soon
 guard "an unknown host" --brief "$BRIEF" --out "$WORK/run.out" --host solaris
 guard "an unknown material class" --brief "$BRIEF" --out "$WORK/run.out" --material public
+guard "the retired classified material class" --brief "$BRIEF" --out "$WORK/run.out" --material classified
 guard "an unknown argument" --brief "$BRIEF" --out "$WORK/run.out" --turbo
 nothing_ran "a usage error"
 
@@ -282,21 +283,21 @@ nothing_ran "an unanswered egress policy"
 cfg peer_consent true
 
 # The policy question is a separate turn after consent. Garbage remains
-# unanswered. Once set, consent permits unknown material; classified-only does
+# unanswered. Once set, consent permits unknown material; approved-only does
 # not. Explicit local-only/sensitive always wins over both machine-wide keys.
 printf 'peer_egress: maybe\n' >> "$CONFIG"
 peer "$BOTH" --host codex --which
 expect 2 claude egress 6 "a garbage egress policy"
 nothing_ran "a garbage egress policy"
 
-cfg peer_egress classified-only
+cfg peer_egress approved-only
 peer "$BOTH" --host codex --brief "$BRIEF" --out "$WORK/run.out"
-expect 3 none suppressed 3 "classified-only with unknown material"
-nothing_ran "classified-only unknown material"
+expect 3 none suppressed 3 "approved-only with unknown material"
+nothing_ran "approved-only unknown material"
 
 fresh
-peer "$BOTH" --host codex --brief "$BRIEF" --out "$WORK/run.out" --material classified
-expect 2 claude ok 0 "classified-only with classified material"
+peer "$BOTH" --host codex --brief "$BRIEF" --out "$WORK/run.out" --material approved
+expect 2 claude ok 0 "approved-only with approved material"
 
 fresh
 peer "$BOTH" --host codex --brief "$BRIEF" --out "$WORK/run.out" --material sensitive

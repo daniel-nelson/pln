@@ -638,6 +638,7 @@ for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-appr
   has "$f" 'pln-assurance classify' "$f lost semantic assurance classification"
   has "$f" 'at most four pre-fix readers' "$f lost the R3 reader cap"
   has "$f" 'peer_egress' "$f lost the separate peer-egress policy"
+  has "$f" 'without asking again' "$f does not explain that consent is a standing policy"
   hasnt "$f" '### Rejected' "$f embeds worker-only rejection detail"
   hasnt "$f" 'Judge by substance, never by phrasing' "$f embeds worker-only merge detail"
 done

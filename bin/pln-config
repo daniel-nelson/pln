@@ -37,8 +37,8 @@ case "${1:-}" in
     fi
     if [ "$KEY" = "peer_egress" ]; then
       case "$VALUE" in
-        consent | classified-only) ;;
-        *) echo "pln-config: peer_egress must be consent or classified-only" >&2; exit 2 ;;
+        consent | approved-only) ;;
+        *) echo "pln-config: peer_egress must be consent or approved-only" >&2; exit 2 ;;
       esac
     fi
     mkdir -p "$STATE_DIR"

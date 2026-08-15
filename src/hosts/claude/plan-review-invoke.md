@@ -2,4 +2,4 @@ Use one fresh non-fork `general-purpose` `Agent` call (see Spawning a fresh-cont
 
 The call's result is the result pointer, the only thing that reaches this context. If fork mode runs it in the background, wait for its completion notification and apply the same non-empty check.
 
-**Alongside the peer.** Where a peer ran too, start its shell call (step 4) in the background — `Bash` with `run_in_background: true` — and make this `Agent` call in the same turn without waiting on the peer. The `Agent` call is what blocks; the peer runs while it does, so the step costs the slower reader rather than the sum of the two. Read the helper's eight lines and its `--out` file once the agent has returned. Where a background shell call isn't available, run them in sequence: the review is the same, it just costs both.
+**Alongside the peer.** Where a peer ran too, start its shell call (step 4) in the background — `Bash` with `run_in_background: true` — and make this `Agent` call in the same turn without waiting on the peer. Read only the helper's fixed eight lines once both return; the merge worker reads its `--out` artifact. Where background shell is unavailable, sequence them.

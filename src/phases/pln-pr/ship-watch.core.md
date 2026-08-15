@@ -114,8 +114,7 @@ Both halves run at whichever close hands the PR to the user — Step 8's or Step
 <!-- pln:endonly -->
 <!-- pln:only codex -->
 - **Reading a spawned agent's exit code as its result.** A `codex exec` call can exit 0 having written nothing; an empty output file is a failed reviewer, not a reviewer that found nothing. That distinction is what the fail-closed gate in Step 3.1 rests on.
-- **Reading a transcript into your own context.** `codex review` replays the whole diff on stdout, and every spawn's events file is its full reasoning trace. Capture both to files and read only what you need — the review summary, the agent's final message. Keeping that out of the orchestrator is why the work is spawned at all.
+- **Reading a transcript into your own context.** `codex review`, CI logs, reviewer output, and spawn event streams stay in artifacts. Read fixed metadata or validated bounded envelopes only; keeping raw material out is why the work is spawned.
 - **Delegating a commit, a push, or `gh pr create` to a spawned agent.** It is sandboxed: no network, no writable `.git`. Those are the orchestrator's calls, at every step.
 - **Applying the nested-CLI OAuth race to native agents.** Native Codex agents are in-session workers and can run concurrently when leases are disjoint. Only fallback `codex` processes share the login race and must remain serial; any native serialization needs its own dependency or review-coverage reason.
 <!-- pln:endonly -->
-

@@ -19,6 +19,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN="$SCRIPT_DIR/../bin/pln-config"
 ROUTER="$SCRIPT_DIR/../bin/pln-model-route"
+LEDGER="$SCRIPT_DIR/../bin/pln-route-ledger"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/pln-config-test.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
@@ -171,5 +172,39 @@ route="$(PLN_STATE_DIR="$PLN_STATE_DIR" "$ROUTER" resolve --host codex --profile
   --current-model gpt-5.6-sol --current-effort high --economy-available false)"
 eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "unavailable economy routing did not fall back to inherit"
 eq "$(route_field FALLBACK "$route")" "economy-unavailable" "the economy fallback was not attributed"
+
+# --- durable routing ledger --------------------------------------------------
+PLAN_ROOT="$WORK/plan root"
+mkdir -p "$PLAN_ROOT/evidence" "$PLAN_ROOT/results"
+ledger_out="$("$LEDGER" --root "$PLAN_ROOT" --ledger "$PLAN_ROOT/routing.tsv" \
+  --scope "prior decision lookup" --tier evidence --reason "mechanically closed" \
+  --risk-flags none --requested-profile evidence --actual-profile evidence \
+  --actual-model gpt-5.6-luna --actual-effort low --fallback none \
+  --source-state deadbeef --status complete \
+  --artifacts "evidence/prior.md,results/prior.txt")"
+eq "$(route_field LEDGER_FILE "$ledger_out")" "$PLAN_ROOT/routing.tsv" \
+  "the routing ledger did not report its durable path"
+eq "$(route_field ENTRY_COUNT "$ledger_out")" "1" \
+  "the routing ledger did not report its bounded entry count"
+eq "$(wc -l < "$PLAN_ROOT/routing.tsv" | tr -d ' ')" "2" \
+  "the routing ledger did not write one header and one entry"
+grep -q $'prior decision lookup\tevidence\tmechanically closed\tnone\tevidence\tevidence\tgpt-5.6-luna\tlow\tnone\tdeadbeef\tcomplete\tevidence/prior.md,results/prior.txt' \
+  "$PLAN_ROOT/routing.tsv" || fail "the routing ledger lost required attribution fields"
+
+"$LEDGER" --root "$PLAN_ROOT" --ledger "$PLAN_ROOT/routing.tsv" \
+  --scope "review merge" --tier judgment --reason "open synthesis" \
+  --risk-flags review --requested-profile judgment --actual-profile judgment \
+  --actual-model selected:fable --actual-effort high --fallback none \
+  --source-state cafebabe --status escalated --artifacts "evidence/review.json" >/dev/null
+eq "$(wc -l < "$PLAN_ROOT/routing.tsv" | tr -d ' ')" "3" \
+  "the routing ledger did not append a second route"
+
+rc=0
+"$LEDGER" --root "$PLAN_ROOT" --ledger "$WORK/outside.tsv" \
+  --scope x --tier direct --reason x --risk-flags none \
+  --requested-profile inherit --actual-profile inherit --actual-model inherit \
+  --actual-effort low --fallback none --source-state x --status complete \
+  --artifacts none >/dev/null 2>&1 || rc=$?
+eq "$rc" "2" "the routing ledger accepted a path outside the plan root"
 
 echo "OK"

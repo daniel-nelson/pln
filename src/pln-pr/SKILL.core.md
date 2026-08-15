@@ -66,6 +66,8 @@ This skill follows pln's discipline. Never call the `AskUserQuestion` tool. Surf
 
 <!-- pln:include model-routing-host -->
 
+<!-- pln:include context-firewall -->
+
 ## Spawning a fresh-context agent
 
 Every reviewer, fix pass, and verification run below is a **fresh-context agent**: a blank-slate worker that gets one prompt, does the work, and returns one final message. It has none of this conversation's context, so its brief carries everything it needs — the diff command, the ledger path, the findings it owns.

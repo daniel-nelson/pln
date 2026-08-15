@@ -12,8 +12,8 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 has() { grep -qF -- "$2" "$1" || fail "$3"; }
 hasnt() { grep -qF -- "$2" "$1" && fail "$3"; return 0; }
 
-for name in context-envelope preflight-research interview-research plan-review \
-  plan-review-merge item-implementation final-verification; do
+for name in context-envelope evidence-collection preflight-research interview-research plan-review \
+  plan-review-merge pr-review-merge item-implementation final-verification; do
   file="$REPO_DIR/src/workers/$name.md"
   [ -s "$file" ] || fail "missing or empty worker contract: $file"
   has "$file" 'WORKER_ONLY_SENTINEL_' "$file has no worker-only sentinel"
@@ -39,6 +39,7 @@ has "$envelope" 'REQUESTED_PROFILE:' 'result envelopes do not attribute the requ
 has "$envelope" 'ACTUAL_PROFILE:' 'result envelopes do not attribute the actual profile'
 has "$envelope" 'ACTUAL_MODEL:' 'result envelopes do not attribute the actual model'
 has "$envelope" 'ACTUAL_EFFORT:' 'result envelopes do not attribute the actual effort'
+has "$envelope" 'ESCALATE:' 'result envelopes do not carry evidence-to-frontier escalation'
 has "$implementation" 'When it says `worker`' 'implementation contract lost worker commit ownership'
 has "$implementation" 'When it says `coordinator`' 'implementation contract lost coordinator commit ownership'
 has "$implementation" 'host assignment owns which value applies' \
@@ -63,6 +64,15 @@ has "$interview" 'Check exactly the one proposed ask-lane question' \
 has "$interview" 'Do not read prior plans or architecture-decision records in this mode' \
   'item research may trawl prior decisions'
 
+evidence="$REPO_DIR/src/workers/evidence-collection.md"
+has "$evidence" 'mechanically closed' 'evidence worker is not limited to closed facts'
+has "$evidence" 'ESCALATE: frontier' 'evidence worker lost immediate frontier escalation'
+has "$evidence" 'must not recommend' 'evidence worker may leak judgment into its result'
+
+pr_merge="$REPO_DIR/src/workers/pr-review-merge.md"
+has "$pr_merge" 'raw artifact paths' 'PR merge worker no longer owns raw review artifacts'
+has "$pr_merge" '4096-byte budget' 'PR merge worker lost its bounded coordinator result'
+
 "$REPO_DIR/bin/pln-generate" --host claude --out-dir "$WORK/claude" >/dev/null
 "$REPO_DIR/bin/pln-generate" --host codex --out-dir "$WORK/codex" >/dev/null
 for host in claude codex; do
@@ -72,6 +82,15 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln/review-approval.md" 'src/workers/plan-review-merge.md' "$host review phase does not reference review merge contract"
   has "$WORK/$host/phases/pln/implementation.md" 'src/workers/item-implementation.md' "$host implementation phase does not reference implementation contract"
   has "$WORK/$host/phases/pln/finish-ship.md" 'src/workers/final-verification.md' "$host finish phase does not reference verification contract"
+  has "$WORK/$host/SKILL.md" 'at most two exact operations' "$host /pln router lost the direct lookup budget"
+  has "$WORK/$host/SKILL.md" 'routing.tsv' "$host /pln router lost the local routing ledger"
+  has "$WORK/$host/pln-pr/SKILL.md" 'at most two exact operations' "$host /pln-pr router lost the direct lookup budget"
+  has "$WORK/$host/pln-pr/SKILL.md" 'routing.tsv' "$host /pln-pr router lost the local routing ledger"
+  has "$WORK/$host/phases/pln/outline.md" 'Preflight is judgment work' "$host preflight no longer stays frontier"
+  has "$WORK/$host/phases/pln/interview.md" 'candidate prior-record matches' "$host interview lost the prior-record evidence/judgment split"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Possibly unbounded metadata' "$host PR scope phase lost file-first metadata collection"
+  has "$WORK/$host/phases/pln-pr/review.md" 'src/workers/pr-review-merge.md' "$host PR review phase lost file-first merge ownership"
+  has "$WORK/$host/phases/pln-pr/review.md" 'Never open a reviewer or peer result' "$host PR review reads raw findings into the coordinator"
   for file in "$WORK/$host/SKILL.md" "$WORK/$host/phases/pln/"*.md; do
     hasnt "$file" 'WORKER_ONLY_SENTINEL_' "$file contains worker-only contract prose"
     hasnt "$file" 'Do not inventory strengths or praise the plan' "$file embeds reviewer-only detail"

@@ -38,10 +38,11 @@ For needs-a-decision findings, surface them to the user **one at a time**, as pr
 
 ### Step 5. Red team — verify the fixes
 
-After the fix pass, dispatch one red-team agent (a single fresh-context agent) against the **post-fix** diff. Give it the list of what was already found and fixed, and tell it its job is to find what the reviewers missed and to confirm the fixes actually hold:
+After the fix pass, dispatch one red-team judgment agent against the **post-fix** diff. It writes complete findings to `<plan-dir>/evidence/post-fix-red-team.json` and returns only that pointer. Give it the list of what was already found and fixed, and tell it its job is to find what the reviewers missed and confirm the fixes:
 
-"The diff has already been reviewed and fixed. Read the current diff (`DIFF_BASE=$(git merge-base origin/<base> HEAD) && git diff \"$DIFF_BASE\"`). Verify the fixes for these findings actually resolve them (listed below), and hunt for anything the review missed — cross-cutting concerns, integration-boundary failures, regressions the fixes introduced. Report only real, line-quoted findings. End with `Recommendation: ship` or `Recommendation: hold because <reason>`."
+"The diff has already been reviewed and fixed. Read the current diff (`DIFF_BASE=$(git merge-base origin/<base> HEAD) && git diff \"$DIFF_BASE\"`). Verify the listed fixes and hunt for missed cross-cutting failures or regressions. Write only real, line-quoted findings plus the recommendation to the assigned artifact; return only its `RESULT_FILE` pointer."
+
+Never open that reviewer output inline. Give its artifact and the exact post-fix fingerprint to a fresh judgment merge/verifier, which updates `REVIEW.md` and returns a bounded envelope. One malformed retry, then fail closed.
 
 - If the red team confirms and finds nothing blocking: record its non-blocking notes in `REVIEW.md`. Only the ones that clear the follow-up bar (Style's "Ending a message") reach the closing message's bullet list and the PR body; the rest stay internal.
 - If it surfaces a new blocking finding: add it to `REVIEW.md` and run **one** more fix cluster (Step 4's mechanism) to clear it, then continue. Do not loop indefinitely — a second blocking round means stop and hand the situation to the user.
-

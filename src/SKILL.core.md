@@ -13,6 +13,8 @@ You are running the user's personal planning skill. Read every section of this f
 
 See Notifications (in Cross-cutting concerns) for the call sites and message format.
 
+<!-- pln:include readiness -->
+
 <!-- pln:only claude -->
 **Agent authorization**: invoking pln — typing `/pln`, or asking for pln-style treatment in plain words, on every invocation in a session rather than only the first — is itself the request for `Agent`, `SendMessage`, and `Workflow`. It authorizes every phase that spawns one, not implementation alone: Step 3's read-only research subagent, the record check included; Step 3.5's plan reviewer; Step 5's implementation workers; and Step 7's verifier. A general standing instruction against launching workflows or subagents unprompted does not outrank it, because that instruction guards against the model starting a fan-out of its own accord. Step 5 carries the fallback for a host where native Agent is absent or disabled.
 <!-- pln:endonly -->
@@ -51,10 +53,10 @@ If the user gives a single small task, don't engage; just do the work. The skill
 - **No commit ever exists for a partial item.** A subagent here cannot commit at all — `.git` is read-only to it — so it writes files and returns, and the orchestrator commits once the item is complete. If a subagent stops mid-item (a blocker), its changes stay uncommitted in the tree and it writes a handoff file, so the resumed agent picks up from that state. Every commit is still a clean checkpoint; only who runs `git commit` differs.
 <!-- pln:endonly -->
 <!-- pln:only claude -->
-- **When notifications are on, fire them before writing the user-facing text, not after.** At each of the three notify moments (interview question, blocker, completion), call `PushNotification` (when `notify_push` is on) and run `pln-notify-desktop` (it self-gates) in the same turn, before producing the message the user reads. This is not a "when convenient" aside: asking the model to fire a notification *after* it has already written the text is the exact wording that made an earlier version fail — the trailing tool call gets dropped mid-turn. Fire first, then write.
+- **When notifications are on, fire them before writing the user-facing text, not after.** Before every turn that waits for user input, call `PushNotification` (when `notify_push` is on) and run `pln-notify-desktop` (it self-gates) in the same turn; also fire them before completion. This includes readiness, outline, adoption, recovery, trust, interview, and blocker questions. This is not a "when convenient" aside: a trailing tool call gets dropped mid-turn. Fire first, then write.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-- **When notifications are on, fire them before writing the user-facing text, not after.** At each of the three notify moments (interview question, blocker, completion), {{NOTIFY_CALL}} (it self-gates) in the same turn, before producing the message the user reads. This is not a "when convenient" aside: asking the model to fire a notification *after* it has already written the text is the exact wording that made an earlier version fail — the trailing tool call gets dropped mid-turn. Fire first, then write.
+- **When notifications are on, fire them before writing the user-facing text, not after.** Before every turn that waits for user input, {{NOTIFY_CALL}} (it self-gates) in the same turn; also fire it before completion. This includes readiness, outline, adoption, recovery, trust, interview, and blocker questions. This is not a "when convenient" aside: a trailing tool call gets dropped mid-turn. Fire first, then write.
 <!-- pln:endonly -->
 - **Never report the state of pln's own machinery without checking it first.** Why a mechanism did not run — the peer review, a notification, a subagent, a verification step — and what the pipeline did or did not do are readable facts: the helper's own output, `pln-config`, `PLAN.md`, the transcript. Read one before you tell the user; never infer it from what the mechanism was supposed to do. `pln-peer --which` reports `STATUS=ready` on rungs 1 and 2 because one session read the older `STATUS=none` as "no peer available" and skipped a cross-model review with the peer installed, authenticated and consented.
 
@@ -181,38 +183,11 @@ For a legacy `PLAN.md` with no cursor, derive the most conservative compatible p
 
 ### Notifications
 
-The point is to pull the user back at the moments they're actually needed — an implementation run can take an hour, and they're context-switching away from it. This is not progress reporting; it fires at exactly three moments and no others.
+The top preamble owns channel setup. This section owns call timing: fire the enabled channels **before** writing user-facing text at these moments, never after:
 
-<!-- pln:only claude -->
-Two independent channels, each a separate toggle, both default on. Set up once by the top-of-file Notification setup preamble (not Step 1 pre-flight — that is skipped on a "continue" invocation, and notification setup can't be):
-
-- **Phone push** — the harness `PushNotification` tool, gated on `notify_push`. Loaded via `ToolSearch` in the preamble when on. Self-suppresses when the user is watching the terminal, so it reaches them only when actually away.
-- **Local desktop** — `{{SKILL_DIR}}/bin/pln-notify-desktop "<message>"`, gated on `notify_desktop`. macOS (`osascript`) and Linux (`notify-send`); a no-op elsewhere. It covers the at-the-computer case the push channel's self-suppression removes. The helper self-gates, so call it unconditionally at each site — don't check `notify_desktop` yourself.
-
-Firing both at every moment is deliberate: between the push's away-only delivery and the desktop's at-computer delivery, the user is covered in either state without pln ever trying to guess which one they're in — the presence guessing is what proved unreliable.
-<!-- pln:endonly -->
-<!-- pln:only codex -->
-One channel on this host, toggleable, default on. Set up once by the top-of-file Notification setup preamble (not Step 1 pre-flight — that is skipped on a "continue" invocation, and notification setup can't be):
-
-- **Local desktop** — `{{SKILL_DIR}}/bin/pln-notify-desktop "<message>"`, gated on `notify_desktop`. macOS (`osascript`) and Linux (`notify-send`); a no-op elsewhere. The helper self-gates, so call it unconditionally at each site — don't check `notify_desktop` yourself.
-
-There is no phone-push channel here. Codex's own `notify` hook is user-configured in `~/.codex/config.toml` and fires on turn completion; a skill cannot call it for a specific moment, so it can't serve pln's three. `notify_push` is ignored on this host.
-<!-- pln:endonly -->
-
-The three moments (fire the enabled channels **before** writing the user-facing text — see Hard constraints):
-
-1. **Interview question asked (Step 3).** Before posting each ask-lane question. Name the item and the gist, e.g. "pln: item 4 — which auth provider?" The push self-suppresses when the user is present, so this is safe to fire on every question.
-2. **Blocker surfaced (Step 5).** In interactive mode, before surfacing a subagent's `BLOCKED:` handoff as a decision. In auto mode, blockers are deferred; fire once, before presenting them together at the Step 6 end-of-run review, not per-blocker. Name the item and the one-line blocking question, e.g. "pln: item 7 blocked — schema change needed, needs your call."
-3. **Plan complete (Step 7).** Once, before the final wrap-up. Summarize the outcome, e.g. "pln: plan done, 8/8 items, gauntlet passed."
+1. **Any user-input wait.** Before posting any question or gate that pauses the run: readiness configuration, outline confirmation, ask-lane interview questions, master-plan adoption, recovery/trust conflicts, and implementation blockers. Name the phase or item and the gist. In auto mode, deferred blockers notify only when they are actually presented, not when first recorded.
+2. **Plan complete (Step 7).** Once, before the final wrap-up. Summarize the outcome, e.g. "pln: plan done, 8/8 items, gauntlet passed."
 
 Message rules: under 200 characters, one line, no markdown (a long message is truncated by the push channel and reads badly in a desktop banner). Make it specific — a generic "pln needs you" wastes the notification; name the item and the question or outcome. Pass the same one-line string to every channel.
 
-Config (all in `~/.pln/config.yaml`, via `{{SKILL_DIR}}/bin/pln-config`), each independently toggleable:
-
-<!-- pln:only claude -->
-- `notify_push` — `false` disables phone push. Default on.
-<!-- pln:endonly -->
-- `notify_desktop` — `false` disables the local desktop notification. Default on.
-- `notify_desktop_persist` — `true` makes the desktop notification stay until dismissed rather than auto-vanishing (macOS: a dialog that waits for a click; Linux: `critical` urgency, which standard daemons don't auto-expire). Default off, because a persistent alert on every question is intrusive for the general audience; a user who tends to miss vanishing banners turns it on. `{{SKILL_DIR}}/bin/pln-config set notify_desktop_persist true`.
-
-Toggle any of these mid-session with `pln-config set <key> false` (or `true`); it takes effect from the next `/pln` invocation's preamble.
+The independently toggleable keys live in `~/.pln/config.yaml`: `notify_push` (Claude only), `notify_desktop`, and `notify_desktop_persist`. Defaults are on, on, and off respectively; the preamble defines host behavior.

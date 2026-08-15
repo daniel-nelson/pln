@@ -18,7 +18,7 @@ Every reviewer this skill spawns is the same model as the orchestrator spawning 
 
 ### Step 3. Risk-calibrated review roster
 
-Use the R1/R2/R3 classification persisted in scope-baseline and validate the roster with `bin/pln-assurance roster`. Every tier has one fresh broad frontier reviewer. R2 adds at most two applicable specialist lenses. R3 runs at most four pre-fix readers: broad, up to two highest-risk specialists, and one adversarial slot. `DIFF_LINES` may raise routine work to R2 at the provisional threshold but never reduces the roster; the fewer-than-30-lines shortcut is removed.
+Use the R1/R2/R3 classification persisted in scope-baseline and validate the roster with `bin/pln-assurance roster`. Every tier has one fresh broad judgment reviewer inheriting the hosting model. R2 adds at most two applicable specialist lenses. R3 runs at most four pre-fix readers: broad, up to two highest-risk specialists, and one adversarial slot. `DIFF_LINES` may raise routine work to R2 at the provisional threshold but never reduces the roster; the fewer-than-30-lines shortcut is removed.
 
 <!-- pln:include pr-review-dispatch -->
 

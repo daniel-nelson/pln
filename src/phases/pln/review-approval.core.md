@@ -40,12 +40,12 @@ An instruction broader than any one of those (a bare "skip it") is the whole ste
 
 ## Plan review ownership
 
-The coordinator owns whether review runs, risk/roster validation, peer consent and egress prompts, reader dispatch, the approval gate, and user-driven re-review. It never reads raw findings. The broad/specialist/adversarial reviewer contract is `{{SKILL_DIR}}/src/workers/plan-review.md`; reconciliation lives in `{{SKILL_DIR}}/src/workers/plan-review-merge.md`.
+The coordinator owns whether review runs, risk/roster validation, reader dispatch, the approval gate, and user-driven re-review. The always-loaded readiness sweep owns peer consent and egress prompts; review never raises them late. The coordinator never reads raw findings. The broad/specialist/adversarial reviewer contract is `{{SKILL_DIR}}/src/workers/plan-review.md`; reconciliation lives in `{{SKILL_DIR}}/src/workers/plan-review-merge.md`.
 
 Every reviewer sees the plan but never the interview transcript or rejected options. The merge worker alone reads raw findings, checks citations/evidence state, updates `PLAN.md`, and returns a bounded envelope. A finding on a user-made decision is protected from repair. Empty or failed readers contribute nothing and are named accurately at the gate. The coordinator reads only the validated 4096-byte envelope; malformed merge output gets one fresh judgment retry, then fails closed.
 ### Step 3.5. Plan review
 
-Every item's detail section is now written, and nobody has read the plan who wasn't in the conversation that produced it. This reading happens before adoption. The universal enabled floor is one fresh broad frontier reviewer; semantic risk may add specialists and the R3 adversarial slot.
+Every item's detail section is now written, and nobody has read the plan who wasn't in the conversation that produced it. This reading happens before adoption. The universal enabled floor is one fresh broad judgment reviewer inheriting the hosting model; semantic risk may add specialists and the R3 adversarial slot.
 
 1. Use the existing `evidence/` and `results/` folders. Dispatch `assurance-classification.md`, validate its output with `pln-assurance classify`, then create the pre-fix roster with `pln-assurance roster`. If plan review is off, run no readers; record the opt-out and warn only for R3.
 2. Assemble the broad review brief without opening the contract or plan in coordinator context:

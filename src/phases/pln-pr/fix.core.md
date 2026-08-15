@@ -51,4 +51,16 @@ The R3 red team writes complete findings to `<plan-dir>/evidence/post-fix-red-te
 Never open that reviewer output inline. Give its artifact and the exact post-fix fingerprint to a fresh judgment merge/verifier, which updates `REVIEW.md` and returns a bounded envelope. One malformed retry, then fail closed.
 
 - If the red team confirms and finds nothing blocking: record its non-blocking notes in `REVIEW.md`. Only the ones that clear the follow-up bar (Style's "Ending a message") reach the closing message's bullet list and the PR body; the rest stay internal.
-- If it surfaces a new blocking finding: add it to `REVIEW.md` and run **one** more fix cluster (Step 4's mechanism) to clear it, then continue. Do not loop indefinitely — a second blocking round means stop and hand the situation to the user.
+- If it surfaces a verified actionable finding: add or reopen it in `REVIEW.md` and apply the progress protocol below. Do not ask whether to begin another repair round.
+
+**Repair progress, not a global round cap.** Adoption of `PR after implementation`, or direct invocation of `/pln-pr`, is standing authority to repair every verified, unambiguous, in-scope finding until assurance is clean and the PR is green. A new repair round is already-authorized repair work, not a new permission boundary. Global round count never blocks it.
+
+The merge worker assigns each verified actionable finding a stable **repair key** made from the affected behavioral boundary and its runnable reproduction or named failing test. Never key a defect by round number, finding title, or `file:line` alone. Preserve these fields in `REVIEW.md`: repair key, failed repair attempts, last repair candidate, and last repair outcome.
+
+For each open finding, run `bin/pln-assurance repair-action --disposition <value> --failed-attempts <n>`:
+
+- Use `new` with zero attempts for a repair key not previously acted on. A different verified reproduction is a new finding, even when it appears in a later assurance round.
+- Use `persisted` after an attempted fix leaves the same behavioral reproduction failing; increment its failed-attempt count against the candidate just tested. Fewer than three consecutive failed repair attempts returns to Step 4 with a fresh fix worker. A successful narrow reproduction resets the defect's consecutive-failure count; a later different failure gets its own key.
+- Use `needs-decision`, `out-of-scope`, or `destructive` only for a genuine user-owned boundary, and `worker-blocked` only when the repair worker returned a durable blocker rather than an incomplete or failed result.
+
+On `ACTION=repair`, rebuild the affected clusters from the ledger, run Step 4 with fresh workers, checkpoint the candidate, and repeat the assurance appropriate to the risk. On `ACTION=block`, persist `Phase: blocker`, the reason, exact candidate, and partial-state pointers before asking the one question the blocker actually requires. For `same-defect-stuck`, name the three failed candidates and why the identical reproduction survived. Do not run the full project gauntlet during these cycles; Step 7 runs it once after assurance is clean.

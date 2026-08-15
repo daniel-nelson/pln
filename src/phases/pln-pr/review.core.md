@@ -72,9 +72,9 @@ Never open a reviewer or peer result in coordinator context. Collect only fixed 
 
 The merge worker applies these ledger rules:
 
-- **Deduplicate** by `file:line`, merge corroborating citations/reproductions, and retain every reader role that raised the defect.
+- **Deduplicate** by affected behavioral boundary plus reproduction or named failing test. Merge corroborating `file:line` citations and retain every reader role that raised the defect; a changed citation does not create a new defect, while a different verified reproduction does.
 - **Classify evidence:** independently check the exact candidate and record `verified`, `unverified`, or `disproved`. Only verified findings become open automatic-fix work; unverified/disproved findings stay in the appendix with counterevidence.
-- **Write `REVIEW.md`** before any fix. Its header names risk tier, role coverage, and verified/unverified/disproved counts. Each finding carries evidence state, severity, citation, reproduction, proposed fix, and open/fixed/skipped status where actionable.
+- **Write `REVIEW.md`** before any fix. Its header names risk tier, role coverage, and verified/unverified/disproved counts. Each actionable finding carries evidence state, severity, citation, reproduction, proposed fix, open/fixed/skipped status, a stable repair key, failed repair attempts, last repair candidate, and last repair outcome.
 - **Return only a bounded envelope** to the coordinator: successful/failed reader attribution, header counts, acted-on cluster names, critical finding titles, and the exact tree fingerprint. Raw findings stay in evidence artifacts and the complete merged state stays in `REVIEW.md`.
 
 Validate the merge result through `bin/pln-read-envelope --root <plan-dir> --max-bytes 4096`; record its route in `routing.tsv`. A malformed merge gets one fresh judgment retry, then fails closed. If there are zero acted-on findings from at least one successful reviewer, note it and skip the fix pass: go to Step 6 (version/changelog) and then the Step 7 gauntlet.

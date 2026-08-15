@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.35.0 — 2026-08-15
+
+### Changed
+
+- **Post-fix assurance no longer stops merely because it found defects in a second round.** Adopting `PR after implementation`, or invoking `/pln-pr` directly, is standing authority to repair every verified, unambiguous, in-scope finding through clean assurance and a green PR. Findings now carry a stable behavioral repair key and per-defect attempt history; new reproductions and same-defect retries continue automatically. The run returns to the user only after three consecutive failed repairs of the same reproduced defect or at a genuine decision, scope, destructive-action, or worker blocker. A deterministic `pln-assurance repair-action` check and generated-skill regression prevent a global review-round cap from quietly returning.
+
 ## 1.34.0 — 2026-08-15
 
 ### Changed

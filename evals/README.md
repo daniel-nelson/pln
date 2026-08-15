@@ -2,6 +2,8 @@
 
 The checked-in fixtures are synthetic and contain no production or customer data. Ordinary repository tests run only `bin/pln-eval validate`, deterministic scoring, and fake CLI boundaries through `bash tests/evals.sh`; they never call Claude Code or Codex.
 
+The sealed 1.32 qualification corpus retains the historical `classified-only` token. It is evidence from an opened holdout, not current configuration guidance, and must not be rewritten when terminology changes. Current runtime/config tests use `approved-only`.
+
 Real-model runs are explicit:
 
 ```bash

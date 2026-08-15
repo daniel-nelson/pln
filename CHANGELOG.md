@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.33.0 — 2026-08-15
+
+### Changed
+
+- **The restrictive peer-egress policy is now named `approved-only`.** The former `classified-only` name sounded as though sensitive or classified documents were the only material allowed to leave. Both choices are standing policies, not per-send prompts: `consent` sends material not marked sensitive/local-only without asking again, while `approved-only` sends only material explicitly approved for peer egress and otherwise stays local without prompting. The policy and matching `--material approved` marker replace the retired names; `classified-only` and `--material classified` are rejected rather than retained as aliases.
+
 ## 1.32.0 — 2026-08-14
 
 ### Changed

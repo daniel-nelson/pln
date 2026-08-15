@@ -3,6 +3,7 @@
 # fragment. No expressions, no escapes — keep them plain.
 SKILL_DIR=${CLAUDE_SKILL_DIR}
 HOST_NAME=Claude Code
+HOST_CLI=claude
 NOTIFY_CALL=call `PushNotification` and run `pln-notify-desktop`
 ORCH_TOOLS=the harness Agent/Workflow tools
 REVIEW_ARMY_SHORT=A semantic R1–R3 roster runs one broad reviewer, up to two risk specialists, and for R3 one local-or-peer adversarial slot

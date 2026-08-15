@@ -14,7 +14,6 @@ Usage:
 Resolve options:
   --current-model NAME
   --current-effort LEVEL
-  --current-capability frontier|below|unknown
   --evidence-profile inherit|economy
   --economy-available true|false
 USAGE
@@ -29,7 +28,6 @@ HOST=""
 PROFILE=""
 CURRENT_MODEL=""
 CURRENT_EFFORT=""
-CURRENT_CAPABILITY=""
 EVIDENCE_PROFILE=""
 ECONOMY_AVAILABLE="auto"
 
@@ -39,7 +37,6 @@ while [ $# -gt 0 ]; do
     --profile) PROFILE="${2:-}"; shift 2 ;;
     --current-model) CURRENT_MODEL="${2:-}"; shift 2 ;;
     --current-effort) CURRENT_EFFORT="${2:-}"; shift 2 ;;
-    --current-capability) CURRENT_CAPABILITY="${2:-}"; shift 2 ;;
     --evidence-profile) EVIDENCE_PROFILE="${2:-}"; shift 2 ;;
     --economy-available) ECONOMY_AVAILABLE="${2:-}"; shift 2 ;;
     *) echo "pln-model-route: unknown argument '$1'" >&2; usage ;;
@@ -98,29 +95,14 @@ if [ "$ACTION" = "probe" ]; then
 fi
 
 case "$PROFILE" in inherit | judgment | evidence) ;; *) usage ;; esac
-case "$CURRENT_CAPABILITY" in '' | frontier | below | unknown) ;; *) usage ;; esac
 case "$ECONOMY_AVAILABLE" in auto | true | false) ;; *) usage ;; esac
 
-lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 judgment_effort() {
   case "$1" in
     high | xhigh | max | ultracode) printf '%s\n' "$1" ;;
     *) printf '%s\n' "$JUDGMENT_EFFORT" ;;
   esac
 }
-CURRENT_LOWER="$(lower "$CURRENT_MODEL")"
-if [ -z "$CURRENT_CAPABILITY" ]; then
-  if [ -z "$CURRENT_MODEL" ]; then
-    CURRENT_CAPABILITY="unknown"
-  elif [[ "$CURRENT_LOWER" =~ $FRONTIER_PATTERN ]]; then
-    CURRENT_CAPABILITY="frontier"
-  elif [[ "$CURRENT_LOWER" =~ $BELOW_FLOOR_PATTERN ]]; then
-    CURRENT_CAPABILITY="below"
-  else
-    CURRENT_CAPABILITY="unknown"
-  fi
-fi
-
 STATUS="ok"
 ACTUAL_PROFILE="$PROFILE"
 MODEL="${CURRENT_MODEL:-inherited-unreported}"
@@ -133,23 +115,9 @@ case "$PROFILE" in
     ;;
   judgment)
     EFFORT="$(judgment_effort "$CURRENT_EFFORT")"
-    case "$CURRENT_CAPABILITY" in
-      frontier)
-        MODEL="${CURRENT_MODEL:-inherited-frontier-unreported}"
-        ;;
-      below)
-        MODEL="$FRONTIER_MODEL"
-        MODEL_ARGUMENT="$FRONTIER_MODEL"
-        ;;
-      unknown)
-        STATUS="confirmation"
-        ACTUAL_PROFILE="unresolved"
-        MODEL="${CURRENT_MODEL:-unknown}"
-        MODEL_ARGUMENT="none"
-        EFFORT="none"
-        FALLBACK="deliberate-inherit-required"
-        ;;
-    esac
+    # Model names are release metadata, not a durable capability oracle. A
+    # judgment worker inherits the model selected for the hosting session,
+    # whether its exact name is known, custom, or unreported.
     ;;
   evidence)
     [ -n "$EVIDENCE_PROFILE" ] || EVIDENCE_PROFILE="$($SELF_DIR/pln-config get evidence_profile 2>/dev/null || true)"

@@ -558,14 +558,22 @@ done
 for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
   has "$f" '## Model and effort routing' "$f lost semantic model routing"
   has "$f" '`inherit`' "$f lost the ordinary inherited profile"
-  has "$f" '`judgment`' "$f lost the frontier capability floor"
+  has "$f" '`judgment`' "$f lost the judgment profile"
   has "$f" '`evidence`' "$f lost the bounded evidence profile"
   has "$f" 'actual profile, model, and effort' "$f does not require actual routing attribution"
+  has "$f" 'always inherits the hosting model' "$f does not make judgment inheritance unconditional"
+  hasnt "$f" 'ask whether to inherit for this run' "$f retains the late model-inheritance gate"
+  hasnt "$f" 'frontier-capability floor' "$f still claims model names are a capability test"
+  has "$f" 'Start-of-invocation readiness sweep' "$f lost the early configuration sweep"
+  has "$f" 'before any repository research, phase action, or long-running dispatch' \
+    "$f can defer predictable configuration until work is underway"
+  has "$f" 'Never raise either configuration question later in the run' \
+    "$f can still block an unattended run on late peer configuration"
+  has "$f" 'Before every turn that waits for user input' \
+    "$f does not notify before every user-input wait"
 done
-has "$real_c/SKILL.md" '`fable`' "the Claude build lost its current frontier alias"
 has "$real_c/SKILL.md" '`sonnet`' "the Claude build lost its economy alias"
 hasnt "$real_c/SKILL.md" 'gpt-5.6-sol' "the Claude build contains Codex model mechanics"
-has "$real_x/SKILL.md" '`gpt-5.6-sol`' "the Codex build lost its current frontier model"
 has "$real_x/SKILL.md" '`gpt-5.6-luna`' "the Codex build lost its economy model"
 hasnt "$real_x/SKILL.md" '`fable`' "the Codex build contains Claude model mechanics"
 hasnt "$REPO_DIR/src/SKILL.core.md" 'gpt-5.6-sol' "the shared /pln core hardcodes an aging Codex model"
@@ -575,6 +583,10 @@ hasnt "$REPO_DIR/src/pln-pr/SKILL.core.md" 'gpt-5.6-sol' "the shared /pln-pr cor
 # Codex exactly as it reaches for `codex` from Claude.
 hasnt "$real_x/pln-pr/SKILL.md" 'no second one to consult' \
   "the codex build still says a peer cannot be consulted from this host"
+for f in "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" 'Start-of-invocation readiness sweep' "$f lost the early PR configuration sweep"
+  has "$f" 'Before every turn that waits for user input' "$f does not notify before every PR input wait"
+done
 
 # ─── the dashboard skeleton ───────────────────────────────────────────────────
 # The skeleton in Step 2 is the shape every later step addresses items by: the

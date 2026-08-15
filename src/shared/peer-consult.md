@@ -6,7 +6,7 @@ One helper selects and runs a cross-provider peer. Use it for R3's adversarial s
   --material approved --timeout 1800
 ```
 
-`--material` is mandatory as a judgment before a real send even though the helper safely defaults to `unknown`: use `classified` only when repository/session instructions and inspected content permit cross-provider egress; use `unknown` when classification is incomplete. `sensitive` and `local-only` are explicit suppression states. A session or repository instruction that calls material sensitive, confidential, private, or local-only always suppresses sending, regardless of machine-wide settings. Never weaken that instruction by relabeling the material.
+`--material` is mandatory as a judgment before a real send even though the helper safely defaults to `unknown`: use `approved` only when repository/session instructions and inspected content permit cross-provider egress; use `unknown` when approval is unclear. `sensitive` and `local-only` are explicit suppression states. A session or repository instruction that calls material sensitive, confidential, private, or local-only always suppresses sending, regardless of machine-wide settings. Never weaken that instruction by relabeling the material.
 
 The peer brief is file-first and self-contained. A peer may be prompt-in/text-out without repository access, so include the reviewed plan/diff portion, source fingerprint, paths, schema, and question. If the material is too large, include the decision-bearing portion and name the rest; never substitute a bare path. The peer's result and log remain raw artifacts read only by the assigned judgment merge worker.
 
@@ -19,11 +19,13 @@ The helper reports eight fixed metadata lines: rung, peer, status, result/log pa
 - `consent` sends material not marked sensitive/local-only without asking again.
 - `approved-only` sends only material explicitly approved for peer egress; other material stays local without prompting.
 
-The helper asks neither question itself and sends nothing in either pending state. If both are unset, the ordering is mandatory:
+The helper asks neither question itself and sends nothing in either pending state. The always-loaded start-of-invocation readiness sweep owns both questions; if both are unset, the ordering there is mandatory:
 
 1. Exit 5 / `STATUS=consent`: ask the existing cross-provider question in its own turn, naming the selected peer, the material, external quota, and that the answer applies across repositories. Store `peer_consent true|false`.
 2. Only after consent is true, exit 6 / `STATUS=egress`: ask in a separate turn whether to send eligible material automatically without asking again (`consent`) or require explicit peer-egress approval (`approved-only`). Explain that both are standing policies, then store the exact answer with `pln-config set peer_egress consent|approved-only`.
-3. Re-run the same command. Never combine the questions, infer the policy from consent, or send between the two answers. An upgraded install with `peer_consent: true` and no `peer_egress` starts at step 2.
+3. Re-run the readiness sweep on the next invocation. Never combine the questions, infer the policy from consent, or send between the two answers. An install with `peer_consent: true` and no `peer_egress` starts at step 2.
+
+During plan review or PR review, `STATUS=consent|egress` is never a late prompt. It means readiness changed after the invocation began: use the fresh same-host substitute for this run and leave the question for the next invocation's sweep.
 
 The egress question must say what each answer changes and give the exact later commands. A concise shape is:
 

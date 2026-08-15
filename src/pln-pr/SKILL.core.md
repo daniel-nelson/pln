@@ -243,7 +243,7 @@ For needs-a-decision findings, surface them to the user **one at a time**, as pr
 4. Run lightweight verification only (type-check + lint on touched files, not the full suite). Fix on failure — nothing here is staged, since `git` writes are not yours to make.
 <!-- pln:only claude -->
 5. Do not commit — clusters run in parallel and share this working tree, so a commit from you here could race another cluster's. Leave the fixed files in the tree and name them in your final message; the orchestrator commits the cluster.
-6. Update each finding's status in `REVIEW.md` to `fixed` before returning, and say in your final message which findings the cluster cleared."
+6. Do not edit `REVIEW.md` — it is a shared checkpoint file and concurrent writes would race even when code leases are disjoint. Say in your final message which findings the cluster cleared; the orchestrator updates their statuses and commit hashes after it checkpoints the cluster."
 <!-- pln:endonly -->
 <!-- pln:only codex -->
 5. Do not commit — `.git` is read-only to you. Leave the fixed files in the tree and name them in your final message; the orchestrator commits the cluster.
@@ -356,7 +356,7 @@ Both halves run at whichever close hands the PR to the user — Step 8's or Step
 - **Treating a failed review as a clean one.** If no reviewer succeeds, that is zero coverage, not zero findings. Fail closed and stop — never write an empty ledger and open the PR.
 - **The orchestrator fixing findings itself.** It dispatches fix agents; it does not read code or edit files. If you catch yourself editing in the orchestrator, stop and spawn the cluster.
 - **Acting on unverified findings.** A finding with no `motivating_code` is a suspicion, not a bug. It stays in the appendix and is not fixed.
-- **Fix agents colliding on a file.** Cluster by file so two agents never edit the same one. Clusters run in parallel on Claude (`parallel()`, isolation-free since files don't overlap) and one at a time on Codex; either way, only the orchestrator touches git, one commit at a time, so the tree still settles predictably.
+- **Fix agents colliding on a file.** Cluster by file so two agents never edit the same one. Claude launches disjoint clusters as named background Agents; Codex currently consumes clusters one at a time. Either way, only the orchestrator touches git, commits one cluster at a time by explicit path, and never includes bytes from a blocked cluster.
 - **Splicing refs or the PR body into a shell command.** Bind refs to quoted vars and pass the body by file (`--body-file` / `--description` from a temp file). Never inline `<body>`.
 - **Imposing a version bump on a repo that has no stated convention.** Step 6 is conditional. No stated version-bump rule found anywhere (`CLAUDE.md`/`AGENTS.md` or the `VERSION`/`CHANGELOG.md` shape), no bump — and if the branch already bumped, don't bump again.
 - **Looking for gstack.** pln-pr is self-contained. It never reads gstack checklists, calls gstack binaries, or assumes gstack is installed.
@@ -369,5 +369,5 @@ Both halves run at whichever close hands the PR to the user — Step 8's or Step
 - **Reading a spawned agent's exit code as its result.** A `codex exec` call can exit 0 having written nothing; an empty output file is a failed reviewer, not a reviewer that found nothing. That distinction is what the fail-closed gate in Step 3.1 rests on.
 - **Reading a transcript into your own context.** `codex review` replays the whole diff on stdout, and every spawn's events file is its full reasoning trace. Capture both to files and read only what you need — the review summary, the agent's final message. Keeping that out of the orchestrator is why the work is spawned at all.
 - **Delegating a commit, a push, or `gh pr create` to a spawned agent.** It is sandboxed: no network, no writable `.git`. Those are the orchestrator's calls, at every step.
-- **Running reviewers concurrently to save wall-clock.** Two `codex` processes race on the shared OAuth token file. Serial is the price of this host; say so up front rather than discovering it as a mid-run auth failure.
+- **Applying the nested-CLI OAuth race to native agents.** Native Codex agents are in-session workers and can run concurrently when leases are disjoint. Only fallback `codex` processes share the login race and must remain serial; any native serialization needs its own dependency or review-coverage reason.
 <!-- pln:endonly -->

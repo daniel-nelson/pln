@@ -322,10 +322,39 @@ has "$real_c/SKILL.md" 'commit owner: worker' \
   "the claude build lost worker-owned item commits"
 has "$real_x/SKILL.md" 'commit owner: coordinator' \
   "the codex build lost coordinator-owned item commits"
-has "$real_c/SKILL.md" 'resumeFromRunId' \
-  "the claude build lost Workflow blocker resume"
-has "$real_x/SKILL.md" 'resume_agent' \
-  "the codex build lost native blocker resume"
+
+# Native orchestration contracts are deliberately tested by current surface,
+# not by historical feature flags or tool names. Claude's sequential item loop
+# needs an addressable background Agent so a blocker can continue through
+# SendMessage; Workflow stays for true fan-out. Codex continuation starts a new
+# turn on the same idle agent with followup_task. Nested CLI helpers remain only
+# as the old/disabled-host fallback and the cross-provider peer boundary.
+has "$real_c/SKILL.md" 'directly addressable background Agent' \
+  "the claude build does not use addressable background Agents for item work"
+has "$real_c/SKILL.md" 'SendMessage' \
+  "the claude build lost native blocker continuation"
+has "$real_c/SKILL.md" 'pipeline(' \
+  "the claude build lost current Workflow fan-out mechanics"
+has "$real_x/SKILL.md" 'followup_task' \
+  "the codex build lost current native blocker continuation"
+has "$real_x/SKILL.md" 'send_message' \
+  "the codex build lost current running-agent steering"
+for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
+  hasnt "$f" 'resumeFromRunId' "$f still uses the removed Workflow resume input"
+  hasnt "$f" 'JSON.parse' "$f still treats Workflow args as a string"
+  hasnt "$f" 'agentType' "$f still uses the historical Workflow agent option"
+done
+for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  hasnt "$f" 'resume_agent' "$f still names the historical Codex resume tool"
+  hasnt "$f" 'send_input' "$f still names the historical Codex input tool"
+  hasnt "$f" 'close_agent' "$f still names the historical Codex close tool"
+  hasnt "$f" 'multi_agent_v2' "$f still pins a superseded Codex feature generation"
+  hasnt "$f" 'Pin to V1' "$f still pins Codex multi-agent V1"
+done
+has "$real_c/pln-pr/SKILL.md" 'commit them one cluster at a time by explicit path' \
+  "the claude fix fan-out has no executable commit ownership"
+has "$real_x/pln-pr/SKILL.md" 'OAuth token race applies only to fallback CLI processes' \
+  "the codex build still constrains native concurrency by a nested-CLI OAuth race"
 
 # This is a regression ceiling on the always-resident coordinator prompt, not a
 # target. The worker-owned contracts below are deliberately outside it. The
@@ -493,7 +522,8 @@ spawn_c="$(spawn_of "$real_c/SKILL.md")"
 spawn_x="$(spawn_of "$real_x/SKILL.md")"
 [ -n "$spawn_c" ] || fail "the claude build has no same-model spawn block"
 [ -n "$spawn_x" ] || fail "the codex build has no same-model spawn block"
-grep -qF 'agentType' <<<"$spawn_c" || fail "the claude build's reviewer is not a harness agent"
+grep -qF 'general-purpose` `Agent' <<<"$spawn_c" \
+  || fail "the claude build's reviewer is not a current harness Agent"
 grep -qF 'pln-codex-agent' <<<"$spawn_x" || fail "the codex build's reviewer is not a codex spawn"
 grep -qF 'read-only' <<<"$spawn_x" || fail "the codex build's reviewer is not read-only"
 grep -qF 'plan-review.brief.md' <<<"$spawn_c" \

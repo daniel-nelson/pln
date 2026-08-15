@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # tests/claude-agent.sh — regression check for bin/pln-claude-agent.
 #
-# The mirror of tests/codex-agent.sh, for the other direction: a session running
-# under Codex consults Claude through this helper, so it is driven here against
-# a fake `claude` on PATH — no Claude install, no network, no credentials.
+# The mirror of tests/codex-agent.sh, for the other direction: cross-provider
+# consultation and the rare one-shot legacy-host fallback share this guarded
+# helper, so it is driven here against a fake `claude` on PATH — no Claude
+# install, network, or credentials.
 #
 # What it pins down is the set of guards whose absence fails *silently*: a run
 # that exits non-zero having printed prose is a failure and not a review, a run

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # pln-claude-agent — run one fresh-context Claude Code agent and hand back its
 # result. The mirror image of pln-codex-agent, for the other direction: it is
-# what a session running under Codex (or any host) uses to consult Claude.
+# what a session running under Codex uses to consult Claude, and the guarded
+# one-shot fallback for an older/disabled Claude host with no native Agent.
 #
 # `claude -p` is a different shape from `codex exec`, so it needs its own set of
 # guards. Each one below is here because its absence fails *silently* or fails
@@ -17,11 +18,12 @@
 #     `--model` exits 1 having written a sentence of prose to stdout; reading
 #     the file without checking the exit code turns that into a "review".
 #   - an empty result is a failure, not an agent that found nothing to say.
-#   - the tool set is restricted, not merely permission-gated. `--allowedTools`
+#   - the default tool set is restricted, not merely permission-gated. `--allowedTools`
 #     only *adds* permissions — it cannot take away what the user's own
 #     settings already allow, so it is no way to make a reviewer read-only.
-#     `--tools` is: the default `Read,Grep,Glob` leaves the agent no shell and
-#     no writer, which is what a peer reviewing someone's repo should have.
+#     `--tools` is: the default `Read,Grep,Glob` leaves a peer no shell and no
+#     writer. A disclosed legacy-host implementation fallback widens this
+#     explicitly; native same-provider Agent remains preferred.
 #   - MCP servers are not loaded (`--strict-mcp-config` with no `--mcp-config`).
 #     A reviewer with the caller's MCP surface can reach the network and other
 #     people's systems, and every server it loads is startup latency for a run
@@ -34,9 +36,10 @@
 #     break the very users it pretended to protect. The auth probe in pln-peer
 #     and the run see the same environment, so they agree.
 #
-# Deliberately absent: `--resume`. This helper exists for one-shot peer
-# consultation — a review, a second opinion — not for pln's per-item loop, which
-# is the host's own job. Nothing here needs to continue a thread.
+# Deliberately absent: `--resume`. The helper is one-shot and nonpersistent.
+# Cross-provider peer work needs no continuation; a rare legacy-host item
+# blocker continues through a fresh run pointed at its handoff and existing
+# diff. Current Claude hosts use named native Agents and SendMessage instead.
 #
 # Usage:
 #   pln-claude-agent --brief <file> --out <file> [options]

@@ -79,6 +79,9 @@ case "${FAKE_PEER_SCENARIO:?FAKE_PEER_SCENARIO not set}" in
   consent)
     printf 'RUNG=2\nPEER=claude\nSTATUS=consent\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
     exit 5 ;;
+  egress)
+    printf 'RUNG=2\nPEER=claude\nSTATUS=egress\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
+    exit 6 ;;
   declined)
     printf 'RUNG=3\nPEER=none\nSTATUS=declined\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
     exit 3 ;;
@@ -109,6 +112,7 @@ run_setup() { # run_setup <host> <scenario>
 }
 
 get_flag() { env PLN_STATE_DIR="$STORE" "$SKILL/bin/pln-config" get peer_nudge_shown; }
+get_egress_flag() { env PLN_STATE_DIR="$STORE" "$SKILL/bin/pln-config" get peer_egress_nudge_shown; }
 
 peer_was_called() { [ -s "$WORK/peer.log" ]; }
 
@@ -117,12 +121,28 @@ run_setup claude ready
 [ "$RC" -eq 0 ] || fail "setup exited $RC on a ready peer (expected 0) — output:\n$OUT"
 echo "$OUT" | grep -q "Tip:" && fail "a ready peer still printed the tip"
 [ "$(get_flag)" = "true" ] || fail "a ready peer did not set peer_nudge_shown"
+echo "$OUT" | grep -q 'Peer egress policy:' \
+  || fail "a usable peer did not surface the egress policy — output:\n$OUT"
+echo "$OUT" | grep -qF "$SKILL/bin/pln-config\" set peer_egress consent" \
+  || fail "the peer-egress notice omitted the consent command"
+echo "$OUT" | grep -qF "$SKILL/bin/pln-config\" set peer_egress classified-only" \
+  || fail "the peer-egress notice omitted the classified-only command"
+[ "$(get_egress_flag)" = "true" ] || fail "the peer-egress notice did not persist its marker"
 
 # --- consent pending: the existing one-time gate handles it later ------------
 run_setup claude consent
 [ "$RC" -eq 0 ] || fail "setup exited $RC on consent-pending (expected 0) — output:\n$OUT"
 echo "$OUT" | grep -q "Tip:" && fail "consent-pending still printed the tip"
 [ "$(get_flag)" = "true" ] || fail "consent-pending did not set peer_nudge_shown"
+echo "$OUT" | grep -q 'Peer egress policy:' \
+  || fail "consent-pending did not surface the later egress choice"
+
+# --- consented upgraded install: unset egress is still explained ------------
+run_setup claude egress
+[ "$RC" -eq 0 ] || fail "setup exited $RC on egress-pending (expected 0) — output:\n$OUT"
+echo "$OUT" | grep -q 'Peer egress policy:' \
+  || fail "egress-pending upgraded install did not surface the policy"
+[ "$(get_egress_flag)" = "true" ] || fail "egress-pending did not set its one-time marker"
 
 # --- declined: the user already said no ---------------------------------------
 run_setup claude declined
@@ -154,6 +174,7 @@ echo "$OUT" | grep -q 'Install and sign in to codex,' \
 rm -rf "$STORE"
 mkdir -p "$STORE"
 env PLN_STATE_DIR="$STORE" "$SKILL/bin/pln-config" set peer_nudge_shown true >/dev/null
+env PLN_STATE_DIR="$STORE" "$SKILL/bin/pln-config" set peer_egress_nudge_shown true >/dev/null
 : > "$WORK/peer.log"
 RC=0
 OUT="$(env PATH="$BASE_PATH" HOME="$FAKE_HOME" PLN_HOST="claude" PLN_STATE_DIR="$STORE" \

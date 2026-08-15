@@ -12,7 +12,7 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 has() { grep -qF -- "$2" "$1" || fail "$3"; }
 hasnt() { grep -qF -- "$2" "$1" && fail "$3"; return 0; }
 
-for name in context-envelope evidence-collection preflight-research interview-research plan-review \
+for name in context-envelope evidence-collection preflight-research interview-research assurance-classification plan-review \
   plan-review-merge pr-review-merge execution-schedule item-implementation final-verification; do
   file="$REPO_DIR/src/workers/$name.md"
   [ -s "$file" ] || fail "missing or empty worker contract: $file"
@@ -56,6 +56,12 @@ has "$scheduling" 'Unknown targets or uncertain independence use `UNKNOWN`' \
 
 verification="$REPO_DIR/src/workers/final-verification.md"
 has "$verification" 'full gauntlet' 'verification contract lost the full gauntlet'
+has "$verification" 'Recompute the fingerprint' 'verification contract lost exact-candidate invalidation'
+
+assurance="$REPO_DIR/src/workers/assurance-classification.md"
+has "$assurance" 'Classify meaning, not line count' 'assurance worker regressed to size-only risk'
+has "$assurance" 'Unknown or conflicting risk' 'assurance worker no longer fails closed'
+has "$assurance" 'SPECIALIST_AREAS=' 'assurance worker lost deterministic roster inputs'
 has "$verification" 'Do not fix a failure inline' 'verification contract may hide a failed gate'
 
 preflight="$REPO_DIR/src/workers/preflight-research.md"
@@ -79,6 +85,7 @@ has "$evidence" 'must not recommend' 'evidence worker may leak judgment into its
 
 pr_merge="$REPO_DIR/src/workers/pr-review-merge.md"
 has "$pr_merge" 'raw artifact paths' 'PR merge worker no longer owns raw review artifacts'
+has "$pr_merge" '`verified`, `unverified`, or `disproved`' 'PR merge worker retained self-scored confidence'
 has "$pr_merge" '4096-byte budget' 'PR merge worker lost its bounded coordinator result'
 
 "$REPO_DIR/bin/pln-generate" --host claude --out-dir "$WORK/claude" >/dev/null

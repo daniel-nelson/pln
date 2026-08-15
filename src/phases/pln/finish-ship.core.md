@@ -8,6 +8,8 @@ Read this file in full before the first deferred-item revisit, final verificatio
 
 Persist verification results, follow-ups, Ship choice, PR base, and any downstream PR identity/outcome before reporting completion. When the requested stopping point or ship handoff is durably complete, set `Phase: complete`. On restart, reconcile those fields before repeating an external action; an uncertain push, PR creation, or CI action fails closed.
 
+<!-- pln:include assurance-policy -->
+
 ### Step 6. Deferred-item revisit
 
 After the last item completes, before final verification: walk back through any items marked ⏸ deferred (and any deferred sub-questions). For each, ask the user: "Revisit now, push to a future session, or drop?"
@@ -16,7 +18,7 @@ Auto-mode blocked nodes are different: `run-manifest.tsv` carries each concrete 
 
 ### Step 7. End-of-task verification + wrap-up
 
-1. Spawn one fresh-context agent with `{{SKILL_DIR}}/src/workers/final-verification.md`, `PLAN.md`, the project root, `evidence/final-verification.md`, `results/final-verification.txt`, and a 2048-byte budget. It runs the full gauntlet once; large output stays in the evidence file. Validate its `RESULT_FILE` with `bin/pln-read-envelope --root <plan-dir> --max-bytes 2048 <result-file>` and write only the pass/fail envelope summary to the dashboard's Verification section. Any missing, empty, malformed, out-of-root, or oversized result is a failed verification.
+1. Write the exact ordered gauntlet to `evidence/final-verification.commands` and a normalized non-secret environment description to `evidence/final-verification.environment`. Run `bin/pln-assurance fingerprint` and persist all hashes before execution. Spawn one fresh-context agent with `{{SKILL_DIR}}/src/workers/final-verification.md`, those artifacts/fingerprint, `PLAN.md`, the project root, `evidence/final-verification.md`, `results/final-verification.txt`, and a 2048-byte budget. It runs the full gauntlet once, recomputes the fingerprint afterward, and fails if candidate identity moved. Validate its envelope and record only per-command pass/fail plus the exact hashes in the dashboard. Missing, empty, malformed, out-of-root, oversized, skipped, or mismatched results fail verification.
 2. If anything fails: it's now a new item. Don't paper over. Either spawn an agent to fix-and-rerun, or spawn a spinoff if the failure is out-of-scope.
 3. If notifications are on, fire them first (see Notifications): {{NOTIFY_CALL}}, summarizing the outcome (e.g. "pln: plan done, 8/8 items, gauntlet passed").
 4. Sweep the run's own record for outstanding work (see Follow-ups) before drafting anything. A run that never looks reports whatever it happens to remember.
@@ -26,6 +28,8 @@ Auto-mode blocked nodes are different: `run-manifest.tsv` carries each concrete 
 ### Step 8. Ship — hand off to `/pln-pr`
 
 A finished plan is not a shipped one, and shipping is `/pln-pr`'s job: it reviews the branch with fresh-context reviewers, fixes what they find, verifies once, and opens the pull request. Pushing and running `gh pr create` from here instead skips all of it.
+
+If root repository instructions explicitly declare that this repository self-hosts `/pln-pr` and therefore skips its own source review, honor that narrow exception: require the named offline gauntlet and manual installation, warn truthfully that source review did not run, then follow the repository's direct commit/push/PR path. Never apply that exception outside the repository that declares it.
 
 Read the dashboard's `Ship` field — not what the conversation remembers, so a restarted or resumed session doesn't have to recall a choice made turns ago:
 

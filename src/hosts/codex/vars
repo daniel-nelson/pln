@@ -8,4 +8,4 @@ SKILL_DIR=$_PLN_DIR
 HOST_NAME=Codex
 NOTIFY_CALL=run `<resolved _PLN_DIR>/bin/pln-notify-desktop "<message>"`
 ORCH_TOOLS=Codex's native multi-agent tools
-REVIEW_ARMY_SHORT=A native `codex review` pass, the lenses a general review underweights, and an adversarial pass (plus a cross-model pass when a peer agent is available) run as sequential native subagents
+REVIEW_ARMY_SHORT=A semantic R1–R3 roster runs one broad reviewer, up to two risk specialists, and for R3 one local-or-peer adversarial slot

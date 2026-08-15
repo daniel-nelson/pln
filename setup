@@ -111,3 +111,29 @@ if [ "$("$SKILL_DIR/bin/pln-config" get peer_nudge_shown 2>/dev/null)" != "true"
     "$SKILL_DIR/bin/pln-config" set peer_nudge_shown true >/dev/null
   fi
 fi
+
+# ─── One-time peer-egress policy explanation ────────────────────────────────
+# Consent answers whether another provider may be used at all. This separate
+# choice answers whether unknown/unclassified material may leave after consent.
+# Explain both choices when a usable peer exists; first actual use still asks
+# in its own turn if the key remains unset.
+if [ "$("$SKILL_DIR/bin/pln-config" get peer_egress_nudge_shown 2>/dev/null)" != "true" ]; then
+  set +e
+  PEER_EGRESS_WHICH="$("$SKILL_DIR/bin/pln-peer" --which --host "$HOST" 2>/dev/null)"
+  PEER_EGRESS_RC=$?
+  set -e
+  PEER_EGRESS_RUNG="$(printf '%s\n' "$PEER_EGRESS_WHICH" | sed -n 's/^RUNG=//p')"
+  PEER_EGRESS_STATUS="$(printf '%s\n' "$PEER_EGRESS_WHICH" | sed -n 's/^STATUS=//p')"
+  if [ "$PEER_EGRESS_RUNG" != "3" ] \
+    && [ "$PEER_EGRESS_STATUS" != "declined" ] \
+    && [ "$PEER_EGRESS_STATUS" != "suppressed" ]; then
+    echo ""
+    echo "Peer egress policy: cross-provider consent and material classification are separate."
+    echo "  On first peer use, pln asks whether unclassified material may be sent. Choose:"
+    echo "  \"$SKILL_DIR/bin/pln-config\" set peer_egress consent"
+    echo "    permits unknown/unclassified material after cross-provider consent, or"
+    echo "  \"$SKILL_DIR/bin/pln-config\" set peer_egress classified-only"
+    echo "    keeps unknown material local. Explicit local-only or sensitive instructions always win."
+    "$SKILL_DIR/bin/pln-config" set peer_egress_nudge_shown true >/dev/null
+  fi
+fi

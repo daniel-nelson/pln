@@ -38,7 +38,9 @@ eq() { # eq <got> <want> <description>
 # this is the common case, not the edge one.
 eq "$("$BIN" get peer_command)" "" "a missing config file did not read as empty"
 eq "$("$BIN" get evidence_profile)" "inherit" "an unset evidence profile did not default to inherit"
-eq "$("$BIN" list)" "evidence_profile: inherit" "list did not expose the default evidence profile"
+eq "$("$BIN" get peer_egress)" "" "an unset peer-egress policy did not remain promptable"
+eq "$("$BIN" list)" $'evidence_profile: inherit\npeer_egress: unset' \
+  "list did not expose the default evidence profile and unset peer-egress policy"
 [ -e "$CONFIG" ] && fail "a read created the config file"
 
 # --- evidence routing is opt-in and validated -------------------------------
@@ -46,6 +48,14 @@ eq "$("$BIN" list)" "evidence_profile: inherit" "list did not expose the default
 eq "$("$BIN" get evidence_profile)" "economy" "economy evidence routing did not round-trip"
 eq "$("$BIN" list | grep '^evidence_profile:' | wc -l | tr -d ' ')" "1" \
   "list printed the evidence profile more than once"
+
+# --- peer egress is a separate, validated choice from provider consent ------
+"$BIN" set peer_egress classified-only
+eq "$("$BIN" get peer_egress)" "classified-only" "classified-only peer egress did not round-trip"
+"$BIN" set peer_egress consent
+eq "$("$BIN" get peer_egress)" "consent" "consent peer egress did not overwrite classified-only"
+eq "$("$BIN" list | grep '^peer_egress:' | wc -l | tr -d ' ')" "1" \
+  "list printed peer_egress more than once"
 
 # --- a boolean survives the round trip byte-identical ------------------------
 "$BIN" set notify_push false
@@ -129,6 +139,7 @@ guard "set with no value" set lonely
 # *un*answered has to remove the line, not blank it.
 guard "set with an empty value" set peer_consent ""
 guard "an unknown evidence profile" set evidence_profile turbo
+guard "an unknown peer-egress policy" set peer_egress public
 eq "$("$BIN" get peer_command)" "$CMD" "a rejected write still altered the file"
 
 # --- semantic model routing --------------------------------------------------

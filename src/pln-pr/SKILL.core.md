@@ -35,7 +35,7 @@ If `PLN_DIR` is `none`, the helpers aren't found: skip the config-gated notifica
 
 Engage when the user types `/pln-pr`, or asks to put up / open / create / make a PR or "ship it", on a branch that has commits ahead of its base. Most often this comes right after a `/pln` run completed its own gauntlet; it also works standalone on any feature branch.
 
-**The trigger holds even when the PR ask is one clause of a bigger instruction.** "Bump the version and open the PR", "commit and push this up", "and then open the PR" all route here — the review army is the point, and it must not be skipped just because the request was phrased as a sequence of git steps. The one exception: if the user explicitly says to skip review (e.g. "just push and open the PR, no review"), honor that and do the bare push + PR.
+**The trigger holds even when the PR ask is one clause of a bigger instruction.** "Bump the version and open the PR", "commit and push this up", "and then open the PR" all route here. Review is skipped only by an explicit per-run instruction; `plan_review=false` never applies to PR review. Honor a skip, but classify risk first and warn clearly when R3 critical assurance is being skipped. A repository's explicit self-hosting rule for the workflow that defines `/pln-pr` counts as that repository's narrow skip only when its named substitute gauntlet/manual-install assurance is performed; never generalize it.
 
 If the branch has no commits ahead of base, say so and stop — there is nothing to put up.
 
@@ -80,7 +80,7 @@ How to spawn one on this host:
 
 This file is the always-loaded PR coordinator contract. Detailed scope, review, fix, blocker, and ship/watch instructions live in generated phase documents. Read this router in full on every invocation and after compaction.
 
-Every `REVIEW.md` has a top-level `## State` section containing one `Phase` value: `scope-baseline`, `review`, `fix`, `blocker`, `ship-watch`, or `complete`. The same state section persists the validated base and its source, trust/command-confirmation status, diff base and tree fingerprint, review status, PR identity, and CI round/status. Those fields, not conversational memory, decide safe resume behavior.
+Every `REVIEW.md` has a top-level `## State` section containing one `Phase` value: `scope-baseline`, `review`, `fix`, `blocker`, `ship-watch`, or `complete`. The same state section persists the validated base/source, trust/command confirmation, diff base, tree/command/environment/candidate fingerprints, semantic risk and roster, review status, PR identity, and CI round/status. Those fields, not conversational memory, decide safe resume behavior.
 
 At every boundary, finish the old phase's ledger/state writes first. Then write the new cursor. Then read the mapped document in full before the phase's first action. In short: write durable state first, then advance `Phase`, then read the new phase file and act. Persist a user decision or blocker question before sending it, and persist external identities/results before advancing past the action that created them.
 

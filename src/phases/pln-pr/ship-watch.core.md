@@ -6,7 +6,9 @@ name: pln-pr-phase-ship-watch
 
 Read this file in full before version/changelog, final-gauntlet, push, PR, or CI actions. Reconcile the stored tree fingerprint, command/environment fingerprint, PR identity, and CI round before reusing results or repeating an external action. Conflicts or uncertain external completion fail closed.
 
-Write the new tree fingerprint after every fix/version/CI edit and invalidate stale verification. Persist the final gauntlet before push; persist PR identity immediately after create/update; persist every CI round and outcome before another fix/watch cycle. After terminal green/merge-ready status or the user's deliberate stop is durable, set `Phase: complete`.
+Write new tree/command/environment/candidate fingerprints after every fix, version, command, environment, or CI edit and invalidate stale verification. Persist the final gauntlet before push; persist PR identity immediately after create/update; persist every CI round and outcome before another fix/watch cycle. After terminal green/merge-ready status or the user's deliberate stop is durable, set `Phase: complete`.
+
+<!-- pln:include assurance-policy -->
 
 ### Step 6. Version and changelog (conditional — before the gauntlet)
 
@@ -24,7 +26,7 @@ When you do bump: raise the version per the repo's scheme (read recent changelog
 
 ### Step 7. Final gauntlet — once
 
-Spawn one fresh-context agent to run the full gauntlet on the final tree — including any version/changelog change from Step 6 — and return pass/fail per command. Record the summary in `REVIEW.md`'s verification section. This is the mandatory post-fix run; the only other full-suite run is the optional Step 2 baseline. If the gauntlet commands came from an untrusted plan (per Step 1) and were not already confirmed, confirm them before this run.
+Write the ordered commands and normalized non-secret environment to artifacts, compute the exact candidate fingerprint, then spawn one fresh-context agent to run the full gauntlet on that candidate—including version/changelog changes. Recompute afterward; any mismatch fails. Record pass/fail per command plus tree/command/environment/candidate hashes in `REVIEW.md`. This is the mandatory post-fix run; the only other full-suite run is the optional baseline. Confirm untrusted commands first.
 <!-- pln:only codex -->
 Same spawn shape and the same sandbox caveat as Step 2.
 <!-- pln:endonly -->
@@ -85,7 +87,9 @@ This step only runs right after Step 8 created a **brand-new** draft PR (`IS_NEW
 
 **On green:** undraft (`gh pr ready`; `glab mr update --ready` equivalent), record the observed duration as above, fire the completion notification ({{NOTIFY_CALL}}), and close with the PR URL and a one-line summary, same as Step 8's own completion message would have — including any genuine follow-ups (found during review or during this watch loop) as a closing bullet list, then the to-do-location flow (Follow-ups, below).
 
-**On a red required check:** this is a new finding, not a one-off report. Append it to `REVIEW.md` (status `open`) the same way Step 3.1 writes any other finding — `file`/check name, what failed, and the check's own output or log link as the motivating evidence — then dispatch **exactly one fresh fix cluster** through Step 4's mechanism (`pr-fix-dispatch` / `pr-fix-invoke`). Each CI-red round gets a new fresh worker and a separate `fix-ci-<round>-manifest.tsv`; never continue a pre-PR fix worker or reuse its manifest. Push the coordinator-integrated commit and re-enter the watch loop. Every round — win or lose — is logged in `REVIEW.md`'s `## CI watch log`: round number, failing check, what the fresh cluster changed, and commit hash.
+**On a red required check:** capture logs file-first and have a fresh judgment worker classify the failure before editing: `infrastructure`, `flaky`, `permission`, or `code`. Infrastructure/flaky/permission failures do not authorize code changes; record evidence and retry/wait/escalate as appropriate. A code failure becomes a verified finding and a new candidate. Dispatch exactly one fresh CI fix cluster with its own `fix-ci-<round>-manifest.tsv`; never reuse a pre-PR worker or manifest.
+
+After a CI code fix, recompute risk and candidate fingerprints, invalidate the earlier review/gauntlet, run the applicable fresh review/post-fix assurance on the changed candidate, and run every local gauntlet command not exactly subsumed by the required CI checks before pushing. Exact subsumption means the same command, inputs, and relevant environment—not a similar check name. Push only the reverified candidate and re-enter the watch loop. Log each round's classification, evidence state, changed fingerprint, local commands, fresh reader attribution, and commit. Retain the same-check three-round stop provisionally.
 
 **Truly stumped — stop, don't loop forever.** Track, per failing check name, how many consecutive rounds it has gone fix-then-still-red. Stop the loop — do not dispatch another fix cluster — the moment either holds: the **same** check has now failed **three rounds in a row**, or a fix cluster's own return is a `BLOCKED:` (it could not identify a concrete fix, the same shape Step 4's fix agents already use). When that happens, leave the PR in draft, fire the notification channels first, then surface the blocker to the user in the same shape as Step 4's needs-a-decision path — one question, as prose, in the option-message shape — naming the check, how many rounds were tried, and what each round's fix cluster attempted. State that in the question itself; do not point at the CI watch log in `REVIEW.md` for it. Nothing here has an upper bound on *how many* rounds run before that point; only the three-in-a-row (or one-explicitly-stuck) condition ends it.
 

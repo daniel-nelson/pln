@@ -14,10 +14,9 @@
 #   - the skip-the-host rule, in both directions. Under Claude it reaches for
 #     Codex, under Codex for Claude, and it never consults the host itself —
 #     which is the whole reason a "second opinion" is worth having.
-#   - the one-time consent gate: unset asks, `false` declines to rung 3, `true`
-#     lets a run through, and nothing is sent in any state until it is granted
-#     — `--which` and `--dry-run` included, because both name another vendor's
-#     CLI as a destination.
+#   - cross-provider consent is asked before the separate peer-egress policy;
+#     neither unanswered gate sends anything. `classified-only` suppresses
+#     unknown material, while explicit sensitive/local-only always suppresses.
 #   - `--which` reporting a selection (`STATUS=ready`) and an empty ladder
 #     (rung 3, `STATUS=none`) as two different things, so neither can be read
 #     as the other.
@@ -187,6 +186,7 @@ guard "a brief that does not exist" --brief "$WORK/nope.md" --out "$WORK/run.out
 guard "an empty brief" --brief "$WORK/blank.md" --out "$WORK/run.out"
 guard "a non-numeric timeout" --brief "$BRIEF" --out "$WORK/run.out" --timeout soon
 guard "an unknown host" --brief "$BRIEF" --out "$WORK/run.out" --host solaris
+guard "an unknown material class" --brief "$BRIEF" --out "$WORK/run.out" --material public
 guard "an unknown argument" --brief "$BRIEF" --out "$WORK/run.out" --turbo
 nothing_ran "a usage error"
 
@@ -195,6 +195,7 @@ nothing_ran "a usage error"
 # so a machine with one agent CLI and no peer_command is never asked it.
 cfg peer_command -
 cfg peer_consent -
+cfg peer_egress -
 fresh
 peer "$NEITHER" --brief "$BRIEF" --out "$WORK/run.out"
 expect 3 none none 3 "no peer on the machine"
@@ -204,6 +205,7 @@ nothing_ran "rung 3"
 
 # --- the host is never its own peer ------------------------------------------
 cfg peer_consent true
+cfg peer_egress consent
 fresh
 peer "$ONLY_CLAUDE" --host claude --which
 expect 3 none none 3 "a Claude host with only claude installed"
@@ -246,6 +248,7 @@ expect 3 none none 3 "a codex that is installed but not logged in"
 # --- the one-time consent gate ------------------------------------------------
 # Unset: a peer is named so the caller's question can name it, and nothing moves.
 cfg peer_consent -
+cfg peer_egress -
 fresh
 peer "$BOTH" --host codex --brief "$BRIEF" --out "$WORK/run.out"
 expect 2 claude consent 5 "an unanswered consent question"
@@ -274,8 +277,40 @@ nothing_ran "consent declined"
 # Granted, in any casing.
 cfg peer_consent YES
 peer "$BOTH" --host codex --which
-expect 2 claude ready 0 "consent granted as YES"
+expect 2 claude egress 6 "consent granted before egress policy is answered"
+nothing_ran "an unanswered egress policy"
 cfg peer_consent true
+
+# The policy question is a separate turn after consent. Garbage remains
+# unanswered. Once set, consent permits unknown material; classified-only does
+# not. Explicit local-only/sensitive always wins over both machine-wide keys.
+printf 'peer_egress: maybe\n' >> "$CONFIG"
+peer "$BOTH" --host codex --which
+expect 2 claude egress 6 "a garbage egress policy"
+nothing_ran "a garbage egress policy"
+
+cfg peer_egress classified-only
+peer "$BOTH" --host codex --brief "$BRIEF" --out "$WORK/run.out"
+expect 3 none suppressed 3 "classified-only with unknown material"
+nothing_ran "classified-only unknown material"
+
+fresh
+peer "$BOTH" --host codex --brief "$BRIEF" --out "$WORK/run.out" --material classified
+expect 2 claude ok 0 "classified-only with classified material"
+
+fresh
+peer "$BOTH" --host codex --brief "$BRIEF" --out "$WORK/run.out" --material sensitive
+expect 3 none suppressed 3 "explicit sensitive material"
+nothing_ran "explicit sensitive material"
+
+cfg peer_egress consent
+peer "$BOTH" --host codex --which
+expect 2 claude ready 0 "consent egress policy permits unknown material"
+
+fresh
+peer "$BOTH" --host codex --brief "$BRIEF" --out "$WORK/run.out" --material local-only
+expect 3 none suppressed 3 "explicit local-only material"
+nothing_ran "explicit local-only material"
 
 # --- rung 1 beats rung 2, and carries the whole configured command -----------
 # The command has flags and spaces: a config read that returned only its first

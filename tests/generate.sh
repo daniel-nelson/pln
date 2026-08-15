@@ -357,8 +357,10 @@ for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
 done
 has "$real_c/phases/pln-pr/fix.md" 'coordinator stages explicit paths and commits each completed cluster' \
   "the claude fix fan-out has no executable commit ownership"
-has "$real_x/phases/pln-pr/review.md" 'OAuth token race applies only to fallback CLI processes' \
-  "the codex build still constrains native concurrency by a nested-CLI OAuth race"
+has "$real_x/phases/pln-pr/review.md" 'Start independent slots concurrently' \
+  "the codex build does not use native concurrency for independent review slots"
+has "$real_x/phases/pln-pr/review.md" 'nested CLI processes share the login boundary' \
+  "the codex build lost fallback-only serialization"
 
 # This is a regression ceiling on the always-resident coordinator prompt, not a
 # target. The worker-owned contracts below are deliberately outside it. The
@@ -432,7 +434,7 @@ has "$real_x/phases/pln/implementation.md" 'git worktree add --detach' \
   'the Codex implementation phase lost orchestrator-created worktrees'
 has "$real_c/phases/pln-pr/fix.md" 'coordinator stages explicit paths and commits each completed cluster' \
   "the Claude fix phase lost coordinator commit ownership"
-has "$real_x/phases/pln-pr/review.md" 'OAuth token race applies only to fallback CLI processes' \
+has "$real_x/phases/pln-pr/review.md" 'Start independent slots concurrently' \
   "the Codex fix phase lost native concurrency semantics"
 for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
   has "$f" 'fix-manifest.tsv' "$f lost dependency-aware fix scheduling"
@@ -578,12 +580,35 @@ for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-appr
   has "$f" 'src/workers/plan-review-merge.md' "$f lost the merge contract pointer"
   has "$f" 'pln-build-review-brief' "$f no longer assembles one on-disk brief"
   has "$f" 'Never open raw findings in this context' "$f may read raw findings inline"
-  has "$f" 'A finding on a user-made decision is always protected from repair' \
+  has "$f" 'A finding on a user-made decision is protected from repair' \
     "$f lost coordinator-facing user-decision protection"
-  has "$f" 'Flagging is reserved for material user-owned forks' \
-    "$f lost coordinator-facing outcome policy"
+  has "$f" 'pln-assurance classify' "$f lost semantic assurance classification"
+  has "$f" 'at most four pre-fix readers' "$f lost the R3 reader cap"
+  has "$f" 'peer_egress' "$f lost the separate peer-egress policy"
   hasnt "$f" '### Rejected' "$f embeds worker-only rejection detail"
   hasnt "$f" 'Judge by substance, never by phrasing' "$f embeds worker-only merge detail"
+done
+
+# Assurance is phase-local and risk-calibrated. Tiny critical diffs never take
+# a shortcut, reviewers provide evidence state rather than self-scored
+# confidence, and every reusable gauntlet is tied to an exact candidate.
+for root in "$real_c" "$real_x"; do
+  review="$root/phases/pln-pr/review.md"
+  fix="$root/phases/pln-pr/fix.md"
+  ship="$root/phases/pln-pr/ship-watch.md"
+  finish="$root/phases/pln/finish-ship.md"
+  has "$review" '### Step 3. Risk-calibrated review roster' "$review lost semantic assurance tiers"
+  has "$review" 'at most four pre-fix readers' "$review lost the R3 pre-fix cap"
+  has "$review" '"verified"|"unverified"' "$review lost evidence-state findings"
+  hasnt "$review" 'DIFF_LINES < 30' "$review retained the line-count shortcut"
+  hasnt "$review" 'confidence: 1-10' "$review retained reviewer self-scoring"
+  has "$fix" 'R1 narrowly verifies' "$fix lost tiered post-fix assurance"
+  has "$fix" 'separate from the four-reader pre-fix cap' "$fix counts red team in the pre-fix roster"
+  has "$ship" '`infrastructure`, `flaky`, `permission`, or `code`' "$ship edits before classifying CI failure"
+  has "$ship" 'not exactly subsumed by the required CI checks' "$ship lost local gauntlet complement coverage"
+  has "$ship" 'tree/command/environment/candidate hashes' "$ship lost exact-final-candidate evidence"
+  has "$finish" 'bin/pln-assurance fingerprint' "$finish lost exact pln verification identity"
+  has "$finish" 'self-hosts `/pln-pr`' "$finish lost the narrow self-hosting exception for pln-pr"
 done
 
 for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
@@ -602,7 +627,7 @@ done
 # same brief file the peer would have been handed, and say how to run it
 # alongside the peer rather than after it.
 spawn_of() { # spawn_of <file>
-  awk '/^\*\*Spawning the same-model reviewer/,/^The review runs once/' "$1"
+  awk '/^\*\*Spawning same-model reviewers/,/^The review runs once/' "$1"
 }
 spawn_c="$(spawn_of "$real_c/phases/pln/review-approval.md")"
 spawn_x="$(spawn_of "$real_x/phases/pln/review-approval.md")"
@@ -612,11 +637,11 @@ grep -qF 'general-purpose` `Agent' <<<"$spawn_c" \
   || fail "the claude build's reviewer is not a current harness Agent"
 grep -qF 'pln-codex-agent' <<<"$spawn_x" || fail "the codex build's reviewer is not a codex spawn"
 grep -qF 'read-only' <<<"$spawn_x" || fail "the codex build's reviewer is not read-only"
-grep -qF 'plan-review.brief.md' <<<"$spawn_c" \
-  || fail "the claude build's reviewer is not pointed at the brief file"
-grep -qF 'plan-review.brief.md' <<<"$spawn_x" \
-  || fail "the codex build's reviewer is not handed the brief the peer would have had"
-grep -qF 'run_in_background' <<<"$spawn_c" \
+grep -qF "points at that role's brief" <<<"$spawn_c" \
+  || fail "the claude build's reviewer is not pointed at its roster brief"
+grep -qF "points at that role's brief" <<<"$spawn_x" \
+  || fail "the codex build's reviewer is not handed its roster brief"
+grep -qF 'start its shell call in the background' <<<"$spawn_c" \
   || fail "the claude build does not say how to run the reviewer alongside the peer"
 grep -qF 'Alongside the peer' <<<"$spawn_x" \
   || fail "the codex build does not say how to run the reviewer alongside the peer"

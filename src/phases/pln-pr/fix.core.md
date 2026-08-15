@@ -8,6 +8,8 @@ Read this file in full before the first fix decision or dispatch. Rebuild open c
 
 Before asking a decision or handing off a blocked cluster, write it and all partial-state pointers durably, then set `Phase: blocker` and load that phase. Once every finding is durably fixed/skipped and the post-fix result is recorded, set `Phase: ship-watch` and load that phase before versioning, the final gauntlet, push, PR, or CI work.
 
+<!-- pln:include assurance-policy -->
+
 ### Step 4. Fix pass — clustered fix subagents
 
 Classify each acted-on finding as **auto-fix** (mechanical, unambiguous — a null check, a missing timeout, a spec for uncovered behavior) or **needs-a-decision** (a judgment call — a design change, a tradeoff, anything where the fix isn't obvious or is destructive).
@@ -38,11 +40,13 @@ Before dispatch, snapshot the source tree and send the resolved cluster list to 
 
 <!-- pln:include pr-fix-invoke -->
 
-### Step 5. Red team — verify the fixes
+### Step 5. Post-fix assurance
 
-After the fix pass, dispatch one red-team judgment agent against the **post-fix** diff. It writes complete findings to `<plan-dir>/evidence/post-fix-red-team.json` and returns only that pointer. Give it the list of what was already found and fixed, and tell it its job is to find what the reviewers missed and confirm the fixes:
+Every fix creates a new candidate; recompute its exact fingerprint before assurance. R1 narrowly verifies the finding and targeted tests. R2 runs one fresh post-fix verifier across the fixes and specialist risks. R3 runs a full fresh red-team pass after nontrivial fixes; this is separate from the four-reader pre-fix cap. A trivial R3 fix still gets a fresh verifier plus explicit evidence for why a full red team was unnecessary.
 
-"The diff has already been reviewed and fixed. Read the current diff (`DIFF_BASE=$(git merge-base origin/<base> HEAD) && git diff \"$DIFF_BASE\"`). Verify the listed fixes and hunt for missed cross-cutting failures or regressions. Write only real, line-quoted findings plus the recommendation to the assigned artifact; return only its `RESULT_FILE` pointer."
+The R3 red team writes complete findings to `<plan-dir>/evidence/post-fix-red-team.json` and returns only that pointer. Give it the verified findings/fixes and exact candidate fingerprint:
+
+"Read the exact post-fix candidate. Reproduce the listed fixes and hunt for missed cross-cutting failures or regressions. Write only findings with exact citations and runnable reproduction/test evidence; label unsupported suspicions unverified. Return only the assigned `RESULT_FILE` pointer."
 
 Never open that reviewer output inline. Give its artifact and the exact post-fix fingerprint to a fresh judgment merge/verifier, which updates `REVIEW.md` and returns a bounded envelope. One malformed retry, then fail closed.
 

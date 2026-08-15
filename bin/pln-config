@@ -35,6 +35,12 @@ case "${1:-}" in
         *) echo "pln-config: evidence_profile must be inherit or economy" >&2; exit 2 ;;
       esac
     fi
+    if [ "$KEY" = "peer_egress" ]; then
+      case "$VALUE" in
+        consent | classified-only) ;;
+        *) echo "pln-config: peer_egress must be consent or classified-only" >&2; exit 2 ;;
+      esac
+    fi
     mkdir -p "$STATE_DIR"
     if grep -qE "^${KEY}:" "$CONFIG_FILE" 2>/dev/null; then
       # Portable in-place rewrite (avoids BSD vs GNU `sed -i` divergence)
@@ -48,6 +54,9 @@ case "${1:-}" in
   list)
     if ! grep -q '^evidence_profile:' "$CONFIG_FILE" 2>/dev/null; then
       echo 'evidence_profile: inherit'
+    fi
+    if ! grep -q '^peer_egress:' "$CONFIG_FILE" 2>/dev/null; then
+      echo 'peer_egress: unset'
     fi
     cat "$CONFIG_FILE" 2>/dev/null || true
     ;;

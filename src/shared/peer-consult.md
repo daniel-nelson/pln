@@ -1,66 +1,46 @@
-One helper picks the peer and runs it, so no step in either skill carries probe logic of its own. A peer is always a `judgment` path, never evidence/economy:
+One helper selects and runs a cross-provider peer. Use it for R3's adversarial slot, an explicitly assurance-first posture, or an explicit user request. It is additive model-family independence, not a universal dependency and never an economy route. Below, `$PLN_BIN` is the installed `bin/` directory.
 
 ```bash
 "$PLN_BIN/pln-peer" \
-  --brief "$RUN/peer.brief.md" \
-  --out   "$RUN/peer.out" \
-  --timeout 1800
+  --brief "<standalone-brief>" --out "<raw-result>" \
+  --material classified --timeout 1800
 ```
 
-Write the brief to a file first and point `--brief` at it. The prompt never goes on the command line, for the same reason a spawned agent's brief doesn't: it is a page of markdown full of backticks, quotes and `$`, and shell-escaping it by hand is how a call ends up running a truncated prompt.
+`--material` is mandatory as a judgment before a real send even though the helper safely defaults to `unknown`: use `classified` only when repository/session instructions and inspected content permit cross-provider egress; use `unknown` when classification is incomplete. `sensitive` and `local-only` are explicit suppression states. A session or repository instruction that calls material sensitive, confidential, private, or local-only always suppresses sending, regardless of machine-wide settings. Never weaken that instruction by relabeling the material.
 
-**The brief has to stand alone.** A peer may be a plain prompt-in, text-out CLI with no access to the repository at all, so the material being reviewed goes *in* the brief — the plan text, the diff — and the paths are named as well, for a peer that can read files. A brief that only says "review the plan at ./plans/…/PLAN.md" gets a competent answer from one peer and an invented one from another. Where the material is too large to inline whole, inline the part that carries the question and name the rest.
+The peer brief is file-first and self-contained. A peer may be prompt-in/text-out without repository access, so include the reviewed plan/diff portion, source fingerprint, paths, schema, and question. If the material is too large, include the decision-bearing portion and name the rest; never substitute a bare path. The peer's result and log remain raw artifacts read only by the assigned judgment merge worker.
 
-**Naming the paths only helps while the tree still matches the material.** Asking a peer to check the brief's claims against the files it names holds while those files are still the state the material was written against, so send the commit the material was taken from alongside the paths. A peer reading a repository that has moved past that commit is reading someone else's edits and will report them as errors in the material.
+The helper reports eight fixed metadata lines: rung, peer, status, result/log paths, and actual judgment profile/model/effort. Rung 1 is the configured `peer_command`; rung 2 is an authenticated supported CLI other than the host; rung 3 sends nothing. Read no result unless exit 0 and `STATUS=ok`.
 
-The helper prints exactly eight lines and nothing else, so reading it costs almost no context:
+## Two separate first-use decisions
 
-```
-RUNG=2
-PEER=codex
-STATUS=ok
-RESULT_FILE=/…/peer.out
-LOG_FILE=/…/peer.out.log
-ACTUAL_PROFILE=judgment
-ACTUAL_MODEL=<selected model, or configured-peer-unreported>
-ACTUAL_EFFORT=<selected effort, or configured-peer-unreported>
-```
+`peer_consent` authorizes cross-provider use at all. `peer_egress` then controls unknown/unclassified material, treating supported providers equivalently:
 
-The three rungs, in order. The helper walks them; nothing above it needs to know how:
+- `consent` permits unknown or unclassified material after cross-provider consent.
+- `classified-only` permits only material deliberately classified for peer egress; unknown material stays local.
 
-1. **A command the user named in config** — `peer_command`, their whole invocation, so this rung covers a tool pln has never heard of. The contract is a pipe: the command reads its prompt on stdin and writes its answer to stdout. `"$PLN_BIN/pln-config" set peer_command "gemini -p"`.
-2. **A known agent CLI on PATH that is not hosting this session** — under Claude it reaches for `codex`, under Codex for `claude`, and only when that CLI is authenticated too. Probes ship only for CLIs whose invocation pln has actually reproduced; a probe that finds a command and calls it wrong is worse than finding nothing, so everything else arrives through rung 1.
-3. **Nobody** — `RUNG=3`, `PEER=none`, exit 3. What that means is the caller's call, and neither answer is an error: a step whose value is a *fresh context* has a same-model agent do that reading (see Spawning a fresh-context agent) and says so — where that agent runs alongside a peer anyway, rung 3 leaves it as the only reader rather than adding one; a pass whose only value is a *different model* skips and says so.
+The helper asks neither question itself and sends nothing in either pending state. If both are unset, the ordering is mandatory:
 
-**The one-time consent.** Rungs 1 and 2 hand the material to a CLI from another vendor, so pln asks the user once per machine, before the first send, and never again. The helper enforces that itself and cannot ask: with no answer recorded it sends nothing, exits 5, and names the peer it would have used.
+1. Exit 5 / `STATUS=consent`: ask the existing cross-provider question in its own turn, naming the selected peer, the material, external quota, and that the answer applies across repositories. Store `peer_consent true|false`.
+2. Only after consent is true, exit 6 / `STATUS=egress`: ask in a separate turn whether to permit unclassified material (`consent`) or keep unknown material local (`classified-only`). Store the exact answer with `pln-config set peer_egress consent|classified-only`.
+3. Re-run the same command. Never combine the questions, infer the policy from consent, or send between the two answers. An upgraded install with `peer_consent: true` and no `peer_egress` starts at step 2.
+
+The egress question must say what each answer changes and give the exact later commands. A concise shape is:
 
 ```
-RUNG=1
-PEER=gemini
-STATUS=consent
+Cross-provider use is allowed, but pln has not recorded what material may leave this machine.
+
+Permit unclassified material, or keep unknown material local?
+
+`consent` lets pln send material unless this session or repository marks it sensitive/local-only. `classified-only` sends only material deliberately classified for peer egress. Either answer is remembered in `~/.pln/config.yaml`; `pln-config set peer_egress consent` or `classified-only` changes it later.
 ```
 
-That is your cue to ask, as a binary question naming that peer and what this call would actually send it — a plan, a diff. What the answer decides is broader than the one call: one key, `peer_consent`, covers every pln skill and every repository on this machine, so the question is about peer use, not about this review.
+Other outcomes:
 
-```
-The plan review is ready to go to `gemini`, a different model on this machine, and pln has never asked whether that's allowed.
+- Exit 3 / `STATUS=none`: no usable peer exists.
+- Exit 3 / `STATUS=declined`: cross-provider consent was denied.
+- Exit 3 / `STATUS=suppressed`: the material was sensitive/local-only, or `classified-only` rejected unknown material.
+- Exit 4 / `STATUS=empty|timeout|error`: the selected peer failed; empty is failure, never a clean review.
+- Exit 0 / `STATUS=ready`: `--which` selected a permitted peer without sending.
 
-Send it there?
-
-Yes and the plan text goes to `gemini` now, and pln consults a peer from then on — later reviews, other repos, `/pln-pr`'s cross-model pass — without asking again. The material leaves this machine and the call can spend your quota with that vendor. No and nothing is ever sent: the review runs on a fresh agent of this same model instead, which still gets a blank-slate reading of the plan. Either answer is remembered in `~/.pln/config.yaml`, and `pln-config set peer_consent true` or `false` changes it later.
-```
-
-On yes, `"$PLN_BIN/pln-config" set peer_consent true` and run the same command again. On no, `"$PLN_BIN/pln-config" set peer_consent false` and carry on as if the run had come back rung 3. Never ask when the helper did not exit 5 — exit 3 means nothing would leave the machine anyway, and a question that changes nothing is worse than no question.
-
-Reading the fixed metadata:
-
-- **exit 0, `STATUS=ok`** — record `RESULT_FILE` as a raw artifact path and pass it to the applicable judgment merge worker. Never open the peer answer in coordinator context.
-- **exit 0, `STATUS=ready`** — a `--which` call, nothing sent: a peer is selected and consent is recorded. It is not rung 3's `none`, which is the no-peer case; the two statuses are distinct so a selection cannot be read as an empty ladder and the pass skipped for no reason.
-- **exit 5, `STATUS=consent`** — nothing was sent. Ask the one-time question above, record the answer, and either re-run or fall back.
-- **exit 3** — rung 3 above. `STATUS=declined` is the same fallback with a different cause: the user has peer consult switched off, so say that rather than "no peer available", which would read as a broken install.
-- **exit 4**, `STATUS=empty|timeout|error` — a peer was picked, ran, and failed. An empty answer is a failed peer, not a peer that found nothing; don't read `RESULT_FILE`. Retry once with a fresh peer run when the caller requires peer coverage; after that use the caller's judgment fallback or fail closed, and attribute the failure.
-- **`LOG_FILE`** is the peer's stderr and event trace. Never read it into your context — it exists for a post-mortem on a failed run.
-
-Briefs, results, and logs stay on disk. The coordinator may read only the helper's fixed eight-line metadata. Record requested/actual judgment routing, rung, fallback, source state, status, and artifact paths in `routing.tsv`.
-
-Say which rung ran, in a clause, wherever the result is reported: "reviewed by codex", "no peer available — reviewed by a fresh same-model agent". Where the caller runs both readers, name both. A reader weighs a finding differently depending on whose eyes were on it. `--which` reports the selection without running anything, for when that has to be known before the brief is assembled; it takes neither `--brief` nor `--out`, and it is gated the same way, so it answers `consent` too.
+When R3 requires the adversarial slot and any no-send/failure state occurs, dispatch one fresh same-model adversarial judgment reviewer into that same slot. Do not add it as a fifth reader. Attribute the result truthfully: name the peer when it ran; otherwise name the reason and say that a fresh same-model substitute ran without model-family independence. For lower tiers, no-send simply means no additive peer unless the user explicitly requested one; never invent coverage.

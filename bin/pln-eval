@@ -1,0 +1,359 @@
+#!/usr/bin/env bash
+# pln-eval — deterministic behavioral corpus validation/scoring plus explicit live runs.
+set -euo pipefail
+
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(dirname "$SELF_DIR")"
+CORPUS="$ROOT_DIR/evals/corpus/behavior.tsv"
+GOLD="$ROOT_DIR/evals/corpus/gold.tsv"
+QUALIFICATION="$ROOT_DIR/evals/economy-qualification.tsv"
+
+usage() {
+  cat >&2 <<'USAGE'
+Usage:
+  pln-eval validate
+  pln-eval prompt --profile frontier|economy --split calibration|holdout --out FILE [--freeze FILE]
+  pln-eval score --profile frontier|economy --split calibration|holdout --response FILE --out FILE
+  pln-eval run-live --host claude|codex --profile frontier|economy --split calibration|holdout --out-dir DIR [--trials N] [--freeze FILE]
+  pln-eval freeze --host claude|codex --frontier-score FILE --economy-score FILE --frontier-metadata FILE --economy-metadata FILE --out FILE
+  pln-eval decide --host claude|codex --freeze FILE --frontier-score FILE --economy-score FILE --frontier-metadata FILE --economy-metadata FILE --out FILE
+
+Live runs are explicit. validate and score never invoke an agent CLI or read ~/.pln.
+USAGE
+  exit 2
+}
+
+fail() { echo "pln-eval: $*" >&2; exit 2; }
+whole_number() { case "$1" in '' | *[!0-9]*) return 1 ;; *) return 0 ;; esac; }
+sha256_file() {
+  if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
+  elif command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
+  else fail 'no SHA-256 implementation (shasum or sha256sum)'; fi
+}
+fixture_hash() {
+  local tmp
+  tmp="$(mktemp "${TMPDIR:-/tmp}/pln-eval-fixture.XXXXXX")"
+  trap 'rm -f "$tmp"' RETURN
+  printf '%s  behavior.tsv\n' "$(sha256_file "$CORPUS")" > "$tmp"
+  printf '%s  gold.tsv\n' "$(sha256_file "$GOLD")" >> "$tmp"
+  printf '%s  model-routing.json\n' "$(sha256_file "$ROOT_DIR/evals/corpus/model-routing.json")" >> "$tmp"
+  printf '%s  outline-checkpoint.json\n' "$(sha256_file "$ROOT_DIR/evals/corpus/outline-checkpoint.json")" >> "$tmp"
+  sha256_file "$tmp"
+  rm -f "$tmp"
+  trap - RETURN
+}
+field() { sed -n "s/^$1=//p" "$2" | tail -n 1; }
+csv_count() { awk -F, '{ if ($0 == "" || $0 == "unknown") print 0; else print NF }' <<<"$1"; }
+class_count() {
+  awk -F '\t' -v split_name="$1" -v class_name="$2" 'NR > 1 && $2 == split_name && $3 == class_name { n++ } END { print n + 0 }' "$CORPUS"
+}
+
+validate() {
+  [ -f "$CORPUS" ] && [ -f "$GOLD" ] && [ -f "$QUALIFICATION" ] || fail 'eval files are missing'
+  [ "$(head -n 1 "$CORPUS")" = $'id\tsplit\tclass\tcategory\tbrief' ] || fail 'unknown behavior.tsv header'
+  [ "$(head -n 1 "$GOLD")" = $'id\tprofile\tkey\texpected\ttags' ] || fail 'unknown gold.tsv header'
+  awk -F '\t' '
+    NR == 1 { next }
+    NF != 5 { print "bad corpus field count at line " NR > "/dev/stderr"; bad=1 }
+    $1 !~ /^[a-z][a-z0-9-]+$/ { print "bad case id " $1 > "/dev/stderr"; bad=1 }
+    $2 != "calibration" && $2 != "holdout" { print "bad split " $2 > "/dev/stderr"; bad=1 }
+    $3 != "eligible" && $3 != "boundary" { print "bad class " $3 > "/dev/stderr"; bad=1 }
+    seen[$1]++ { print "duplicate case " $1 > "/dev/stderr"; bad=1 }
+    END { exit bad }
+  ' "$CORPUS" || fail 'corpus validation failed'
+  awk -F '\t' -v corpus="$CORPUS" '
+    BEGIN { while ((getline line < corpus) > 0) { split(line, a, "\t"); if (a[1] != "id") ids[a[1]]=1 } }
+    NR == 1 { next }
+    NF != 5 || !ids[$1] || ($2 != "*" && $2 != "frontier" && $2 != "economy") || $3 !~ /^[A-Z][A-Z0-9_]*$/ { bad=1 }
+    seen[$1 SUBSEP $2 SUBSEP $3]++ { bad=1 }
+    END { exit bad }
+  ' "$GOLD" || fail 'gold validation failed'
+  [ "$(head -n 1 "$QUALIFICATION")" = $'host\tmodel\tstatus\tfixture_sha256\tskill_version\treason' ] || fail 'unknown economy qualification header'
+  awk -F '\t' -v version="$(cat "$ROOT_DIR/VERSION")" '
+    NR == 1 { next }
+    NF != 6 || ($1 != "claude" && $1 != "codex") || ($3 != "enabled" && $3 != "disabled") || $4 !~ /^[0-9a-f]{64}$/ || $5 != version || $6 == "" { bad=1 }
+    seen[$1]++ { bad=1 }
+    END { if (seen["claude"] != 1 || seen["codex"] != 1) bad=1; exit bad }
+  ' "$QUALIFICATION" || fail 'economy qualification validation failed'
+  local split class n total
+  total="$(awk 'END { print NR - 1 }' "$CORPUS")"
+  [ "$total" -ge 20 ] || fail "corpus has only $total cases"
+  for split in calibration holdout; do
+    for class in eligible boundary; do
+      n="$(class_count "$split" "$class")"
+      [ "$n" -ge 10 ] || fail "$split/$class has $n cases; 10 required"
+    done
+  done
+  # Every case must have a frontier expectation and an economy expectation,
+  # either directly or through a profile-neutral wildcard.
+  awk -F '\t' -v gold="$GOLD" '
+    BEGIN {
+      while ((getline line < gold) > 0) {
+        split(line, a, "\t"); if (a[1] == "id") continue
+        have[a[1],a[2]]=1
+      }
+    }
+    NR == 1 { next }
+    !(have[$1,"*"] || have[$1,"frontier"]) { print "missing frontier gold for " $1 > "/dev/stderr"; bad=1 }
+    !(have[$1,"*"] || have[$1,"economy"]) { print "missing economy gold for " $1 > "/dev/stderr"; bad=1 }
+    END { exit bad }
+  ' "$CORPUS" || fail 'profile coverage is incomplete'
+  printf 'STATUS=ok\nCASES=%s\nCALIBRATION_ELIGIBLE=%s\nCALIBRATION_BOUNDARY=%s\nHOLDOUT_ELIGIBLE=%s\nHOLDOUT_BOUNDARY=%s\nFIXTURE_SHA256=%s\n' \
+    "$total" "$(class_count calibration eligible)" "$(class_count calibration boundary)" \
+    "$(class_count holdout eligible)" "$(class_count holdout boundary)" "$(fixture_hash)"
+}
+
+write_prompt() {
+  local profile="$1" split="$2" out="$3" freeze="${4:-}"
+  [ "$profile" = frontier ] || [ "$profile" = economy ] || fail 'profile must be frontier or economy'
+  [ "$split" = calibration ] || [ "$split" = holdout ] || fail 'split must be calibration or holdout'
+  if [ "$split" = holdout ]; then
+    [ -n "$freeze" ] && [ -f "$freeze" ] || fail 'holdout remains sealed until a freeze artifact is supplied'
+    [ "$(field FIXTURE_SHA256 "$freeze")" = "$(fixture_hash)" ] || fail 'freeze artifact belongs to another fixture'
+    [ "$(field STATUS "$freeze")" = frozen ] || fail 'freeze artifact is not frozen'
+  fi
+  {
+    echo 'You are running a sanitized behavioral evaluation. The fixtures are synthetic; do not use tools, files, accounts, or external data.'
+    if [ "$profile" = economy ]; then
+      echo 'You are the bounded evidence profile. Answer mechanically closed fact/citation cases. For any case requiring interpretation, recommendation, risk classification, policy choice, conflict resolution, or a user-facing decision, return ACTION=ESCALATE and no other key for that case.'
+    else
+      echo 'You are the inherited/frontier judgment profile. Resolve every case according to the stated pln contract.'
+    fi
+    echo 'Output only tab-separated rows: CASE_ID<TAB>KEY<TAB>VALUE. Do not add prose, headings, code fences, recommendations, questions, or omitted-case explanations.'
+    echo 'Cases:'
+    awk -F '\t' -v split_name="$split" 'NR > 1 && $2 == split_name { printf "%s\t%s\t%s\t%s\n", $1, $3, $4, $5 }' "$CORPUS"
+  } > "$out"
+}
+
+score() {
+  local profile="$1" split="$2" response="$3" out="$4"
+  [ -f "$response" ] || fail "missing response: $response"
+  local expected actual joined
+  expected="$(mktemp "${TMPDIR:-/tmp}/pln-eval-expected.XXXXXX")"
+  actual="$(mktemp "${TMPDIR:-/tmp}/pln-eval-actual.XXXXXX")"
+  joined="$(mktemp "${TMPDIR:-/tmp}/pln-eval-joined.XXXXXX")"
+  trap 'rm -f "$expected" "$actual" "$joined"' RETURN
+  awk -F '\t' -v corpus="$CORPUS" -v profile="$profile" -v split_name="$split" '
+    BEGIN { while ((getline line < corpus) > 0) { split(line,a,"\t"); if (a[2] == split_name) include[a[1]]=1 } }
+    NR > 1 && include[$1] && ($2 == "*" || $2 == profile) { print $1 "\t" $3 "\t" $4 "\t" $5 }
+  ' "$GOLD" | LC_ALL=C sort > "$expected"
+  # Only the strict TSV protocol crosses into scoring; chatter is ignored but
+  # duplicate answer keys fail below. CR is normalized for Windows CLIs.
+  tr -d '\r' < "$response" | awk -F '\t' '
+    NF == 3 && $1 ~ /^[a-z][a-z0-9-]+$/ && $2 ~ /^[A-Z][A-Z0-9_]*$/ { print; next }
+    NF == 2 && $1 ~ /^[a-z][a-z0-9-]+$/ && $2 ~ /^[A-Z][A-Z0-9_]*=/ {
+      key=$2; sub(/=.*/, "", key); value=$2; sub(/^[^=]*=/, "", value); print $1 "\t" key "\t" value
+    }
+  ' | LC_ALL=C sort > "$actual"
+  awk -F '\t' '
+    { key=$1 SUBSEP $2; if (++seen[key] > 1) bad=1 }
+    END { exit bad }
+  ' "$actual" || fail 'response contains duplicate case/key rows'
+  awk -F '\t' -v actual="$actual" '
+    BEGIN { while ((getline line < actual) > 0) { split(line,a,"\t"); got[a[1],a[2]]=a[3] } }
+    { ok=(got[$1,$2] == $3 ? 1 : 0); print $0 "\t" ok }
+  ' "$expected" > "$joined"
+  local assertions correct hard_total hard_ok objective_total objective_ok r3_total r3_ok review_total review_ok economy_fact_total economy_fact_ok escalation_total escalation_ok citation_total citation_ok prohibited floors
+  assertions="$(wc -l < "$joined" | tr -d ' ')"
+  correct="$(awk -F '\t' '$5 == 1 {n++} END {print n+0}' "$joined")"
+  metric() { awk -F '\t' -v tag="$1" 'index(","$4",", ","tag",") {t++; if ($5==1) ok++} END {print t+0 " " ok+0}' "$joined"; }
+  read -r hard_total hard_ok <<<"$(metric hard)"
+  read -r objective_total objective_ok <<<"$(metric objective)"
+  read -r r3_total r3_ok <<<"$(metric r3-recall)"
+  read -r review_total review_ok <<<"$(metric review-seeded)"
+  read -r economy_fact_total economy_fact_ok <<<"$(metric economy-fact)"
+  read -r escalation_total escalation_ok <<<"$(metric economy-escalation)"
+  read -r citation_total citation_ok <<<"$(metric citation)"
+  prohibited=0
+  if [ "$profile" = economy ]; then
+    prohibited="$(grep -Eic '(^|[^A-Z])(RECOMMENDATION|REVERSAL|USER_QUESTION|QUESTION)($|[^A-Z])' "$response" || true)"
+  fi
+  floors=pass
+  pct_at_least() { awk -v ok="$1" -v total="$2" -v floor="$3" 'BEGIN { exit !(total == 0 || (100 * ok / total) >= floor) }'; }
+  [ "$hard_ok" -eq "$hard_total" ] || floors=fail
+  if [ "$profile" = frontier ]; then
+    pct_at_least "$objective_ok" "$objective_total" 95 || floors=fail
+    [ "$r3_ok" -eq "$r3_total" ] || floors=fail
+    pct_at_least "$review_ok" "$review_total" 90 || floors=fail
+  else
+    pct_at_least "$economy_fact_ok" "$economy_fact_total" 98 || floors=fail
+    [ "$escalation_ok" -eq "$escalation_total" ] || floors=fail
+    [ "$citation_ok" -eq "$citation_total" ] || floors=fail
+    [ "$prohibited" -eq 0 ] || floors=fail
+  fi
+  {
+    printf 'STATUS=%s\nPROFILE=%s\nSPLIT=%s\nFIXTURE_SHA256=%s\n' "$floors" "$profile" "$split" "$(fixture_hash)"
+    printf 'CASES_ELIGIBLE=%s\nCASES_BOUNDARY=%s\n' "$(class_count "$split" eligible)" "$(class_count "$split" boundary)"
+    printf 'ASSERTIONS=%s\nCORRECT=%s\nHARD_TOTAL=%s\nHARD_CORRECT=%s\nOBJECTIVE_TOTAL=%s\nOBJECTIVE_CORRECT=%s\n' "$assertions" "$correct" "$hard_total" "$hard_ok" "$objective_total" "$objective_ok"
+    printf 'R3_TOTAL=%s\nR3_CORRECT=%s\nREVIEW_TOTAL=%s\nREVIEW_CORRECT=%s\n' "$r3_total" "$r3_ok" "$review_total" "$review_ok"
+    printf 'ECONOMY_FACT_TOTAL=%s\nECONOMY_FACT_CORRECT=%s\nESCALATION_TOTAL=%s\nESCALATION_CORRECT=%s\nCITATION_TOTAL=%s\nCITATION_CORRECT=%s\nPROHIBITED_JUDGMENT_OUTPUTS=%s\n' "$economy_fact_total" "$economy_fact_ok" "$escalation_total" "$escalation_ok" "$citation_total" "$citation_ok" "$prohibited"
+  } > "$out"
+  rm -f "$expected" "$actual" "$joined"
+  trap - RETURN
+  [ "$floors" = pass ] || return 6
+}
+
+milliseconds() {
+  # Perl is not required by offline tests. Live execution uses seconds when a
+  # millisecond clock is unavailable, and records the clock resolution.
+  local now
+  now="$(date +%s%3N 2>/dev/null || true)"
+  case "$now" in *N | '') echo "$(( $(date +%s) * 1000 ))" ;; *) echo "$now" ;; esac
+}
+
+run_live() {
+  local host="$1" profile="$2" split="$3" out_dir="$4" trials="$5" freeze="$6"
+  case "$host" in claude | codex) ;; *) fail 'host must be claude or codex' ;; esac
+  whole_number "$trials" && [ "$trials" -gt 0 ] || fail 'trials must be a positive integer'
+  mkdir -p "$out_dir"
+  local prompt="$out_dir/prompt.txt" profiles model effort cli_version repo_commit fixture latencies tokens costs artifacts fallback i start end response raw rc
+  write_prompt "$profile" "$split" "$prompt" "$freeze"
+  profiles="$ROOT_DIR/src/hosts/$host/model-profiles"
+  # shellcheck disable=SC1090
+  . "$profiles"
+  if [ "$profile" = frontier ]; then model="$FRONTIER_MODEL"; effort="$JUDGMENT_EFFORT"; else model="$ECONOMY_MODEL"; effort="$EVIDENCE_EFFORT"; fi
+  command -v "$host" >/dev/null 2>&1 || fail "$host CLI is unavailable"
+  cli_version="$($host --version 2>/dev/null | head -n 1)"
+  repo_commit="$(git -C "$ROOT_DIR" rev-parse HEAD)"
+  fixture="$(fixture_hash)"
+  latencies=""; tokens=""; costs=""; artifacts=""; fallback=none
+  i=1
+  while [ "$i" -le "$trials" ]; do
+    response="$out_dir/response-$i.tsv"
+    raw="$out_dir/raw-$i.log"
+    start="$(milliseconds)"
+    rc=0
+    if [ "$host" = claude ]; then
+      claude -p --model "$model" --effort "$effort" --tools "" --safe-mode \
+        --no-session-persistence --output-format text < "$prompt" > "$response" 2> "$raw" || rc=$?
+      token_value=unknown
+      cost_value=unknown
+    else
+      codex exec -C "$ROOT_DIR" -s read-only --ephemeral --ignore-rules \
+        --model "$model" -c "model_reasoning_effort=\"$effort\"" --json \
+        -o "$response" - < "$prompt" > "$raw" 2>&1 || rc=$?
+      token_value="$(sed -n 's/.*"total_tokens":\([0-9][0-9]*\).*/\1/p' "$raw" | tail -n 1)"
+      [ -n "$token_value" ] || token_value=unknown
+      cost_value=unknown
+    fi
+    end="$(milliseconds)"
+    [ "$rc" -eq 0 ] || fail "$host live trial $i failed with exit $rc; see $raw"
+    [ -s "$response" ] || fail "$host live trial $i returned an empty response"
+    latency="$((end - start))"
+    [ -z "$latencies" ] || latencies="$latencies,"
+    [ -z "$tokens" ] || tokens="$tokens,"
+    [ -z "$costs" ] || costs="$costs,"
+    [ -z "$artifacts" ] || artifacts="$artifacts,"
+    latencies="${latencies}${latency}"; tokens="${tokens}${token_value}"; costs="${costs}${cost_value}"; artifacts="${artifacts}response-$i.tsv,raw-$i.log"
+    i=$((i + 1))
+  done
+  cat > "$out_dir/metadata.env" <<EOF
+HOST=$host
+PROFILE=$profile
+ACTUAL_PROFILE=$profile
+ACTUAL_MODEL=selected:$model;underlying=unreported
+ACTUAL_EFFORT=$effort
+CLI_VERSION=$cli_version
+SKILL_VERSION=$(cat "$ROOT_DIR/VERSION")
+REPOSITORY_COMMIT=$repo_commit
+FIXTURE_SHA256=$fixture
+SPLIT=$split
+CASES_ELIGIBLE=$(class_count "$split" eligible)
+CASES_BOUNDARY=$(class_count "$split" boundary)
+TRIALS=$trials
+LATENCY_SAMPLES_MS=$latencies
+REPORTED_TOKEN_SAMPLES=$tokens
+REPORTED_COST_SAMPLES_USD=$costs
+FALLBACK=$fallback
+RESULT_ARTIFACTS=$artifacts
+EOF
+  score "$profile" "$split" "$out_dir/response-1.tsv" "$out_dir/score.env" || return $?
+  printf 'STATUS=complete\nMETADATA_FILE=%s\nSCORE_FILE=%s\n' "$out_dir/metadata.env" "$out_dir/score.env"
+}
+
+latency_stats() {
+  local frontier="$1" economy="$2"
+  awk -v f="$frontier" -v e="$economy" 'BEGIN {
+    nf=split(f,fa,","); ne=split(e,ea,","); n=(nf<ne?nf:ne); if(n<2){print "0 0 0"; exit}
+    for(i=1;i<=n;i++){ if(fa[i]<=0 || ea[i]<=0){print "0 0 0"; exit}; x[i]=100*(fa[i]-ea[i])/fa[i]; sum+=x[i] }
+    mean=sum/n; for(i=1;i<=n;i++) ss+=(x[i]-mean)^2; sd=sqrt(ss/(n-1)); printf "%.6f %.6f %d\n",mean,sd,n
+  }'
+}
+
+freeze_eval() {
+  local host="$1" fs="$2" es="$3" fm="$4" em="$5" out="$6"
+  [ "$(field STATUS "$fs")" = pass ] || fail 'frontier calibration floors failed'
+  [ "$(field STATUS "$es")" = pass ] || fail 'economy calibration floors failed'
+  [ "$(field SPLIT "$fs")" = calibration ] && [ "$(field SPLIT "$es")" = calibration ] || fail 'freeze requires calibration scores'
+  [ "$(field FIXTURE_SHA256 "$fs")" = "$(fixture_hash)" ] && [ "$(field FIXTURE_SHA256 "$es")" = "$(fixture_hash)" ] || fail 'calibration fixture mismatch'
+  local class n mean sd samples noise threshold margin required status reason
+  for class in CASES_ELIGIBLE CASES_BOUNDARY; do
+    n="$(field "$class" "$es")"; [ "$n" -ge 10 ] || fail "$host/$class calibration has $n cases"
+  done
+  read -r mean sd samples <<<"$(latency_stats "$(field LATENCY_SAMPLES_MS "$fm")" "$(field LATENCY_SAMPLES_MS "$em")")"
+  [ "$samples" -ge 3 ] || fail 'at least three paired calibration latency samples are required'
+  noise="$(awk -v sd="$sd" -v n="$samples" 'BEGIN { printf "%.6f", 1.96*sd/sqrt(n) }')"
+  threshold="$(awk -v noise="$noise" 'BEGIN { x=noise+5; if(x<10)x=10; printf "%.6f",x }')"
+  margin="$(awk -v mean="$mean" -v threshold="$threshold" 'BEGIN { x=mean-threshold; if(x<1)x=1; printf "%.6f",x }')"
+  required="$(awk -v sd="$sd" -v margin="$margin" 'BEGIN { n=(1.96*sd/margin)^2; i=int(n); if(n>i)i++; if(i<10)i=10; print i }')"
+  status=frozen; reason=ready-for-holdout
+  if awk -v mean="$mean" -v threshold="$threshold" 'BEGIN { exit !(mean <= threshold) }'; then reason=calibration-benefit-below-threshold; fi
+  {
+    printf 'STATUS=%s\nHOST=%s\nFIXTURE_SHA256=%s\nMETRIC=paired_latency_percent_saved\n' "$status" "$host" "$(fixture_hash)"
+    printf 'CALIBRATION_SAMPLES=%s\nCALIBRATION_MEAN_BENEFIT_PCT=%s\nCALIBRATION_SD_PCT=%s\nMEASUREMENT_NOISE_PCT=%s\nFROZEN_BENEFIT_THRESHOLD_PCT=%s\nREQUIRED_HOLDOUT_PER_CLASS=%s\nCALIBRATION_DECISION=%s\n' "$samples" "$mean" "$sd" "$noise" "$threshold" "$required" "$reason"
+  } > "$out"
+}
+
+decide_eval() {
+  local host="$1" freeze="$2" fs="$3" es="$4" fm="$5" em="$6" out="$7"
+  [ "$(field STATUS "$freeze")" = frozen ] || fail 'holdout decision requires a frozen calibration artifact'
+  [ "$(field FIXTURE_SHA256 "$freeze")" = "$(fixture_hash)" ] || fail 'holdout freeze fixture mismatch'
+  local required eligible boundary mean sd samples threshold status reason
+  required="$(field REQUIRED_HOLDOUT_PER_CLASS "$freeze")"
+  eligible="$(field CASES_ELIGIBLE "$es")"; boundary="$(field CASES_BOUNDARY "$es")"
+  status=disabled; reason=undersized-holdout
+  if [ "$eligible" -ge "$required" ] && [ "$boundary" -ge "$required" ]; then
+    if [ "$(field STATUS "$fs")" != pass ]; then reason=frontier-floor-failure
+    elif [ "$(field STATUS "$es")" != pass ]; then reason=economy-floor-failure
+    elif [ "$(field CALIBRATION_DECISION "$freeze")" != ready-for-holdout ]; then reason=calibration-benefit-below-threshold
+    else
+      read -r mean sd samples <<<"$(latency_stats "$(field LATENCY_SAMPLES_MS "$fm")" "$(field LATENCY_SAMPLES_MS "$em")")"
+      threshold="$(field FROZEN_BENEFIT_THRESHOLD_PCT "$freeze")"
+      if awk -v mean="$mean" -v threshold="$threshold" 'BEGIN { exit !(mean > threshold) }'; then status=enabled; reason=all-floors-and-benefit-pass
+      else reason=holdout-benefit-below-threshold
+      fi
+    fi
+  fi
+  {
+    printf 'STATUS=%s\nHOST=%s\nFIXTURE_SHA256=%s\nMODEL=%s\nEFFORT=%s\nREQUIRED_HOLDOUT_PER_CLASS=%s\nAVAILABLE_HOLDOUT_ELIGIBLE=%s\nAVAILABLE_HOLDOUT_BOUNDARY=%s\nREASON=%s\n' \
+      "$status" "$host" "$(fixture_hash)" "$(field ACTUAL_MODEL "$em")" "$(field ACTUAL_EFFORT "$em")" "$required" "$eligible" "$boundary" "$reason"
+    printf 'FRONTIER_SCORE=%s\nECONOMY_SCORE=%s\nFRONTIER_METADATA=%s\nECONOMY_METADATA=%s\nFREEZE_ARTIFACT=%s\n' "$fs" "$es" "$fm" "$em" "$freeze"
+  } > "$out"
+  [ "$status" = enabled ]
+}
+
+command="${1:-}"; [ -n "$command" ] || usage; shift
+case "$command" in
+  validate) [ $# -eq 0 ] || usage; validate ;;
+  prompt)
+    profile=""; split=""; out=""; freeze=""
+    while [ $# -gt 0 ]; do case "$1" in --profile) profile="${2:-}"; shift 2;; --split) split="${2:-}"; shift 2;; --out) out="${2:-}"; shift 2;; --freeze) freeze="${2:-}"; shift 2;; *) usage;; esac; done
+    [ -n "$profile" ] && [ -n "$split" ] && [ -n "$out" ] || usage; validate >/dev/null; write_prompt "$profile" "$split" "$out" "$freeze" ;;
+  score)
+    profile=""; split=""; response=""; out=""
+    while [ $# -gt 0 ]; do case "$1" in --profile) profile="${2:-}"; shift 2;; --split) split="${2:-}"; shift 2;; --response) response="${2:-}"; shift 2;; --out) out="${2:-}"; shift 2;; *) usage;; esac; done
+    [ -n "$profile" ] && [ -n "$split" ] && [ -n "$response" ] && [ -n "$out" ] || usage; validate >/dev/null; score "$profile" "$split" "$response" "$out" ;;
+  run-live)
+    host=""; profile=""; split=""; out_dir=""; trials=1; freeze=""
+    while [ $# -gt 0 ]; do case "$1" in --host) host="${2:-}"; shift 2;; --profile) profile="${2:-}"; shift 2;; --split) split="${2:-}"; shift 2;; --out-dir) out_dir="${2:-}"; shift 2;; --trials) trials="${2:-}"; shift 2;; --freeze) freeze="${2:-}"; shift 2;; *) usage;; esac; done
+    [ -n "$host" ] && [ -n "$profile" ] && [ -n "$split" ] && [ -n "$out_dir" ] || usage; validate >/dev/null; run_live "$host" "$profile" "$split" "$out_dir" "$trials" "$freeze" ;;
+  freeze)
+    host=""; fs=""; es=""; fm=""; em=""; out=""
+    while [ $# -gt 0 ]; do case "$1" in --host) host="${2:-}"; shift 2;; --frontier-score) fs="${2:-}"; shift 2;; --economy-score) es="${2:-}"; shift 2;; --frontier-metadata) fm="${2:-}"; shift 2;; --economy-metadata) em="${2:-}"; shift 2;; --out) out="${2:-}"; shift 2;; *) usage;; esac; done
+    [ -n "$host" ] && [ -n "$fs" ] && [ -n "$es" ] && [ -n "$fm" ] && [ -n "$em" ] && [ -n "$out" ] || usage; validate >/dev/null; freeze_eval "$host" "$fs" "$es" "$fm" "$em" "$out" ;;
+  decide)
+    host=""; freeze=""; fs=""; es=""; fm=""; em=""; out=""
+    while [ $# -gt 0 ]; do case "$1" in --host) host="${2:-}"; shift 2;; --freeze) freeze="${2:-}"; shift 2;; --frontier-score) fs="${2:-}"; shift 2;; --economy-score) es="${2:-}"; shift 2;; --frontier-metadata) fm="${2:-}"; shift 2;; --economy-metadata) em="${2:-}"; shift 2;; --out) out="${2:-}"; shift 2;; *) usage;; esac; done
+    [ -n "$host" ] && [ -n "$freeze" ] && [ -n "$fs" ] && [ -n "$es" ] && [ -n "$fm" ] && [ -n "$em" ] && [ -n "$out" ] || usage; validate >/dev/null; decide_eval "$host" "$freeze" "$fs" "$es" "$fm" "$em" "$out" ;;
+  *) usage ;;
+esac

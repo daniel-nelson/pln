@@ -51,7 +51,7 @@ done
 
 echo ""
 echo "Done. Skills available:"
-echo "  /pln        — two-phase planning: interview all items, then implement one at a time"
+echo "  /pln        — two-phase planning, then dependency-aware implementation"
 echo "  /pln-pr     — review the current branch and open a pull request, the pln way"
 echo "  /pln-update — update pln to the latest version"
 echo ""

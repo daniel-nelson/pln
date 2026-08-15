@@ -176,7 +176,22 @@ eq "$(route_field EFFORT "$route")" "low" "bounded evidence did not use low effo
 "$BIN" set evidence_profile economy
 route="$(PLN_STATE_DIR="$PLN_STATE_DIR" "$ROUTER" resolve --host codex --profile evidence \
   --current-model gpt-5.6-sol --current-effort high --economy-available true)"
-eq "$(route_field MODEL_ARGUMENT "$route")" "gpt-5.6-luna" "opted-in Codex evidence did not use its economy profile"
+eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "an unqualified economy route did not fall back to inherit"
+case "$(route_field FALLBACK "$route")" in
+  economy-not-qualified:*) ;;
+  *) fail "an unqualified economy fallback lost its reason" ;;
+esac
+
+QUALIFICATION="$WORK/economy-qualification.tsv"
+cat > "$QUALIFICATION" <<'EOF'
+host	model	status	fixture_sha256	skill_version	reason
+claude	sonnet	enabled	fixture	1.32.0	test-qualified
+codex	gpt-5.6-luna	enabled	fixture	1.32.0	test-qualified
+EOF
+route="$(PLN_STATE_DIR="$PLN_STATE_DIR" PLN_ECONOMY_QUALIFICATION_FILE="$QUALIFICATION" \
+  "$ROUTER" resolve --host codex --profile evidence \
+  --current-model gpt-5.6-sol --current-effort high --economy-available true)"
+eq "$(route_field MODEL_ARGUMENT "$route")" "gpt-5.6-luna" "qualified opted-in Codex evidence did not use its economy profile"
 eq "$(route_field ACTUAL_PROFILE "$route")" "evidence" "economy evidence lost semantic attribution"
 
 route="$(PLN_STATE_DIR="$PLN_STATE_DIR" "$ROUTER" resolve --host codex --profile evidence \

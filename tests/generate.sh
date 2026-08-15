@@ -359,6 +359,8 @@ has "$real_c/phases/pln-pr/fix.md" 'coordinator stages explicit paths and commit
   "the claude fix fan-out has no executable commit ownership"
 has "$real_x/phases/pln-pr/review.md" 'Start independent slots concurrently' \
   "the codex build does not use native concurrency for independent review slots"
+has "$real_x/phases/pln-pr/review.md" 'before entering the shared `wait_agent` mailbox loop' \
+  "the codex review invocation still serializes native independent slots"
 has "$real_x/phases/pln-pr/review.md" 'nested CLI processes share the login boundary' \
   "the codex build lost fallback-only serialization"
 

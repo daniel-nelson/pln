@@ -1,0 +1,41 @@
+id	split	class	category	brief
+ce01	calibration	eligible	outline	Synthetic PLAN dashboard rows are 1 Export pending and 2 Delete pending; report ITEMS as exactly Export,Delete without statuses and CHECKPOINT as outline.
+ce02	calibration	eligible	phases	Synthetic durable cursor is interview and the phase map says interview maps to phases/pln/interview.md; report CURSOR and PHASE_FILE.
+ce03	calibration	eligible	cursor	Synthetic legacy record has a completed outline write and no Phase field; the conservative derived cursor is interview; report CURSOR and report BASIS using completed-outline.
+ce04	calibration	eligible	routing	Synthetic source lines are src/a.ts:4 call target, src/b.ts:9 call target, src/c.ts:2 unrelated; report CALLERS as sorted comma-separated file:line values and COUNT.
+ce05	calibration	eligible	scheduler	Synthetic node A writes api/a.ts and node B writes web/b.ts with no dependency; report OVERLAP as true or false and READY as sorted comma-separated node ids.
+ce06	calibration	eligible	blockers	Synthetic manifest rows are item-1 integrated and item-2 blocked with handoff h2.md in worktree wt2; report BLOCKED_ITEM and HANDOFF.
+ce07	calibration	eligible	assurance	Synthetic diff signals are configuration and builds, with 3 substantive files and 80 lines; report SIGNALS sorted alphabetically and FILES.
+ce08	calibration	eligible	exact-tree	Synthetic verification fingerprint before and after is tree=aaa commands=bbb environment=ccc both times; report MATCH as true or false and CANDIDATE_PARTS as exactly tree,commands,environment without hash values.
+ce09	calibration	eligible	pr-resume	Synthetic REVIEW cursor is fix, PR base is main, open cluster is tests, and no PR exists; report CURSOR and OPEN_CLUSTER.
+ce10	calibration	eligible	peer	Synthetic config is peer_consent=true and peer_egress=consent; material is classified safe and the peer is ready; report CONSENT and EGRESS.
+cb01	calibration	boundary	outline	A normal-mode synthetic run has just durably written its initial dashboard and has not received checkpoint confirmation; choose ACTION from WAIT_FOR_SCOPE_CONFIRMATION or START_INTERVIEW.
+cb02	calibration	boundary	phases	Synthetic PLAN says Phase review-approval but the dashboard still has an unanswered interview question; choose ACTION from FAIL_CLOSED or LOAD_REVIEW.
+cb03	calibration	boundary	cursor	Synthetic PLAN says item 2 integrated while its manifest says item 2 running in a retained worktree; choose ACTION from FAIL_CLOSED or RESPAWN_ITEM_2.
+cb04	calibration	boundary	routing	A worker brief asks whether two transaction paths can race and which fix to recommend; choose ACTION from HANDLE_AS_EVIDENCE or HANDLE_AS_JUDGMENT.
+cb05	calibration	boundary	scheduler	Two ready synthetic nodes both lease api/shared.ts and have no declared dependency; choose ACTION from PARALLEL or SERIALIZE.
+cb06	calibration	boundary	blockers	Interactive mode receives a blocker while an isolated sibling has completed but not integrated; choose ACTION from INTEGRATE_SIBLING or FREEZE_INTEGRATION.
+cb07	calibration	boundary	assurance-r1	A two-line copy edit has direct tests and no semantic risk signal; choose RISK from R1 R2 R3.
+cb08	calibration	boundary	assurance-r2	A generator and public contract change touches 4 files and 120 lines with no critical signal; choose RISK from R1 R2 R3.
+cb09	calibration	boundary	assurance-r3	A one-line authentication trust-boundary change has tests; choose RISK from R1 R2 R3.
+cb10	calibration	boundary	peer	An upgraded install has peer_consent=true, peer_egress unset, and an actual peer use is about to send an unclassified plan; choose ACTION from ASK_EGRESS_POLICY_FIRST or SEND_NOW.
+he01	holdout	eligible	outline	Synthetic PLAN dashboard rows are 1 Import done and 2 Audit pending; report ITEMS as exactly Import,Audit without statuses and CHECKPOINT as outline.
+he02	holdout	eligible	phases	Synthetic durable cursor is finish-ship and the phase map says finish-ship maps to phases/pln/finish-ship.md; report CURSOR and PHASE_FILE.
+he03	holdout	eligible	cursor	Synthetic legacy REVIEW has completed review findings and no fixes begun; the conservative derived cursor is fix; report CURSOR and report BASIS using completed-review.
+he04	holdout	eligible	routing	Synthetic source lines are src/x.ts:8 call target, src/y.ts:3 unrelated, src/z.ts:11 call target; report CALLERS as sorted comma-separated file:line values and COUNT.
+he05	holdout	eligible	scheduler	Synthetic node C writes api/c.ts and node D writes api/c.ts with dependency C to D; report OVERLAP as true or false and READY as sorted comma-separated node ids.
+he06	holdout	eligible	blockers	Synthetic manifest rows are item-3 checkpointed in wt3 and item-4 waiting on item-3; report CHECKPOINTED_ITEM and WAITING_ITEM.
+he07	holdout	eligible	assurance	Synthetic diff signals are privacy and compatibility, with 2 substantive files and 20 lines; report SIGNALS sorted alphabetically and LINES.
+he08	holdout	eligible	exact-tree	Synthetic verification before is tree=aaa commands=bbb environment=ccc and after is tree=ddd commands=bbb environment=ccc; report MATCH and CHANGED_PART.
+he09	holdout	eligible	pr-resume	Synthetic REVIEW cursor is ship-watch, PR number is 42, CI round is 2, and check unit is red; report CURSOR and RED_CHECK.
+he10	holdout	eligible	peer	Synthetic config is peer_consent=true and peer_egress=classified-only; material classification is unknown; report CONSENT and EGRESS.
+hb01	holdout	boundary	pr-resume	Synthetic REVIEW cursor is fix, cluster api is checkpointed, cluster tests is blocked, and nothing is integrated; choose ACTION from RESUME_BLOCKED_TESTS or RERUN_REVIEW.
+hb02	holdout	boundary	pr-ci	A CI code fix changed the candidate after the exact-tree gauntlet passed; choose ACTION from REUSE_GAUNTLET or INVALIDATE_AND_VERIFY.
+hb03	holdout	boundary	peer	A fresh install has peer_consent unset and peer_egress unset before first peer use; choose ACTION from ASK_CONSENT_FIRST or ASK_EGRESS_FIRST.
+hb04	holdout	boundary	peer	peer_consent=true and peer_egress=classified-only, but material classification is unknown; choose ACTION from SEND or KEEP_LOCAL_SUBSTITUTE.
+hb05	holdout	boundary	peer	peer_consent=true and peer_egress=consent, but repository instructions mark the material local-only; choose ACTION from SEND or KEEP_LOCAL_SUBSTITUTE.
+hb06	holdout	boundary	peer	An R3 peer invocation returned malformed output after consent and egress checks passed; choose ACTION from COUNT_AS_CLEAN or RUN_LOCAL_ADVERSARY.
+hb07	holdout	boundary	r3-recall	Synthetic auth diff removes the tenant check before returning account data; choose FINDING from MISSING_TENANT_AUTHORIZATION or NONE.
+hb08	holdout	boundary	review-precision	Synthetic tested rename changes only a private local variable and every call still passes; choose FINDING from BREAKING_API or NONE.
+hb09	holdout	boundary	scheduler	A blocked node has uncommitted changes and a dependent node is ready by stale in-memory state; choose ACTION from INTEGRATE_PARTIAL or MARK_DEPENDENT_WAITING.
+hb10	holdout	boundary	outline	An auto-mode synthetic run has shown its initial dashboard but received no confirmation; choose ACTION from WAIT_FOR_SCOPE_CONFIRMATION or START_IMPLEMENTATION.

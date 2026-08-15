@@ -51,8 +51,22 @@ PROFILE_FILE="$ROOT_DIR/src/hosts/$HOST/model-profiles"
 [ -f "$PROFILE_FILE" ] || { echo "pln-model-route: missing host profiles at $PROFILE_FILE" >&2; exit 3; }
 # shellcheck disable=SC1090
 . "$PROFILE_FILE"
+QUALIFICATION_FILE="${PLN_ECONOMY_QUALIFICATION_FILE:-$ROOT_DIR/evals/economy-qualification.tsv}"
 
-probe_available() {
+qualification_field() {
+  local field="$1"
+  [ -f "$QUALIFICATION_FILE" ] || return 0
+  awk -F '\t' -v host="$HOST" -v model="$ECONOMY_MODEL" -v field="$field" '
+    NR == 1 { for (i=1; i<=NF; i++) column[$i]=i; next }
+    $1 == host && $2 == model { if (column[field]) print $column[field]; exit }
+  ' "$QUALIFICATION_FILE"
+}
+
+economy_qualified() {
+  [ "$(qualification_field status)" = enabled ]
+}
+
+probe_controls_available() {
   local help
   case "$HOST" in
     claude)
@@ -69,7 +83,7 @@ probe_available() {
 }
 
 if [ "$ACTION" = "probe" ]; then
-  if probe_available; then
+  if probe_controls_available && economy_qualified; then
     echo 'STATUS=available'
     echo "HOST=$HOST"
     echo "MODEL=$ECONOMY_MODEL"
@@ -144,14 +158,19 @@ case "$PROFILE" in
     EFFORT="$EVIDENCE_EFFORT"
     if [ "$EVIDENCE_PROFILE" = "economy" ]; then
       if [ "$ECONOMY_AVAILABLE" = "auto" ]; then
-        probe_available && ECONOMY_AVAILABLE="true" || ECONOMY_AVAILABLE="false"
+        probe_controls_available && ECONOMY_AVAILABLE="true" || ECONOMY_AVAILABLE="false"
       fi
-      if [ "$ECONOMY_AVAILABLE" = "true" ]; then
+      if [ "$ECONOMY_AVAILABLE" = "true" ] && economy_qualified; then
         MODEL="$ECONOMY_MODEL"
         MODEL_ARGUMENT="$ECONOMY_MODEL"
       else
         MODEL="${CURRENT_MODEL:-inherited-unreported}"
-        FALLBACK="economy-unavailable"
+        if [ "$ECONOMY_AVAILABLE" != "true" ]; then
+          FALLBACK="economy-unavailable"
+        else
+          qualification_reason="$(qualification_field reason)"
+          FALLBACK="economy-not-qualified:${qualification_reason:-missing-qualification}"
+        fi
       fi
     fi
     ;;

@@ -65,16 +65,18 @@ has "$interview" 'Do not read prior plans or architecture-decision records in th
 
 "$REPO_DIR/bin/pln-generate" --host claude --out-dir "$WORK/claude" >/dev/null
 "$REPO_DIR/bin/pln-generate" --host codex --out-dir "$WORK/codex" >/dev/null
-for file in "$WORK/claude/SKILL.md" "$WORK/codex/SKILL.md"; do
-  has "$file" 'src/workers/preflight-research.md' "$file does not reference pre-flight contract"
-  has "$file" 'src/workers/interview-research.md' "$file does not reference interview contract"
-  has "$file" 'src/workers/plan-review.md' "$file does not reference review contract"
-  has "$file" 'src/workers/plan-review-merge.md' "$file does not reference review merge contract"
-  has "$file" 'src/workers/item-implementation.md' "$file does not reference implementation contract"
-  has "$file" 'src/workers/final-verification.md' "$file does not reference verification contract"
-  hasnt "$file" 'WORKER_ONLY_SENTINEL_' "$file contains worker-only contract prose"
-  hasnt "$file" 'Do not inventory strengths or praise the plan' "$file embeds reviewer-only detail"
-  hasnt "$file" 'Run the new test before the fix' "$file embeds implementation-worker detail"
+for host in claude codex; do
+  has "$WORK/$host/phases/pln/outline.md" 'src/workers/preflight-research.md' "$host outline phase does not reference pre-flight contract"
+  has "$WORK/$host/phases/pln/interview.md" 'src/workers/interview-research.md' "$host interview phase does not reference interview contract"
+  has "$WORK/$host/phases/pln/review-approval.md" 'src/workers/plan-review.md' "$host review phase does not reference review contract"
+  has "$WORK/$host/phases/pln/review-approval.md" 'src/workers/plan-review-merge.md' "$host review phase does not reference review merge contract"
+  has "$WORK/$host/phases/pln/implementation.md" 'src/workers/item-implementation.md' "$host implementation phase does not reference implementation contract"
+  has "$WORK/$host/phases/pln/finish-ship.md" 'src/workers/final-verification.md' "$host finish phase does not reference verification contract"
+  for file in "$WORK/$host/SKILL.md" "$WORK/$host/phases/pln/"*.md; do
+    hasnt "$file" 'WORKER_ONLY_SENTINEL_' "$file contains worker-only contract prose"
+    hasnt "$file" 'Do not inventory strengths or praise the plan' "$file embeds reviewer-only detail"
+    hasnt "$file" 'Run the new test before the fix' "$file embeds implementation-worker detail"
+  done
 done
 
 brief_dir="$WORK/brief"

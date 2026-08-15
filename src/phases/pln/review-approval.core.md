@@ -1,0 +1,137 @@
+---
+name: pln-phase-review-approval
+---
+
+# /pln phase: plan review and approval
+
+Read this file in full before the first review or approval action. `Phase: review-approval` permits only plan review, plan repair, the approval conversation, and durable adoption writes; no feature implementation may begin here.
+
+A review round remains in this phase until its merge result and all plan repairs/findings are durable. Persist any reopened question before sending it. After explicit adoption, write the Ship choice and PR base, reconcile all open questions/findings, then set `Phase: implementation` and read the implementation phase in full before dispatch. Delegated mode's advance adoption uses the same durable writes before advancing.
+
+## Consulting a peer model
+
+Some of this skill's work is worth putting to a **peer**: a model other than the one running this session, asked to check what that model produced. A fresh agent on this host is a fresh context; a peer is a fresh context *and* a different set of blind spots. Below, `$PLN_BIN` stands for `{{SKILL_DIR}}/bin` — substitute the real path when you run it.
+
+<!-- pln:include peer-consult -->
+
+## The plan review switch
+
+Before the approval gate, the finished plan itself goes under review (Step 3.5): a reader that never saw the interview argues with the plan and checks its claims against the files it names. It is on by default, and exactly two things turn it off — a standing preference in config, and an instruction in the session. Nothing else does. **The size of the plan never does:** a two-item plan and a twelve-item plan get the same review. There is no small-plan shortcut, because the reviewer's cost is reading the plan and checking its claims, which already scales with the plan, and because the short plan is regularly the dangerous one — two items that change how every future run behaves are worth more scrutiny than nine items of one-line edits.
+
+**The standing preference** is `plan_review` in `~/.pln/config.yaml`, read once where the review would start:
+
+```bash
+{{SKILL_DIR}}/bin/pln-config get plan_review
+```
+
+`false` or `no` means off, for every plan in every repository. Anything else — including absent, which is what an install that has never been told otherwise reads — means on. Off is a clean no-op rather than a degraded run: no brief is assembled, no peer is selected, no consent question is raised, and Step 4 is exactly the gate it would have been without the step. Don't announce the skip; a line explaining what didn't happen is noise on every plan of a user who already opted out. `{{SKILL_DIR}}/bin/pln-config set plan_review false` turns it off, `true` back on.
+
+**A spoken instruction wins over the key, for that run only**, in both directions — "skip the review" where the key is on, "review this one" where it is off — and never writes to config. Config is the standing preference; a sentence is about this plan. Honor it whenever it arrives before the gate, including mid-interview, and don't literal-match: infer the intent from natural phrasing, the way the defer / drop / think-offline signals are inferred.
+
+The review has three parts that can be switched off separately, and an instruction naming one leaves the others running:
+
+- **The whole step** — "skip the review", "no review this time", "straight to the gate". Step 3.5 doesn't run.
+- **The peer** — "skip the cross-model pass", "don't send it anywhere", "keep it local". The review still runs, on a fresh same-model agent, exactly as if no peer had been available. Treat it as a `peer_consent` of `false` for that run: nothing is sent, no consent question is raised, and the result says which rung ran as always.
+- **Applying anything** — "just tell me, don't change the plan", "flag everything". The review runs and every finding reaches the gate flagged; nothing is written into `PLAN.md`.
+
+An instruction broader than any one of those (a bare "skip it") is the whole step. When it is genuinely ambiguous which part is meant, ask one short question instead of guessing — guessing wrong either sends a plan the user meant to keep on the machine, or throws away a review they wanted.
+
+## Plan review ownership
+
+The coordinator owns whether review runs, the order of the readers and merge, peer consent, the approval gate, and any user-driven re-review. It never reads raw findings. Detailed adversarial checks live in `{{SKILL_DIR}}/src/workers/plan-review.md`; reject / repair / flag and deduplication rules live in `{{SKILL_DIR}}/src/workers/plan-review-merge.md`.
+
+The reviewer sees the plan but never the interview transcript or rejected options. Both readers receive the same assembled brief. The merge worker alone reads their raw findings, verifies citations, updates `PLAN.md`, and returns a bounded envelope. A finding on a user-made decision is always protected from repair. Flagging is reserved for material user-owned forks; repairs restore an already-recorded outcome, and rejections change nothing about the acceptance criteria. Findings that reopen one decision become one gate entry.
+
+Empty or failed readers contribute nothing and are named accurately at the gate. The merge worker confirms every write, records who actually ran, and leaves flagged findings in `PLAN.md` for Step 4. The coordinator reads only its validated 4096-byte envelope; if that envelope is missing, malformed, out of root, or oversized, retry with a fresh merge worker rather than reading raw findings inline.
+### Step 3.5. Plan review
+
+Every item's detail section is now written, and nobody has read the plan who wasn't in the conversation that produced it. That reading happens here, before the user is asked to adopt anything, so what reaches the gate is a plan that has already been argued with. When the switch is off, skip the whole step and say nothing about it — see The plan review switch.
+
+1. Use the plan directory's existing `evidence/` and `results/` folders for review outputs. Say one line naming who is about to read the plan; `"$PLN_BIN/pln-peer" --which` selects the peer without writing or sending a brief. `STATUS=ready` names one; only rung 3's `none` means no peer is available.
+2. Assemble one byte-identical brief for both readers without opening the contract or plan in this context:
+
+   ```bash
+   "$PLN_BIN/pln-build-review-brief" \
+     --contract "{{SKILL_DIR}}/src/workers/plan-review.md" \
+     --plan "<plan-dir>/PLAN.md" --root "<repository-root>" \
+     --commit "$(git rev-parse HEAD)" --out "<plan-dir>/evidence/plan-review.brief.md"
+   ```
+
+3. Run the peer per Consulting a peer model, including its one-time consent gate. A peer remains prompt-in/text-out; the helper captures its answer as raw findings:
+
+   ```bash
+   "$PLN_BIN/pln-peer" \
+     --brief "<plan-dir>/evidence/plan-review.brief.md" \
+     --out   "<plan-dir>/evidence/plan-review.peer.out"
+   ```
+
+4. Spawn a fresh same-model reviewer on the same assembled brief whether or not the peer ran, and concurrently where the host supports it. Its assignment names `evidence/plan-review.agent.out`; its final response is only that result pointer. A missing, empty, errored, or timed-out reader contributes nothing, never a clean result. One successful reader is the review; both failing is no review. Record which actually ran.
+5. Spawn one fresh merge worker with `{{SKILL_DIR}}/src/workers/plan-review-merge.md`, the plan path, both raw result paths, the actual-reader list, whether applying is enabled, the item scope, `evidence/plan-review-merge.md`, `results/plan-review-merge.txt`, and a 4096-byte budget. On a bounded round, say that these findings replace the in-scope items' earlier findings. The merge worker alone reads findings and edits `PLAN.md`.
+6. Read the merge envelope only through `bin/pln-read-envelope --root <plan-dir> --max-bytes 4096 <plan-dir>/results/plan-review-merge.txt`. Validate its scope and counts, then go to Step 4. Never open raw findings in this context.
+
+**Spawning the same-model reviewer on this host, and running it alongside the peer:**
+
+<!-- pln:include plan-review-invoke -->
+
+The review runs once, on the finished plan. Re-showing it at the gate is not by itself a reason to read it again: a second pass over a document the user is in the middle of editing spends minutes producing findings about sentences that are still moving. What does earn another pass is a rewrite the user asked for at the gate, on the terms set out under Re-review after a rewrite in Step 4. A repair you made yourself in response to a finding never does.
+
+**What the plan is checked against** is the tree as it stands before any item runs, and this step finishes before Step 5 starts. A review that overlaps implementation reads a repository the plan no longer describes: an item's own repair comes back as the pre-existing state, the plan is reported as wrong about the world, and the items still unbuilt yield nothing, so the half of the review that is still valid is the half that found nothing. Reviewing what implementation produced is a diff review and belongs to `/pln-pr`.
+
+### Step 4. Master-plan approval gate
+
+**Resolve mandated questions first.** Before anything else in this step, check the dashboard's Pre-flight findings for a mandated rule (Step 1: a required decision named by the project's own `CLAUDE.md`/`AGENTS.md`) that the interview never actually resolved — not every mandated rule needs a decision, but one that does isn't allowed to ride into the gate unanswered. If one is still open, ask and resolve it now, in its own message, one question at a time exactly as in Step 3. Record the answer in the dashboard before moving on. Only once every mandated question is resolved does the gate itself get shown, and it gets shown in a message of its own — never folded into the same message as a mandated question, and never bundled with the three-way adopt choice below.
+
+Show the user the master plan in one message, with enough in it to adopt on without opening the file:
+
+- Print the dashboard (status list) — the same bullet list of items the Step 2 skeleton showed, updated. This is the user's overview and their editing surface, and it is cheap: in a measured 9,195-character gate it was under a tenth of the message. It stays.
+- **Do not print a digest of the items.** Every item's intent was settled with the user, question by question, in the interview they just finished; restating it back is the largest avoidable block in the message and it is the half they already know. The detail lives in `PLAN.md` for the implementer and the reviewer.
+- Print **one numbered list of what was settled without the user**: the decide-and-disclose calls that clear The fork test, and — when Step 3.5 ran — the findings the review flagged rather than rejected or repaired.
+
+  **What earns a number is filtered before the list is built, not after.** Anything that fails The fork test is not listed — it is the work, and it lives in its item's section. That is the cut, and it is most of what used to fill this list. Findings that all reopen the same decision are one entry, so the number of entries is the number of questions, not the number of defects.
+
+  **A call already said in the flow still gets a number**, in its own group at the top marked as already-said, one line each. It is tempting to collapse those into a clause with a count, since the user saw them once and one word would have stopped them — but that rests on the disclosure line having registered, and it lands mid-interview inside a message about something else. A line read past is not a decision ratified. Keep the number, so the gate stays the one surface where everything decided without the user is visible and answerable by number. One number space across both kinds (so the user can reply "3, 7, 8" without saying which kind each is), each entry named by its item's title as well as its number per Naming things the user reads. Each entry is one line that opens with its kind:
+  - ***decision*** — what was decided, with its cited rationale.
+  - ***flagged*** — the finding in one sentence, what the reviewer would change, and which kind it is: a false factual claim, a contradiction inside the plan, or a judgment call.
+
+  When both readers ran, each ***flagged*** entry names the reader that raised it; a defect both raised is one numbered entry naming both.
+
+  **Repairs are never listed, and neither are rejections.** A finding the reviewer raised and you repaired is you fixing your own drafting inside a document the user does not read — it was never theirs to write and is not theirs to ratify. It is recorded in its item's section, and a rejection in the dashboard's Plan review section; both are for the implementer, the reviewer, and the next revision of this filter. In the gate this rule was drawn from, sixteen of thirty-six numbered entries were repairs: 44% of the list, none of it actionable.
+
+  A finding that lands on the plan as a whole rather than on any one item — a missing item, an ordering that won't work — is numbered in the same sequence, in a final group of its own after the per-item ones. It is in the dashboard's Open questions, not in an item's section, but it is one of the things the user can act on, so it gets a number like everything else.
+- When Step 3.5 ran, say in one clause who read the plan: the peer CLI by name and a fresh agent of the same model when both ran, or whichever one did — and when no peer read it, why (no second CLI on this machine, peer consult switched off, you were asked to keep this plan local for this run, or the peer ran and failed). The user weighs a flagged finding differently depending on whose eyes were on the plan. A review that found nothing gets the same one clause and no more; saying nothing reads as if the step never ran.
+- Self-triage the list. Lead with the entries you're least sure about and name them for the user's eye ("worth a look: 3, 7"). One triage line covers the whole list rather than one per kind — the single number space exists so there is one thing to scan and one way to reply. **What earns a place is that your answer and theirs would produce different builds**, which is a harder bar than the fork test itself and is meant to be: an entry closest to the ask/decide line, one whose authority is weakest, one where you can genuinely picture them saying "no, the other one". Two or three is the usual size of that; a triage line naming half the list has triaged nothing. The rest stand as a scannable list the user can skim or ignore. The risk to avoid is a miscalibrated "all safe here" that buries an entry the user would have changed; when genuinely unsure, flag rather than bury. Then offer to walk the flagged entries one at a time (see Walking the flagged entries below), so the user answers them where they are told about them instead of scrolling back up a forty-entry list to reply by number. The offer rides here, with the triage line — never after the prompt below, which stays the message's last line.
+- End with a three-way prompt, one option per line:
+
+  ```
+  Adopt this master plan?
+  a) implement it and open a PR when done
+  b) implement only
+  c) reopen anything by number / change something?
+  ```
+
+**When no review ran** — `plan_review` is off, the user skipped it, or the plan was written before the step existed — none of the review's part of this appears: no rung clause, no empty findings list, and no note explaining what didn't happen. The numbered list is the disclosed decisions and nothing else, exactly the gate it was before the step existed.
+
+This is the only place implementation-blocking approval lives. Possible responses:
+
+- *Adopt* — either of the two shapes below. Either way, every numbered entry not reopened stands as accepted: decisions hold and flagged findings were seen and left alone. Proceed to Step 5.
+  - **a) Implement and open a PR when done.** Record `Ship: PR after implementation` in the dashboard's Ship field, plus `PR base: <branch>` when item 4's stacking override applies. This answers Step 8's ask up front: Step 7's wrap-up hands straight to `/pln-pr` with no further prompt.
+  - **b) Implement only.** Record `Ship: implement only` in the dashboard's Ship field. Step 8 still asks once, at the end of Step 7's wrap-up, exactly as it did before this choice existed.
+- *Reopen by number* (e.g. "3, 7, 8") — any entry, of either kind. A **decision** returns to the one-question-at-a-time interview, exactly like Step 3, but starting from the recorded position and its rationale, not a blank question ("I chose X because Y; here's the tradeoff; what would you change?"). A **flagged** finding becomes an interview question of the same shape: what the reviewer found, what it would change, what the user wants done. Resolve each, update `PLAN.md`, re-show, re-prompt. Unlisted entries remain accepted.
+
+  A repair is not on the list, so it cannot be reopened by number — but the user can still name one they disagree with in prose, and it is then shown with what it replaced and reverted if they say so. The record in the item's detail section is what makes that one edit instead of a reconstruction; re-read the revert to confirm it landed.
+- *Change X* — make the change in `PLAN.md`, re-show the affected section(s), re-prompt the same three-way question. Loop until the user adopts.
+
+A rewrite made through either response is an item's section being written again, so it goes through Step 3's four checks — the first of them most of all. A reopened decision has changed that item's premise, and the parts written under the old one are reconciled rather than left standing beside the new answer.
+
+**Walking the flagged entries.** Accepting the offer walks the triaged entries in Step 3's format: one question per turn, `AskUserQuestion` never used, each entry restated in full when its turn comes — its number and title, what it is, and what each answer changes — because by then the list is several screens up and the point of the walk is that nothing has to be found again. It is the *Reopen by number* path with the hunting removed, and it ends the same way: update `PLAN.md`, re-show, re-prompt. Declining leaves the gate as it is — reply by number, or adopt. The offer is not a fourth answer to the adopt prompt: adopting still adopts the whole plan, triaged entries included.
+
+A walked entry the user changes is a rewrite like any other and starts a bounded round below; one they look at and leave alone is not, and starts nothing. When a round produces its own triage line, that line carries the same offer — the user declines it as easily as they accept it, and suppressing it would hide findings that reached the line by the same triage.
+
+**Re-review after a rewrite.** Both responses above are the user changing the plan, and a change the user made is the only thing that starts another round. An edit made through either counts as a rewrite of an item, for this purpose, when it changes that item's premise, intent, acceptance criteria, or a decision another item depends on. An edit that only tightens wording, fixes a typo, or is otherwise trivially correct does not. Neither does a repair you made yourself in response to a review finding: a repair is finished once it is made and recorded in its item's section, and reading your own response to a reviewer is the loop that has no end. So an item a correction touched and the user did not is not a changed item here.
+
+When one or more items are rewritten, re-run Step 3.5 bounded to just those items before re-showing the gate — not the whole plan again. Give the re-review each rewritten item's section plus the sections of any items whose own text names it as a dependency, so a cross-item contradiction the rewrite introduced is still catchable. The new pass's findings replace the rewritten item's prior findings entirely; findings on every other, untouched item stand as they were. Say in one line which items were re-reviewed before re-prompting, and record the round in the dashboard's Plan review section.
+
+**When the rounds stop.** Coverage decides this, not cost. They stop when every item the user changed has been read since they changed it and that latest reading found no false factual claim and no contradiction inside the plan. A judgment call earns no further round; it goes to the gate flagged like any other finding. There is no round cap and none is needed — only the user's own edits start a round, so the rounds end when the user stops editing. A cap would end them somewhere else instead, leaving whatever the last rewrite introduced unread.
+
+Do not enter Step 5 without an explicit adoption signal. Delegated mode is the one exception, and only because the signal was already given: the instruction that entered it adopts the plan in advance for the whole run, and what that mode prints before Step 5 is its short list of reversals, one-way doors, flagged findings and unanswerable questions — not a gate.
+

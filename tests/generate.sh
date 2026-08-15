@@ -85,6 +85,7 @@ cat > "$R/src/nested/OTHER.core.md" <<'CORE'
 name: fixture-nested
 ---
 Nested target for {{TOOL}}.
+Generated output root: {{OUTPUT_ROOT}}.
 CORE
 
 # ─── --list names every target, relative and sorted ───────────────────────────
@@ -126,6 +127,9 @@ hasnt "$f" 'Workflow' "claude mechanics leaked into the codex build"
 # ─── nested targets land at the same relative path ────────────────────────────
 [ -f "$out_x/nested/OTHER.md" ] || fail "a nested target was not written under out-dir"
 has "$out_x/nested/OTHER.md" 'Nested target for codex exec.' "nested target not rendered"
+out_x_abs="$(cd "$out_x" && pwd -P)"
+has "$out_x/nested/OTHER.md" "Generated output root: $out_x_abs." \
+  "nested target did not receive the absolute generated output root"
 
 # ─── the banner is stamped, and after the frontmatter ─────────────────────────
 for f in "$out_c/SKILL.md" "$out_x/SKILL.md"; do
@@ -318,9 +322,9 @@ done <<< "$targets"
 # checks above would pass on an empty file.
 has "$real_c/SKILL.md" 'Workflow' "the claude build has no Workflow mechanics"
 has "$real_x/SKILL.md" 'pln-codex-agent' "the codex build has no Codex agent mechanics"
-has "$real_c/SKILL.md" 'commit owner: worker' \
+has "$real_c/phases/pln/implementation.md" 'commit owner: worker' \
   "the claude build lost worker-owned item commits"
-has "$real_x/SKILL.md" 'commit owner: coordinator' \
+has "$real_x/phases/pln/implementation.md" 'commit owner: coordinator' \
   "the codex build lost coordinator-owned item commits"
 
 # Native orchestration contracts are deliberately tested by current surface,
@@ -329,13 +333,13 @@ has "$real_x/SKILL.md" 'commit owner: coordinator' \
 # SendMessage; Workflow stays for true fan-out. Codex continuation starts a new
 # turn on the same idle agent with followup_task. Nested CLI helpers remain only
 # as the old/disabled-host fallback and the cross-provider peer boundary.
-has "$real_c/SKILL.md" 'directly addressable background Agent' \
+has "$real_c/phases/pln/implementation.md" 'directly addressable Agents rather than Workflow' \
   "the claude build does not use addressable background Agents for item work"
-has "$real_c/SKILL.md" 'SendMessage' \
+has "$real_c/phases/pln/implementation.md" 'SendMessage' \
   "the claude build lost native blocker continuation"
-has "$real_c/SKILL.md" 'pipeline(' \
+has "$real_c/phases/pln-pr/review.md" 'pipeline(' \
   "the claude build lost current Workflow fan-out mechanics"
-has "$real_x/SKILL.md" 'followup_task' \
+has "$real_x/phases/pln/implementation.md" 'followup_task' \
   "the codex build lost current native blocker continuation"
 has "$real_x/SKILL.md" 'send_message' \
   "the codex build lost current running-agent steering"
@@ -351,9 +355,9 @@ for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
   hasnt "$f" 'multi_agent_v2' "$f still pins a superseded Codex feature generation"
   hasnt "$f" 'Pin to V1' "$f still pins Codex multi-agent V1"
 done
-has "$real_c/pln-pr/SKILL.md" 'commit them one cluster at a time by explicit path' \
+has "$real_c/phases/pln-pr/fix.md" 'commit them one cluster at a time by explicit path' \
   "the claude fix fan-out has no executable commit ownership"
-has "$real_x/pln-pr/SKILL.md" 'OAuth token race applies only to fallback CLI processes' \
+has "$real_x/phases/pln-pr/review.md" 'OAuth token race applies only to fallback CLI processes' \
   "the codex build still constrains native concurrency by a nested-CLI OAuth race"
 
 # This is a regression ceiling on the always-resident coordinator prompt, not a
@@ -363,25 +367,82 @@ has "$real_x/pln-pr/SKILL.md" 'OAuth token race applies only to fallback CLI pro
 for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
   bytes="$(LC_ALL=C wc -c < "$f")"
   bytes="${bytes//[[:space:]]/}"
-  [ "$bytes" -le 138000 ] \
-    || fail "$f is $bytes bytes; coordinator ceiling is 138000"
+  [ "$bytes" -le 60000 ] \
+    || fail "$f is $bytes bytes; phase router ceiling is 60000"
 done
+
+# The public skills are routers. Every detailed phase is generated one level
+# below phases/, carries only its host's mechanics, and is addressed by the
+# absolute output root baked into the router at generation time.
+pln_phases='outline interview review-approval implementation blocker finish-ship'
+pr_phases='scope-baseline review fix blocker ship-watch'
+for host_out in "$real_c" "$real_x"; do
+  host_out="$(cd "$host_out" && pwd -P)"
+  router="$host_out/SKILL.md"
+  pr_router="$host_out/pln-pr/SKILL.md"
+  for phase in $pln_phases; do
+    phase_file="$host_out/phases/pln/$phase.md"
+    [ -s "$phase_file" ] || fail "missing /pln phase $phase"
+    has "$router" "$phase_file" "the /pln router does not use the absolute $phase path"
+  done
+  for phase in $pr_phases; do
+    phase_file="$host_out/phases/pln-pr/$phase.md"
+    [ -s "$phase_file" ] || fail "missing /pln-pr phase $phase"
+    has "$pr_router" "$phase_file" "the /pln-pr router does not use the absolute $phase path"
+  done
+done
+
+# Always-active invariants stay in the routers; phase details do not leak back
+# into them. First actions, cursor transitions, recovery, and conflict handling
+# are explicit state-machine contracts rather than remembered sequencing.
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+  has "$f" 'Initial outline checkpoint is mandatory' "$f lost the outline invariant"
+  has "$f" 'Master-plan adoption is mandatory' "$f lost the adoption invariant"
+  has "$f" 'No inline feature work before adoption' "$f lost the no-inline invariant"
+  has "$f" "before the phase's first action" "$f does not require first-action phase loading"
+  has "$f" 'write durable state first, then advance `Phase`, then read the new phase file' \
+    "$f lost write-then-advance semantics"
+  has "$f" 'fail closed' "$f lost conflict-safe restart behavior"
+  hasnt "$f" '### Step 3. Interview phase' "$f still embeds the interview phase"
+  hasnt "$f" '### Step 5. Implementation phase' "$f still embeds the implementation phase"
+done
+for f in "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" "before the phase's first action" "$f does not require first-action phase loading"
+  has "$f" 'write durable state first, then advance `Phase`, then read the new phase file' \
+    "$f lost write-then-advance semantics"
+  has "$f" 'fail closed' "$f lost conflict-safe restart behavior"
+  hasnt "$f" '### Step 3. Review army' "$f still embeds the review phase"
+  hasnt "$f" '### Step 4. Fix pass' "$f still embeds the fix phase"
+done
+
+# Invariants and native mechanics each have one generated home.
+has "$real_c/phases/pln/implementation.md" 'directly addressable Agents rather than Workflow' \
+  "the Claude implementation phase lost item 2 native mechanics"
+has "$real_x/phases/pln/implementation.md" 'followup_task' \
+  "the Codex implementation phase lost item 2 native mechanics"
+has "$real_c/phases/pln-pr/fix.md" 'commit them one cluster at a time by explicit path' \
+  "the Claude fix phase lost coordinator commit ownership"
+has "$real_x/phases/pln-pr/review.md" 'OAuth token race applies only to fallback CLI processes' \
+  "the Codex fix phase lost native concurrency semantics"
 
 # Repository discovery is shared planning discipline: both coordinators must
 # delegate it, while the detailed worker contracts remain outside the generated
 # coordinator prompt.
-for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+for host_out in "$real_c" "$real_x"; do
+  f="$host_out/SKILL.md"
+  outline_file="$host_out/phases/pln/outline.md"
+  interview_file="$host_out/phases/pln/interview.md"
   has "$f" '## Coordinator context firewall' "$f lost the shared context firewall"
-  has "$f" 'src/workers/preflight-research.md' "$f does not mandate a pre-flight research worker"
-  has "$f" '8192-byte ceiling' "$f lost the pre-flight envelope budget"
-  has "$f" 'src/workers/interview-research.md' "$f does not mandate per-item research"
-  has "$f" 'Before the first proposal for every active item' "$f makes per-item research optional"
-  has "$f" 'decision-record-query mode' "$f lost query-scoped prior-decision checks"
-  has "$f" '.git/info/exclude' "$f does not keep local plans out of .gitignore"
-  has "$f" 'Outside a git worktree' "$f does not allocate an external non-git run directory"
+  has "$outline_file" 'src/workers/preflight-research.md' "$outline_file does not mandate a pre-flight research worker"
+  has "$outline_file" '8192-byte ceiling' "$outline_file lost the pre-flight envelope budget"
+  has "$interview_file" 'src/workers/interview-research.md' "$interview_file does not mandate per-item research"
+  has "$interview_file" 'Before the first proposal for every active item' "$interview_file makes per-item research optional"
+  has "$interview_file" 'decision-record-query mode' "$interview_file lost query-scoped prior-decision checks"
+  has "$outline_file" '.git/info/exclude' "$outline_file does not keep local plans out of .gitignore"
+  has "$outline_file" 'Outside a git worktree' "$outline_file does not allocate an external non-git run directory"
   hasnt "$f" 'WORKER_ONLY_SENTINEL_' "$f embedded worker-only runtime instructions"
-  has "$f" 'Outside a git worktree, use the external temporary run directory' \
-    "$f contradicts pre-flight's non-git plan location"
+  has "$outline_file" 'Outside a git worktree, use the external temporary run directory' \
+    "$outline_file contradicts pre-flight's non-git plan location"
 done
 hasnt "$real_c/SKILL.md" "Codex's native path" \
   "the claude build explains its blocker mechanics through the other host"
@@ -404,29 +465,31 @@ done
 # follow-up recorded by one and only offered by the other would be the same bug
 # the write-by-default rule exists to fix. The global instructions file it reads
 # is the one host-specific part, so each build must name its own path.
-for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+for f in "$real_c/phases/pln/finish-ship.md" "$real_x/phases/pln/finish-ship.md" "$real_c/phases/pln-pr/ship-watch.md" "$real_x/phases/pln-pr/ship-watch.md"; do
   has "$f" 'The to-do-location flow' "$f lost the to-do-location flow"
   has "$f" 'without asking' "$f does not record follow-ups without asking"
 done
 # The end-of-run sweep is the other half of that flow, shared the same way: a
 # close that never looks at the run's own record reports whatever it happens to
 # remember, and the to-do-location flow then has nothing to write.
-for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+for f in "$real_c/phases/pln/finish-ship.md" "$real_x/phases/pln/finish-ship.md" "$real_c/phases/pln-pr/ship-watch.md" "$real_x/phases/pln-pr/ship-watch.md"; do
   has "$f" "Sweep the run's own record" "$f lost the end-of-run sweep"
   has "$f" 'nothing outstanding says so' "$f does not report an empty sweep"
 done
 
-has "$real_c/SKILL.md" '~/.claude/CLAUDE.md' "the claude build reads no global instructions file"
-has "$real_x/SKILL.md" '$CODEX_HOME/AGENTS.md' "the codex build reads no global instructions file"
+has "$real_c/phases/pln/finish-ship.md" '~/.claude/CLAUDE.md' "the claude build reads no global instructions file"
+has "$real_x/phases/pln/finish-ship.md" '$CODEX_HOME/AGENTS.md' "the codex build reads no global instructions file"
 
 # The peer ladder is one shared source both skills read, and the property that
 # matters is that neither carries probe logic of its own: every build of both
 # targets reaches the peer through the same helper, behind the same one-time
 # consent key.
-for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-approval.md" "$real_c/phases/pln-pr/review.md" "$real_x/phases/pln-pr/review.md"; do
   has "$f" '## Consulting a peer model' "$f carries no peer section"
   has "$f" 'pln-peer' "$f does not reach the peer through the picker"
   has "$f" 'peer_consent' "$f names no consent key in front of the peer"
+done
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
   has "$f" '## Model and effort routing' "$f lost semantic model routing"
   has "$f" '`inherit`' "$f lost the ordinary inherited profile"
   has "$f" '`judgment`' "$f lost the frontier capability floor"
@@ -454,11 +517,11 @@ hasnt "$real_x/pln-pr/SKILL.md" 'no second one to consult' \
 # checkbox — where the number is text nested inside a bullet, and some renderers
 # relabel it a) b) c) — would ship silently. The sections are asserted here for
 # the same reason: each is written by one step and read by another.
-has "$real_c/SKILL.md" '1. <one-line summary> — ⬜ pending' \
+has "$real_c/phases/pln/outline.md" '1. <one-line summary> — ⬜ pending' \
   "the claude build's dashboard row is not number-first with a trailing status"
-has "$real_x/SKILL.md" '1. <one-line summary> — ⬜ pending' \
+has "$real_x/phases/pln/outline.md" '1. <one-line summary> — ⬜ pending' \
   "the codex build's dashboard row is not number-first with a trailing status"
-for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+for f in "$real_c/phases/pln/outline.md" "$real_x/phases/pln/outline.md"; do
   hasnt "$f" '- [ ] 1.' "$f still writes the dashboard as checkbox bullets"
   has "$f" '5. <one-line summary> — 🚫 dropped' "$f lost a dashboard state from the skeleton"
   has "$f" 'Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · 🚫 dropped' \
@@ -490,7 +553,7 @@ done
 # ─── the plan review, as skill text ───────────────────────────────────────────
 # Step 3.5 keeps coordinator policy in the generated skill while the detailed
 # reviewer and merge rubrics remain in installed worker contracts.
-for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-approval.md"; do
   has "$f" '### Step 3.5. Plan review' "$f lost the plan review step"
   has "$f" '## The plan review switch' "$f lost the plan review switch"
   has "$f" 'plan_review' "$f names no config key for the switch"
@@ -500,28 +563,23 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
   has "$f" 'src/workers/plan-review-merge.md' "$f lost the merge contract pointer"
   has "$f" 'pln-build-review-brief' "$f no longer assembles one on-disk brief"
   has "$f" 'Never open raw findings in this context' "$f may read raw findings inline"
-  # One test decides what spends the user's attention, and both surfaces run it.
-  # Two separately-worded batteries is what filled the gate with a log of the
-  # agent's own work.
-  has "$f" '### The fork test — what spends the user'"'"'s attention' \
-    "$f lost the fork test"
-  has "$f" 'you can name two answers you would honestly implement' \
-    "$f lost the fork half of the fork test"
-  has "$f" 'The consequence is theirs, and material' \
-    "$f lost the consequence half of the fork test — where proportionality lives"
-  has "$f" 'anything landing on a decision the user made' \
-    "$f lost the override that sends a protected decision to the user regardless"
-  # The record is not a channel. Every silent lane below rests on this being
-  # said out loud, because a user who never opens PLAN.md cannot be told by it.
-  has "$f" 'a channel to the user' \
-    "$f lost the rule that the plan record is not how the user is told"
   has "$f" 'A finding on a user-made decision is always protected from repair' \
     "$f lost coordinator-facing user-decision protection"
   has "$f" 'Flagging is reserved for material user-owned forks' \
     "$f lost coordinator-facing outcome policy"
-  has "$f" 'How a decision is recorded' "$f lost the rule that makes the plan readable alone"
   hasnt "$f" '### Rejected' "$f embeds worker-only rejection detail"
   hasnt "$f" 'Judge by substance, never by phrasing' "$f embeds worker-only merge detail"
+done
+
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+  has "$f" '### The fork test — what spends the user'"'"'s attention' "$f lost the fork test"
+  has "$f" 'you can name two answers you would honestly implement' "$f lost the fork half of the fork test"
+  has "$f" 'The consequence is theirs, and material' "$f lost the consequence half of the fork test"
+  has "$f" 'anything landing on a decision the user made' "$f lost protected decision handling"
+  has "$f" 'a channel to the user' "$f lost the rule that the plan record is not how the user is told"
+done
+for f in "$real_c/phases/pln/interview.md" "$real_x/phases/pln/interview.md"; do
+  has "$f" 'How a decision is recorded' "$f lost the rule that makes the plan readable alone"
 done
 
 # The same-model reviewer is spawned on this host, so that block — and only that
@@ -531,8 +589,8 @@ done
 spawn_of() { # spawn_of <file>
   awk '/^\*\*Spawning the same-model reviewer/,/^The review runs once/' "$1"
 }
-spawn_c="$(spawn_of "$real_c/SKILL.md")"
-spawn_x="$(spawn_of "$real_x/SKILL.md")"
+spawn_c="$(spawn_of "$real_c/phases/pln/review-approval.md")"
+spawn_x="$(spawn_of "$real_x/phases/pln/review-approval.md")"
 [ -n "$spawn_c" ] || fail "the claude build has no same-model spawn block"
 [ -n "$spawn_x" ] || fail "the codex build has no same-model spawn block"
 grep -qF 'general-purpose` `Agent' <<<"$spawn_c" \
@@ -552,7 +610,11 @@ grep -qF 'wait_agent' <<<"$spawn_x" \
 
 # ─── and nothing above touched the working tree ───────────────────────────────
 if [ -d "$REPO_DIR/.git" ]; then
-  dirty="$(git -C "$REPO_DIR" status --porcelain -- $targets)"
+  tracked_targets="$(git -C "$REPO_DIR" ls-files -- $targets)"
+  dirty=""
+  if [ -n "$tracked_targets" ]; then
+    dirty="$(git -C "$REPO_DIR" status --porcelain -- $tracked_targets)"
+  fi
   [ -z "$dirty" ] || fail "the test modified tracked skill files: $dirty"
 fi
 

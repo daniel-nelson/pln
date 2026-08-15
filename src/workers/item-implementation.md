@@ -10,11 +10,11 @@ You are a fresh worker implementing exactly one adopted plan item. The assignmen
    - After the fix, record the exact command and test count, not raw passing output.
    - Account for time- or date-sensitive behavior.
 4. Before claiming verification, re-read the project's completion instructions and reproduce any named environment condition this run did not already match. Run the assigned lightweight pre-commit checks. Fix failures before returning success.
-5. Follow the assignment's commit owner exactly. When it says `worker`, commit a complete verified item with the required co-author trailer, never `--amend` or `--no-verify`. When it says `coordinator`, do not stage or commit. The host assignment owns which value applies; this shared contract does not infer it.
-6. Update the item's `PLAN.md` section with done status, dead ends, artifacts, and discoveries; include a commit hash only when this worker owned the commit. Add a Cross-item note only for a fact a later item needs.
+5. Follow the assignment's commit owner exactly. When it says `worker`, commit a complete verified item only inside the worker's exclusive worktree and within its explicit lease, with the required co-author trailer; never `--amend`, `--no-verify`, or broad staging. When it says `coordinator`, do not stage or commit. The host assignment owns which value applies; this shared contract does not infer it.
+6. Never edit `PLAN.md`, `REVIEW.md`, the run manifest, or another coordinator-owned ledger. Put proposed item status, dead ends, artifacts, discoveries, and any cross-item note in the evidence/result artifacts; the coordinator validates them and performs the durable ledger update after the item checkpoint.
 7. Capture memories when required by the project's rules.
 
-If a recorded mechanism is wrong and the correction is reversible and in scope, correct it and record the discovery. If any blocker threshold is crossed, stop instead of improvising: preserve partial work as the host assignment directs, write the handoff file, and return `BLOCKED: <one-line question>; HANDOFF_FILE=<absolute path>`. Do not write a successful result.
+If a recorded mechanism is wrong and the correction is reversible and in scope, correct it and record the discovery. If any blocker threshold is crossed, stop instead of improvising: preserve partial work in the assigned worktree, write the handoff file, and return `BLOCKED: <one-line question>; HANDOFF_FILE=<absolute path>`. Do not write a successful result or commit partial work.
 
 On success, write detailed command/test output to the evidence path and a concise envelope following `src/workers/context-envelope.md` to the result path. Keep it within the assigned budget and include changed files, verification summary, commit ownership outcome, and anything the next item needs. Final chat response: `RESULT_FILE=<absolute envelope path>`.
 

@@ -16,10 +16,10 @@ Steps 1–8 run in order, top to bottom. The skill has two distinct conversation
 - **Plan review** (Step 3.5) — a reader who never saw the interview argues with the finished plan before the user is asked to adopt it. Still no code changes; only `PLAN.md` is written to.
 - **Master-plan approval gate** (Step 4) — show the complete master plan, get a single yes-to-the-whole. Self-adopted in delegated mode, where that yes was given in advance.
 <!-- pln:only claude -->
-- **Implementation phase** (Step 5) — a thin orchestrator walks items sequentially with one fresh, named background Agent per item and `PLAN.md` as the spec. No more discussion questions; a blocker pauses the loop and continues that same Agent through `SendMessage`.
+- **Implementation phase** (Step 5) — a fresh frontier scheduler builds item dependencies, short checkpointed cohorts, and isolated disjoint waves. A thin coordinator owns ledgers and integration; blockers continue through durable Agent/worktree state.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-- **Implementation phase** (Step 5) — a thin orchestrator walks the items one at a time, spawning a fresh-context agent per item with `PLAN.md` as the spec. No more discussion questions; the only interruptions are a blocker threshold, which pauses the loop and resumes the blocked item.
+- **Implementation phase** (Step 5) — a fresh frontier scheduler builds item dependencies, short checkpointed cohorts, and isolated disjoint waves. A thin coordinator owns ledgers and integration; blockers continue through durable agent/worktree state.
 <!-- pln:endonly -->
 
 Implementation never begins while items still have open per-item questions. If the user redirects mid-interview ("just go do item 1 now"), note gently that the rest of the interview comes first; the point of the two-phase split is to avoid the "answer Q1, implement, then ask Q2" antipattern.
@@ -133,6 +133,7 @@ In delegated mode there is nothing to ask: show the dashboard and go straight in
 - Main plan file is always `PLAN.md`.
 - Spinoff files use a meaningful slug, e.g., `item-7-first-date-restructure.md`.
 - Handoff files (written by a subagent at a blocker) use `<timestamp>-item-<N>-<slug>.md` in the plan dir. They are transient scratch: not committed, and deleted by the resuming subagent once the item completes. The durable record (the decision, the dead ends) folds into `PLAN.md`; the handoff file only bridges one blocked subagent to its replacement.
+- `run-manifest.tsv`, `schedule-nodes.tsv`, and `dirty-start.tsv` are local coordinator-owned execution state. Together with `PLAN.md`, retained worktrees, results, and handoffs, they must recover the run without a surviving agent handle.
 <!-- pln:only codex -->
 - The orchestrator appends two things to a handoff file when it reads a `BLOCKED:` result: the blocked agent's handle (its thread id on the fallback), and — in auto mode — the label of the stash holding the partial work. The agent can write neither; it doesn't know its own handle, and touching `.git` is the orchestrator's job. Without them, an orchestrator that is restarted or compacted before the user answers has no way to continue the agent or find the work.
 <!-- pln:endonly -->

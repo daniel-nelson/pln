@@ -63,7 +63,7 @@ Always skip `/pln-pr` in this repository. This is the repo that ships `/pln-pr`,
 
 ## Testing
 
-Run every script in `tests/` before opening a PR — each needs only bash and git, no network, no agent CLI installed, no credentials, and none of them writes to the working tree or reads the developer's own `~/.pln`. All eight must print `OK`:
+Run every script in `tests/` before opening a PR — each needs only bash and git, no network, no agent CLI installed, no credentials, and none of them writes to the working tree or reads the developer's own `~/.pln`. All nine must print `OK`:
 
 - `bash tests/generate.sh` — `bin/pln-generate`: the three directives, the generated-by banner, `--list`, `--clean`, every error path, and the two properties the host seam rests on — each host's build carries its own mechanics and none of the other's, and a `pln:include` resolves against `src/shared/` for a host that has no fragment of that name while a host fragment of the same name still wins (a missing name fails loudly, naming both folders). Checked against the real `src/` — where both skills must carry the whole Style section, the peer ladder behind its consent key, and the plan review's rules, the rung-3 spawn being the one part that differs by host — as well as fixtures.
 - `bash tests/config.sh` — `bin/pln-config` and `bin/pln-model-route`: config round trips preserve whole values and exact keys; `evidence_profile` defaults to `inherit`, validates its opt-in, and host-local semantic routing preserves recognized frontier choices, requires deliberate unknown-capability fallback, and attributes unavailable economy fallback.
@@ -73,6 +73,7 @@ Run every script in `tests/` before opening a PR — each needs only bash and gi
 - `bash tests/setup.sh` — `setup` against an isolated fake install: the peer nudge retains its settled-state behavior, and the optional economy-evidence notice appears once only when the host route is usable, includes the exact opt-in command, and no-ops cleanly otherwise.
 - `bash tests/envelope.sh` — `bin/pln-read-envelope`: valid and exact-boundary envelopes pass, while oversized, missing, out-of-root, final-component symlink, and parent-directory symlink results fail before content reaches stdout.
 - `bash tests/worker-contracts.sh` — every worker-owned runtime contract is installed, complete, host-neutral, absent from the generated coordinator prompt, and carries the requested/actual routing envelope; the review-brief helper assembles repository metadata, the exact worker contract, and the complete plan.
+- `bash tests/scheduler.sh` — `bin/pln-scheduler`: conservative dependency/write-lease waves, three-item cohorts, non-git and unknown serial fallback, lifecycle transitions, ordered integration, handle-free recovery, and dirty-tree byte protection.
 
 A test that drives a `bin/` helper does it through a fake CLI on `PATH` — never a real `claude` or `codex`, which most users of this repo will not have.
 

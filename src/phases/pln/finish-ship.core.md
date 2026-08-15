@@ -12,7 +12,7 @@ Persist verification results, follow-ups, Ship choice, PR base, and any downstre
 
 After the last item completes, before final verification: walk back through any items marked ⏸ deferred (and any deferred sub-questions). For each, ask the user: "Revisit now, push to a future session, or drop?"
 
-Items marked ⏸ blocked (auto mode) are different: each already has a concrete blocking question recorded in its handoff file. Ask that question directly, same one-question-at-a-time format as a live blocker, record the answer, and resume the run per the auto-mode blocker protocol above — don't fold it into the "revisit / push / drop" prompt used for deferred items.
+Auto-mode blocked nodes are different: `run-manifest.tsv` carries each concrete handoff and marks dependency descendants `waiting`. Ask each blocking question directly, one at a time, record the answer, continue from its retained worktree, then return to `Phase: implementation` and recompute readiness. Do not fold blockers or dependency waits into the "revisit / push / drop" prompt used for genuinely deferred items.
 
 ### Step 7. End-of-task verification + wrap-up
 
@@ -69,7 +69,7 @@ Applies at Step 7's wrap-up, and at the equivalent point in `/pln-pr`. The bar a
 - **Calling the notifier by bare name, or through a variable a fresh shell doesn't have** — `pln-notify-desktop` is not on `PATH`, and `$_PLN_DIR` is resolved once in the preamble and gone by the next shell call. Every notify site runs the full path you resolved there. A bare `pln-notify-desktop` fails with `command not found`; `"$_PLN_DIR/bin/pln-notify-desktop"` in a later shell silently runs `/bin/pln-notify-desktop`, which doesn't exist either. Neither is visible to the user, who just doesn't get notified.
 <!-- pln:endonly -->
 - **Assuming Step 1 pre-flight runs on every invocation** — it only runs before writing a *new* plan skeleton. A "continue the plan" invocation or a reopened decision skips Step 1 entirely. Anything that must hold on every invocation regardless of new-vs-continuing — notification setup is the example — belongs in the top-of-file preamble, not inside Step 1.
-- **Trusting a remembered item cursor instead of `PLAN.md`'s status** — when building or resuming a run, the pending-item list comes from reading the dashboard fresh, not from what the orchestrator recalls doing earlier in the conversation. A stale cursor after a restart can re-spawn an item already marked ✅ done.
+- **Trusting a remembered item cursor instead of durable state** — rebuild outcomes from `PLAN.md` and execution state from the validated run manifest. A stale cursor after restart can respawn integrated work or skip a checkpoint waiting to integrate.
 <!-- pln:only claude -->
 - **Stringifying structured Workflow input** — saved-workflow `args` is structured data already. Read it directly; stringifying or parsing it recreates an obsolete contract and can corrupt a resumed fan-out's input.
 - **Putting the user-interruptible item loop inside Workflow** — Workflow has no mid-run user-input channel. Sequential item work uses named background Agents; Workflow remains for genuine independent fan-out. If native Agent is unavailable and the helper fallback runs, disclose that switch.
@@ -80,6 +80,5 @@ Applies at Step 7's wrap-up, and at the equivalent point in `/pln-pr`. The bar a
 - **Putting the brief on the command line** — a subagent brief is a page of markdown with backticks, quotes and `$` in it. Compose it in a file and pass its contents as the child's message (or `--brief` on the fallback); hand-escaping it into an argument is how a spawn ends up running a silently truncated prompt.
 - **Reading the child's reasoning trace instead of its result** — on the native path the child returns a summary and its final message is the result; on the fallback the events file is the full trace. Read the final message; keeping the trace out of your context is the reason for spawning an agent at all.
 - **Re-spawning a blocked item instead of continuing it** — a fresh agent knows nothing of the first attempt. Use `followup_task` on the idle native agent (or the captured thread id on the CLI fallback); a fresh agent is only the recovery path when that identity is genuinely gone. Persist the identity in the handoff the moment `BLOCKED:` arrives.
-- **Expecting the blocked agent to stash its own work** — that's the orchestrator's job, not the agent's. In auto mode the orchestrator stashes after reading the `BLOCKED:` result. If neither does it, the next item starts on a tree carrying half of the previous one.
+- **Moving blocked work through an anonymous stash** — blocker recovery is the manifest's named retained worktree plus handoff/result, not a shifting `stash@{N}`. Keep it isolated and dispatch only proven-independent nodes.
 <!-- pln:endonly -->
-

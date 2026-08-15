@@ -14,6 +14,8 @@ Classify each acted-on finding as **auto-fix** (mechanical, unambiguous — a nu
 
 For needs-a-decision findings, surface them to the user **one at a time**, as prose, in the option-message shape, fire notifications first. Record each answer in `REVIEW.md` against its finding. A skipped finding is marked `skipped`; it becomes a follow-up in the closing message's bullet list only if it clears the follow-up bar (Style's "Ending a message") — someone will actually need to act on it or decide about it later. A skip that was really "not worth doing" gets no follow-up entry.
 
+Before dispatch, snapshot the source tree and send the resolved cluster list to a fresh `judgment`-profile worker on `{{SKILL_DIR}}/src/workers/execution-schedule.md` in `pr-fix-clusters` mode. Validate its envelope and build `<plan-dir>/fix-manifest.tsv` with `bin/pln-scheduler`. Every cluster remains a fresh-worker node; cohorts/context reuse are forbidden. Dependencies, overlapping/ancestor leases, generators, lockfiles, tests, configuration, migrations, and shared effects add edges; unknown means serial. Parallelize only one manifest wave of isolated, pairwise-disjoint clusters. `REVIEW.md`, the manifest, git checkpoints, and integration are coordinator-only. Auto mode never applies to `/pln-pr`.
+
 <!-- pln:include pr-fix-dispatch -->
 
 1. "Read `REVIEW.md` at `<path>`. Your spec is the findings in cluster {K}, listed below. Fix each one to the project's quality bar.
@@ -26,12 +28,12 @@ For needs-a-decision findings, surface them to the user **one at a time**, as pr
    - Before reporting verification, re-read the project's completion rule (`CLAUDE.md`/`AGENTS.md`) and reproduce any environmental condition it names — cleared credentials, a specific timezone, a service, a clean database — that this run didn't already match.
 4. Run lightweight verification only (type-check + lint on touched files, not the full suite). Fix on failure — nothing here is staged, since `git` writes are not yours to make.
 <!-- pln:only claude -->
-5. Do not commit — clusters run in parallel and share this working tree, so a commit from you here could race another cluster's. Leave the fixed files in the tree and name them in your final message; the orchestrator commits the cluster.
+5. Do not commit — the coordinator owns the cluster checkpoint and integration. Edit only the assigned isolated worktree and leased paths, then name them in your final message.
 6. Do not edit `REVIEW.md` — it is a shared checkpoint file and concurrent writes would race even when code leases are disjoint. Say in your final message which findings the cluster cleared; the orchestrator updates their statuses and commit hashes after it checkpoints the cluster."
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-5. Do not commit — `.git` is read-only to you. Leave the fixed files in the tree and name them in your final message; the orchestrator commits the cluster.
-6. Update each finding's status in `REVIEW.md` to `fixed` before returning, and say in your final message which findings the cluster cleared."
+5. Do not commit — `.git` is read-only to you. Edit only the assigned worktree and leased paths, then name them in your final message.
+6. Do not edit `REVIEW.md` or the fix manifest. Say in your final message which findings the cluster cleared; the coordinator records the validated checkpoint."
 <!-- pln:endonly -->
 
 <!-- pln:include pr-fix-invoke -->

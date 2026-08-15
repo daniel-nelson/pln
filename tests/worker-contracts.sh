@@ -13,7 +13,7 @@ has() { grep -qF -- "$2" "$1" || fail "$3"; }
 hasnt() { grep -qF -- "$2" "$1" && fail "$3"; return 0; }
 
 for name in context-envelope evidence-collection preflight-research interview-research plan-review \
-  plan-review-merge pr-review-merge item-implementation final-verification; do
+  plan-review-merge pr-review-merge execution-schedule item-implementation final-verification; do
   file="$REPO_DIR/src/workers/$name.md"
   [ -s "$file" ] || fail "missing or empty worker contract: $file"
   has "$file" 'WORKER_ONLY_SENTINEL_' "$file has no worker-only sentinel"
@@ -34,6 +34,7 @@ has "$merge" 'never repair over a user-made decision' 'merge contract lost user-
 has "$merge" '4096-byte budget' 'merge contract lost its bounded envelope'
 
 implementation="$REPO_DIR/src/workers/item-implementation.md"
+scheduling="$REPO_DIR/src/workers/execution-schedule.md"
 envelope="$REPO_DIR/src/workers/context-envelope.md"
 has "$envelope" 'REQUESTED_PROFILE:' 'result envelopes do not attribute the requested profile'
 has "$envelope" 'ACTUAL_PROFILE:' 'result envelopes do not attribute the actual profile'
@@ -45,6 +46,13 @@ has "$implementation" 'When it says `coordinator`' 'implementation contract lost
 has "$implementation" 'host assignment owns which value applies' \
   'implementation contract started inferring host mechanics'
 has "$implementation" 'BLOCKED:' 'implementation contract lost blocker handling'
+has "$implementation" 'Never edit `PLAN.md`, `REVIEW.md`, the run manifest' \
+  'implementation worker may race coordinator ledgers'
+has "$scheduling" $'ITEM\tDEPS\tLEASES\tCOHORT\tCONTEXT\tDIRTY_STATE' \
+  'scheduling contract lost its deterministic node schema'
+has "$scheduling" 'no cohort exceeds three nodes' 'scheduling contract lost the cohort cap'
+has "$scheduling" 'Unknown targets or uncertain independence use `UNKNOWN`' \
+  'scheduling contract no longer serializes uncertainty'
 
 verification="$REPO_DIR/src/workers/final-verification.md"
 has "$verification" 'full gauntlet' 'verification contract lost the full gauntlet'
@@ -81,6 +89,7 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln/review-approval.md" 'src/workers/plan-review.md' "$host review phase does not reference review contract"
   has "$WORK/$host/phases/pln/review-approval.md" 'src/workers/plan-review-merge.md' "$host review phase does not reference review merge contract"
   has "$WORK/$host/phases/pln/implementation.md" 'src/workers/item-implementation.md' "$host implementation phase does not reference implementation contract"
+  has "$WORK/$host/phases/pln/implementation.md" 'src/workers/execution-schedule.md' "$host implementation phase does not reference scheduling contract"
   has "$WORK/$host/phases/pln/finish-ship.md" 'src/workers/final-verification.md' "$host finish phase does not reference verification contract"
   has "$WORK/$host/SKILL.md" 'at most two exact operations' "$host /pln router lost the direct lookup budget"
   has "$WORK/$host/SKILL.md" 'routing.tsv' "$host /pln router lost the local routing ledger"
@@ -91,6 +100,7 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Possibly unbounded metadata' "$host PR scope phase lost file-first metadata collection"
   has "$WORK/$host/phases/pln-pr/review.md" 'src/workers/pr-review-merge.md' "$host PR review phase lost file-first merge ownership"
   has "$WORK/$host/phases/pln-pr/review.md" 'Never open a reviewer or peer result' "$host PR review reads raw findings into the coordinator"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'src/workers/execution-schedule.md' "$host PR fix phase does not reference scheduling contract"
   for file in "$WORK/$host/SKILL.md" "$WORK/$host/phases/pln/"*.md; do
     hasnt "$file" 'WORKER_ONLY_SENTINEL_' "$file contains worker-only contract prose"
     hasnt "$file" 'Do not inventory strengths or praise the plan' "$file embeds reviewer-only detail"

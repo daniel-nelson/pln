@@ -322,8 +322,8 @@ done <<< "$targets"
 # checks above would pass on an empty file.
 has "$real_c/SKILL.md" 'Workflow' "the claude build has no Workflow mechanics"
 has "$real_x/SKILL.md" 'pln-codex-agent' "the codex build has no Codex agent mechanics"
-has "$real_c/phases/pln/implementation.md" 'commit owner: worker' \
-  "the claude build lost worker-owned item commits"
+has "$real_c/phases/pln/implementation.md" 'commit owner: coordinator' \
+  "the claude build lost coordinator-owned item checkpoints"
 has "$real_x/phases/pln/implementation.md" 'commit owner: coordinator' \
   "the codex build lost coordinator-owned item commits"
 
@@ -355,7 +355,7 @@ for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
   hasnt "$f" 'multi_agent_v2' "$f still pins a superseded Codex feature generation"
   hasnt "$f" 'Pin to V1' "$f still pins Codex multi-agent V1"
 done
-has "$real_c/phases/pln-pr/fix.md" 'commit them one cluster at a time by explicit path' \
+has "$real_c/phases/pln-pr/fix.md" 'coordinator stages explicit paths and commits each completed cluster' \
   "the claude fix fan-out has no executable commit ownership"
 has "$real_x/phases/pln-pr/review.md" 'OAuth token race applies only to fallback CLI processes' \
   "the codex build still constrains native concurrency by a nested-CLI OAuth race"
@@ -420,10 +420,25 @@ has "$real_c/phases/pln/implementation.md" 'directly addressable Agents rather t
   "the Claude implementation phase lost item 2 native mechanics"
 has "$real_x/phases/pln/implementation.md" 'followup_task' \
   "the Codex implementation phase lost item 2 native mechanics"
-has "$real_c/phases/pln-pr/fix.md" 'commit them one cluster at a time by explicit path' \
+for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
+  has "$f" 'run-manifest.tsv' "$f lost durable execution state"
+  has "$f" 'provisional cohort cap is three' "$f lost bounded same-context reuse"
+  has "$f" 'Unknown dependencies or leases serialize' "$f no longer fails closed on scheduling uncertainty"
+  has "$f" 'coordinator alone updates `PLAN.md`' "$f lets item workers race the plan ledger"
+done
+has "$real_c/phases/pln/implementation.md" 'isolation: "worktree"' \
+  'the Claude implementation phase lost native worktree isolation'
+has "$real_x/phases/pln/implementation.md" 'git worktree add --detach' \
+  'the Codex implementation phase lost orchestrator-created worktrees'
+has "$real_c/phases/pln-pr/fix.md" 'coordinator stages explicit paths and commits each completed cluster' \
   "the Claude fix phase lost coordinator commit ownership"
 has "$real_x/phases/pln-pr/review.md" 'OAuth token race applies only to fallback CLI processes' \
   "the Codex fix phase lost native concurrency semantics"
+for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
+  has "$f" 'fix-manifest.tsv' "$f lost dependency-aware fix scheduling"
+  has "$f" 'cohorts/context reuse are forbidden' "$f may reuse a PR fix worker across clusters"
+  has "$f" 'workers touch neither git nor `REVIEW.md`' "$f lets fix workers race shared ledgers"
+done
 
 # Repository discovery is shared planning discipline: both coordinators must
 # delegate it, while the detailed worker contracts remain outside the generated

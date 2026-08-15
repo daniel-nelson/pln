@@ -26,8 +26,9 @@
 # Rungs 1 and 2 send the brief to another vendor's CLI: it leaves the machine
 # and it may spend the user's quota. Two independent gates apply. The one-time
 # `peer_consent` authorizes cross-provider use. The one-time `peer_egress`
-# policy says whether unknown/unclassified material may leave after consent:
-# `consent` permits it; `classified-only` requires `--material classified`.
+# policy says whether material without explicit peer-egress approval may leave
+# after consent: `consent` permits it; `approved-only` requires
+# `--material approved`.
 # Explicit sensitive/local-only material never leaves under either policy.
 #
 #   unset  → nothing is sent. STATUS=consent, exit 5, with RUNG/PEER naming who
@@ -61,7 +62,7 @@
 #   --model NAME     model override, where the peer takes one. Ignored on rung
 #                    1: a configured command is complete as written.
 #   --host NAME      override host detection (claude|codex). Mostly for tests.
-#   --material CLASS classified|unknown|sensitive|local-only (default unknown).
+#   --material CLASS approved|unknown|sensitive|local-only (default unknown).
 #   --dry-run        report the selection and print the command, run nothing.
 #
 # The rung-1 contract, which is also what a user configuring `peer_command` is
@@ -114,7 +115,7 @@ Usage: pln-peer --brief <file> --out <file> [options]
   --timeout SECS   ceiling on a hung run (default 1800; 0 disables)
   --model NAME     model override where the peer takes one
   --host NAME      override host detection (claude|codex)
-  --material CLASS classified|unknown|sensitive|local-only (default unknown)
+  --material CLASS approved|unknown|sensitive|local-only (default unknown)
   --which          report the selection and exit without running anything
   --dry-run        report the selection and print the command, run nothing
 USAGE
@@ -152,8 +153,8 @@ case "$HOST" in
   *) echo "pln-peer: --host must be claude or codex" >&2; exit 2 ;;
 esac
 case "$MATERIAL" in
-  classified | unknown | sensitive | local-only) ;;
-  *) echo "pln-peer: --material must be classified, unknown, sensitive, or local-only" >&2; exit 2 ;;
+  approved | unknown | sensitive | local-only) ;;
+  *) echo "pln-peer: --material must be approved, unknown, sensitive, or local-only" >&2; exit 2 ;;
 esac
 
 ACTUAL_PROFILE="none"
@@ -323,8 +324,8 @@ fi
 case "$(printf '%s' "$EGRESS" | tr '[:upper:]' '[:lower:]')" in
   consent)
     ;;
-  classified-only)
-    if [ "$MATERIAL" != "classified" ]; then
+  approved-only)
+    if [ "$MATERIAL" != "approved" ]; then
       report 3 none suppressed "" ""
       exit 3
     fi

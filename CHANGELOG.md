@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.33.0 — 2026-08-15
+
+### Changed
+
+- **The restrictive peer-egress policy is now named `approved-only`.** The former `classified-only` name sounded as though sensitive or classified documents were the only material allowed to leave. The policy and `--material approved` now say what the gate actually means: only material explicitly approved for peer egress may be sent; unknown, sensitive, and local-only material stays local. `classified-only` and `--material classified` are rejected rather than retained as aliases.
+
 ## 1.32.0 — 2026-08-14
 
 ### Changed

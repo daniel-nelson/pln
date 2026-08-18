@@ -126,6 +126,9 @@ git -C "$FIXTURE" add commands.txt environment.txt
 git -C "$FIXTURE" commit -qm fixtures
 content="$($SIMPLIFY fingerprint --repo "$FIXTURE")"
 case "$content" in CONTENT_SHA256=????????????????????????????????????????????????????????????????) ;; *) fail 'content fingerprint output is malformed' ;; esac
+if "$SIMPLIFY" marker --repo "$FIXTURE" --completed 2026-02-31T12:34:56Z >/dev/null 2>&1; then
+  fail 'marker accepted a calendar-invalid UTC timestamp'
+fi
 marker="$($SIMPLIFY marker --repo "$FIXTURE" --completed 2026-08-18T12:34:56Z)"
 [ "$marker" = "PLN-SIMPLIFY-V1 completed=2026-08-18T12:34:56Z content-sha256=${content#CONTENT_SHA256=}" ] \
   || fail 'V1 marker grammar changed'
@@ -139,6 +142,8 @@ status="$($SIMPLIFY status --repo "$FIXTURE" --now 2026-08-18T12:34:56Z)"
 has_line "$status" 'STATUS=fresh' 'an unchanged marker candidate was not fresh'
 has_line "$status" "MARKER=$marker_new" 'multiple-marker winner did not select the greatest completion time'
 marker="$marker_new"
+selected="$($SIMPLIFY selected-marker --repo "$FIXTURE" --head HEAD)"
+[ "$selected" = "$marker" ] || fail 'selected-marker did not return the exact valid winner'
 BODY="$FIXTURE/pr-body.txt"
 printf 'Summary\n\nPLN-SIMPLIFY-V99 completed=bad\n' > "$BODY"
 "$SIMPLIFY" propagate --repo "$FIXTURE" --body "$BODY"
@@ -156,6 +161,15 @@ grep -qF "$marker" "$BODY" || fail 'PR-body propagation changed the selected exa
 printf 'changed\n' > "$FIXTURE/source.txt"
 git -C "$FIXTURE" add source.txt
 git -C "$FIXTURE" commit -qm changed
+if "$SIMPLIFY" selected-marker --repo "$FIXTURE" --head HEAD >/dev/null 2>&1; then
+  fail 'selected-marker accepted a marker invalidated by candidate content'
+fi
+stale_body_hash="$(shasum -a 256 "$BODY" | awk '{print $1}')"
+if "$SIMPLIFY" propagate --repo "$FIXTURE" --body "$BODY" --head HEAD >/dev/null 2>&1; then
+  fail 'PR-body propagation accepted a marker invalidated by candidate content'
+fi
+[ "$(shasum -a 256 "$BODY" | awk '{print $1}')" = "$stale_body_hash" ] \
+  || fail 'failed stale-marker propagation mutated the PR body'
 status="$($SIMPLIFY status --repo "$FIXTURE" --now 2026-11-16T12:35:00Z --due-commits 100 --overdue-commits 250 --due-days 90 --overdue-days 180)"
 has_line "$status" 'STATUS=due' 'time threshold did not make changed content due'
 status="$($SIMPLIFY status --repo "$FIXTURE" --now 2026-08-18T12:34:56Z --due-commits 1 --overdue-commits 250 --due-days 90 --overdue-days 180)"
@@ -187,6 +201,27 @@ binding_one="$(printf '%s\n' "$decision" | sed -n 's/^BYPASS_BINDING=//p')"
 decision="$($SIMPLIFY enforce --repo "$FIXTURE" --base HEAD --head HEAD --run-id run-2 --now 2027-02-14T12:35:00Z)"
 binding_two="$(printf '%s\n' "$decision" | sed -n 's/^BYPASS_BINDING=//p')"
 [ "$binding_one" != "$binding_two" ] || fail 'freshness bypass binding ignored durable run identity'
+decision="$($SIMPLIFY enforce --repo "$FIXTURE" --base HEAD^ --head HEAD --run-id run-1 --now 2027-02-14T12:35:00Z)"
+binding_base="$(printf '%s\n' "$decision" | sed -n 's/^BYPASS_BINDING=//p')"
+[ "$binding_one" != "$binding_base" ] || fail 'freshness bypass binding ignored resolved base identity'
+printf 'schema=1\nmode=required\nminimum-client=1\nprotocol=1\ndue-commits=99\noverdue-commits=249\ndue-days=89\noverdue-days=179\n' > "$policy"
+decision="$($SIMPLIFY enforce --repo "$FIXTURE" --base HEAD --head HEAD --run-id run-1 --now 2027-02-14T12:35:00Z)"
+binding_policy="$(printf '%s\n' "$decision" | sed -n 's/^BYPASS_BINDING=//p')"
+[ "$binding_one" != "$binding_policy" ] || fail 'freshness bypass binding ignored policy content'
+
+# Explicit status arguments are the test/CI override layer and win over policy
+# thresholds. Unsupported policy versions fail closed only in required mode;
+# advisory older-client compatibility remains observable but non-blocking.
+printf 'schema=1\nmode=advisory\nminimum-client=1\nprotocol=1\ndue-commits=500\noverdue-commits=600\ndue-days=500\noverdue-days=600\n' > "$policy"
+status="$($SIMPLIFY status --repo "$FIXTURE" --now 2026-08-18T12:34:56Z --due-commits 1 --overdue-commits 250 --due-days 90 --overdue-days 180)"
+has_line "$status" 'STATUS=due' 'explicit cadence threshold did not override repository policy'
+printf 'schema=2\nmode=advisory\nminimum-client=99\nprotocol=2\n' > "$policy"
+decision="$($SIMPLIFY enforce --repo "$FIXTURE" --base HEAD --head HEAD --run-id compatibility --now 2027-02-14T12:35:00Z)"
+has_line "$decision" 'ACTION=follow-up' 'unsupported advisory policy became a blocking compatibility break'
+printf 'schema=1\nmode=disabled\nminimum-client=1\nprotocol=1\n' > "$policy"
+decision="$($SIMPLIFY enforce --repo "$FIXTURE" --base HEAD --head HEAD --run-id disabled --now 2027-02-14T12:35:00Z)"
+has_line "$decision" 'STATUS=disabled' 'disabled repository policy was not silent'
+has_line "$decision" 'ACTION=continue' 'disabled repository policy blocked review'
 printf 'schema=2\nmode=required\nminimum-client=1\nprotocol=1\n' > "$policy"
 if "$SIMPLIFY" enforce --repo "$FIXTURE" --base HEAD --head HEAD --run-id run-3 >/dev/null 2>&1; then
   fail 'aware client accepted an unsupported required policy schema'

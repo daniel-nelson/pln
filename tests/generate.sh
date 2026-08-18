@@ -372,6 +372,7 @@ for host_out in "$real_c" "$real_x"; do
   host_out="$(cd "$host_out" && pwd -P)"
   simplify="$host_out/pln-simplify/SKILL.md"
   has "$simplify" 'name: pln-simplify' 'pln-simplify frontmatter name/path disagree'
+  has "$simplify" 'architecture decluttering' 'pln-simplify trigger metadata lost natural-language requests'
   has "$simplify" 'nothing worth changing' 'pln-simplify lost the valid clean-assessment outcome'
   has "$simplify" "$host_out/SKILL.md" 'pln-simplify duplicated the root lifecycle router'
   has "$simplify" 'phases/pln/implementation.md' 'pln-simplify duplicated the implementation lifecycle'
@@ -605,6 +606,15 @@ for host_out in "$real_c" "$real_x"; do
   done
   has "$host_out/phases/pln-simplify/map-synthesize.md" "$host_out/phases/pln/outline.md" \
     'pln-simplify duplicated plan placement or the outline checkpoint'
+  has "$router" 'bin/pln-simplify status --repo <root>' \
+    'pln-simplify router lost its cadence-status consumer'
+  verify_record="$host_out/phases/pln-simplify/verify-record.md"
+  has "$verify_record" 'unpublished candidate ref' \
+    'pln-simplify verification no longer isolates failed candidates'
+  has "$verify_record" 'candidate HEAD still equals the tested commit' \
+    'pln-simplify verification lost its unchanged-branch integration boundary'
+  has "$verify_record" 'bin/pln-simplify marker' \
+    'pln-simplify verification lost deterministic marker construction'
 done
 
 # The to-do-location flow is one source per host, included by both skills — a
@@ -740,6 +750,7 @@ done
 # confidence, and every reusable gauntlet is tied to an exact candidate.
 for root in "$real_c" "$real_x"; do
   review="$root/phases/pln-pr/review.md"
+  scope="$root/phases/pln-pr/scope-baseline.md"
   fix="$root/phases/pln-pr/fix.md"
   ship="$root/phases/pln-pr/ship-watch.md"
   finish="$root/phases/pln/finish-ship.md"
@@ -762,6 +773,14 @@ for root in "$real_c" "$real_x"; do
   has "$ship" '`infrastructure`, `flaky`, `permission`, or `code`' "$ship edits before classifying CI failure"
   has "$ship" 'not exactly subsumed by the required CI checks' "$ship lost local gauntlet complement coverage"
   has "$ship" 'tree/command/environment/candidate hashes' "$ship lost exact-final-candidate evidence"
+  has "$scope" 'bin/pln-simplify' "$scope lost the cadence enforcement consumer"
+  has "$scope" 'consume it when the run reaches `complete` or deliberately stops' \
+    "$scope lost freshness-bypass lifetime enforcement"
+  has "$ship" 'pln-simplify" propagate' "$ship lost PR-body marker propagation"
+  has "$ship" 'requires its content fingerprint to prove the resolved HEAD' \
+    "$ship can propagate a marker invalidated by candidate mutation"
+  has "$ship" 'consume any recorded simplification freshness bypass' \
+    "$ship can reuse a completed run's freshness bypass"
   has "$finish" 'bin/pln-assurance fingerprint' "$finish lost exact pln verification identity"
   has "$finish" 'self-hosts `/pln-pr`' "$finish lost the narrow self-hosting exception for pln-pr"
 done

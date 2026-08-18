@@ -52,12 +52,17 @@ valid_utc() {
 }
 
 utc_epoch() {
+  local epoch canonical
   valid_utc "$1" || return 1
   if date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" '+%s' >/dev/null 2>&1; then
-    date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" '+%s'
+    epoch="$(date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" '+%s')" || return 1
+    canonical="$(date -u -r "$epoch" '+%Y-%m-%dT%H:%M:%SZ')" || return 1
   else
-    date -u -d "$1" '+%s' 2>/dev/null
+    epoch="$(date -u -d "$1" '+%s' 2>/dev/null)" || return 1
+    canonical="$(date -u -d "@$epoch" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null)" || return 1
   fi
+  [ "$canonical" = "$1" ] || return 1
+  printf '%s\n' "$epoch"
 }
 
 content_fingerprint() { # repo ref
@@ -189,7 +194,7 @@ case "$cmd" in
   marker)
     repo=''; completed=''; ref=HEAD
     while [ $# -gt 0 ]; do case "$1" in --repo) repo="${2:-}"; shift 2 ;; --completed) completed="${2:-}"; shift 2 ;; --ref) ref="${2:-}"; shift 2 ;; *) usage ;; esac; done
-    [ -n "$repo" ] && [ -n "$completed" ] || usage; repo="$(repo_abs "$repo")"; valid_utc "$completed" || fail 'completion time must be canonical UTC YYYY-MM-DDTHH:MM:SSZ'
+    [ -n "$repo" ] && [ -n "$completed" ] || usage; repo="$(repo_abs "$repo")"; utc_epoch "$completed" >/dev/null || fail 'completion time must be a valid canonical UTC instant YYYY-MM-DDTHH:MM:SSZ'
     [ -z "$(git -C "$repo" status --porcelain=v1 --untracked-files=normal)" ] || fail 'marker candidates require a clean non-ignored tree'
     printf '%s completed=%s content-sha256=%s\n' "$PREFIX" "$completed" "$(content_fingerprint "$repo" "$ref")"
     ;;

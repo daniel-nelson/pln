@@ -93,12 +93,16 @@ has "$simplify_map" 'concepts, responsibilities, and owners' \
   'simplification mapping lost concept/ownership discovery'
 has "$simplify_map" 'duplicated policy' 'simplification mapping lost duplicate-policy discovery'
 has "$simplify_map" 'compatibility paths' 'simplification mapping lost compatibility discovery'
+has "$simplify_map" 'Do not propose edits, implement, delete, commit, or touch coordinator ledgers' \
+  'simplification mapper crossed into synthesis, implementation, or coordination ownership'
 has "$simplify_synthesis" 'nothing worth changing' \
   'simplification synthesis forces churn in a coherent system'
 has "$simplify_synthesis" 'consumer closure' \
   'simplification synthesis permits deletion without bounded consumers'
 has "$simplify_synthesis" 'Concept reduction outranks line reduction' \
   'simplification synthesis regressed to a line-deletion target'
+has "$simplify_synthesis" 'Do not edit product files, plans, review ledgers, or git state' \
+  'simplification synthesis crossed into implementation or coordination ownership'
 
 preflight="$REPO_DIR/src/workers/preflight-research.md"
 has "$preflight" '8192-byte envelope budget' 'pre-flight contract lost its budget'

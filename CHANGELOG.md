@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.38.0 — 2026-08-18
+
+### Changed
+
+- **Planning, implementation, and review now challenge unnecessary system surface throughout the lifecycle, and `/pln-simplify` provides recurring counter-pressure.** `/pln` compares proposed durable concepts with current owners before admitting a new one, implementation checkpoints account for reuse, consolidation, retirement, and justified compatibility, and the existing broad plan and PR reviews test structural fit without adding another permanent reviewer or cleanup quota. The new host-neutral simplification workflow maps concepts and ownership, accepts `nothing worth changing`, reuses `/pln` for adopted work, verifies an unpublished exact candidate, records a portable content-bound commit marker, and exposes advisory cadence with an opt-in repository policy. `/pln-pr` checks that cadence, preserves one-run bypass boundaries, and propagates only a marker that still proves the resolved candidate.
+
 ## 1.37.0 — 2026-08-18
 
 ### Changed

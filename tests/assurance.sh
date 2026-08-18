@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ASSURANCE="$REPO_DIR/bin/pln-assurance"
+SIMPLIFY="$REPO_DIR/bin/pln-simplify"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 has_line() { printf '%s\n' "$1" | grep -Fqx "$2" || fail "$3"; }
@@ -115,5 +116,80 @@ printf 'bash tests/a.sh\n' > "$FIXTURE/commands.txt"
 printf 'runtime=node-24\ntimezone=America/Los_Angeles\n' > "$FIXTURE/environment.txt"
 environment_changed="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt")"
 [ "$environment_changed" != "$first" ] || fail 'environment edit did not invalidate fingerprint'
+
+# Simplification success metadata has a content-only identity distinct from the
+# assurance candidate fingerprint. The marker grammar and cadence boundaries
+# are a portable V1 protocol, not prose interpreted by a model.
+[ -x "$SIMPLIFY" ] || fail 'missing executable simplification helper'
+git -C "$FIXTURE" checkout -q -- source.txt
+git -C "$FIXTURE" add commands.txt environment.txt
+git -C "$FIXTURE" commit -qm fixtures
+content="$($SIMPLIFY fingerprint --repo "$FIXTURE")"
+case "$content" in CONTENT_SHA256=????????????????????????????????????????????????????????????????) ;; *) fail 'content fingerprint output is malformed' ;; esac
+marker="$($SIMPLIFY marker --repo "$FIXTURE" --completed 2026-08-18T12:34:56Z)"
+[ "$marker" = "PLN-SIMPLIFY-V1 completed=2026-08-18T12:34:56Z content-sha256=${content#CONTENT_SHA256=}" ] \
+  || fail 'V1 marker grammar changed'
+if "$SIMPLIFY" marker --repo "$FIXTURE" --completed 2026-08-18T12:34:56+00:00 >/dev/null 2>&1; then
+  fail 'marker accepted a non-canonical UTC timestamp'
+fi
+git -C "$FIXTURE" commit --allow-empty -qm "simplification assessment" -m "$marker"
+marker_new="$($SIMPLIFY marker --repo "$FIXTURE" --completed 2026-08-18T12:35:00Z)"
+git -C "$FIXTURE" commit --allow-empty -qm "newer simplification assessment" -m "$marker_new"
+status="$($SIMPLIFY status --repo "$FIXTURE" --now 2026-08-18T12:34:56Z)"
+has_line "$status" 'STATUS=fresh' 'an unchanged marker candidate was not fresh'
+has_line "$status" "MARKER=$marker_new" 'multiple-marker winner did not select the greatest completion time'
+marker="$marker_new"
+BODY="$FIXTURE/pr-body.txt"
+printf 'Summary\n\nPLN-SIMPLIFY-V99 completed=bad\n' > "$BODY"
+"$SIMPLIFY" propagate --repo "$FIXTURE" --body "$BODY"
+body_once="$(shasum -a 256 "$BODY" | awk '{print $1}')"
+"$SIMPLIFY" propagate --repo "$FIXTURE" --body "$BODY"
+body_twice="$(shasum -a 256 "$BODY" | awk '{print $1}')"
+[ "$body_once" = "$body_twice" ] || fail 'PR-body propagation changed bytes on its second run'
+[ "$(grep -c '^PLN-SIMPLIFY-V1 completed=' "$BODY")" -eq 1 ] \
+  || fail 'PR-body marker propagation was not idempotent'
+grep -qF "$marker" "$BODY" || fail 'PR-body propagation changed the selected exact marker line'
+
+# Hybrid cadence: unchanged content stays fresh; after a content change, either
+# visible-commit or elapsed-time threshold can make it due/overdue, with overdue
+# taking precedence. Defaults are frozen at 100/250 commits and 90/180 days.
+printf 'changed\n' > "$FIXTURE/source.txt"
+git -C "$FIXTURE" add source.txt
+git -C "$FIXTURE" commit -qm changed
+status="$($SIMPLIFY status --repo "$FIXTURE" --now 2026-11-16T12:35:00Z --due-commits 100 --overdue-commits 250 --due-days 90 --overdue-days 180)"
+has_line "$status" 'STATUS=due' 'time threshold did not make changed content due'
+status="$($SIMPLIFY status --repo "$FIXTURE" --now 2026-08-18T12:34:56Z --due-commits 1 --overdue-commits 250 --due-days 90 --overdue-days 180)"
+has_line "$status" 'STATUS=due' 'visible-commit threshold did not make changed content due'
+status="$($SIMPLIFY status --repo "$FIXTURE" --now 2027-02-14T12:35:00Z --due-commits 100 --overdue-commits 250 --due-days 90 --overdue-days 180)"
+has_line "$status" 'STATUS=overdue' 'time threshold did not make changed content overdue'
+
+# Missing/stripped metadata is unknown, malformed marker-like lines do not win,
+# and unsupported protocols fail open as unknown rather than fabricated age.
+UNKNOWN="$FIXTURE-unknown"
+mkdir -p "$UNKNOWN"
+git -C "$UNKNOWN" init -q
+git -C "$UNKNOWN" config user.email test@example.com
+git -C "$UNKNOWN" config user.name Test
+printf 'x\n' > "$UNKNOWN/x"
+git -C "$UNKNOWN" add x
+git -C "$UNKNOWN" commit -qm 'PLN-SIMPLIFY-V2 completed=2026-08-18T12:34:56Z content-sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+status="$($SIMPLIFY status --repo "$UNKNOWN" --now 2026-08-18T12:34:56Z)"
+has_line "$status" 'STATUS=unknown' 'missing supported metadata fabricated staleness'
+
+# Repository policy is advisory by default. A supported V1 required policy can
+# stop only overdue, while disabled is silent and unknown remains non-blocking.
+policy="$FIXTURE/.pln-simplify-policy"
+printf 'schema=1\nmode=required\nminimum-client=1\nprotocol=1\ndue-commits=100\noverdue-commits=250\ndue-days=90\noverdue-days=180\n' > "$policy"
+decision="$($SIMPLIFY enforce --repo "$FIXTURE" --base HEAD --head HEAD --run-id run-1 --now 2027-02-14T12:35:00Z)"
+has_line "$decision" 'ACTION=block' 'required policy did not block overdue status'
+binding_one="$(printf '%s\n' "$decision" | sed -n 's/^BYPASS_BINDING=//p')"
+[ -n "$binding_one" ] || fail 'required-policy result omitted its run-bound bypass binding'
+decision="$($SIMPLIFY enforce --repo "$FIXTURE" --base HEAD --head HEAD --run-id run-2 --now 2027-02-14T12:35:00Z)"
+binding_two="$(printf '%s\n' "$decision" | sed -n 's/^BYPASS_BINDING=//p')"
+[ "$binding_one" != "$binding_two" ] || fail 'freshness bypass binding ignored durable run identity'
+printf 'schema=2\nmode=required\nminimum-client=1\nprotocol=1\n' > "$policy"
+if "$SIMPLIFY" enforce --repo "$FIXTURE" --base HEAD --head HEAD --run-id run-3 >/dev/null 2>&1; then
+  fail 'aware client accepted an unsupported required policy schema'
+fi
 
 echo "assurance tests: OK"

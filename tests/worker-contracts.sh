@@ -13,7 +13,8 @@ has() { grep -qF -- "$2" "$1" || fail "$3"; }
 hasnt() { grep -qF -- "$2" "$1" && fail "$3"; return 0; }
 
 for name in context-envelope evidence-collection preflight-research interview-research assurance-classification plan-review \
-  plan-review-merge pr-review-merge execution-schedule item-implementation final-verification; do
+  plan-review-merge pr-review-merge execution-schedule item-implementation final-verification \
+  simplification-map simplification-synthesis; do
   file="$REPO_DIR/src/workers/$name.md"
   [ -s "$file" ] || fail "missing or empty worker contract: $file"
   has "$file" 'WORKER_ONLY_SENTINEL_' "$file has no worker-only sentinel"
@@ -86,6 +87,19 @@ has "$assurance" 'Unknown or conflicting risk' 'assurance worker no longer fails
 has "$assurance" 'SPECIALIST_AREAS=' 'assurance worker lost deterministic roster inputs'
 has "$verification" 'Do not fix a failure inline' 'verification contract may hide a failed gate'
 
+simplify_map="$REPO_DIR/src/workers/simplification-map.md"
+simplify_synthesis="$REPO_DIR/src/workers/simplification-synthesis.md"
+has "$simplify_map" 'concepts, responsibilities, and owners' \
+  'simplification mapping lost concept/ownership discovery'
+has "$simplify_map" 'duplicated policy' 'simplification mapping lost duplicate-policy discovery'
+has "$simplify_map" 'compatibility paths' 'simplification mapping lost compatibility discovery'
+has "$simplify_synthesis" 'nothing worth changing' \
+  'simplification synthesis forces churn in a coherent system'
+has "$simplify_synthesis" 'consumer closure' \
+  'simplification synthesis permits deletion without bounded consumers'
+has "$simplify_synthesis" 'Concept reduction outranks line reduction' \
+  'simplification synthesis regressed to a line-deletion target'
+
 preflight="$REPO_DIR/src/workers/preflight-research.md"
 has "$preflight" '8192-byte envelope budget' 'pre-flight contract lost its budget'
 has "$preflight" 'Locate, but do not read or summarize, prior decision records' \
@@ -140,6 +154,12 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln/implementation.md" 'adopted system-fit outcome' \
     "$host coordinator no longer checks the bounded diff against adopted ownership"
   has "$WORK/$host/phases/pln/finish-ship.md" 'src/workers/final-verification.md' "$host finish phase does not reference verification contract"
+  has "$WORK/$host/phases/pln-simplify/map-synthesize.md" 'src/workers/simplification-map.md' \
+    "$host simplification phase does not reference its mapping contract"
+  has "$WORK/$host/phases/pln-simplify/map-synthesize.md" 'src/workers/simplification-synthesis.md' \
+    "$host simplification phase does not reference its synthesis contract"
+  has "$WORK/$host/phases/pln-simplify/verify-record.md" 'src/workers/final-verification.md' \
+    "$host simplification recording does not reuse final verification"
   has "$WORK/$host/SKILL.md" 'at most two exact operations' "$host /pln router lost the direct lookup budget"
   has "$WORK/$host/SKILL.md" 'routing.tsv' "$host /pln router lost the local routing ledger"
   has "$WORK/$host/pln-pr/SKILL.md" 'at most two exact operations' "$host /pln-pr router lost the direct lookup budget"

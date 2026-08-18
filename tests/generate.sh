@@ -336,6 +336,8 @@ real_x="$WORK/real-codex"
 
 targets="$("$BIN" --list)"
 [ -n "$targets" ] || fail "the real sources declare no targets"
+printf '%s\n' "$targets" | grep -qxF 'pln-simplify/SKILL.md' \
+  || fail 'the real target list omits pln-simplify/SKILL.md'
 
 while IFS= read -r t; do
   for f in "$real_c/$t" "$real_x/$t"; do
@@ -366,6 +368,17 @@ done <<< "$targets"
 # checks above would pass on an empty file.
 has "$real_c/SKILL.md" 'Workflow' "the claude build has no Workflow mechanics"
 has "$real_x/SKILL.md" 'pln-codex-agent' "the codex build has no Codex agent mechanics"
+for host_out in "$real_c" "$real_x"; do
+  host_out="$(cd "$host_out" && pwd -P)"
+  simplify="$host_out/pln-simplify/SKILL.md"
+  has "$simplify" 'name: pln-simplify' 'pln-simplify frontmatter name/path disagree'
+  has "$simplify" 'nothing worth changing' 'pln-simplify lost the valid clean-assessment outcome'
+  has "$simplify" "$host_out/SKILL.md" 'pln-simplify duplicated the root lifecycle router'
+  has "$simplify" 'phases/pln/implementation.md' 'pln-simplify duplicated the implementation lifecycle'
+  has "$simplify" 'phases/pln/blocker.md' 'pln-simplify duplicated blocker handling'
+  has "$simplify" 'phases/pln-simplify/map-synthesize.md' 'pln-simplify lost its mapping specialization'
+  has "$simplify" 'phases/pln-simplify/verify-record.md' 'pln-simplify lost success recording'
+done
 has "$real_c/phases/pln/implementation.md" 'commit owner: coordinator' \
   "the claude build lost coordinator-owned item checkpoints"
 has "$real_x/phases/pln/implementation.md" 'commit owner: coordinator' \
@@ -580,6 +593,18 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   has "$f" '### Message shape' "$f lost the shared message shapes"
   has "$f" '### Conversational voice' "$f lost the host voice fragment inside Style"
   has "$f" '### Echoing recorded decisions' "$f lost the shared formatting rules"
+done
+
+for host_out in "$real_c" "$real_x"; do
+  host_out="$(cd "$host_out" && pwd -P)"
+  router="$host_out/pln-simplify/SKILL.md"
+  for phase in map-synthesize verify-record; do
+    phase_file="$host_out/phases/pln-simplify/$phase.md"
+    [ -s "$phase_file" ] || fail "missing /pln-simplify phase $phase"
+    has "$router" "$phase_file" "the /pln-simplify router does not use the absolute $phase path"
+  done
+  has "$host_out/phases/pln-simplify/map-synthesize.md" "$host_out/phases/pln/outline.md" \
+    'pln-simplify duplicated plan placement or the outline checkpoint'
 done
 
 # The to-do-location flow is one source per host, included by both skills — a

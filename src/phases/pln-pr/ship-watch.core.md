@@ -4,6 +4,8 @@ name: pln-pr-phase-ship-watch
 
 # /pln-pr phase: ship and watch
 
+<!-- pln:include active-turn-lifecycle -->
+
 Read this file in full before version/changelog, final-gauntlet, push, PR, or CI actions. Reconcile the stored tree fingerprint, command/environment fingerprint, PR identity, and CI round before reusing results or repeating an external action. Conflicts or uncertain external completion fail closed.
 
 Write new tree/command/environment/candidate fingerprints after every fix, version, command, environment, or CI edit and invalidate stale verification. Persist the final gauntlet before push; persist PR identity immediately after create/update; persist every CI round and outcome before another fix/watch cycle. After terminal green/merge-ready status or the user's deliberate stop is durable, set `Phase: complete`.

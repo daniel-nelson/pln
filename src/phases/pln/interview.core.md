@@ -4,6 +4,8 @@ name: pln-phase-interview
 
 # /pln phase: interview
 
+<!-- pln:include active-turn-lifecycle -->
+
 Read this file in full before the first interview action. `Phase: interview` permits planning conversation, durable plan edits, read-only research, and incidental capture only; it never permits feature implementation.
 
 Before sending any question, write the self-contained question under `Open questions`. After the answer, write the decision and reconcile the item before removing that question. When every active item is resolved, finish every item/detail/dashboard write, set `Phase: review-approval`, then read that phase in full before review or gate work.

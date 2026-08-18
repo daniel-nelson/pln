@@ -4,6 +4,8 @@ name: pln-phase-implementation
 
 # /pln phase: implementation
 
+<!-- pln:include active-turn-lifecycle -->
+
 Read this file in full before the first implementation action. Rebuild pending work from the durable dashboard and `<plan-dir>/run-manifest.tsv`, never memory. `Phase: implementation` permits scheduling, item dispatch, and coordinator checkpointing only after adoption is recorded.
 
 Keep the cursor here across ordinary item boundaries. On a blocker, first write the handoff and item/dashboard state, then set `Phase: blocker` and load that file. When no runnable implementation or deferred item remains, finish all item outcomes, set `Phase: finish-ship`, and load that phase before verification or shipping.

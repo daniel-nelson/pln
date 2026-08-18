@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.37.0 — 2026-08-18
+
+### Changed
+
+- **Accepted automatic work now stays attached to the active parent turn across `/pln` and `/pln-pr`.** Every recursively loaded phase applies one shared terminal-state audit: reconcile native workers and tracked command handles, consume completed results into the durable cursor, and run the phase finish check before any final response. A progress update is commentary, never permission to end the turn while work is running, recoverable, ready, or awaiting integration; the host's native activity UI remains the authoritative progress surface without synthetic chat heartbeats.
+- **Peer work and PR watches follow the same lifecycle instead of escaping through host-specific gaps.** An overlapping `pln-peer` call must retain and join both native handles. Claude retains and joins its native background task or monitor; Codex runs networked CI polling in the coordinator's resumable command session and polls that same handle rather than launching a disowned shell process that requires a later user turn to rediscover it.
+
 ## 1.36.0 — 2026-08-18
 
 ### Changed

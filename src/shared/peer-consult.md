@@ -10,6 +10,8 @@ One helper selects and runs a cross-provider peer. Use it for R3's adversarial s
 
 The peer brief is file-first and self-contained. A peer may be prompt-in/text-out without repository access, so include the reviewed plan/diff portion, source fingerprint, paths, schema, and question. If the material is too large, include the decision-bearing portion and name the rest; never substitute a bare path. The peer's result and log remain raw artifacts read only by the assigned judgment merge worker.
 
+Run the helper as a tracked foreground or host-native resumable command. If it overlaps an independent same-model roster, retain both native handles and join both before advancing. Never detach `pln-peer` with an untracked shell `&`/`disown`, and never send a final response while the peer subprocess or its paired roster remains active.
+
 The helper reports eight fixed metadata lines: rung, peer, status, result/log paths, and actual judgment profile/model/effort. Rung 1 is the configured `peer_command`; rung 2 is an authenticated supported CLI other than the host; rung 3 sends nothing. Read no result unless exit 0 and `STATUS=ok`.
 
 ## Two separate one-time decisions

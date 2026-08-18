@@ -4,6 +4,8 @@ name: pln-pr-phase-fix
 
 # /pln-pr phase: fix
 
+<!-- pln:include active-turn-lifecycle -->
+
 Read this file in full before the first fix decision or dispatch. Rebuild open clusters from `REVIEW.md`, not memory. Keep the cursor here while fixes and their narrow verification/checkpoints complete.
 
 Before asking a decision or handing off a blocked cluster, write it and all partial-state pointers durably, then set `Phase: blocker` and load that phase. Once every finding is durably fixed/skipped and the post-fix result is recorded, set `Phase: ship-watch` and load that phase before versioning, the final gauntlet, push, PR, or CI work.

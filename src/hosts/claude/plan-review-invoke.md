@@ -2,4 +2,4 @@ Use one fresh non-fork `general-purpose` `Agent` call per same-model roster slot
 
 Each call's result is a pointer, the only thing that reaches this context. Independent roster slots may use one Workflow fan-out, but the validated roster cap still applies. Wait for completion and apply the same non-empty check to every slot.
 
-**Alongside the peer.** Where the R3 adversarial slot uses a peer, start its shell call in the background and run the same-model roster slots without waiting. Read only fixed metadata once all return; the merge worker reads raw artifacts. Where background shell is unavailable, sequence them.
+**Alongside the peer.** Where the R3 adversarial slot uses a peer, start its shell call in the background as a tracked native Bash task and run the same-model roster slots without waiting. Retain the task handle, join it and the roster before advancing, and read only fixed metadata once all return; the merge worker reads raw artifacts. Where tracked background shell is unavailable, sequence them.

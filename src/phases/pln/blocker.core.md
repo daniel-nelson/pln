@@ -4,6 +4,8 @@ name: pln-phase-blocker
 
 # /pln phase: blocker handling
 
+<!-- pln:include active-turn-lifecycle -->
+
 Read this file in full before the first blocker action. Enter only after the worker's partial state, handoff, worktree, available handle/thread, and item status are durable in `run-manifest.tsv`. On restart, validate the manifest and reconcile its source HEAD, dirty snapshot, handoff, worktree, diff/commit, result, and item row before asking or resuming. A handle is an optimization, not required recovery state; missing or conflicting worktree/artifact state fails closed.
 
 Persist the blocking question in `Open questions` before sending it. After the answer, write the decision and remove the open question, retain the recorded partial state, set `Phase: implementation`, then read the implementation phase in full before continuing the same worker or its documented fresh-worker fallback. Recompute readiness from the manifest; never jump to a remembered next item.

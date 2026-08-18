@@ -4,6 +4,8 @@ name: pln-phase-review-approval
 
 # /pln phase: plan review and approval
 
+<!-- pln:include active-turn-lifecycle -->
+
 Read this file in full before the first review or approval action. `Phase: review-approval` permits only plan review, plan repair, the approval conversation, and durable adoption writes; no feature implementation may begin here.
 
 A review round remains in this phase until its merge result and all plan repairs/findings are durable. Persist any reopened question before sending it. After explicit adoption, write the Ship choice and PR base, reconcile all open questions/findings, then set `Phase: implementation` and read the implementation phase in full before dispatch. Delegated mode's advance adoption uses the same durable writes before advancing.

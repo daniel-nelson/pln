@@ -4,6 +4,8 @@ name: pln-pr-phase-scope-baseline
 
 # /pln-pr phase: scope and baseline
 
+<!-- pln:include active-turn-lifecycle -->
+
 Read this file in full before the first repository or remote action. Create `REVIEW.md` before durable scope work with a `## State` section containing `Phase: scope-baseline`, Base, Base source, Trust/command confirmation, Diff base, Tree/command/environment/candidate fingerprints, Risk tier/signals, Review status, PR identity, and CI round/status. Update those fields as facts become known.
 
 Finish base validation, trust decisions, exact-tree fingerprinting, and any baseline result before advancing. Then set `Phase: review` and read the review phase in full. If an existing ledger shows later durable work, reconcile it and follow the router rather than overwriting or re-reviewing it.

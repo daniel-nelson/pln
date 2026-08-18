@@ -1,3 +1,3 @@
 host	model	status	fixture_sha256	skill_version	reason
-claude	sonnet	disabled	dbf7d3d0490bdbd54027791e070ea7ae918ff37b80ecbb18d6d8e2037782b6ff	1.36.0	replacement-frontier-pass-economy-holdout-not-reused
-codex	gpt-5.6-luna	disabled	dbf7d3d0490bdbd54027791e070ea7ae918ff37b80ecbb18d6d8e2037782b6ff	1.36.0	calibration-unavailable-no-api-credits
+claude	sonnet	disabled	dbf7d3d0490bdbd54027791e070ea7ae918ff37b80ecbb18d6d8e2037782b6ff	1.37.0	replacement-frontier-pass-economy-holdout-not-reused
+codex	gpt-5.6-luna	disabled	dbf7d3d0490bdbd54027791e070ea7ae918ff37b80ecbb18d6d8e2037782b6ff	1.37.0	calibration-unavailable-no-api-credits

@@ -77,6 +77,14 @@ has "$interview" 'Check exactly the one proposed ask-lane question' \
   'record research is no longer query-scoped'
 has "$interview" 'Do not read prior plans or architecture-decision records in this mode' \
   'item research may trawl prior decisions'
+has "$interview" 'current owner, closest analogues, and material producers, callers, and consumers' \
+  'item research lost the existing-system ownership map'
+has "$interview" 'reuse, extension, consolidation, replacement, and directly caused retirement routes' \
+  'item research no longer compares additive work with smaller system-fit routes'
+has "$interview" 'localized correction inside an established owner' \
+  'item research applies the heavy system-fit comparison to local corrections'
+has "$interview" 'specific acceptance criterion or invariant' \
+  'item research permits unsupported claims of distinctness'
 
 evidence="$REPO_DIR/src/workers/evidence-collection.md"
 has "$evidence" 'mechanically closed' 'evidence worker is not limited to closed facts'
@@ -104,6 +112,14 @@ for host in claude codex; do
   has "$WORK/$host/pln-pr/SKILL.md" 'routing.tsv' "$host /pln-pr router lost the local routing ledger"
   has "$WORK/$host/phases/pln/outline.md" 'Preflight is judgment work' "$host preflight no longer stays frontier"
   has "$WORK/$host/phases/pln/interview.md" 'candidate prior-record matches' "$host interview lost the prior-record evidence/judgment split"
+  has "$WORK/$host/phases/pln/interview.md" 'strongest existing-owner route' \
+    "$host interview no longer gates new durable concepts on system fit"
+  has "$WORK/$host/phases/pln/interview.md" 'do not admit the new concept' \
+    "$host interview does not block unsupported additive ownership"
+  has "$WORK/$host/phases/pln/interview.md" 'even when plan review is disabled' \
+    "$host system-fit gate incorrectly depends on plan review"
+  has "$WORK/$host/phases/pln/interview.md" 'no direct retirement found' \
+    "$host interview no longer records the directly caused retirement outcome"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Possibly unbounded metadata' "$host PR scope phase lost file-first metadata collection"
   has "$WORK/$host/phases/pln-pr/review.md" 'src/workers/pr-review-merge.md' "$host PR review phase lost file-first merge ownership"
   has "$WORK/$host/phases/pln-pr/review.md" 'Never open a reviewer or peer result' "$host PR review reads raw findings into the coordinator"

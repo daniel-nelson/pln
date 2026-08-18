@@ -27,11 +27,25 @@ review="$REPO_DIR/src/workers/plan-review.md"
 has "$review" 'Finding nothing is permitted' 'review contract forces manufactured findings'
 has "$review" 'file:line' 'review contract lost citation checking'
 has "$review" 'RESULT_FILE=' 'native reviewer no longer returns a result pointer'
+has "$review" 'durable responsibilities and owners across the complete plan' \
+  'broad review lost whole-plan responsibility composition'
+has "$review" 'added, reused, retained, consolidated, replaced, and retired' \
+  'broad review lost qualitative surface-state mapping'
+has "$review" 'current owners, closest analogues, and sibling items' \
+  'broad review no longer compares parallel planned surfaces'
 
 merge="$REPO_DIR/src/workers/plan-review-merge.md"
 has "$merge" 'Reject, repair, or flag' 'merge contract lost its classification rubric'
 has "$merge" 'never repair over a user-made decision' 'merge contract lost user-decision protection'
 has "$merge" '4096-byte budget' 'merge contract lost its bounded envelope'
+has "$merge" 'responsibility, owner, or path' \
+  'merge contract no longer groups related structural findings'
+has "$merge" 'combined repair set against the complete plan' \
+  'merge contract no longer checks structural repairs as a whole'
+has "$merge" 'strictly dominant internal correction' \
+  'merge contract turns clear-winner internal repairs into user gates'
+has "$merge" 'visible behavior, scope, cost, risk appetite, irreversible or external state, or work outside' \
+  'merge contract lost the canonical material-fork boundary'
 
 implementation="$REPO_DIR/src/workers/item-implementation.md"
 scheduling="$REPO_DIR/src/workers/execution-schedule.md"

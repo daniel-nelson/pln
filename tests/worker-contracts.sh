@@ -14,7 +14,7 @@ hasnt() { grep -qF -- "$2" "$1" && fail "$3"; return 0; }
 
 for name in context-envelope evidence-collection preflight-research interview-research assurance-classification plan-review \
   plan-review-merge pr-review-merge execution-schedule item-implementation final-verification \
-  simplification-map simplification-synthesis; do
+  simplification-map simplification-synthesis behavior-preservation; do
   file="$REPO_DIR/src/workers/$name.md"
   [ -s "$file" ] || fail "missing or empty worker contract: $file"
   has "$file" 'WORKER_ONLY_SENTINEL_' "$file has no worker-only sentinel"
@@ -67,6 +67,10 @@ has "$implementation" 'equally capable smaller route' \
   'implementation worker no longer prefers coherent reuse over parallel ownership'
 has "$implementation" 'Surface balance:' \
   'implementation results lost their qualitative surface balance'
+has "$implementation" 'Retained behavior:' \
+  'implementation surface balance no longer names retained-behavior evidence'
+has "$implementation" 'behavior-preservation.md' \
+  'implementation stopped using the shared behavior-preservation owner'
 has "$implementation" 'non-binding reversible mechanics' \
   'implementation worker may treat reversible plan mechanics as immutable'
 has "$scheduling" $'ITEM\tDEPS\tLEASES\tCOHORT\tCONTEXT\tDIRTY_STATE' \
@@ -89,6 +93,7 @@ has "$verification" 'Do not fix a failure inline' 'verification contract may hid
 
 simplify_map="$REPO_DIR/src/workers/simplification-map.md"
 simplify_synthesis="$REPO_DIR/src/workers/simplification-synthesis.md"
+behavior_preservation="$REPO_DIR/src/workers/behavior-preservation.md"
 has "$simplify_map" 'concepts, responsibilities, and owners' \
   'simplification mapping lost concept/ownership discovery'
 has "$simplify_map" 'duplicated policy' 'simplification mapping lost duplicate-policy discovery'
@@ -103,6 +108,29 @@ has "$simplify_synthesis" 'Concept reduction outranks line reduction' \
   'simplification synthesis regressed to a line-deletion target'
 has "$simplify_synthesis" 'Do not edit product files, plans, review ledgers, or git state' \
   'simplification synthesis crossed into implementation or coordination ownership'
+has "$simplify_synthesis" 'behavior-preservation.md' \
+  'simplification synthesis stopped using the shared behavior-preservation owner'
+
+# One shared owner protects both simplification and structural repair from
+# mistaking source reachability for preserved behavior.
+has "$behavior_preservation" 'removal, replacement, or consolidation' \
+  'behavior preservation no longer covers every simplifying mutation'
+has "$behavior_preservation" 'direct and indirect consumers' \
+  'behavior preservation lost indirect-consumer coverage'
+has "$behavior_preservation" 'externally observable behavior' \
+  'behavior preservation lost observable-boundary coverage'
+has "$behavior_preservation" 'Private reachability, an absence of references' \
+  'private or reference evidence can masquerade as behavioral proof'
+has "$behavior_preservation" 'post-change tests alone' \
+  'post-only tests can masquerade as behavioral proof'
+has "$behavior_preservation" 'recorded pre-change source' \
+  'behavior preservation lost its baseline characterization'
+has "$behavior_preservation" 'compare the post-change result' \
+  'behavior preservation lost its pre/post comparison'
+has "$behavior_preservation" 'Public, compatibility, persisted/stateful, or uncertain' \
+  'compatibility or state uncertainty no longer retains the surface or blocks'
+has "$behavior_preservation" '`no change`' \
+  'behavior preservation forces churn when no safe candidate exists'
 
 preflight="$REPO_DIR/src/workers/preflight-research.md"
 has "$preflight" '8192-byte envelope budget' 'pre-flight contract lost its budget'
@@ -143,6 +171,8 @@ has "$pr_merge" 'bin/pln-assurance repair-key --kind structural' \
   'PR merge worker lost deterministic structural repair identity'
 has "$pr_merge" 'private reachability' \
   'PR merge worker can auto-route deletion without private reachability proof'
+has "$pr_merge" 'behavior-preservation.md' \
+  'PR merge stopped using the shared behavior-preservation owner'
 
 "$REPO_DIR/bin/pln-generate" --host claude --out-dir "$WORK/claude" >/dev/null
 "$REPO_DIR/bin/pln-generate" --host codex --out-dir "$WORK/codex" >/dev/null
@@ -155,6 +185,8 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln/implementation.md" 'src/workers/execution-schedule.md' "$host implementation phase does not reference scheduling contract"
   has "$WORK/$host/phases/pln/implementation.md" 'qualitative surface balance' \
     "$host coordinator no longer validates implementation surface balance"
+  has "$WORK/$host/phases/pln/implementation.md" 'retained behavior' \
+    "$host coordinator no longer validates retained-behavior evidence"
   has "$WORK/$host/phases/pln/implementation.md" 'adopted system-fit outcome' \
     "$host coordinator no longer checks the bounded diff against adopted ownership"
   has "$WORK/$host/phases/pln/finish-ship.md" 'src/workers/final-verification.md' "$host finish phase does not reference verification contract"
@@ -162,6 +194,8 @@ for host in claude codex; do
     "$host simplification phase does not reference its mapping contract"
   has "$WORK/$host/phases/pln-simplify/map-synthesize.md" 'src/workers/simplification-synthesis.md' \
     "$host simplification phase does not reference its synthesis contract"
+  has "$WORK/$host/phases/pln-simplify/map-synthesize.md" 'src/workers/behavior-preservation.md' \
+    "$host simplification phase stopped using the shared behavior-preservation owner"
   has "$WORK/$host/phases/pln-simplify/verify-record.md" 'src/workers/final-verification.md' \
     "$host simplification recording does not reuse final verification"
   has "$WORK/$host/SKILL.md" 'at most two exact operations' "$host /pln router lost the direct lookup budget"
@@ -185,9 +219,13 @@ for host in claude codex; do
     "$host broad PR review lost structural traversal"
   has "$WORK/$host/phases/pln-pr/review.md" 'structural_evidence?' \
     "$host PR finding schema lost additive structural evidence"
+  has "$WORK/$host/phases/pln-pr/review.md" 'src/workers/behavior-preservation.md' \
+    "$host PR review stopped using the shared behavior-preservation owner"
   has "$WORK/$host/phases/pln-pr/fix.md" 'src/workers/execution-schedule.md' "$host PR fix phase does not reference scheduling contract"
   has "$WORK/$host/phases/pln-pr/fix.md" 'repository-native discovery' \
     "$host PR fix phase can delete private surface without native discovery"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'src/workers/behavior-preservation.md' \
+    "$host PR fix phase stopped using the shared behavior-preservation owner"
   has "$WORK/$host/phases/pln-pr/fix.md" 'rerun the structural reference check and consumer map' \
     "$host post-fix assurance lost structural closure"
   for file in "$WORK/$host/SKILL.md" "$WORK/$host/phases/pln/"*.md; do

@@ -4,6 +4,7 @@ You are a fresh worker implementing exactly one adopted plan item. The assignmen
 
 1. Read `PLAN.md` in full. Its dashboard—pre-flight findings, mandated skills, verification commands, cross-item notes—and the assigned item's detail section are your spec. Re-establish every mandated skill in your fresh context.
 2. Implement only that item to its acceptance criteria. Before adding a parallel owner or behavior path, inspect the established owners and the plan's adopted system-fit outcome. Prefer an equally capable smaller route through reuse, extension, consolidation, replacement, or directly caused retirement when repository evidence supports it. Existing duplication is evidence to assess, not permission for more, and this comparison never widens into unrelated cleanup or a deletion/size quota. Preserve all unrelated worktree changes.
+   For every removal, replacement, or consolidation, read and follow `behavior-preservation.md` beside this file before editing product files. Establish or validate its repository-native pre-change characterization, including indirect consumers and externally observable behavior, then run and compare the post-change characterization. If the baseline is missing or uncertainty remains at a public, compatibility, persisted/stateful, or dynamic boundary, retain the surface or stop at the existing blocker threshold; private reachability, absent references, and post-change tests alone never authorize the change.
 3. The plan records binding intent, acceptance criteria, depended-on decisions, and visible consequences, not reversible mechanics. You may replace non-binding reversible mechanics with a smaller in-scope mechanism without blocking when those binding outcomes remain intact; record the departure and evidence in the result. Stop at the normal blocker threshold if the alternative changes scope, consequences, an irreversible effect, a user decision, or a cross-item premise.
 4. When the item calls for a test:
    - Exercise the path the code actually runs and assert what crosses a mocked boundary, not only the boundary's inputs. Say when an external boundary remains mocked.
@@ -23,6 +24,7 @@ On success, write detailed command/test output to the evidence path and a concis
 Surface balance:
 - Added: <new durable surface, or none>
 - Reused/consolidated/replaced/retired: <existing surface used or removed, or none>
+- Retained behavior: <affected boundary and repository-native pre/post comparison evidence, or not applicable when no removal/replacement/consolidation occurred>
 - Retained duplication/compatibility: <repository evidence and reason, or none>
 ```
 

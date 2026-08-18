@@ -145,10 +145,38 @@ has "$behavior_preservation" 'Public, compatibility, persisted/stateful, or unce
   'compatibility or state uncertainty no longer retains the surface or blocks'
 has "$behavior_preservation" '`no change`' \
   'behavior preservation forces churn when no safe candidate exists'
+has "$behavior_preservation" 'Safety disposition:' \
+  'behavior preservation lost its explicit safety-disposition record'
+has "$behavior_preservation" 'Baseline suite/outcome:' \
+  'behavior preservation disposition lost the exact baseline conjunct'
+has "$behavior_preservation" 'Fault detection:' \
+  'behavior preservation disposition lost meaningful new-test fault detection'
+has "$behavior_preservation" 'Consumer closure:' \
+  'behavior preservation disposition lost direct/indirect/dynamic closure'
+has "$behavior_preservation" 'Observable/state effects:' \
+  'behavior preservation disposition lost externally observable and state effects'
+has "$behavior_preservation" 'Public/compatibility classification:' \
+  'behavior preservation disposition lost public/compatibility classification'
+has "$behavior_preservation" 'Comparable pre/post route:' \
+  'behavior preservation disposition lost the comparable pre/post route'
+has "$behavior_preservation" 'Consequential/destructive uncertainty:' \
+  'behavior preservation disposition lost consequential/destructive uncertainty'
+has "$behavior_preservation" 'The default is `retain`' \
+  'behavior preservation no longer defaults to retention'
+has "$behavior_preservation" 'Only `admit` when every required conjunct is `pass`' \
+  'behavior preservation can admit an incomplete safety proof'
+has "$behavior_preservation" 'missing, malformed, `unknown`, or `fail`' \
+  'behavior preservation does not fail closed on malformed or missing proof'
+has "$behavior_preservation" 'Structural clues cannot override' \
+  'structural clues can override the safety veto'
 has "$simplify_synthesis" 'exact runnable baseline commands or scenarios and their recorded outcomes' \
   'simplification synthesis admits candidates without executable baseline evidence'
 has "$simplify_synthesis" '`capture during implementation` is not evidence' \
   'simplification synthesis may defer its admission gate into implementation'
+has "$simplify_synthesis" 'one complete `Safety disposition` record per candidate' \
+  'simplification synthesis does not return a complete disposition per candidate'
+has "$simplify_synthesis" '`retain` candidate' \
+  'simplification synthesis drops retained candidates instead of reporting their veto'
 has "$implementation" 'rerun the same admitted behavior suite' \
   'implementation no longer validates equivalent pre/post behavior evidence'
 
@@ -195,6 +223,10 @@ has "$pr_merge" 'behavior-preservation.md' \
   'PR merge stopped using the shared behavior-preservation owner'
 has "$pr_merge" 'exact runnable baseline commands or scenarios and recorded outcomes' \
   'PR merge can admit structural repair without executable baseline evidence'
+has "$pr_merge" 'one complete `Safety disposition` record' \
+  'PR merge does not normalize structural repairs to the shared disposition'
+has "$pr_merge" 'missing or malformed disposition is `retain`' \
+  'PR merge does not default malformed structural proof to retention'
 
 "$REPO_DIR/bin/pln-generate" --host claude --out-dir "$WORK/claude" >/dev/null
 "$REPO_DIR/bin/pln-generate" --host codex --out-dir "$WORK/codex" >/dev/null
@@ -224,6 +256,14 @@ for host in claude codex; do
     "$host simplification phase admits candidates without baseline execution evidence"
   has "$WORK/$host/phases/pln-simplify/map-synthesize.md" '`capture during implementation`' \
     "$host simplification phase may postpone behavior admission evidence"
+  has "$WORK/$host/phases/pln-simplify/map-synthesize.md" 'Treat an omitted or malformed disposition as `retain`' \
+    "$host simplification coordinator does not default-retain malformed proof"
+  has "$WORK/$host/phases/pln-simplify/map-synthesize.md" 'Only an `admit` record with every required conjunct marked `pass`' \
+    "$host simplification coordinator does not recognize complete admission proof"
+  has "$WORK/$host/phases/pln-simplify/map-synthesize.md" 'convert it to retained evidence' \
+    "$host simplification coordinator does not demote incomplete admission"
+  has "$WORK/$host/phases/pln-simplify/map-synthesize.md" '`nothing worth changing`' \
+    "$host simplification coordinator lost the no-change outcome"
   has "$WORK/$host/phases/pln-simplify/verify-record.md" 'src/workers/final-verification.md' \
     "$host simplification recording does not reuse final verification"
   has "$WORK/$host/SKILL.md" 'at most two exact operations' "$host /pln router lost the direct lookup budget"
@@ -253,6 +293,8 @@ for host in claude codex; do
     "$host PR review can admit repair without executable baseline evidence"
   has "$WORK/$host/phases/pln-pr/review.md" 'implementation-detail tests' \
     "$host PR review can substitute implementation-coupled coverage"
+  has "$WORK/$host/phases/pln-pr/review.md" 'Safety disposition' \
+    "$host PR merge does not persist the shared safety disposition"
   has "$WORK/$host/phases/pln-pr/fix.md" 'src/workers/execution-schedule.md' "$host PR fix phase does not reference scheduling contract"
   has "$WORK/$host/phases/pln-pr/fix.md" 'repository-native discovery' \
     "$host PR fix phase can delete private surface without native discovery"
@@ -262,6 +304,10 @@ for host in claude codex; do
     "$host PR fix phase lost equivalent pre/post behavior execution"
   has "$WORK/$host/phases/pln-pr/fix.md" 'full repository gauntlet remains the final regression floor' \
     "$host PR fix phase displaced the final gauntlet"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'missing or malformed record is `retain`' \
+    "$host PR repair does not fail closed on a missing disposition"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'Only a complete `admit` record' \
+    "$host PR repair does not require complete admission proof"
   has "$WORK/$host/phases/pln-pr/fix.md" 'rerun the structural reference check and consumer map' \
     "$host post-fix assurance lost structural closure"
   for file in "$WORK/$host/SKILL.md" "$WORK/$host/phases/pln/"*.md; do

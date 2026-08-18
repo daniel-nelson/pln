@@ -4,6 +4,8 @@ name: pln-pr-phase-review
 
 # /pln-pr phase: review
 
+<!-- pln:include active-turn-lifecycle -->
+
 Read this file in full before the first reviewer or peer action. Keep `Phase: review` until successful-reader attribution, raw artifacts, merge outcome, and the complete ledger are durable. Missing, empty, or malformed reviewers are failures, never clean results.
 
 After the merged ledger is durable, set `Review status` and then set `Phase: fix` when acted-on findings remain or `Phase: ship-watch` when none remain. Read the mapped phase before its first action.

@@ -61,6 +61,17 @@ has "$WORK/plan/run-manifest.tsv" $'4\t1,2,3\tUNKNOWN\t-\tfresh\tunknown\t3\tori
 has "$WORK/plan/run-manifest.tsv" $'5\t1,4\tsrc/api/generated\t-\tfresh\tclean\t4\toriginal' \
   'unknown/ancestor relations did not add conservative dependency edges'
 
+if "$SCHEDULER" finish-check --manifest "$WORK/plan/run-manifest.tsv" \
+  >"$WORK/finish-check.out" 2>"$WORK/finish-check.err"; then
+  fail 'a pending implementation manifest unexpectedly passed the finish gate'
+fi
+has "$WORK/finish-check.out" 'STATUS=active' \
+  'the finish gate did not report a nonterminal manifest as active'
+has "$WORK/finish-check.out" $'ACTIVE\t1\tpending' \
+  'the finish gate did not identify a pending item'
+has "$WORK/finish-check.err" 'implementation remains; keep the coordinator turn alive' \
+  'the finish gate did not explain the required coordinator behavior'
+
 ready="$WORK/ready.out"
 "$SCHEDULER" ready --manifest "$WORK/plan/run-manifest.tsv" > "$ready"
 has "$ready" $'READY\t1\t1\tisolated\tfresh' 'node 1 was not initially ready'
@@ -160,5 +171,38 @@ has "$WORK/err" 'cohort exceeds the three-node cap' \
   'overlong cohort failed without naming the cap'
 
 "$SCHEDULER" verify --manifest "$WORK/plan/run-manifest.tsv" >/dev/null
+
+cat > "$WORK/plan/terminal-nodes.tsv" <<'EOF'
+ITEM	DEPS	LEASES	COHORT	CONTEXT	DIRTY_STATE
+1	-	src/terminal	-	fresh	clean
+EOF
+"$SCHEDULER" build --root "$WORK/plan" --nodes "$WORK/plan/terminal-nodes.tsv" \
+  --manifest "$WORK/plan/terminal-manifest.tsv" --source-root "$WORK/repo" \
+  --source-head head --dirty-snapshot "$WORK/plan/dirty.tsv" --repo-mode git >/dev/null
+"$SCHEDULER" claim --manifest "$WORK/plan/terminal-manifest.tsv" --item 1 \
+  --handle terminal-agent --worktree "$WORK/terminal-wt" >/dev/null
+if "$SCHEDULER" finish-check --manifest "$WORK/plan/terminal-manifest.tsv" \
+  >"$WORK/finish-check.out" 2>"$WORK/finish-check.err"; then
+  fail 'a running implementation worker unexpectedly passed the finish gate'
+fi
+has "$WORK/finish-check.out" $'ACTIVE\t1\trunning' \
+  'the finish gate did not identify a running worker'
+"$SCHEDULER" checkpoint --manifest "$WORK/plan/terminal-manifest.tsv" --item 1 \
+  --result results/terminal.txt --commit abc123 --actual-profile judgment \
+  --actual-model frontier --actual-effort high >/dev/null
+if "$SCHEDULER" finish-check --manifest "$WORK/plan/terminal-manifest.tsv" \
+  >"$WORK/finish-check.out" 2>"$WORK/finish-check.err"; then
+  fail 'a checkpointed but unintegrated item unexpectedly passed the finish gate'
+fi
+has "$WORK/finish-check.out" $'ACTIVE\t1\tcheckpointed' \
+  'the finish gate did not identify an unintegrated checkpoint'
+"$SCHEDULER" integrate --manifest "$WORK/plan/terminal-manifest.tsv" --item 1 \
+  --commit abc123 >/dev/null
+"$SCHEDULER" finish-check --manifest "$WORK/plan/terminal-manifest.tsv" \
+  >"$WORK/finish-check.out"
+has "$WORK/finish-check.out" 'STATUS=complete' \
+  'a fully integrated manifest did not pass the finish gate'
+has "$WORK/finish-check.out" 'ACTIVE_COUNT=0' \
+  'the complete finish gate reported active work'
 
 echo "OK"

@@ -58,7 +58,7 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 
 ## How it works
 
-**`/pln`** runs a complete interview phase before writing a single line of code. It first shows an editable chapter-outline view, then asks one question at a time and records every decision into `PLAN.md`. Once you approve the master plan, the main session becomes a thin orchestrator: it derives a conservative dependency graph, runs independent items in isolated worktrees in waves of at most three, and keeps uncertain or overlapping work serial. A durable manifest, item-level checkpoints, and retained blocker worktrees let a restarted session continue without trusting conversational memory or a surviving agent handle. Plans are saved to `./plans/<date>-<slug>/PLAN.md` relative to wherever you launched your agent.
+**`/pln`** runs a complete interview phase before writing a single line of code. It first shows an editable chapter-outline view, then asks one question at a time and records every decision into `PLAN.md`. Once you approve the master plan, the main session becomes a thin orchestrator: it derives a conservative dependency graph, runs independent items in isolated worktrees in waves of at most three, and keeps uncertain or overlapping work serial. A durable manifest, item-level checkpoints, and retained blocker worktrees let a restarted session continue without trusting conversational memory or a surviving agent handle. On Codex, every quiet subagent wait is reconciled against the native agent list and a manifest finish check prevents the coordinator from ending its turn while implementation remains. If you explicitly ask Codex to persist across turns to a verifiable endpoint—“I am going to sleep; work through completion and open the green PR,” for example—pln also uses a native durable goal when that session exposes one, without making it a new permission gate. Plans are saved to `./plans/<date>-<slug>/PLAN.md` relative to wherever you launched your agent.
 
 The peer posture is built in: during the interview phase, pln will disagree with your framing if it sees a problem, bring up considerations you didn't name, and stop after one question rather than overwhelming you with options. The goal is a plan *you* shaped, not one that was handed to you.
 
@@ -77,6 +77,7 @@ The plan is the same on both hosts, and so is the `PLAN.md` and the review ledge
 | Continuing a blocked item | named Agent + `SendMessage` | durable manifest + `followup_task`, or a fresh recovery agent |
 | Who commits and integrates | the coordinator | the coordinator |
 | `/pln-pr` review | risk-capped Workflow fan-out | risk-capped native reviewer fan-out |
+| Unattended liveness | native completion notifications keep the coordinator active | mailbox reconciliation + manifest finish gate; native goal for explicit across-turn requests when available |
 | Cross-model pass | reaches for `codex`, or whatever `peer_command` names | reaches for `claude`, or whatever `peer_command` names |
 | Notifications | phone push + desktop | desktop |
 

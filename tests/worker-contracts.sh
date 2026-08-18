@@ -48,11 +48,19 @@ has "$implementation" 'host assignment owns which value applies' \
 has "$implementation" 'BLOCKED:' 'implementation contract lost blocker handling'
 has "$implementation" 'Never edit `PLAN.md`, `REVIEW.md`, the run manifest' \
   'implementation worker may race coordinator ledgers'
+has "$implementation" 'equally capable smaller route' \
+  'implementation worker no longer prefers coherent reuse over parallel ownership'
+has "$implementation" 'Surface balance:' \
+  'implementation results lost their qualitative surface balance'
+has "$implementation" 'non-binding reversible mechanics' \
+  'implementation worker may treat reversible plan mechanics as immutable'
 has "$scheduling" $'ITEM\tDEPS\tLEASES\tCOHORT\tCONTEXT\tDIRTY_STATE' \
   'scheduling contract lost its deterministic node schema'
 has "$scheduling" 'no cohort exceeds three nodes' 'scheduling contract lost the cohort cap'
 has "$scheduling" 'Unknown targets or uncertain independence use `UNKNOWN`' \
   'scheduling contract no longer serializes uncertainty'
+has "$scheduling" 'Known consolidation, replacement, or retirement targets' \
+  'scheduling leases omit known anti-bloat write targets'
 
 verification="$REPO_DIR/src/workers/final-verification.md"
 has "$verification" 'full gauntlet' 'verification contract lost the full gauntlet'
@@ -105,6 +113,10 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln/review-approval.md" 'src/workers/plan-review-merge.md' "$host review phase does not reference review merge contract"
   has "$WORK/$host/phases/pln/implementation.md" 'src/workers/item-implementation.md' "$host implementation phase does not reference implementation contract"
   has "$WORK/$host/phases/pln/implementation.md" 'src/workers/execution-schedule.md' "$host implementation phase does not reference scheduling contract"
+  has "$WORK/$host/phases/pln/implementation.md" 'qualitative surface balance' \
+    "$host coordinator no longer validates implementation surface balance"
+  has "$WORK/$host/phases/pln/implementation.md" 'adopted system-fit outcome' \
+    "$host coordinator no longer checks the bounded diff against adopted ownership"
   has "$WORK/$host/phases/pln/finish-ship.md" 'src/workers/final-verification.md' "$host finish phase does not reference verification contract"
   has "$WORK/$host/SKILL.md" 'at most two exact operations' "$host /pln router lost the direct lookup budget"
   has "$WORK/$host/SKILL.md" 'routing.tsv' "$host /pln router lost the local routing ledger"

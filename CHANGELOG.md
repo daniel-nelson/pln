@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.36.0 — 2026-08-18
+
+### Changed
+
+- **Codex coordinators can no longer treat a quiet subagent wait as permission to end the turn.** After every timed-out mailbox wait they reconcile `list_agents`, consume any completion that landed between waits, and continue waiting while a child is still running. A child finishing after the coordinator's final response cannot wake that parent again, so commentary may report progress but a final response is forbidden while accepted implementation, review, fix, or CI work remains.
+- **`/pln` now has a deterministic implementation finish gate.** `pln-scheduler finish-check` exits nonzero and names every pending, running, checkpointed, blocked, waiting, interrupted, or failed item until the whole manifest is integrated. Codex must reconcile native agents and pass this gate before leaving the implementation phase, preventing the observed failure where a worker completed after the parent had silently stopped.
+- **Explicit unattended, across-turn requests use Codex's durable goal primitive when available.** A request such as “I am going to sleep; work through completion and open the green PR” creates or reuses a matching native goal without asking another permission question. Missing goal tools or an unrelated active goal degrade to the existing manifest and live wait loop; goals never bypass plan approval, broaden authority, or answer a genuine user-owned blocker.
+
 ## 1.35.0 — 2026-08-15
 
 ### Changed

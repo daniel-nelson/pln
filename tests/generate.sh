@@ -387,6 +387,27 @@ has "$real_x/phases/pln/implementation.md" 'followup_task' \
   "the codex build lost current native blocker continuation"
 has "$real_x/SKILL.md" 'send_message' \
   "the codex build lost current running-agent steering"
+for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" 'A quiet `wait_agent` timeout is not evidence that the child is still running' \
+    "$f does not require mailbox reconciliation after quiet waits"
+  has "$f" 'A child completion cannot start a new coordinator turn after you send the final response' \
+    "$f does not explain why a running coordinator may not end its turn"
+  has "$f" 'explicitly asks for persistence across turns' \
+    "$f does not recognize an explicit durable-goal request"
+  has "$f" '`create_goal`' \
+    "$f does not use the native durable goal when it is exposed"
+  has "$f" 'the manifest and wait loop remain the fallback' \
+    "$f lets a missing goal tool become a user-facing blocker"
+done
+for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
+  hasnt "$f" 'create_goal' "$f received Codex-only durable-goal mechanics"
+done
+has "$real_x/phases/pln/implementation.md" 'pln-scheduler finish-check' \
+  "the codex implementation phase has no manifest-backed finish gate"
+has "$real_x/phases/pln/implementation.md" 'run `list_agents` after every quiet timeout' \
+  "the codex implementation phase can miss a completion between waits"
+has "$real_x/phases/pln/implementation.md" 'Never send a final response from `Phase: implementation`' \
+  "the codex implementation phase can still end while work is active"
 for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
   hasnt "$f" 'resumeFromRunId' "$f still uses the removed Workflow resume input"
   hasnt "$f" 'JSON.parse' "$f still treats Workflow args as a string"

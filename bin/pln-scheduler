@@ -17,6 +17,7 @@ Usage:
   pln-scheduler interrupt --manifest FILE --item N
   pln-scheduler set-handle --manifest FILE --item N --handle TEXT
   pln-scheduler recover --manifest FILE --item N
+  pln-scheduler finish-check --manifest FILE
   pln-scheduler check-dirty --repo DIR --snapshot FILE --manifest FILE --allow-items CSV|-
   pln-scheduler verify --manifest FILE
 EOF
@@ -445,6 +446,21 @@ case "$command" in
     esac
     printf 'ITEM=%s\nSTATUS=%s\nRECOVERY=%s\nHANDLE=%s\nHANDOFF=%s\nWORKTREE=%s\nRESULT=%s\nCOMMIT=%s\n' \
       "$item" "$status" "$recovery" "$handle" "$handoff" "$worktree" "$result" "$commit"
+    ;;
+
+  finish-check)
+    manifest=""
+    while [ $# -gt 0 ]; do case "$1" in --manifest) manifest="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$manifest" ] || usage
+    verify_manifest "$manifest"
+    active_count="$(awk -F '\t' '$1 ~ /^[1-9][0-9]*$/ && $15 != "integrated" { n++ } END { print n+0 }' "$manifest")"
+    if [ "$active_count" -gt 0 ]; then
+      printf 'STATUS=active\nACTIVE_COUNT=%s\n' "$active_count"
+      awk -F '\t' -v OFS='\t' '$1 ~ /^[1-9][0-9]*$/ && $15 != "integrated" { print "ACTIVE",$1,$15 }' "$manifest"
+      echo 'pln-scheduler: implementation remains; keep the coordinator turn alive' >&2
+      exit 3
+    fi
+    printf 'STATUS=complete\nACTIVE_COUNT=0\n'
     ;;
 
   check-dirty)

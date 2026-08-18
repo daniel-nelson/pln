@@ -46,6 +46,13 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 
 has() { grep -qF -- "$2" "$1" || fail "$3"; }
 hasnt() { grep -qF -- "$2" "$1" && fail "$3"; return 0; }
+appears_before() { # appears_before <file> <first text> <second text> <description>
+  local f="$1" first="$2" second="$3" what="$4" first_line second_line
+  first_line="$(awk -v needle="$first" 'index($0, needle) { print NR; exit }' "$f")"
+  second_line="$(awk -v needle="$second" 'index($0, needle) { print NR; exit }' "$f")"
+  [ -n "$first_line" ] && [ -n "$second_line" ] && [ "$first_line" -lt "$second_line" ] \
+    || fail "$what"
+}
 has_one_trailing_newline() { # has_one_trailing_newline <file> <description>
   local f="$1" what="$2" last penultimate
   [ -s "$f" ] || fail "$what is empty"
@@ -379,6 +386,20 @@ for host_out in "$real_c" "$real_x"; do
   has "$simplify" 'phases/pln/blocker.md' 'pln-simplify duplicated blocker handling'
   has "$simplify" 'phases/pln-simplify/map-synthesize.md' 'pln-simplify lost its mapping specialization'
   has "$simplify" 'phases/pln-simplify/verify-record.md' 'pln-simplify lost success recording'
+  behavior_owner="$host_out/src/workers/behavior-preservation.md"
+  has "$simplify" "$behavior_owner" 'pln-simplify lost the absolute installed behavior-preservation owner'
+  has "$simplify" 'complete canonical `Safety disposition` is `admit`' \
+    'pln-simplify lost its canonical pre-outline admission boundary'
+  has "$simplify" 'every required conjunct is `pass`' \
+    'pln-simplify admits an incompletely proven simplification'
+  has "$simplify" 'Missing, unknown, incomplete, malformed, or non-`admit` proof retains the surface.' \
+    'pln-simplify lost its fail-closed retention rule'
+  has "$simplify" 'If no candidate clears that gate, `nothing worth changing` is a successful outcome.' \
+    'pln-simplify lost its no-churn success outcome'
+  hasnt "$simplify" '- Baseline suite/outcome:' \
+    'pln-simplify duplicated the detailed behavior-preservation policy'
+  appears_before "$simplify" '## Simplification admission gate' '## Phase router' \
+    'pln-simplify does not load the admission gate before phase routing'
 done
 has "$real_c/phases/pln/implementation.md" 'commit owner: coordinator' \
   "the claude build lost coordinator-owned item checkpoints"

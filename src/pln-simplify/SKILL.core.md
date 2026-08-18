@@ -19,6 +19,10 @@ This skill owns only mapping, simplification synthesis, cadence interpretation, 
 
 The coordinator never performs worker judgment inline and never edits implementation itself. `/pln-simplify` never invokes `/pln-pr` automatically and never broadens a bounded candidate into unrelated cleanup.
 
+## Simplification admission gate
+
+Before taking the first phase-routed action, read the installed shared behavior-preservation contract at `{{OUTPUT_ROOT}}/src/workers/behavior-preservation.md`; it is the single owner of the detailed admission policy. Mapping may discover and synthesize candidates, but no simplifying candidate may enter the outline or any later phase unless its complete canonical `Safety disposition` is `admit`, every required conjunct is `pass`, and every required evidence field is specific enough to rerun. Missing, unknown, incomplete, malformed, or non-`admit` proof retains the surface. If no candidate clears that gate, `nothing worth changing` is a successful outcome. Do not turn incomplete proof into a question or manufacture work to satisfy cadence.
+
 ## Phase router
 
 The ordinary `PLAN.md` dashboard remains the durable coordinator ledger. Its `Phase` is one of `map-synthesize`, `interview`, `review-approval`, `implementation`, `blocker`, `verify-record`, or `complete`.

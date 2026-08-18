@@ -4,6 +4,8 @@ name: pln-phase-outline
 
 # /pln phase: outline
 
+<!-- pln:include active-turn-lifecycle -->
+
 Read this file in full before the first outline action. It owns pre-flight, plan allocation, skeleton creation, the editable outline checkpoint, and the transition into interview. It does not own any item-level interview question or implementation.
 
 Create `PLAN.md` with `Phase: outline` in its own top-level `## Phase` section before showing the dashboard. If the user edits scope, update the skeleton and keep `Phase: outline`. In normal and auto modes, missing confirmation leaves `Phase: outline`: do not infer confirmation from auto mode or start the interview, review, scheduling, or implementation. After the user accepts the displayed outline—or after delegated mode displays it—finish all outline writes, set `Phase: interview`, then read the mapped interview phase in full before its first action.

@@ -4,6 +4,8 @@ name: pln-phase-finish-ship
 
 # /pln phase: finish and ship
 
+<!-- pln:include active-turn-lifecycle -->
+
 Read this file in full before the first deferred-item revisit, final verification, follow-up, or shipping action. `Phase: finish-ship` is not permission to redo implementation or silently fix verification failures: a failure becomes durable item work and transitions back to `implementation` before any fix dispatch.
 
 Persist verification results, follow-ups, Ship choice, PR base, and any downstream PR identity/outcome before reporting completion. When the requested stopping point or ship handoff is durably complete, set `Phase: complete`. On restart, reconcile those fields before repeating an external action; an uncertain push, PR creation, or CI action fails closed.

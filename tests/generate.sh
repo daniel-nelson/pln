@@ -402,6 +402,40 @@ done
 for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
   hasnt "$f" 'create_goal' "$f received Codex-only durable-goal mechanics"
 done
+
+# Every recursively loaded phase carries one shared terminal-state invariant.
+# Native host activity is the progress surface; status prose never detaches
+# accepted work into a future turn. Keeping this in the phase contracts avoids
+# bloating the thin routers while covering /pln and /pln-pr on both hosts.
+for f in "$real_c"/phases/pln/*.md "$real_x"/phases/pln/*.md \
+  "$real_c"/phases/pln-pr/*.md "$real_x"/phases/pln-pr/*.md; do
+  has "$f" 'Host-native activity is the progress surface' \
+    "$f does not prefer the host activity UI over chat heartbeats"
+  has "$f" 'Before any final response, run the terminal-state audit' \
+    "$f has no shared pre-final reconciliation boundary"
+  has "$f" 'A status update is commentary, never a terminal response' \
+    "$f can still end a turn by describing nonterminal work"
+  has "$f" 'peer subprocess' \
+    "$f does not account for an in-flight peer at the terminal boundary"
+  [ "$(grep -cF '## Active-turn lifecycle' "$f")" = "1" ] \
+    || fail "$f does not carry exactly one shared active-turn lifecycle"
+done
+
+# A Codex CI watch must remain attached to the current native turn through a
+# resumable exec session. A disowned process recreates the exact invisible-work
+# failure that the parent-turn contract prevents.
+codex_watch="$real_x/phases/pln-pr/ship-watch.md"
+has "$codex_watch" 'resumable exec session' \
+  'the Codex CI watch does not use a native tracked command session'
+has "$codex_watch" 'keep the same parent turn active' \
+  'the Codex CI watch can still end its parent turn while checks run'
+hasnt "$codex_watch" '& disown' \
+  'the Codex CI watch still detaches from the native lifecycle'
+hasnt "$codex_watch" 'Whenever this step next gets a turn' \
+  'the Codex CI watch still relies on a future user turn for recovery'
+has "$real_c/phases/pln-pr/ship-watch.md" 'keep the same parent turn active' \
+  'the Claude CI monitor can still be mistaken for detached work'
+
 has "$real_x/phases/pln/implementation.md" 'pln-scheduler finish-check' \
   "the codex implementation phase has no manifest-backed finish gate"
 has "$real_x/phases/pln/implementation.md" 'run `list_agents` after every quiet timeout' \

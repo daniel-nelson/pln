@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.37.0 — 2026-08-18
+
+### Changed
+
+- **Long-running Codex work now emits a visible heartbeat at least every five minutes.** Implementation, review, repair, verification, and CI-watch orchestration report the current named unit, elapsed time, the latest observed status, and when the next visible update is due. Completion, blockers, and item or phase transitions appear immediately and reset the heartbeat clock. Native waits are capped at 60 seconds so the coordinator can honor the deadline.
+- **Heartbeat wording distinguishes liveness from progress.** A bare native `running` status is reported as “no completion or blocker received,” never “progressing,” “making progress,” or “monitored.” This gives users whose Codex client does not expose a persistent subagent activity panel a dependable indication that the coordinator remains alive without inventing evidence about what the worker is doing.
+
 ## 1.36.0 — 2026-08-18
 
 ### Changed

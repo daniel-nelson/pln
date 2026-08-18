@@ -398,9 +398,23 @@ for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
     "$f does not use the native durable goal when it is exposed"
   has "$f" 'the manifest and wait loop remain the fallback' \
     "$f lets a missing goal tool become a user-facing blocker"
+  has "$f" 'No later than five minutes after the last visible update' \
+    "$f does not guarantee a recurring visible heartbeat"
+  has "$f" 'Current: <phase and named item/cluster/check>' \
+    "$f heartbeat does not identify the active work"
+  has "$f" 'Observed: running; no completion or blocker received' \
+    "$f heartbeat can overclaim progress"
+  has "$f" 'Next visible update by <local time>' \
+    "$f heartbeat does not tell the user when to expect another update"
+  has "$f" 'Cap each `wait_agent` call at 60 seconds' \
+    "$f can block too long to honor the heartbeat"
+  has "$f" 'Do not enter a blocking tool call that can outlast the next heartbeat deadline' \
+    "$f cannot honor heartbeats during long direct commands"
 done
 for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
   hasnt "$f" 'create_goal' "$f received Codex-only durable-goal mechanics"
+  hasnt "$f" 'Next visible update by <local time>' \
+    "$f received the Codex-only heartbeat fallback"
 done
 has "$real_x/phases/pln/implementation.md" 'pln-scheduler finish-check' \
   "the codex implementation phase has no manifest-backed finish gate"

@@ -16,6 +16,8 @@ Before asking a decision or handing off a blocked cluster, write it and all part
 
 Classify each acted-on finding as **auto-fix** (mechanical, unambiguous — a null check, a missing timeout, a spec for uncovered behavior) or **needs-a-decision** (a judgment call — a design change, a tradeoff, anything where the fix isn't obvious or is destructive).
 
+A structural consolidation uses the same routes. Removing a surface is auto-fix only when the ledger proves private reachability, bounded consumer closure, repository-native discovery, and targeted behavior before the change; the worker must rerun that discovery and the behavior characterization after the change. Public, compatibility, persisted/stateful, consequential, or uncertain removal is destructive or needs a decision. No similarity score, raw-growth threshold, deletion target, or cleanup quota can authorize it.
+
 For needs-a-decision findings, surface them to the user **one at a time**, as prose, in the option-message shape, fire notifications first. Record each answer in `REVIEW.md` against its finding. A skipped finding is marked `skipped`; it becomes a follow-up in the closing message's bullet list only if it clears the follow-up bar (Style's "Ending a message") — someone will actually need to act on it or decide about it later. A skip that was really "not worth doing" gets no follow-up entry.
 
 Before dispatch, snapshot the source tree and send the resolved cluster list to a fresh `judgment`-profile worker on `{{SKILL_DIR}}/src/workers/execution-schedule.md` in `pr-fix-clusters` mode. Validate its envelope and build `<plan-dir>/fix-manifest.tsv` with `bin/pln-scheduler`. Every cluster remains a fresh-worker node; cohorts/context reuse are forbidden. Dependencies, overlapping/ancestor leases, generators, lockfiles, tests, configuration, migrations, and shared effects add edges; unknown means serial. Parallelize only one manifest wave of isolated, pairwise-disjoint clusters. `REVIEW.md`, the manifest, git checkpoints, and integration are coordinator-only. Auto mode never applies to `/pln-pr`.
@@ -31,6 +33,7 @@ Before dispatch, snapshot the source tree and send the resolved cluster list to 
    - If a test's result could change depending on the time of day or date, say so and account for it.
    - Before reporting verification, re-read the project's completion rule (`CLAUDE.md`/`AGENTS.md`) and reproduce any environmental condition it names — cleared credentials, a specific timezone, a service, a clean database — that this run didn't already match.
 4. Run lightweight verification only (type-check + lint on touched files, not the full suite). Fix on failure — nothing here is staged, since `git` writes are not yours to make.
+   For a structural finding, also run its repeatable structural reference check and remap its direct consumers. For an authorized private deletion, preserve the exact repository-native discovery commands and targeted pre/post behavior output so the merge/verifier can prove the consumer closure stayed closed.
 <!-- pln:only claude -->
 5. Do not commit — the coordinator owns the cluster checkpoint and integration. Edit only the assigned isolated worktree and leased paths, then name them in your final message.
 6. Do not edit `REVIEW.md` — it is a shared checkpoint file and concurrent writes would race even when code leases are disjoint. Say in your final message which findings the cluster cleared; the orchestrator updates their statuses and commit hashes after it checkpoints the cluster."
@@ -46,6 +49,8 @@ Before dispatch, snapshot the source tree and send the resolved cluster list to 
 
 Every fix creates a new candidate; recompute its exact fingerprint before assurance. R1 narrowly verifies the finding and targeted tests. R2 runs one fresh post-fix verifier across the fixes and specialist risks. R3 runs a full fresh red-team pass after nontrivial fixes; this is separate from the four-reader pre-fix cap. A trivial R3 fix still gets a fresh verifier plus explicit evidence for why a full red team was unnecessary.
 
+At the repair's semantic risk tier, every post-fix path must rerun the structural reference check and consumer map for each structural finding and compare the recorded before/after owners, paths, and knobs. For a deletion, it also rechecks private reachability, repository-native discovery, bounded closure, and the targeted post-change behavior against the pre-change characterization. Missing or changed proof reopens the same structural repair key and fails closed; do not treat passing runtime tests alone as structural assurance.
+
 The R3 red team writes complete findings to `<plan-dir>/evidence/post-fix-red-team.json` and returns only that pointer. Give it the verified findings/fixes and exact candidate fingerprint:
 
 "Read the exact post-fix candidate. Reproduce the listed fixes and hunt for missed cross-cutting failures or regressions. Write only findings with exact citations and runnable reproduction/test evidence; label unsupported suspicions unverified. Return only the assigned `RESULT_FILE` pointer."
@@ -57,7 +62,7 @@ Never open that reviewer output inline. Give its artifact and the exact post-fix
 
 **Repair progress, not a global round cap.** Adoption of `PR after implementation`, or direct invocation of `/pln-pr`, is standing authority to repair every verified, unambiguous, in-scope finding until assurance is clean and the PR is green. A new repair round is already-authorized repair work, not a new permission boundary. Global round count never blocks it.
 
-The merge worker assigns each verified actionable finding a stable **repair key** made from the affected behavioral boundary and its runnable reproduction or named failing test. Never key a defect by round number, finding title, or `file:line` alone. Preserve these fields in `REVIEW.md`: repair key, failed repair attempts, last repair candidate, and last repair outcome.
+The merge worker assigns each verified actionable finding a stable **repair key**. Behavioral keys use the affected boundary and runnable reproduction or named failing test. Structural keys use `bin/pln-assurance repair-key --kind structural` with the responsibility/invariant, established owner, and repeatable reference check or reproduction. Never key a defect by round number, finding title, or `file:line` alone, and never rewrite an existing ledger key. Preserve these fields in `REVIEW.md`: repair key, failed repair attempts, last repair candidate, and last repair outcome.
 
 For each open finding, run `bin/pln-assurance repair-action --disposition <value> --failed-attempts <n>`:
 

@@ -117,6 +117,14 @@ pr_merge="$REPO_DIR/src/workers/pr-review-merge.md"
 has "$pr_merge" 'raw artifact paths' 'PR merge worker no longer owns raw review artifacts'
 has "$pr_merge" '`verified`, `unverified`, or `disproved`' 'PR merge worker retained self-scored confidence'
 has "$pr_merge" '4096-byte budget' 'PR merge worker lost its bounded coordinator result'
+has "$pr_merge" 'Findings without `structural_evidence` remain valid' \
+  'PR merge worker broke legacy finding artifacts'
+has "$pr_merge" 'role-tagged owners, analogues, and direct consumers' \
+  'PR merge worker lost structural evidence validation'
+has "$pr_merge" 'bin/pln-assurance repair-key --kind structural' \
+  'PR merge worker lost deterministic structural repair identity'
+has "$pr_merge" 'private reachability' \
+  'PR merge worker can auto-route deletion without private reachability proof'
 
 "$REPO_DIR/bin/pln-generate" --host claude --out-dir "$WORK/claude" >/dev/null
 "$REPO_DIR/bin/pln-generate" --host codex --out-dir "$WORK/codex" >/dev/null
@@ -149,7 +157,15 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Possibly unbounded metadata' "$host PR scope phase lost file-first metadata collection"
   has "$WORK/$host/phases/pln-pr/review.md" 'src/workers/pr-review-merge.md' "$host PR review phase lost file-first merge ownership"
   has "$WORK/$host/phases/pln-pr/review.md" 'Never open a reviewer or peer result' "$host PR review reads raw findings into the coordinator"
+  has "$WORK/$host/phases/pln-pr/review.md" 'current owners, closest analogues, and direct callers or consumers' \
+    "$host broad PR review lost structural traversal"
+  has "$WORK/$host/phases/pln-pr/review.md" 'structural_evidence?' \
+    "$host PR finding schema lost additive structural evidence"
   has "$WORK/$host/phases/pln-pr/fix.md" 'src/workers/execution-schedule.md' "$host PR fix phase does not reference scheduling contract"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'repository-native discovery' \
+    "$host PR fix phase can delete private surface without native discovery"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'rerun the structural reference check and consumer map' \
+    "$host post-fix assurance lost structural closure"
   for file in "$WORK/$host/SKILL.md" "$WORK/$host/phases/pln/"*.md; do
     hasnt "$file" 'WORKER_ONLY_SENTINEL_' "$file contains worker-only contract prose"
     hasnt "$file" 'Do not inventory strengths or praise the plan' "$file embeds reviewer-only detail"

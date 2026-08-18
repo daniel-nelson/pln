@@ -68,6 +68,23 @@ if "$ASSURANCE" repair-action --disposition persisted --failed-attempts nope >/d
   fail 'repair action accepted a non-numeric attempt count'
 fi
 
+# Repair identity follows the semantic proof rather than a title, round, or
+# citation. Structural keys additionally bind the established owner.
+structural_one="$($ASSURANCE repair-key --kind structural --boundary 'configuration loading' --owner 'src/config.ts' --check 'bash tests/config.sh')"
+structural_two="$($ASSURANCE repair-key --check 'bash tests/config.sh' --owner 'src/config.ts' --boundary 'configuration loading' --kind structural)"
+[ "$structural_one" = "$structural_two" ] || fail 'structural repair key depends on argument order'
+case "$structural_one" in REPAIR_KEY=structural:????????????????????????????????????????????????????????????????) ;; *) fail 'structural repair key output is malformed' ;; esac
+
+structural_changed="$($ASSURANCE repair-key --kind structural --boundary 'configuration loading' --owner 'src/config.ts' --check 'bash tests/config-compat.sh')"
+[ "$structural_changed" != "$structural_one" ] || fail 'different structural reference checks shared a repair key'
+
+behavioral="$($ASSURANCE repair-key --kind behavioral --boundary 'configuration loading' --check 'bash tests/config.sh')"
+[ "$behavioral" != "$structural_one" ] || fail 'behavioral and structural identities collided'
+
+if "$ASSURANCE" repair-key --kind structural --boundary ownerless --check check >/dev/null 2>&1; then
+  fail 'structural repair key accepted a missing owner'
+fi
+
 # Fingerprints bind verification to the exact candidate tree, command set, and
 # relevant environment. Any one changing invalidates reuse.
 FIXTURE="$(mktemp -d "${TMPDIR:-/tmp}/pln-assurance-test.XXXXXX")"

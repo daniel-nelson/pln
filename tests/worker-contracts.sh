@@ -94,6 +94,8 @@ has "$verification" 'Do not fix a failure inline' 'verification contract may hid
 simplify_map="$REPO_DIR/src/workers/simplification-map.md"
 simplify_synthesis="$REPO_DIR/src/workers/simplification-synthesis.md"
 behavior_preservation="$REPO_DIR/src/workers/behavior-preservation.md"
+behavior_owner_count="$(grep -RFl -- '# Shared behavior-preservation contract' "$REPO_DIR/src" | wc -l | tr -d ' ')"
+[ "$behavior_owner_count" = 1 ] || fail "behavior preservation must have exactly one shared policy owner"
 has "$simplify_map" 'concepts, responsibilities, and owners' \
   'simplification mapping lost concept/ownership discovery'
 has "$simplify_map" 'duplicated policy' 'simplification mapping lost duplicate-policy discovery'
@@ -125,12 +127,30 @@ has "$behavior_preservation" 'post-change tests alone' \
   'post-only tests can masquerade as behavioral proof'
 has "$behavior_preservation" 'recorded pre-change source' \
   'behavior preservation lost its baseline characterization'
+has "$behavior_preservation" 'Existing behavior-oriented tests are the primary safety net' \
+  'behavior preservation no longer prefers existing behavior specs'
+has "$behavior_preservation" 'implementation-detail tests do not establish the behavioral boundary' \
+  'implementation-coupled tests can masquerade as behavior coverage'
+has "$behavior_preservation" 'recorded pre-change tree' \
+  'behavior preservation no longer runs the safety net on the exact baseline tree'
+has "$behavior_preservation" 'fails meaningfully when the protected behavior is deliberately broken' \
+  'new characterization need not prove that it detects broken behavior'
+has "$behavior_preservation" 'same admitted behavior suite' \
+  'behavior preservation lost equivalent pre/post suite execution'
+has "$behavior_preservation" 'full repository gauntlet remains the final regression floor' \
+  'behavior preservation displaced the final repository gauntlet'
 has "$behavior_preservation" 'compare the post-change result' \
   'behavior preservation lost its pre/post comparison'
 has "$behavior_preservation" 'Public, compatibility, persisted/stateful, or uncertain' \
   'compatibility or state uncertainty no longer retains the surface or blocks'
 has "$behavior_preservation" '`no change`' \
   'behavior preservation forces churn when no safe candidate exists'
+has "$simplify_synthesis" 'exact runnable baseline commands or scenarios and their recorded outcomes' \
+  'simplification synthesis admits candidates without executable baseline evidence'
+has "$simplify_synthesis" '`capture during implementation` is not evidence' \
+  'simplification synthesis may defer its admission gate into implementation'
+has "$implementation" 'rerun the same admitted behavior suite' \
+  'implementation no longer validates equivalent pre/post behavior evidence'
 
 preflight="$REPO_DIR/src/workers/preflight-research.md"
 has "$preflight" '8192-byte envelope budget' 'pre-flight contract lost its budget'
@@ -173,6 +193,8 @@ has "$pr_merge" 'private reachability' \
   'PR merge worker can auto-route deletion without private reachability proof'
 has "$pr_merge" 'behavior-preservation.md' \
   'PR merge stopped using the shared behavior-preservation owner'
+has "$pr_merge" 'exact runnable baseline commands or scenarios and recorded outcomes' \
+  'PR merge can admit structural repair without executable baseline evidence'
 
 "$REPO_DIR/bin/pln-generate" --host claude --out-dir "$WORK/claude" >/dev/null
 "$REPO_DIR/bin/pln-generate" --host codex --out-dir "$WORK/codex" >/dev/null
@@ -189,6 +211,8 @@ for host in claude codex; do
     "$host coordinator no longer validates retained-behavior evidence"
   has "$WORK/$host/phases/pln/implementation.md" 'adopted system-fit outcome' \
     "$host coordinator no longer checks the bounded diff against adopted ownership"
+  has "$WORK/$host/phases/pln/implementation.md" 'same admitted behavior suite' \
+    "$host implementation checkpoint lost equivalent pre/post behavior validation"
   has "$WORK/$host/phases/pln/finish-ship.md" 'src/workers/final-verification.md' "$host finish phase does not reference verification contract"
   has "$WORK/$host/phases/pln-simplify/map-synthesize.md" 'src/workers/simplification-map.md' \
     "$host simplification phase does not reference its mapping contract"
@@ -196,6 +220,10 @@ for host in claude codex; do
     "$host simplification phase does not reference its synthesis contract"
   has "$WORK/$host/phases/pln-simplify/map-synthesize.md" 'src/workers/behavior-preservation.md' \
     "$host simplification phase stopped using the shared behavior-preservation owner"
+  has "$WORK/$host/phases/pln-simplify/map-synthesize.md" 'exact runnable baseline commands or scenarios and recorded outcomes' \
+    "$host simplification phase admits candidates without baseline execution evidence"
+  has "$WORK/$host/phases/pln-simplify/map-synthesize.md" '`capture during implementation`' \
+    "$host simplification phase may postpone behavior admission evidence"
   has "$WORK/$host/phases/pln-simplify/verify-record.md" 'src/workers/final-verification.md' \
     "$host simplification recording does not reuse final verification"
   has "$WORK/$host/SKILL.md" 'at most two exact operations' "$host /pln router lost the direct lookup budget"
@@ -221,11 +249,19 @@ for host in claude codex; do
     "$host PR finding schema lost additive structural evidence"
   has "$WORK/$host/phases/pln-pr/review.md" 'src/workers/behavior-preservation.md' \
     "$host PR review stopped using the shared behavior-preservation owner"
+  has "$WORK/$host/phases/pln-pr/review.md" 'exact baseline commands/scenarios and recorded outcomes' \
+    "$host PR review can admit repair without executable baseline evidence"
+  has "$WORK/$host/phases/pln-pr/review.md" 'implementation-detail tests' \
+    "$host PR review can substitute implementation-coupled coverage"
   has "$WORK/$host/phases/pln-pr/fix.md" 'src/workers/execution-schedule.md' "$host PR fix phase does not reference scheduling contract"
   has "$WORK/$host/phases/pln-pr/fix.md" 'repository-native discovery' \
     "$host PR fix phase can delete private surface without native discovery"
   has "$WORK/$host/phases/pln-pr/fix.md" 'src/workers/behavior-preservation.md' \
     "$host PR fix phase stopped using the shared behavior-preservation owner"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'same admitted behavior suite' \
+    "$host PR fix phase lost equivalent pre/post behavior execution"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'full repository gauntlet remains the final regression floor' \
+    "$host PR fix phase displaced the final gauntlet"
   has "$WORK/$host/phases/pln-pr/fix.md" 'rerun the structural reference check and consumer map' \
     "$host post-fix assurance lost structural closure"
   for file in "$WORK/$host/SKILL.md" "$WORK/$host/phases/pln/"*.md; do

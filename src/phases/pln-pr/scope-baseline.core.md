@@ -6,7 +6,7 @@ name: pln-pr-phase-scope-baseline
 
 <!-- pln:include active-turn-lifecycle -->
 
-Read this file in full before the first repository or remote action. Create `REVIEW.md` before durable scope work with a `## State` section containing `Phase: scope-baseline`, Base, Base source, Trust/command confirmation, Diff base, Tree/command/environment/candidate fingerprints, Risk tier/signals, Review status, PR identity, and CI round/status. Update those fields as facts become known.
+Read this file in full before the first repository or remote action. Create `REVIEW.md` before durable scope work with a `## State` section containing `Phase: scope-baseline`, a new durable Run identity, Base, Base source, Trust/command confirmation, Diff base, Tree/command/environment/candidate fingerprints, Simplification freshness/policy/bypass, Risk tier/signals, Review status, PR identity, and CI round/status. Update those fields as facts become known.
 
 Finish base validation, trust decisions, exact-tree fingerprinting, and any baseline result before advancing. Then set `Phase: review` and read the review phase in full. If an existing ledger shows later durable work, reconcile it and follow the router rather than overwriting or re-reviewing it.
 
@@ -41,6 +41,16 @@ Assign that artifact to an evidence worker for clean/dirty state, bounded counts
 Look for the plan this branch came from: the most recently modified `./plans/<YYYY-MM-DD>-<slug>/PLAN.md` under the session CWD. If one exists, this run belongs to it — the review ledger will live beside it, and its **Verification** section names the gauntlet commands. If none exists, pln-pr runs standalone: it creates `./plans/<YYYY-MM-DD>-pr-<branch-slug>/` for `REVIEW.md`, and discovers the gauntlet itself.
 
 **Resume an existing ledger.** Before deciding to review, check whether a `REVIEW.md` already exists in that plan/standalone dir. If it does, this is a resumed run: read it and honor its per-finding statuses — findings already marked `fixed` are done, `skipped` stay skipped, and only `open` findings still need a fix pass. Do not re-run the review army or overwrite the ledger; pick up from the first `open` finding (Step 4). Re-check a resumed `open` finding cheaply rather than assuming it is unfixed — the fix may have landed just before a crash (see the durability note above). Only run the full review (Step 3) when no ledger exists yet.
+
+Now that the base and durable ledger/run identity both exist, check simplification cadence when `$_PLN_DIR/bin/pln-simplify` exists:
+
+```bash
+"$_PLN_DIR/bin/pln-simplify" enforce --repo . --base "origin/$BASE" --head HEAD --run-id "<durable REVIEW run id>"
+```
+
+Persist status, reason, policy mode/hash, and the emitted bypass binding in `REVIEW.md` before review. `fresh` and `disabled` are silent. `due` is one disclosure and continues. Advisory `overdue` becomes a concrete follow-up; `unknown` continues with truthful attribution and never pretends the run is stale. `/pln-pr` never invokes `/pln-simplify`.
+
+When a supported repository policy makes `overdue` required, stop before review unless the user explicitly grants a **simplification freshness bypass** and gives a reason. This is separate from review skips and this repository's self-hosting exception. Store the reason and exact binding only in this nonterminal run's `REVIEW.md`. Reuse it only on crash recovery with the same durable run identity, repository, resolved base, candidate HEAD, and policy hash/schema; invalidate it on any change and consume it when the run reaches `complete` or deliberately stops. `unknown` remains non-blocking. An unsupported required policy fails closed for this aware client; older clients and direct forge commands necessarily ignore it, so repository-wide enforcement belongs in optional repository-owned CI/branch protection.
 
 Scope the diff against the freshly-fetched base. `git merge-base` is one exact bounded fact; the changed-file map and statistics are evidence-tier artifacts:
 

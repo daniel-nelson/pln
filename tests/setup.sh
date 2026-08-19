@@ -53,11 +53,12 @@ BASE_PATH="/usr/bin:/bin"
 # tests/generate.sh's job, not this branch's), and pln-peer faked so each
 # scenario below can dictate its exit code and STATUS directly.
 SKILL="$WORK/skill"
-mkdir -p "$SKILL/bin"
+mkdir -p "$SKILL/bin" "$SKILL/pln-simplify"
 cp "$REPO_DIR/setup" "$SKILL/setup"
 cp "$REPO_DIR/bin/pln-host" "$SKILL/bin/pln-host"
 cp "$REPO_DIR/bin/pln-config" "$SKILL/bin/pln-config"
 chmod +x "$SKILL/setup" "$SKILL/bin/pln-host" "$SKILL/bin/pln-config"
+printf '%s\n' '---' 'name: pln-simplify' '---' > "$SKILL/pln-simplify/SKILL.md"
 
 cat > "$SKILL/bin/pln-generate" <<'FAKE_GENERATE'
 #!/usr/bin/env bash
@@ -121,6 +122,10 @@ run_setup claude ready
 [ "$RC" -eq 0 ] || fail "setup exited $RC on a ready peer (expected 0) — output:\n$OUT"
 echo "$OUT" | grep -q "Tip:" && fail "a ready peer still printed the tip"
 [ "$(get_flag)" = "true" ] || fail "a ready peer did not set peer_nudge_shown"
+echo "$OUT" | grep -q 'linked /pln-simplify' \
+  || fail "setup did not link the generated simplification skill — output:\n$OUT"
+echo "$OUT" | grep -q '/pln-simplify — map and safely simplify a codebase' \
+  || fail "setup did not advertise pln-simplify — output:\n$OUT"
 echo "$OUT" | grep -q 'Peer egress policy:' \
   || fail "a usable peer did not surface the egress policy — output:\n$OUT"
 echo "$OUT" | grep -qF "$SKILL/bin/pln-config\" set peer_egress consent" \

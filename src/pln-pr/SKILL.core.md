@@ -82,7 +82,7 @@ How to spawn one on this host:
 
 This file is the always-loaded PR coordinator contract. Detailed scope, review, fix, blocker, and ship/watch instructions live in generated phase documents. Read this router in full on every invocation and after compaction.
 
-Every `REVIEW.md` has a top-level `## State` section containing one `Phase` value: `scope-baseline`, `review`, `fix`, `blocker`, `ship-watch`, or `complete`. The same state section persists the validated base/source, trust/command confirmation, diff base, tree/command/environment/candidate fingerprints, semantic risk and roster, review status, PR identity, and CI round/status. Those fields, not conversational memory, decide safe resume behavior.
+Every `REVIEW.md` has a top-level `## State` section containing one `Phase` value: `scope-baseline`, `review`, `fix`, `blocker`, `ship-watch`, or `complete`. The same state section persists a durable run identity, the validated base/source, trust/command confirmation, diff base, tree/command/environment/candidate fingerprints, simplification freshness status/policy/bypass binding, semantic risk and roster, review status, PR identity, and CI round/status. Those fields, not conversational memory, decide safe resume behavior.
 
 At every boundary, finish the old phase's ledger/state writes first. Then write the new cursor. Then read the mapped document in full before the phase's first action. In short: write durable state first, then advance `Phase`, then read the new phase file and act. Persist a user decision or blocker question before sending it, and persist external identities/results before advancing past the action that created them.
 

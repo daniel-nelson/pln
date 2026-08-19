@@ -46,6 +46,13 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 
 has() { grep -qF -- "$2" "$1" || fail "$3"; }
 hasnt() { grep -qF -- "$2" "$1" && fail "$3"; return 0; }
+appears_before() { # appears_before <file> <first text> <second text> <description>
+  local f="$1" first="$2" second="$3" what="$4" first_line second_line
+  first_line="$(awk -v needle="$first" 'index($0, needle) { print NR; exit }' "$f")"
+  second_line="$(awk -v needle="$second" 'index($0, needle) { print NR; exit }' "$f")"
+  [ -n "$first_line" ] && [ -n "$second_line" ] && [ "$first_line" -lt "$second_line" ] \
+    || fail "$what"
+}
 has_one_trailing_newline() { # has_one_trailing_newline <file> <description>
   local f="$1" what="$2" last penultimate
   [ -s "$f" ] || fail "$what is empty"
@@ -336,6 +343,8 @@ real_x="$WORK/real-codex"
 
 targets="$("$BIN" --list)"
 [ -n "$targets" ] || fail "the real sources declare no targets"
+printf '%s\n' "$targets" | grep -qxF 'pln-simplify/SKILL.md' \
+  || fail 'the real target list omits pln-simplify/SKILL.md'
 
 while IFS= read -r t; do
   for f in "$real_c/$t" "$real_x/$t"; do
@@ -366,6 +375,32 @@ done <<< "$targets"
 # checks above would pass on an empty file.
 has "$real_c/SKILL.md" 'Workflow' "the claude build has no Workflow mechanics"
 has "$real_x/SKILL.md" 'pln-codex-agent' "the codex build has no Codex agent mechanics"
+for host_out in "$real_c" "$real_x"; do
+  host_out="$(cd "$host_out" && pwd -P)"
+  simplify="$host_out/pln-simplify/SKILL.md"
+  has "$simplify" 'name: pln-simplify' 'pln-simplify frontmatter name/path disagree'
+  has "$simplify" 'architecture decluttering' 'pln-simplify trigger metadata lost natural-language requests'
+  has "$simplify" 'nothing worth changing' 'pln-simplify lost the valid clean-assessment outcome'
+  has "$simplify" "$host_out/SKILL.md" 'pln-simplify duplicated the root lifecycle router'
+  has "$simplify" 'phases/pln/implementation.md' 'pln-simplify duplicated the implementation lifecycle'
+  has "$simplify" 'phases/pln/blocker.md' 'pln-simplify duplicated blocker handling'
+  has "$simplify" 'phases/pln-simplify/map-synthesize.md' 'pln-simplify lost its mapping specialization'
+  has "$simplify" 'phases/pln-simplify/verify-record.md' 'pln-simplify lost success recording'
+  behavior_owner="$host_out/src/workers/behavior-preservation.md"
+  has "$simplify" "$behavior_owner" 'pln-simplify lost the absolute installed behavior-preservation owner'
+  has "$simplify" 'complete canonical `Safety disposition` is `admit`' \
+    'pln-simplify lost its canonical pre-outline admission boundary'
+  has "$simplify" 'every required conjunct is `pass`' \
+    'pln-simplify admits an incompletely proven simplification'
+  has "$simplify" 'Missing, unknown, incomplete, malformed, or non-`admit` proof retains the surface.' \
+    'pln-simplify lost its fail-closed retention rule'
+  has "$simplify" 'If no candidate clears that gate, `nothing worth changing` is a successful outcome.' \
+    'pln-simplify lost its no-churn success outcome'
+  hasnt "$simplify" '- Baseline suite/outcome:' \
+    'pln-simplify duplicated the detailed behavior-preservation policy'
+  appears_before "$simplify" '## Simplification admission gate' '## Phase router' \
+    'pln-simplify does not load the admission gate before phase routing'
+done
 has "$real_c/phases/pln/implementation.md" 'commit owner: coordinator' \
   "the claude build lost coordinator-owned item checkpoints"
 has "$real_x/phases/pln/implementation.md" 'commit owner: coordinator' \
@@ -582,6 +617,27 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   has "$f" '### Echoing recorded decisions' "$f lost the shared formatting rules"
 done
 
+for host_out in "$real_c" "$real_x"; do
+  host_out="$(cd "$host_out" && pwd -P)"
+  router="$host_out/pln-simplify/SKILL.md"
+  for phase in map-synthesize verify-record; do
+    phase_file="$host_out/phases/pln-simplify/$phase.md"
+    [ -s "$phase_file" ] || fail "missing /pln-simplify phase $phase"
+    has "$router" "$phase_file" "the /pln-simplify router does not use the absolute $phase path"
+  done
+  has "$host_out/phases/pln-simplify/map-synthesize.md" "$host_out/phases/pln/outline.md" \
+    'pln-simplify duplicated plan placement or the outline checkpoint'
+  has "$router" 'bin/pln-simplify status --repo <root>' \
+    'pln-simplify router lost its cadence-status consumer'
+  verify_record="$host_out/phases/pln-simplify/verify-record.md"
+  has "$verify_record" 'unpublished candidate ref' \
+    'pln-simplify verification no longer isolates failed candidates'
+  has "$verify_record" 'candidate HEAD still equals the tested commit' \
+    'pln-simplify verification lost its unchanged-branch integration boundary'
+  has "$verify_record" 'bin/pln-simplify marker' \
+    'pln-simplify verification lost deterministic marker construction'
+done
+
 # The to-do-location flow is one source per host, included by both skills — a
 # follow-up recorded by one and only offered by the other would be the same bug
 # the write-by-default rule exists to fix. The global instructions file it reads
@@ -715,12 +771,15 @@ done
 # confidence, and every reusable gauntlet is tied to an exact candidate.
 for root in "$real_c" "$real_x"; do
   review="$root/phases/pln-pr/review.md"
+  scope="$root/phases/pln-pr/scope-baseline.md"
   fix="$root/phases/pln-pr/fix.md"
   ship="$root/phases/pln-pr/ship-watch.md"
   finish="$root/phases/pln/finish-ship.md"
   has "$review" '### Step 3. Risk-calibrated review roster' "$review lost semantic assurance tiers"
   has "$review" 'at most four pre-fix readers' "$review lost the R3 pre-fix cap"
   has "$review" '"verified"|"unverified"' "$review lost evidence-state findings"
+  has "$review" 'structural_evidence?' "$review lost backward-compatible structural evidence"
+  has "$review" 'direct callers or consumers' "$review lost changed-responsibility consumer traversal"
   hasnt "$review" 'DIFF_LINES < 30' "$review retained the line-count shortcut"
   hasnt "$review" 'confidence: 1-10' "$review retained reviewer self-scoring"
   has "$fix" 'R1 narrowly verifies' "$fix lost tiered post-fix assurance"
@@ -729,10 +788,20 @@ for root in "$real_c" "$real_x"; do
   has "$fix" 'bin/pln-assurance repair-action' "$fix does not use the deterministic repair decision"
   has "$fix" 'three consecutive failed repair attempts' "$fix has no per-defect stuck threshold"
   has "$fix" 'A different verified reproduction is a new finding' "$fix confuses new findings with looping"
+  has "$fix" 'repository-native discovery' "$fix lost private-removal discovery proof"
+  has "$fix" 'rerun the structural reference check and consumer map' "$fix lost post-fix structural assurance"
   hasnt "$fix" 'second blocking round means stop' "$fix retains the global repair-round cap"
   has "$ship" '`infrastructure`, `flaky`, `permission`, or `code`' "$ship edits before classifying CI failure"
   has "$ship" 'not exactly subsumed by the required CI checks' "$ship lost local gauntlet complement coverage"
   has "$ship" 'tree/command/environment/candidate hashes' "$ship lost exact-final-candidate evidence"
+  has "$scope" 'bin/pln-simplify' "$scope lost the cadence enforcement consumer"
+  has "$scope" 'consume it when the run reaches `complete` or deliberately stops' \
+    "$scope lost freshness-bypass lifetime enforcement"
+  has "$ship" 'pln-simplify" propagate' "$ship lost PR-body marker propagation"
+  has "$ship" 'requires its content fingerprint to prove the resolved HEAD' \
+    "$ship can propagate a marker invalidated by candidate mutation"
+  has "$ship" 'consume any recorded simplification freshness bypass' \
+    "$ship can reuse a completed run's freshness bypass"
   has "$finish" 'bin/pln-assurance fingerprint' "$finish lost exact pln verification identity"
   has "$finish" 'self-hosts `/pln-pr`' "$finish lost the narrow self-hosting exception for pln-pr"
 done

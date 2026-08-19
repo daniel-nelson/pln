@@ -53,6 +53,7 @@ echo ""
 echo "Done. Skills available:"
 echo "  /pln        — two-phase planning, then dependency-aware implementation"
 echo "  /pln-pr     — review the current branch and open a pull request, the pln way"
+echo "  /pln-simplify — map and safely simplify a codebase"
 echo "  /pln-update — update pln to the latest version"
 echo ""
 case "$HOST" in

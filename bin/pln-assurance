@@ -7,6 +7,7 @@ usage() {
 Usage:
   pln-assurance classify --signals CSV --substantive-files N --non-generated-lines N
   pln-assurance roster --risk R1|R2|R3 --areas CSV --adversary peer|local
+  pln-assurance repair-key --kind behavioral|structural --boundary TEXT --check TEXT [--owner TEXT]
   pln-assurance repair-action --disposition new|persisted|needs-decision|out-of-scope|destructive|worker-blocked --failed-attempts N
   pln-assurance fingerprint --root DIR --commands FILE --environment FILE
 USAGE
@@ -22,6 +23,17 @@ sha256_file() {
     shasum -a 256 "$1" | awk '{print $1}'
   elif command -v sha256sum >/dev/null 2>&1; then
     sha256sum "$1" | awk '{print $1}'
+  else
+    echo 'pln-assurance: no SHA-256 implementation (shasum or sha256sum)' >&2
+    exit 2
+  fi
+}
+
+sha256_stream() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 | awk '{print $1}'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{print $1}'
   else
     echo 'pln-assurance: no SHA-256 implementation (shasum or sha256sum)' >&2
     exit 2
@@ -110,6 +122,35 @@ case "$command" in
         printf 'SLOT\tadversarial\tsame-model\n'
       fi
     fi
+    ;;
+
+  repair-key)
+    kind=""
+    boundary=""
+    check=""
+    owner=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --kind) kind="${2:-}"; shift 2 ;;
+        --boundary) boundary="${2:-}"; shift 2 ;;
+        --check) check="${2:-}"; shift 2 ;;
+        --owner) owner="${2:-}"; shift 2 ;;
+        *) usage ;;
+      esac
+    done
+    [ -n "$boundary" ] && [ -n "$check" ] || usage
+    case "$kind" in
+      behavioral)
+        [ -z "$owner" ] || usage
+        ;;
+      structural)
+        [ -n "$owner" ] || usage
+        ;;
+      *) usage ;;
+    esac
+    key="$(printf 'pln-repair-key-v1\0kind\0%s\0boundary\0%s\0owner\0%s\0check\0%s\0' \
+      "$kind" "$boundary" "$owner" "$check" | sha256_stream)"
+    printf 'REPAIR_KEY=%s:%s\n' "$kind" "$key"
     ;;
 
   repair-action)

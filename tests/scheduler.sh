@@ -115,6 +115,22 @@ has "$recover" "WORKTREE=$WORK/wt-1" 'handle-free recovery omitted its retained 
   --snapshot "$WORK/plan/dirty.tsv" --manifest "$WORK/plan/run-manifest.tsv" \
   --allow-items 1 > "$WORK/dirty-check.out"
 has "$WORK/dirty-check.out" 'DIRTY_STATE=unchanged' 'unchanged user-owned dirty bytes failed validation'
+mkdir -p "$WORK/repo/src/api"
+printf 'leased worker change\n' > "$WORK/repo/src/api/added.txt"
+"$SCHEDULER" check-dirty --repo "$WORK/repo" \
+  --snapshot "$WORK/plan/dirty.tsv" --manifest "$WORK/plan/run-manifest.tsv" \
+  --allow-items 1 > "$WORK/dirty-check.out"
+has "$WORK/dirty-check.out" 'DIRTY_STATE=unchanged' \
+  'a change inside an allowed lease was compared against the lease sentinel instead of its path'
+printf 'outside lease\n' > "$WORK/repo/outside.txt"
+if "$SCHEDULER" check-dirty --repo "$WORK/repo" \
+  --snapshot "$WORK/plan/dirty.tsv" --manifest "$WORK/plan/run-manifest.tsv" \
+  --allow-items 1 >"$WORK/out" 2>"$WORK/err"; then
+  fail 'an out-of-lease worker change unexpectedly passed validation'
+fi
+has "$WORK/err" 'user-owned dirty state changed outside allowed leases' \
+  'out-of-lease change failed without the safety cause'
+rm -f "$WORK/repo/outside.txt"
 printf 'worker trespass\n' >> "$WORK/repo/user-owned.txt"
 if "$SCHEDULER" check-dirty --repo "$WORK/repo" \
   --snapshot "$WORK/plan/dirty.tsv" --manifest "$WORK/plan/run-manifest.tsv" \

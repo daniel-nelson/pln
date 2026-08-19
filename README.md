@@ -42,6 +42,7 @@ Then run `./setup` in the directory it installed to. `npx skills` copies files; 
 
 - `pln` skill in `~/.claude/skills/pln/` (Claude Code) or `~/.agents/skills/pln/` (Codex)
 - `/pln-pr` slash command (symlinked from `pln/pln-pr/`) for reviewing a branch and opening a pull request
+- `/pln-simplify` slash command (symlinked from `pln/pln-simplify/`) for recurring concept and ownership simplification
 - `/pln-update` slash command (symlinked from `pln/pln-update/`) for updating pln
 
 `./setup` also builds the skill files for the host it was installed under, working the host out from the install path. Claude Code and Codex drive agents differently, so each build carries only its own host's mechanics rather than a page of "if you are on the other host, ignore this". That is the one reason the clone alone isn't enough: without `./setup` the skill files are placeholders that say so. If you cloned somewhere the path doesn't name a host, run `PLN_HOST=codex ./setup` (or `PLN_HOST=claude ./setup`).
@@ -54,6 +55,7 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 |-------|--------------|-------------|
 | `/pln` | `/pln` or `/pln <details of what you want to plan>` | Two-phase planning: overview bullet list followed by detailed back and forth with a peer for each item; implementation only after the plan is written |
 | `/pln-pr` | `/pln-pr` or "put up a PR" | Review the current branch with a fresh-context review army, fix findings under one durable ledger, verify once, and open the pull request |
+| `/pln-simplify` | `/pln-simplify` or a deliberate codebase-simplification request | Map concepts and owners, adopt bounded consolidation or retirement, verify an unpublished exact candidate, and record the successful assessment |
 | `/pln-update` | `/pln-update` | Update pln to the latest version (pln also offers this automatically when a new release appears) |
 
 ## How it works
@@ -63,6 +65,10 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 The peer posture is built in: during the interview phase, pln will disagree with your framing if it sees a problem, bring up considerations you didn't name, and stop after one question rather than overwhelming you with options. The goal is a plan *you* shaped, not one that was handed to you.
 
 **`/pln-pr`** is the ship half of a plan. After a `/pln` run (or on any branch ahead of its base), it classifies semantic risk, reviews the exact candidate, fixes verified findings, verifies the final tree once, and opens the pull request. R1 routine work gets a fresh broad reviewer; R2 adds up to two applicable specialists; R3 adds an adversarial slot, filled by a permitted cross-model peer or a truthfully attributed same-model substitute. Findings cite exact evidence and are recorded as verified, unverified, or disproved in a durable `REVIEW.md`. Newly verified, unambiguous, in-scope defects continue through repair and fresh assurance without another permission prompt. The unattended flow stops only after three failed repairs of the same reproduced defect or at a genuine user-owned boundary. Disjoint fix clusters may run in isolated worktrees, while the coordinator alone owns the ledger, commits, and integration. Native workers, peers, and CI watches remain attached to the current parent turn until their terminal state, so the host's own activity UI stays authoritative. Any fix creates a new candidate fingerprint, so stale gauntlet evidence is never reused. It depends only on git, native host agents, and optionally the GitHub/GitLab CLI and a peer CLI.
+
+**`/pln-simplify`** is recurring counter-pressure to cumulative additions. Fresh workers map concepts, owners, dependencies, duplicated policy, compatibility paths, and obsolete surfaces, then propose only bounded behavior-preserving consolidation. It reuses `/pln` for interviewing, approval, scheduling, implementation, blockers, and assurance. `nothing worth changing` is a valid verified result. Success is recorded by one exact marker-bearing commit on an unpublished ref; the full gauntlet must pass before the working branch fast-forwards to that unchanged commit. A later `/pln-pr` copies the still-valid marker into the PR description on a best-effort basis.
+
+Cadence is advisory by default. V1 treats changed content as due at 100 visible commits or 90 days and overdue at 250 commits or 180 days; unchanged content remains fresh, and missing or stripped history is `unknown`, never fabricated staleness. A repository can commit `.pln-simplify-policy` with `schema=1`, `mode=advisory|required|disabled`, `minimum-client=1`, `protocol=1`, and optional `due-commits`, `overdue-commits`, `due-days`, and `overdue-days` overrides. Required mode affects policy-aware `/pln-pr` clients; true repository-wide enforcement remains an optional repository-owned CI/branch-protection check.
 
 ## Hosts
 

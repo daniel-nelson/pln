@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+# Deterministic V1 content-marker, cadence, policy, and propagation helper.
+set -euo pipefail
+
+PREFIX='PLN-SIMPLIFY-V1'
+POLICY_NAME='.pln-simplify-policy'
+CLIENT_VERSION=1
+
+fail() { echo "pln-simplify: $*" >&2; exit 2; }
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  pln-simplify fingerprint --repo DIR [--ref REF]
+  pln-simplify marker --repo DIR --completed YYYY-MM-DDTHH:MM:SSZ [--ref REF]
+  pln-simplify status --repo DIR [--now UTC] [threshold overrides]
+  pln-simplify enforce --repo DIR --base REF --head REF --run-id ID [--now UTC]
+  pln-simplify selected-marker --repo DIR [--head REF]
+  pln-simplify propagate --repo DIR --body FILE [--head REF]
+
+V1 defaults: due at 100 visible commits or 90 days; overdue at 250 commits
+or 180 days. Repository overrides live in .pln-simplify-policy.
+EOF
+  exit 2
+}
+
+sha256_file() {
+  if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
+  elif command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
+  else fail 'need shasum or sha256sum'
+  fi
+}
+
+sha256_text() {
+  local tmp
+  tmp="$(mktemp "${TMPDIR:-/tmp}/pln-simplify-text.XXXXXX")"
+  printf '%s' "$1" > "$tmp"
+  sha256_file "$tmp"
+  rm -f "$tmp"
+}
+
+repo_abs() {
+  [ -d "$1/.git" ] || git -C "$1" rev-parse --git-dir >/dev/null 2>&1 || fail "not a git repository: $1"
+  (cd "$1" && pwd -P)
+}
+
+valid_utc() {
+  case "$1" in
+    ????-??-??T??:??:??Z) ;;
+    *) return 1 ;;
+  esac
+  printf '%s\n' "$1" | LC_ALL=C grep -Eq '^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$'
+}
+
+utc_epoch() {
+  local epoch canonical
+  valid_utc "$1" || return 1
+  if date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" '+%s' >/dev/null 2>&1; then
+    epoch="$(date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" '+%s')" || return 1
+    canonical="$(date -u -r "$epoch" '+%Y-%m-%dT%H:%M:%SZ')" || return 1
+  else
+    epoch="$(date -u -d "$1" '+%s' 2>/dev/null)" || return 1
+    canonical="$(date -u -d "@$epoch" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null)" || return 1
+  fi
+  [ "$canonical" = "$1" ] || return 1
+  printf '%s\n' "$epoch"
+}
+
+content_fingerprint() { # repo ref
+  local repo="$1" ref="$2" records entry meta path mode type oid bytes
+  git -C "$repo" rev-parse --verify "$ref^{commit}" >/dev/null 2>&1 || fail "unknown commit ref: $ref"
+  records="$(mktemp "${TMPDIR:-/tmp}/pln-simplify-records.XXXXXX")"
+  : > "$records"
+  while IFS= read -r -d '' entry; do
+    meta="${entry%%$'\t'*}"; path="${entry#*$'\t'}"
+    read -r mode type oid <<< "$meta"
+    LC_ALL=C; bytes="${#path}"
+    printf '%s\0%s\0%s\0%s\0%s\n' "$bytes" "$path" "$mode" "$type" "$oid" >> "$records"
+  done < <(git -C "$repo" ls-tree -rz --full-tree "$ref")
+  sha256_file "$records"
+  rm -f "$records"
+}
+
+policy_defaults() {
+  POLICY_SCHEMA=1; POLICY_MODE=advisory; POLICY_MIN_CLIENT=1; POLICY_PROTOCOL=1
+  DUE_COMMITS=100; OVERDUE_COMMITS=250; DUE_DAYS=90; OVERDUE_DAYS=180
+  POLICY_HASH=none
+}
+
+read_policy() { # repo
+  local file="$1/$POLICY_NAME" line key value seen='|'
+  policy_defaults
+  [ -f "$file" ] || return 0
+  POLICY_HASH="$(sha256_file "$file")"
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in ''|'#'*) continue ;; esac
+    key="${line%%=*}"; value="${line#*=}"
+    [ "$key" != "$line" ] && [ -n "$value" ] || fail "malformed policy line: $line"
+    case "$seen" in *"|$key|"*) fail "duplicate policy key: $key" ;; esac
+    seen="$seen$key|"
+    case "$key" in
+      schema) POLICY_SCHEMA="$value" ;;
+      mode) POLICY_MODE="$value" ;;
+      minimum-client) POLICY_MIN_CLIENT="$value" ;;
+      protocol) POLICY_PROTOCOL="$value" ;;
+      due-commits) DUE_COMMITS="$value" ;;
+      overdue-commits) OVERDUE_COMMITS="$value" ;;
+      due-days) DUE_DAYS="$value" ;;
+      overdue-days) OVERDUE_DAYS="$value" ;;
+      *) fail "unknown policy key: $key" ;;
+    esac
+  done < "$file"
+  for key in schema mode minimum-client protocol; do
+    case "$seen" in *"|$key|"*) ;; *) fail "missing required policy key: $key" ;; esac
+  done
+  case "$POLICY_MODE" in advisory|required|disabled) ;; *) fail "unknown policy mode: $POLICY_MODE" ;; esac
+  for value in "$POLICY_SCHEMA" "$POLICY_MIN_CLIENT" "$POLICY_PROTOCOL" "$DUE_COMMITS" "$OVERDUE_COMMITS" "$DUE_DAYS" "$OVERDUE_DAYS"; do
+    case "$value" in ''|*[!0-9]*) fail 'policy numeric fields must be non-negative integers' ;; esac
+  done
+  [ "$DUE_COMMITS" -le "$OVERDUE_COMMITS" ] || fail 'due-commits exceeds overdue-commits'
+  [ "$DUE_DAYS" -le "$OVERDUE_DAYS" ] || fail 'due-days exceeds overdue-days'
+}
+
+select_marker() { # repo head; sets SELECTED_*
+  local repo="$1" head="$2" commit body line completed claimed actual epoch best_epoch=-1
+  SELECTED_LINE=''; SELECTED_COMMIT=''; SELECTED_COMPLETED=''; SELECTED_SHA=''
+  while IFS= read -r commit; do
+    body="$(git -C "$repo" show -s --format=%B "$commit")"
+    while IFS= read -r line; do
+      printf '%s\n' "$line" | LC_ALL=C grep -Eq '^PLN-SIMPLIFY-V1 completed=[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z content-sha256=[0-9a-f]{64}$' || continue
+      completed="${line#* completed=}"; completed="${completed%% content-sha256=*}"
+      claimed="${line##* content-sha256=}"
+      epoch="$(utc_epoch "$completed" 2>/dev/null || true)"; [ -n "$epoch" ] || continue
+      actual="$(content_fingerprint "$repo" "$commit")"
+      [ "$actual" = "$claimed" ] || continue
+      if [ "$epoch" -gt "$best_epoch" ] || { [ "$epoch" -eq "$best_epoch" ] && { [ -z "$SELECTED_LINE" ] || [[ "$line" > "$SELECTED_LINE" ]]; }; }; then
+        best_epoch="$epoch"; SELECTED_LINE="$line"; SELECTED_COMMIT="$commit"
+        SELECTED_COMPLETED="$completed"; SELECTED_SHA="$claimed"
+      fi
+    done <<< "$body"
+  done < <(git -C "$repo" rev-list --topo-order --date-order "$head")
+}
+
+status_cmd() {
+  local repo='' now='' head=HEAD current_sha commits marker_epoch now_epoch age_days shallow reason
+  local due_commits='' overdue_commits='' due_days='' overdue_days=''
+  while [ $# -gt 0 ]; do case "$1" in
+    --repo) repo="${2:-}"; shift 2 ;; --now) now="${2:-}"; shift 2 ;; --head) head="${2:-}"; shift 2 ;;
+    --due-commits) due_commits="${2:-}"; shift 2 ;; --overdue-commits) overdue_commits="${2:-}"; shift 2 ;;
+    --due-days) due_days="${2:-}"; shift 2 ;; --overdue-days) overdue_days="${2:-}"; shift 2 ;; *) usage ;; esac; done
+  [ -n "$repo" ] || usage; repo="$(repo_abs "$repo")"; read_policy "$repo"
+  [ -n "$due_commits" ] && DUE_COMMITS="$due_commits"; [ -n "$overdue_commits" ] && OVERDUE_COMMITS="$overdue_commits"
+  [ -n "$due_days" ] && DUE_DAYS="$due_days"; [ -n "$overdue_days" ] && OVERDUE_DAYS="$overdue_days"
+  for value in "$DUE_COMMITS" "$OVERDUE_COMMITS" "$DUE_DAYS" "$OVERDUE_DAYS"; do
+    case "$value" in ''|*[!0-9]*) fail 'cadence thresholds must be non-negative integers' ;; esac
+  done
+  [ "$DUE_COMMITS" -le "$OVERDUE_COMMITS" ] || fail 'due-commits exceeds overdue-commits'
+  [ "$DUE_DAYS" -le "$OVERDUE_DAYS" ] || fail 'due-days exceeds overdue-days'
+  if [ "$POLICY_MODE" = disabled ]; then printf 'STATUS=disabled\nPOLICY_MODE=disabled\n'; return 0; fi
+  if [ "$POLICY_MODE" = required ] && { [ "$POLICY_SCHEMA" -ne 1 ] || [ "$POLICY_MIN_CLIENT" -gt "$CLIENT_VERSION" ] || [ "$POLICY_PROTOCOL" -ne 1 ]; }; then
+    fail 'unsupported required simplification policy'
+  fi
+  select_marker "$repo" "$head"
+  if [ -z "$SELECTED_LINE" ]; then
+    shallow="$(git -C "$repo" rev-parse --is-shallow-repository 2>/dev/null || printf unknown)"
+    if [ "$shallow" = true ]; then reason=shallow-no-valid-reachable-v1-marker; else reason=no-valid-reachable-v1-marker; fi
+    printf 'STATUS=unknown\nREASON=%s\nPOLICY_MODE=%s\n' "$reason" "$POLICY_MODE"
+    return 0
+  fi
+  current_sha="$(content_fingerprint "$repo" "$head")"
+  if [ "$current_sha" = "$SELECTED_SHA" ]; then
+    printf 'STATUS=fresh\nREASON=content-unchanged\nPOLICY_MODE=%s\nMARKER=%s\nMARKER_COMMIT=%s\nVISIBLE_COMMITS=0\nAGE_DAYS=0\n' "$POLICY_MODE" "$SELECTED_LINE" "$SELECTED_COMMIT"
+    return 0
+  fi
+  now="${now:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}"; now_epoch="$(utc_epoch "$now")" || fail "invalid --now timestamp: $now"
+  marker_epoch="$(utc_epoch "$SELECTED_COMPLETED")"; age_days=$(( (now_epoch - marker_epoch) / 86400 )); [ "$age_days" -ge 0 ] || age_days=0
+  commits="$(git -C "$repo" rev-list --count "$SELECTED_COMMIT..$head" 2>/dev/null)" || {
+    printf 'STATUS=unknown\nREASON=ancestry-count-failed\nPOLICY_MODE=%s\n' "$POLICY_MODE"; return 0; }
+  local status=fresh reason=below-thresholds
+  if [ "$commits" -ge "$OVERDUE_COMMITS" ] || [ "$age_days" -ge "$OVERDUE_DAYS" ]; then status=overdue; reason=hybrid-overdue-threshold
+  elif [ "$commits" -ge "$DUE_COMMITS" ] || [ "$age_days" -ge "$DUE_DAYS" ]; then status=due; reason=hybrid-due-threshold
+  fi
+  printf 'STATUS=%s\nREASON=%s\nPOLICY_MODE=%s\nMARKER=%s\nMARKER_COMMIT=%s\nVISIBLE_COMMITS=%s\nAGE_DAYS=%s\n' \
+    "$status" "$reason" "$POLICY_MODE" "$SELECTED_LINE" "$SELECTED_COMMIT" "$commits" "$age_days"
+}
+
+cmd="${1:-}"; [ -n "$cmd" ] || usage; shift
+case "$cmd" in
+  fingerprint)
+    repo=''; ref=HEAD
+    while [ $# -gt 0 ]; do case "$1" in --repo) repo="${2:-}"; shift 2 ;; --ref) ref="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$repo" ] || usage; repo="$(repo_abs "$repo")"
+    printf 'CONTENT_SHA256=%s\n' "$(content_fingerprint "$repo" "$ref")"
+    ;;
+  marker)
+    repo=''; completed=''; ref=HEAD
+    while [ $# -gt 0 ]; do case "$1" in --repo) repo="${2:-}"; shift 2 ;; --completed) completed="${2:-}"; shift 2 ;; --ref) ref="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$repo" ] && [ -n "$completed" ] || usage; repo="$(repo_abs "$repo")"; utc_epoch "$completed" >/dev/null || fail 'completion time must be a valid canonical UTC instant YYYY-MM-DDTHH:MM:SSZ'
+    [ -z "$(git -C "$repo" status --porcelain=v1 --untracked-files=normal)" ] || fail 'marker candidates require a clean non-ignored tree'
+    printf '%s completed=%s content-sha256=%s\n' "$PREFIX" "$completed" "$(content_fingerprint "$repo" "$ref")"
+    ;;
+  status) status_cmd "$@" ;;
+  selected-marker)
+    repo=''; head=HEAD
+    while [ $# -gt 0 ]; do case "$1" in --repo) repo="${2:-}"; shift 2 ;; --head) head="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$repo" ] || usage; repo="$(repo_abs "$repo")"; select_marker "$repo" "$head"
+    [ -n "$SELECTED_LINE" ] || exit 3
+    [ "$(content_fingerprint "$repo" "$head")" = "$SELECTED_SHA" ] || exit 3
+    printf '%s\n' "$SELECTED_LINE"
+    ;;
+  propagate)
+    repo=''; body=''; head=HEAD
+    while [ $# -gt 0 ]; do case "$1" in --repo) repo="${2:-}"; shift 2 ;; --body) body="${2:-}"; shift 2 ;; --head) head="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$repo" ] && [ -f "$body" ] || usage; repo="$(repo_abs "$repo")"; select_marker "$repo" "$head"
+    [ -n "$SELECTED_LINE" ] && [ "$(content_fingerprint "$repo" "$head")" = "$SELECTED_SHA" ] || exit 3
+    tmp="$(mktemp "${TMPDIR:-/tmp}/pln-simplify-body.XXXXXX")"
+    LC_ALL=C awk '
+      /^PLN-SIMPLIFY-V[0-9]+ completed=/ { next }
+      { lines[++n]=$0 }
+      END { while (n > 0 && lines[n] == "") n--; for (i=1; i<=n; i++) print lines[i] }
+    ' "$body" > "$tmp"
+    if [ -s "$tmp" ]; then printf '\n%s\n' "$SELECTED_LINE" >> "$tmp"; else printf '%s\n' "$SELECTED_LINE" >> "$tmp"; fi
+    mv "$tmp" "$body"
+    ;;
+  enforce)
+    repo=''; base=''; head=''; run_id=''; now=''
+    while [ $# -gt 0 ]; do case "$1" in --repo) repo="${2:-}"; shift 2 ;; --base) base="${2:-}"; shift 2 ;; --head) head="${2:-}"; shift 2 ;; --run-id) run_id="${2:-}"; shift 2 ;; --now) now="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    [ -n "$repo" ] && [ -n "$base" ] && [ -n "$head" ] && [ -n "$run_id" ] || usage; repo="$(repo_abs "$repo")"; read_policy "$repo"
+    status_args=(--repo "$repo" --head "$head"); [ -n "$now" ] && status_args+=(--now "$now")
+    output="$(status_cmd "${status_args[@]}")"; status="$(printf '%s\n' "$output" | sed -n 's/^STATUS=//p')"
+    base_oid="$(git -C "$repo" rev-parse "$base^{commit}" 2>/dev/null)" || fail "unknown resolved base: $base"
+    head_oid="$(git -C "$repo" rev-parse "$head^{commit}")"
+    binding="$(sha256_text "repo=$repo\nbase=$base_oid\nhead=$head_oid\npolicy=$POLICY_HASH\nschema=$POLICY_SCHEMA\nrun=$run_id\n")"
+    case "$status:$POLICY_MODE" in overdue:required) action=block ;; overdue:*) action=follow-up ;; due:*) action=disclose ;; *) action=continue ;; esac
+    printf '%s\nPOLICY_SCHEMA=%s\nPOLICY_HASH=%s\nACTION=%s\nBYPASS_BINDING=%s\n' \
+      "$output" "$POLICY_SCHEMA" "$POLICY_HASH" "$action" "$binding"
+    ;;
+  *) usage ;;
+esac

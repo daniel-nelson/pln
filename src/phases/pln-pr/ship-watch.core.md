@@ -55,6 +55,10 @@ BODY_FILE=$(mktemp)
 # write the assembled PR body into "$BODY_FILE" (a heredoc, or your host's file-writing tool), then:
 ```
 
+Now perform best-effort simplification-marker propagation. Run `"$_PLN_DIR/bin/pln-simplify" propagate --repo . --head HEAD --body "$BODY_FILE"`. The helper scans reachable local commit messages, strictly selects the V1 winner, requires its content fingerprint to prove the resolved HEAD, removes prior marker copies, and appends the exact selected line once; exit 3 means omit it without failing shipping. PR/MR descriptions are a redundant preservation route only and never cadence input.
+
+An intervening mutation normally invalidates propagation. The only exception is a repository-rule-driven release-metadata-only delta proven at exact hunk/field granularity: reverse just those declared mechanical version/changelog field edits in a temporary index/tree, recompute the same canonical content fingerprint, and require it to match the selected marker. Never exclude a whole mixed-purpose file, accept an arbitrary path, or treat a similar diff as proof. If that narrow proof cannot be constructed, omit the marker. When this run used a simplification freshness bypass, append a separate one-line disclosure naming the reason; never alter the marker line.
+
 **Read `pr_draft` before creating anything:** `"$_PLN_DIR/bin/pln-config" get pr_draft`. Unless it prints `false`, draft mode is on (default on) — a brand-new PR opens as a draft and Step 9 below watches it. `pr_draft false` reverts Step 8 to opening straight to ready, and Step 9 does not run at all.
 
 Detect whether a PR already exists for this branch and **update instead of recreate** — re-running pln-pr on a branch that already has an open PR should refresh it, not error or open a duplicate. This check also decides whether Step 9 applies: **an update to an already-open PR never touches its draft/ready state**, no matter what `pr_draft` says — only a PR this run itself creates goes through the draft/watch/undraft cycle.
@@ -64,6 +68,8 @@ Detect whether a PR already exists for this branch and **update instead of recre
 - Unknown host: print the branch is pushed and give the compare URL if derivable; you cannot open the PR, so nothing below applies.
 
 Clean up: `rm -f "$BODY_FILE"`.
+
+At terminal completion or deliberate stop, consume any recorded simplification freshness bypass so a later invocation on the same candidate must receive a new explicit reason.
 
 **Only fire the completion notification and hand the PR to the user here if Step 9 will not run** — i.e. `IS_NEW_PR=false`, `pr_draft` is off, or the host is unknown. In that case, fire it now ({{NOTIFY_CALL}}), then close with the PR URL and a one-line summary — the complete answer on its own, no pointer to `REVIEW.md`. If any genuine follow-ups made it into the PR body above, list them again as the closing message's bullet list, then run the to-do-location flow (Follow-ups, below).
 <!-- pln:only claude -->

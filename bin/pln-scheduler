@@ -476,7 +476,7 @@ case "$command" in
     if ! awk -F '\t' -v manifest="$manifest" -v allow="$allow_items" '
       function path_allowed(path,    i,l) {
         for (i in lease) {
-          l=lease[i]
+          l=i
           if (path == l || index(path,l "/") == 1 || index(l,path "/") == 1) return 1
         }
         return 0

@@ -436,6 +436,16 @@ for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
 done
 for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
   hasnt "$f" 'create_goal' "$f received Codex-only durable-goal mechanics"
+  has "$f" 'Never launch idle Bash merely to keep the parent turn open' \
+    "$f permits synthetic shell keepalives while native Claude work runs"
+  has "$f" 'run the Agent or Workflow in the foreground or sequence the work' \
+    "$f has no native fallback when background work cannot be awaited"
+  has "$f" 'do not synthesize a shell keepalive' \
+    "$f can still invent an idle wait loop"
+done
+for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  hasnt "$f" 'Never launch idle Bash merely to keep the parent turn open' \
+    "$f received Claude-specific waiting mechanics"
 done
 
 # Every recursively loaded phase carries one shared terminal-state invariant.

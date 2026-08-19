@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.40.0 — 2026-08-19
+
+### Changed
+
+- **Findings and questions are held until the work in flight has quiesced, then sent once.** A coordinator that spoke each time a worker, task, review, or peer call came back was putting substance the user had to read into a message that later output buried, and then re-referring to it from a message further down — the second telling always thinner than the first. Every phase of `/pln`, `/pln-pr`, and `/pln-simplify` now consumes a completed result into the durable record silently while anything else is still outstanding, and sends one message carrying the accumulated findings and the single question only when the last one lands. A question already in front of the user is not overwritten by a landing result either. One question at a time is unchanged; the host's activity surface and ignorable status lines remain exempt, and neither may carry a finding or a question.
+
 ## 1.39.0 — 2026-08-19
 
 ### Changed

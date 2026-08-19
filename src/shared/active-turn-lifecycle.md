@@ -16,7 +16,15 @@ If anything nonterminal remains, wait, poll, recover, integrate, or dispatch it 
 
 **Nothing the user has to have read goes out while work is still running.** A message sent mid-flight scrolls away under everything that follows it, so a later message ends up re-referring to a finding or a question the user never saw — and the retelling is always the thinner one. That is how a question gets asked twice: once where it will be buried, and once in summary, after the user fails to answer the buried copy.
 
-So when a worker, task, review, or peer call returns while others are still outstanding, consume its result, write it into the durable record, and say nothing. Hold its findings and its question. When the last one lands, send one message carrying everything held — the accumulated findings, then the single question that needs answering. One question at a time is unchanged; what changes is that the question waits for a quiet turn instead of competing with output the user is expected to have read on the way past.
+So when a worker, task, review, or peer call returns while others are still outstanding, consume its result, write it into the durable record, and say nothing.
+
+**What is held is a set of topics, not a transcript.** Split each landing result at the seam that matters to the user: one unit per question it raises, carrying the evidence that question turns on. Never hold a running log to replay later. A message that recites three findings and then asks about one of them buries the other two exactly the way mid-flight output did, and the next question has to reach back into it.
+
+When the work quiesces, send the first unit — its finding, its evidence, its question, in whichever of the message shapes fits. Wait for the answer. Then send the next unit, carrying its own evidence with it. A question message stands on its own or it is not finished: the user is not holding evidence from an earlier turn, whether that turn was thirty seconds ago or thirty minutes. One question at a time is unchanged; what changes is that each question waits for a quiet turn and arrives with its own grounds attached.
+
+**A finding that raises no question does not earn a turn of its own.** It goes into the durable record and reaches the user where the run already surfaces such things — the approval gate, the walk through flagged entries, the closing message's sweep. Attaching it to an unrelated question's message is the same conflation from the other end.
+
+**Reconcile the held units before the first goes out, and again after every answer.** A later result routinely changes an earlier one's premise: it can merge two units, answer one outright, or make it moot. What reaches the user is what is true when it is sent, not what each worker said as it landed.
 
 A question already in front of the user is not overwritten either. Where one is open when the last of the work lands, keep holding: the unanswered question stays the only thing on the screen until they answer it.
 

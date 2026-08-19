@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.39.0 — 2026-08-19
+
+### Changed
+
+- **Claude coordinators no longer invent idle shell keepalives while native reviewers or workers run.** Background Agents and Workflows are awaited through their own tracked handles and completion notifications. If the current host surface cannot await the selected primitive natively, the coordinator uses foreground or sequenced native work instead of launching a `sleep` loop, impossible-condition loop, `tail -f`, or dummy background process that wastes a task slot and emits misleading stop messages.
+
 ## 1.38.0 — 2026-08-18
 
 ### Changed

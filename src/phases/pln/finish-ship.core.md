@@ -35,6 +35,7 @@ If root repository instructions explicitly declare that this repository self-hos
 
 Read the dashboard's `Ship` field — not what the conversation remembers, so a restarted or resumed session doesn't have to recall a choice made turns ago:
 
+- **`draft PR after implementation`** — the Step 4 gate already asked and got a yes, and asked for the PR to be left in draft. Hand off immediately at the end of Step 7's wrap-up, no further prompt, carrying the `draft=keep` argument through (see below) so `/pln-pr` opens the PR as a draft and closes with it still a draft rather than marking it ready on green.
 - **`PR after implementation`** — the Step 4 gate already asked and got a yes. Hand off immediately at the end of Step 7's wrap-up, no further prompt.
 - **`implement only`, absent, or the plan predates this field** — ask once, at the end of the Step 7 wrap-up message rather than in a message of its own: open the PR now, or stop here? Skip the ask entirely when there is nothing to put up — no commits ahead of the base branch — or when the user has already said where this run ends. On yes, hand off the same way.
 
@@ -43,12 +44,12 @@ Handing off:
 <!-- pln:only claude -->
 Invoke `/pln-pr` with the `Skill` tool. Its steps then arrive verbatim at the moment they are used, instead of being recalled from a description read an hour of implementation ago — which is why it is a separate skill rather than a section of this file.
 
-When the dashboard's `Ship` field carries a `PR base: <branch>` line (item 4's stacking override), pass that branch through in the `args` string rather than making a human type it at PR time: `Skill({skill: "pln-pr", args: "base=<branch>"})`.
+When the dashboard's `Ship` field carries a `PR base: <branch>` line (item 4's stacking override), pass that branch through in the `args` string rather than making a human type it at PR time: `Skill({skill: "pln-pr", args: "base=<branch>"})`. When the field says `draft PR after implementation`, pass `draft=keep` the same way, and both together when both apply: `Skill({skill: "pln-pr", args: "base=<branch> draft=keep"})`.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
 This host has no tool that invokes a skill, so load it yourself: read `{{SKILL_DIR}}/pln-pr/SKILL.md` in full and follow it. Its steps then arrive verbatim at the moment they are used, instead of being recalled from a description read an hour of implementation ago — which is why it is a separate skill rather than a section of this file.
 
-When the dashboard's `Ship` field carries a `PR base: <branch>` line (item 4's stacking override), there is no separate tool call to attach that argument to — carry it forward explicitly instead: when you reach `pln-pr/SKILL.md`'s Step 0, tell yourself the base is already decided (the stacked branch, not the auto-detected default) and follow that step's own validation before using it, rather than running its auto-detection.
+When the dashboard's `Ship` field carries a `PR base: <branch>` line (item 4's stacking override), there is no separate tool call to attach that argument to — carry it forward explicitly instead: when you reach `pln-pr/SKILL.md`'s Step 0, tell yourself the base is already decided (the stacked branch, not the auto-detected default) and follow that step's own validation before using it, rather than running its auto-detection. Carry `draft=keep` forward the same way when the field says `draft PR after implementation`: at that same Step 0, record the leave-in-draft disposition in `REVIEW.md` as if it had arrived as an argument.
 <!-- pln:endonly -->
 
 This holds for a PR ask anywhere in the session, not only at the end. "Put up a PR", "ship it", and PR asks carried inside a longer instruction — "bump the version and open the PR", "push this up" — all route through `/pln-pr`. The one exception is an explicit "skip the review", which you honor.

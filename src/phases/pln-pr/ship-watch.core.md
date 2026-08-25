@@ -59,7 +59,7 @@ Now perform best-effort simplification-marker propagation. Run `"$_PLN_DIR/bin/p
 
 An intervening mutation normally invalidates propagation. The only exception is a repository-rule-driven release-metadata-only delta proven at exact hunk/field granularity: reverse just those declared mechanical version/changelog field edits in a temporary index/tree, recompute the same canonical content fingerprint, and require it to match the selected marker. Never exclude a whole mixed-purpose file, accept an arbitrary path, or treat a similar diff as proof. If that narrow proof cannot be constructed, omit the marker. When this run used a simplification freshness bypass, append a separate one-line disclosure naming the reason; never alter the marker line.
 
-**Read `pr_draft` before creating anything:** `"$_PLN_DIR/bin/pln-config" get pr_draft`. Unless it prints `false`, draft mode is on (default on) — a brand-new PR opens as a draft and Step 9 below watches it. `pr_draft false` reverts Step 8 to opening straight to ready, and Step 9 does not run at all.
+**Read `pr_draft` before creating anything:** `"$_PLN_DIR/bin/pln-config" get pr_draft`. Unless it prints `false`, draft mode is on (default on) — a brand-new PR opens as a draft and Step 9 below watches it. `pr_draft false` reverts Step 8 to opening straight to ready, and Step 9 does not run at all. The one exception is Step 0's `draft=keep`: it turns draft mode on for this run whatever `pr_draft` says, and Step 9 runs — it is the disposition that decides whether Step 9 ever marks the PR ready, not whether it runs.
 
 Detect whether a PR already exists for this branch and **update instead of recreate** — re-running pln-pr on a branch that already has an open PR should refresh it, not error or open a duplicate. This check also decides whether Step 9 applies: **an update to an already-open PR never touches its draft/ready state**, no matter what `pr_draft` says — only a PR this run itself creates goes through the draft/watch/undraft cycle.
 
@@ -79,13 +79,15 @@ Optionally offer to watch CI (`gh pr checks --watch` via a background command or
 Optionally offer to watch CI (`gh pr checks --watch`, backgrounded) — only if the user wants it; don't start it unprompted. (This is the `pr_draft false` path only — the default path watches unprompted, in Step 9.)
 <!-- pln:endonly -->
 
-Otherwise (`IS_NEW_PR=true`, `pr_draft` on, host known) say the PR opened as a draft and continue straight to Step 9 — no confirmation needed, this is the default behavior, not an offer.
+Otherwise (`IS_NEW_PR=true`, draft mode on, host known) say the PR opened as a draft and continue straight to Step 9 — no confirmation needed, this is the default behavior, not an offer. When the disposition is `keep-draft`, say in the same line that it will stay a draft for the user to look at.
 
 ### Step 9. Watch CI, undraft on green, fix-and-rewatch on red
 
-This step only runs right after Step 8 created a **brand-new** draft PR (`IS_NEW_PR=true`, `pr_draft` on, host known). Nothing here applies to an update to an already-open PR, to a `pr_draft false` run, or to an unknown host — Step 8 already covered those.
+This step only runs right after Step 8 created a **brand-new** draft PR (`IS_NEW_PR=true`, draft mode on, host known). Nothing here applies to an update to an already-open PR, to a `pr_draft false` run with no `draft=keep`, or to an unknown host — Step 8 already covered those.
 
-**No CI configured — undraft immediately.** Check whether the repo reports any checks at all for this PR/MR (`gh pr checks "$BRANCH"`; `glab mr` equivalent). If it reports none — nothing was ever going to turn green — run `gh pr ready` (`glab mr update --ready` equivalent) right away, fire the completion notification ({{NOTIFY_CALL}}) noting there was no CI to wait on, hand the user the PR URL, and stop. Do not enter the watch loop for a repo with no CI.
+**`keep-draft` changes one thing here: the PR is never marked ready.** Read the disposition from `REVIEW.md` rather than from what the conversation remembers. Everything else in this step is unchanged — the watch, the classification, the fix-and-rewatch loop, the recorded CI duration, the notification, the closing message — and every `gh pr ready` (`glab mr update --ready`) below is skipped. Say in the closing message that the PR is left in draft and that marking it ready is the user's call, so an unfamiliar reader does not read the draft state as an unfinished run.
+
+**No CI configured — undraft immediately.** Check whether the repo reports any checks at all for this PR/MR (`gh pr checks "$BRANCH"`; `glab mr` equivalent). If it reports none — nothing was ever going to turn green — run `gh pr ready` (`glab mr update --ready` equivalent) right away, fire the completion notification ({{NOTIFY_CALL}}) noting there was no CI to wait on, hand the user the PR URL, and stop. Do not enter the watch loop for a repo with no CI. Under `keep-draft`, do the same minus the `gh pr ready`.
 
 **"Green" means required checks if any exist, else all checks.** `gh pr checks "$BRANCH" --required` reports the subset marked required; if the repo has none marked required, fall back to plain `gh pr checks "$BRANCH"` and require all of those to pass instead — this is the same distinction the command ships for. A required check that fails is what drives the fix-and-rewatch loop below; a failing *optional* check when required checks exist is a follow-up, not a blocker, if it clears the follow-up bar (Style's "Ending a message"). The PR body was already assembled at Step 8, so this can't be folded back into it — post it as a PR comment (or a body edit, if the host makes that easy) once found, and carry it into the eventual closing message's bullet list.
 
@@ -93,7 +95,7 @@ This step only runs right after Step 8 created a **brand-new** draft PR (`IS_NEW
 
 <!-- pln:include pr-watch-dispatch -->
 
-**On green:** undraft (`gh pr ready`; `glab mr update --ready` equivalent), record the observed duration as above, fire the completion notification ({{NOTIFY_CALL}}), and close with the PR URL and a one-line summary, same as Step 8's own completion message would have — including any genuine follow-ups (found during review or during this watch loop) as a closing bullet list, then the to-do-location flow (Follow-ups, below).
+**On green:** undraft (`gh pr ready`; `glab mr update --ready` equivalent — skipped entirely under `keep-draft`), record the observed duration as above, fire the completion notification ({{NOTIFY_CALL}}), and close with the PR URL and a one-line summary, same as Step 8's own completion message would have — including any genuine follow-ups (found during review or during this watch loop) as a closing bullet list, then the to-do-location flow (Follow-ups, below).
 
 **On a red required check:** capture logs file-first and have a fresh judgment worker classify the failure before editing: `infrastructure`, `flaky`, `permission`, or `code`. Infrastructure/flaky/permission failures do not authorize code changes; record evidence and retry/wait/escalate as appropriate. A code failure becomes a verified finding and a new candidate. Dispatch exactly one fresh CI fix cluster with its own `fix-ci-<round>-manifest.tsv`; never reuse a pre-PR worker or manifest.
 

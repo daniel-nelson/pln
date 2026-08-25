@@ -117,6 +117,22 @@ printf 'runtime=node-24\ntimezone=America/Los_Angeles\n' > "$FIXTURE/environment
 environment_changed="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt")"
 [ "$environment_changed" != "$first" ] || fail 'environment edit did not invalidate fingerprint'
 
+# A tracked symlink to a directory must fingerprint (git hash-object on the
+# path follows the link and dies), and retargeting the link must invalidate.
+mkdir "$FIXTURE/linked-dir"
+printf 'inner\n' > "$FIXTURE/linked-dir/inner.txt"
+ln -s linked-dir "$FIXTURE/dir-link"
+git -C "$FIXTURE" add linked-dir dir-link
+if ! symlinked="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt" 2>/dev/null)"; then
+  fail 'fingerprint failed on a tracked symlink to a directory'
+fi
+rm "$FIXTURE/dir-link"
+ln -s other-target "$FIXTURE/dir-link"
+retargeted="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt")"
+[ "$retargeted" != "$symlinked" ] || fail 'retargeted symlink did not invalidate fingerprint'
+rm "$FIXTURE/dir-link"
+ln -s linked-dir "$FIXTURE/dir-link"
+
 # Simplification success metadata has a content-only identity distinct from the
 # assurance candidate fingerprint. The marker grammar and cadence boundaries
 # are a portable V1 protocol, not prose interpreted by a model.

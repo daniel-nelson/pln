@@ -66,7 +66,12 @@ snapshot_tree() {
   printf 'PATH\tHASH\n' > "$tmp"
   if [ -s "$paths" ]; then
     LC_ALL=C sort -u "$paths" | while IFS= read -r path; do
-      if [ -e "$repo_real/$path" ] || [ -L "$repo_real/$path" ]; then
+      if [ -L "$repo_real/$path" ]; then
+        # git stores a symlink as its target string; hashing the path itself
+        # follows the link and fails when the target is a directory.
+        hash="$(printf '%s' "$(readlink "$repo_real/$path")" | git hash-object --stdin)" \
+          || fail "could not hash dirty path: $path"
+      elif [ -e "$repo_real/$path" ]; then
         hash="$(git -C "$repo_real" hash-object -- "$path")" \
           || fail "could not hash dirty path: $path"
       else

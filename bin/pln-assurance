@@ -219,7 +219,12 @@ case "$command" in
     } > "$manifest"
     while IFS= read -r -d '' path; do
       printf '%s\0' "$path" >> "$manifest"
-      if [ -e "$root/$path" ] || [ -L "$root/$path" ]; then
+      if [ -L "$root/$path" ]; then
+        # git stores a symlink as its target string at mode 120000; hashing the
+        # path itself follows the link and fails when the target is a directory.
+        blob="$(printf '%s' "$(readlink "$root/$path")" | git hash-object --stdin)"
+        printf 'l\0%s\0' "$blob" >> "$manifest"
+      elif [ -e "$root/$path" ]; then
         if [ -x "$root/$path" ]; then mode="x"; else mode="-"; fi
         blob="$(git -C "$root" hash-object --no-filters -- "$path")"
         printf '%s\0%s\0' "$mode" "$blob" >> "$manifest"

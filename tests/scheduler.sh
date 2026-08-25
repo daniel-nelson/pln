@@ -24,10 +24,14 @@ printf 'owned\n' > "$WORK/repo/user-owned.txt"
 git -C "$WORK/repo" add base.txt user-owned.txt
 git -C "$WORK/repo" commit -qm base
 printf 'user dirty\n' >> "$WORK/repo/user-owned.txt"
+mkdir "$WORK/repo/linked-dir"
+printf 'inner\n' > "$WORK/repo/linked-dir/inner.txt"
+ln -s linked-dir "$WORK/repo/dir-link"
 
 "$SCHEDULER" snapshot --repo "$WORK/repo" --out "$WORK/plan/dirty.tsv"
 has "$WORK/plan/dirty.tsv" $'PATH\tHASH' 'dirty snapshot has an unknown header'
 has "$WORK/plan/dirty.tsv" 'user-owned.txt' 'dirty snapshot omitted a modified tracked file'
+has "$WORK/plan/dirty.tsv" 'dir-link' 'dirty snapshot failed on an untracked symlink to a directory'
 
 cat > "$WORK/plan/nodes.tsv" <<'EOF'
 ITEM	DEPS	LEASES	COHORT	CONTEXT	DIRTY_STATE

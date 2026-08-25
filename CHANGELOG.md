@@ -1,6 +1,14 @@
 # Changelog
 
-## 1.40.0 — 2026-08-19
+## 1.41.0 — 2026-08-25
+
+### Changed
+
+- **The offer to walk the flagged entries is now option c of the adopt prompt.** It previously rode in prose beside the triage line, where it was easy to miss; the prompt is now four-way — implement and open a PR, implement only, walk the flagged entries, reopen by number — with the walk dropped (and the reopen option relettered c) when nothing was triaged. The walk itself is unchanged and still is not an adoption.
+
+### Fixed
+
+- **`pln-assurance fingerprint` and `pln-scheduler snapshot` no longer fail on a symlink to a directory.** `git hash-object` on the path follows the link and dies with `fatal: Unable to hash (null)`, so any repo with a tracked or dirty symlink pointing at a directory (a common shape for skill/plugin symlinks) could not produce a candidate fingerprint or dirty snapshot. Symlinks are now hashed the way git itself stores them — by their target string — which also means a retargeted link changes the fingerprint and a symlink is never mode-tested through its target.
 
 ### Changed
 

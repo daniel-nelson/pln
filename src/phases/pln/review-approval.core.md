@@ -94,27 +94,29 @@ Show the user the master plan in one message, with enough in it to adopt on with
 
   A finding that lands on the plan as a whole rather than on any one item — a missing item, an ordering that won't work — is numbered in the same sequence, in a final group of its own after the per-item ones. It is in the dashboard's Open questions, not in an item's section, but it is one of the things the user can act on, so it gets a number like everything else.
 - When Step 3.5 ran, say in one clause the risk tier and which reader roles actually ran. For R3, name the peer or the reason a fresh same-model adversarial substitute ran; never imply model-family independence when it was absent. A review that found nothing gets the same clause and no more.
-- Self-triage the list. Lead with the entries you're least sure about and name them for the user's eye ("worth a look: 3, 7"). One triage line covers the whole list rather than one per kind — the single number space exists so there is one thing to scan and one way to reply. **What earns a place is that your answer and theirs would produce different builds**, which is a harder bar than the fork test itself and is meant to be: an entry closest to the ask/decide line, one whose authority is weakest, one where you can genuinely picture them saying "no, the other one". Two or three is the usual size of that; a triage line naming half the list has triaged nothing. The rest stand as a scannable list the user can skim or ignore. The risk to avoid is a miscalibrated "all safe here" that buries an entry the user would have changed; when genuinely unsure, flag rather than bury. The offer to walk the flagged entries one at a time (see Walking the flagged entries below) is option c of the adopt prompt, so the user answers them where they are told about them instead of scrolling back up a forty-entry list to reply by number.
-- End with a four-way prompt, one option per line:
+- Self-triage the list. Lead with the entries you're least sure about and name them for the user's eye ("worth a look: 3, 7"). One triage line covers the whole list rather than one per kind — the single number space exists so there is one thing to scan and one way to reply. **What earns a place is that your answer and theirs would produce different builds**, which is a harder bar than the fork test itself and is meant to be: an entry closest to the ask/decide line, one whose authority is weakest, one where you can genuinely picture them saying "no, the other one". Two or three is the usual size of that; a triage line naming half the list has triaged nothing. The rest stand as a scannable list the user can skim or ignore. The risk to avoid is a miscalibrated "all safe here" that buries an entry the user would have changed; when genuinely unsure, flag rather than bury. The offer to walk the flagged entries one at a time (see Walking the flagged entries below) is option d of the adopt prompt, so the user answers them where they are told about them instead of scrolling back up a forty-entry list to reply by number.
+- End with a five-way prompt, one option per line:
 
   ```
   Adopt this master plan?
-  a) implement it and open a PR when done
-  b) implement only
-  c) walk the flagged entries one at a time
-  d) reopen anything by number / change something?
+  a) implement it and open a draft PR when done
+  b) implement it and open a PR when done
+  c) implement only
+  d) walk the flagged entries one at a time
+  e) reopen anything by number / change something?
   ```
 
-  When the triage line names no entries, option c has nothing to walk: drop it and letter the reopen option c, restoring the three-way shape.
+  When the triage line names no entries, option d has nothing to walk: drop it and letter the reopen option d, restoring the four-way shape.
 
 **When no review ran** — `plan_review` is off, the user skipped it, or the plan predates review — include no empty findings machinery. For R1/R2 the numbered list is disclosed decisions only. For R3, add one clear warning that critical plan assurance was deliberately skipped; do not claim a reviewer or clean result.
 
 This is the only place implementation-blocking approval lives. Possible responses:
 
-- *Adopt* — either of the two shapes below. Either way, every numbered entry not reopened stands as accepted: decisions hold and flagged findings were seen and left alone. Proceed to Step 5.
-  - **a) Implement and open a PR when done.** Record `Ship: PR after implementation` in the dashboard's Ship field, plus `PR base: <branch>` when item 4's stacking override applies. This answers Step 8's ask up front: Step 7's wrap-up hands straight to `/pln-pr` with no further prompt.
-  - **b) Implement only.** Record `Ship: implement only` in the dashboard's Ship field. Step 8 still asks once, at the end of Step 7's wrap-up, exactly as it did before this choice existed.
-- *c) Walk the flagged entries* — the triaged entries one question per turn, per Walking the flagged entries below. Not an adoption: the walk ends back at this prompt.
+- *Adopt* — one of the three shapes below. Whichever it is, every numbered entry not reopened stands as accepted: decisions hold and flagged findings were seen and left alone. Proceed to Step 5.
+  - **a) Implement and open a draft PR when done.** Record `Ship: draft PR after implementation` in the dashboard's Ship field, plus `PR base: <branch>` when item 4's stacking override applies. This answers Step 8's ask up front: Step 7's wrap-up hands straight to `/pln-pr` with no further prompt. The PR opens as a draft and **stays** one — `/pln-pr` still watches CI and still fixes what goes red, and then closes with the PR in draft instead of marking it ready. On a team, ready is what tells everyone else, and whatever automation waits on ready, that the branch is theirs to look at; this option keeps that signal in the user's hands so they can read the PR first.
+  - **b) Implement and open a PR when done.** Record `Ship: PR after implementation` in the dashboard's Ship field, plus `PR base: <branch>` when item 4's stacking override applies. Same as a, except `/pln-pr` marks the PR ready once CI is green.
+  - **c) Implement only.** Record `Ship: implement only` in the dashboard's Ship field. Step 8 still asks once, at the end of Step 7's wrap-up, exactly as it did before this choice existed.
+- *d) Walk the flagged entries* — the triaged entries one question per turn, per Walking the flagged entries below. Not an adoption: the walk ends back at this prompt.
 - *Reopen by number* (e.g. "3, 7, 8") — any entry, of either kind. A **decision** returns to the one-question-at-a-time interview, exactly like Step 3, but starting from the recorded position and its rationale, not a blank question ("I chose X because Y; here's the tradeoff; what would you change?"). A **flagged** finding becomes an interview question of the same shape: what the reviewer found, what it would change, what the user wants done. Resolve each, update `PLAN.md`, re-show, re-prompt. Unlisted entries remain accepted.
 
   A repair is not on the list, so it cannot be reopened by number — but the user can still name one they disagree with in prose, and it is then shown with what it replaced and reverted if they say so. The record in the item's detail section is what makes that one edit instead of a reconstruction; re-read the revert to confirm it landed.
@@ -122,9 +124,9 @@ This is the only place implementation-blocking approval lives. Possible response
 
 A rewrite made through either response is an item's section being written again, so it goes through Step 3's four checks — the first of them most of all. A reopened decision has changed that item's premise, and the parts written under the old one are reconciled rather than left standing beside the new answer.
 
-**Walking the flagged entries.** Choosing option c walks the triaged entries in Step 3's format: one question per turn, `AskUserQuestion` never used, each entry restated in full when its turn comes — its number and title, what it is, and what each answer changes — because by then the list is several screens up and the point of the walk is that nothing has to be found again. It is the *Reopen by number* path with the hunting removed, and it ends the same way: update `PLAN.md`, re-show, re-prompt. Option c is not an adoption: a or b still adopts the whole plan, triaged entries included, walked or not.
+**Walking the flagged entries.** Choosing option d walks the triaged entries in Step 3's format: one question per turn, `AskUserQuestion` never used, each entry restated in full when its turn comes — its number and title, what it is, and what each answer changes — because by then the list is several screens up and the point of the walk is that nothing has to be found again. It is the *Reopen by number* path with the hunting removed, and it ends the same way: update `PLAN.md`, re-show, re-prompt. Option d is not an adoption: a, b or c still adopts the whole plan, triaged entries included, walked or not.
 
-A walked entry the user changes is a rewrite like any other and starts a bounded round below; one they look at and leave alone is not, and starts nothing. When a round produces its own triage line, the re-prompt's option c covers its entries the same way — the user skips it as easily as they choose it, and dropping it would hide findings that reached the line by the same triage.
+A walked entry the user changes is a rewrite like any other and starts a bounded round below; one they look at and leave alone is not, and starts nothing. When a round produces its own triage line, the re-prompt's option d covers its entries the same way — the user skips it as easily as they choose it, and dropping it would hide findings that reached the line by the same triage.
 
 **Re-review after a rewrite.** Both responses above are the user changing the plan, and a change the user made is the only thing that starts another round. An edit made through either counts as a rewrite of an item, for this purpose, when it changes that item's premise, intent, acceptance criteria, or a decision another item depends on. An edit that only tightens wording, fixes a typo, or is otherwise trivially correct does not. Neither does a repair you made yourself in response to a review finding: a repair is finished once it is made and recorded in its item's section, and reading your own response to a reviewer is the loop that has no end. So an item a correction touched and the user did not is not a changed item here.
 

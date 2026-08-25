@@ -6,7 +6,7 @@ name: pln-pr-phase-scope-baseline
 
 <!-- pln:include active-turn-lifecycle -->
 
-Read this file in full before the first repository or remote action. Create `REVIEW.md` before durable scope work with a `## State` section containing `Phase: scope-baseline`, a new durable Run identity, Base, Base source, Trust/command confirmation, Diff base, Tree/command/environment/candidate fingerprints, Simplification freshness/policy/bypass, Risk tier/signals, Review status, PR identity, and CI round/status. Update those fields as facts become known.
+Read this file in full before the first repository or remote action. Create `REVIEW.md` before durable scope work with a `## State` section containing `Phase: scope-baseline`, a new durable Run identity, Base, Base source, Trust/command confirmation, Diff base, Tree/command/environment/candidate fingerprints, Simplification freshness/policy/bypass, Risk tier/signals, Review status, PR identity, Draft disposition, and CI round/status. Update those fields as facts become known.
 
 Finish base validation, trust decisions, exact-tree fingerprinting, and any baseline result before advancing. Then set `Phase: review` and read the review phase in full. If an existing ledger shows later durable work, reconcile it and follow the router rather than overwriting or re-reviewing it.
 
@@ -26,6 +26,8 @@ Otherwise, auto-detect:
 - Git-native fallback: `git symbolic-ref refs/remotes/origin/HEAD | sed 's|refs/remotes/origin/||'`, else try `origin/main`, then `origin/master`, else `main`.
 
 Print the detected base in one line, and whether it came from the override or was auto-detected. Fetch it: `git fetch origin <base>`. Substitute it for `<base>` everywhere below — bound to the same quoted shell variable and interpolated the same way as Step 8's PR-body assembly (see "Interpolate safely" there); this override joins that existing safe-interpolation path rather than opening a new one.
+
+**`draft=keep`.** If invoked with a `draft=keep` argument — `/pln` Step 8 passes it when the plan was adopted with "open a draft PR when done", and a user can type it directly — a PR this run creates opens as a draft and is left in draft: Step 9 still watches CI and still fixes what goes red, but never marks it ready. Record it in `REVIEW.md`'s `Draft disposition` field (`keep-draft`, otherwise `default`) before any remote action, so a resumed run does not mark ready what this run was told to leave alone. It is the only argument that overrides the `pr_draft` config key, and only in the safe direction: `draft=keep` with `pr_draft false` still opens a draft.
 
 <!-- pln:include pr-host-note -->
 ### Step 1. Locate the plan and scope the diff

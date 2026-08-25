@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.42.0 — 2026-08-25
+
+### Added
+
+- **The adopt prompt leads with "implement it and open a draft PR when done".** Options b–e are the previous a–d, shifted down. The new option a differs from b in exactly one thing: the PR opens as a draft and stays one — `/pln-pr` still watches CI and still fixes what goes red, then closes with the PR in draft rather than marking it ready. On a team, ready is the signal that the branch is everyone else's to look at, and what any undrafting automation waits on, so this keeps that signal in the user's hands until they have read their own PR. It records `Ship: draft PR after implementation`, which Step 8 carries into `/pln-pr` as a `draft=keep` argument; `/pln-pr` records the disposition in `REVIEW.md` so a resumed run does not mark ready what it was told to leave alone. `draft=keep` can also be typed directly, and is the one argument that overrides the `pr_draft` config key — only in the safe direction.
+
 ## 1.41.0 — 2026-08-25
 
 ### Changed

@@ -4,7 +4,7 @@ Retain the command-session handle and keep the same parent turn active until it 
 
 When the validated envelope shows a terminal state:
 
-- **Green** — undraft and record the duration as described above, then fire the completion notification.
+- **Green** — undraft (unless the disposition is `keep-draft`) and record the duration as described above, then fire the completion notification.
 - **Red** — build the finding, write it into `REVIEW.md`, then dispatch the one fix cluster natively, the same way Step 4 already does: `spawn_agent` with a fresh context, `wait_agent`-looped to completion, per Spawning a fresh-context agent and `pr-fix-invoke` — including its `BLOCKED:` handling. This part needs no shell fallback; a fix agent only writes files and needs no network. Once it returns and its commit is pushed, start a fresh resumable command session for the next watch round; never reuse a poll process across candidates.
 
 Track the same-check streak and the `BLOCKED:` case across rounds in the orchestrator's own context (this session, not the background script) — that bookkeeping is what decides when to stop instead of relaunching another round.

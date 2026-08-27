@@ -100,7 +100,25 @@ Urgency does not touch membership. The flag decides where an item's one line ren
 
 ### `touches` and `holds`
 
-*Not written yet. This section defines the two overlap fields — file paths, and named non-file exclusive resources — and the rule that decides whether a second agent can take an item now.*
+These two fields say what an item occupies while someone is working on it, and they are the only inputs to the question of whether a second agent can take an item now.
+
+**`touches` is repository-relative file paths the item is expected to write.** A directory entry stands for everything beneath it, so `app/bookings/` claims that whole subtree and `app/calendar/availability.rb` claims one file.
+
+**`holds` is the non-file exclusive resources the item consumes for its duration** — an eval whose numbers a concurrent change would invalidate, a shared prompt, a migration slot, a deploy, a provisioner handing out a scarce local resource. They are tokens rather than paths: `staging-deploy` names a thing there is one of, not a file that exists.
+
+**Two items overlap when their `touches` intersect by prefix containment in either direction, or their `holds` share a token.** Either direction, because a directory entry is a claim on a region and not a string to match: `app/bookings/` and `app/bookings/cancellation.rb` collide regardless of which item declared which.
+
+**An overlapping item is refused.** It is not offered as parallel-safe until the first one is done — the same answer pln already gives inside a single plan, where an overlap between two items becomes an ordering rather than a warning. The refusal names the item collided with and the path or resource they share, because "not now" on its own sends the reader to open both files to find out why.
+
+The comparison is pairwise against the set of items a run has declared, never a partition of the whole queue. Items nobody has picked up need no lanes computed for them.
+
+**Absent means unknown, and unknown collides with everything.** An item filed with no `touches` is never reported parallel-safe. It is also the cheapest kind of item to file — one sentence mid-run, no fields — and if an empty field read as "writes nothing", the cheapest capture would be the most permissive thing in the queue. `mark` fills the field in later, once someone has looked, so a run that takes an unknown item up says what it will write before it declares its scope.
+
+**`holds` is a field of its own rather than a reserved prefix inside `touches`.** pln already has a field of that shape — the write leases the scheduler works from — and it resolves every entry there as a real path in the working tree, so a bare resource token routed through the same field is looked for on disk and fails. Keeping the two apart also keeps the two kinds of collision distinguishable, which is what lets a refusal say whether a file or a resource is being waited on.
+
+**Why a non-file resource needs a field at all.** Take a provisioner that hands out port blocks from a shared registry with no lock: two runs read the registry, both see the same block free, and both take it. Nothing was written twice, so no `touches` could have expressed the conflict, and it surfaces long afterwards as two working trees fighting over the same ports rather than as a collision at write time. Database names drawn from a counter, a fixed scratch path, and a single staging deploy all have that shape.
+
+**What the answer covers.** Parallel-safety is scoped to runs sharing one working tree. The queue sits wherever it resolved, so a second worktree has its own — its own items, and its own record of what is held — and neither can see the other's. Two agents in two trees are outside what these fields can tell you, and that is a stated limit rather than something the fields quietly close.
 
 ### Intake — how work reaches the queue
 

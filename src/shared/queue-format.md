@@ -140,7 +140,27 @@ The doors differ only in what triggers them. What each one files and where it la
 
 ### Outflow — what a run may change, and where finished work goes
 
-*Not written yet. This section defines the scope a run declares before it starts, what it may and may not mark, and how a record reaches the archive without anything being deleted.*
+Intake is unguarded because filing costs nothing. Outflow is not: every rule below exists so that what the queue says was finished is something that actually was.
+
+**A run declares its scope before it starts.** It names the queue items it is taking — one `pln-queue claim --id <id> --run <name>` each, which checks the collision and records the holder under a single lock, so a second run in this tree reads the item as taken rather than taking it too. That declared set is the whole set this run may ever check off. An item outside it may be reported on, and never marked; the one write a run makes outside its declared set is the user-confirmed archive below, which checks nothing off. A refused claim is an item to drop from the run, not one to work anyway.
+
+**Fully done, or not done.** An item is `[x]` only when every part of it landed. Partial completion is expressed — `[-]`, with the remaining sub-items readable in the detail file — never rounded up, least of all because the run is ending. Half a thing marked done leaves work nobody will look for again.
+
+**`[x]` is not a claim a run may make about work it did not verify.** An item checked off carries the commit or the evidence that closed it, in the record that is archived. `pln-queue archive --disposition completed` refuses a record that is not already `[x]`, so the marking and the evidence cannot come apart.
+
+**The parent's marker is derived from its sub-items**, not chosen: any child done and any child not makes the parent `[-]`, all children done makes it `[x]`, none makes it `[ ]`. New sub-items go in with `mark --add-sub-item`, which keeps the checklist's shape uniform; an existing one is checked off in the detail file's body, which the run working the item keeps current. The parent's own marker is frontmatter, so it is set with `mark --state`.
+
+**A run may add, always, without asking.** New items through the doors above, and new sub-items under an item it is working — including work it discovered was needed and then did. Adding is never a question, and there is no bar to clear for a sub-item under an item that already exists.
+
+**Nothing is deleted.** A record that reaches a terminal state is moved, not removed: `pln-queue archive` copies it to `<queue-root>/done/<YYYY-MM>/<slug>.md`, appends its line to that month's own `index.md`, and only then takes it out of the live queue. The month is the one the record became terminal in — completion for an item a run finished, the confirmation for one finished elsewhere or dropped. There is no delete subcommand and no inverse of `archive`: an item that comes back is a new item whose `source` names the archived one, which leaves no archived `[x]` standing for a completion that was later undone.
+
+The archive is partitioned by month because the index is the part that grows; the detail files are one per item and never do. "What did we finish in August" is one file, and "everything ever finished" is a directory listing.
+
+**The archive inherits the queue root and is never asked about separately.** Wherever the queue resolved, `done/` is beneath it — tracked where the queue is tracked, outside the working tree where the queue is. Excluding a tracked archive is the one case where archiving would be deletion from the repository's record: a tracked detail file moved into an ignored directory shows as a deletion, and the next commit makes it real, under a guarantee that nothing is deleted.
+
+**Work that got finished some other way is the user's call, every time.** `pln-queue stale` reports and never writes: an item whose record says `[x]`, one already `dropped`, an abandoned claim, an item that has simply aged. Those are candidates, not findings. The closing message names them, the user says which are actually finished or dropped, and only then does `archive` run — with their own words as the record's evidence, and with the record keeping the state it had rather than gaining an `[x]` nobody verified. A merged commit that names an item's id proves nothing on its own and archives nothing.
+
+Nothing waits on that answer. The candidates are named in the closing message rather than in a turn of their own, and one nobody answers is named again at the next close — so the live index is bounded by the user's confirmations rather than by a mechanism, which is what "nothing moves without them" costs.
 
 ### Reading the queue back at a close
 

@@ -105,7 +105,7 @@ After a CI code fix, recompute risk and candidate fingerprints, invalidate the e
 
 ## Follow-ups
 
-All of this runs at whichever close hands the PR to the user — Step 8's or Step 9's — and the order is fixed: sweep, file, then draft. Which candidates the user sees is Style's "Ending a message" bar; every one that clears it is in the queue before the closing message is written, the ones Step 9's watch turns up included. This run may be a standalone `/pln-pr` with no `PLAN.md` and no `/pln` step behind it: the helper resolves the queue itself on every call, so nothing here waits on one having run.
+All of this runs at whichever close hands the PR to the user — Step 8's or Step 9's — and the order is fixed: sweep, file, then draft. Which candidates the user sees is Style's "Ending a message" bar; every one that clears it is in the queue before the closing message is written, the ones Step 9's watch turns up included. The same close closes the queue out: an item this run claimed is marked from what landed and archived only with the evidence that closed it, and `pln-queue stale`'s candidates are named for the user to confirm, never archived on the run's own reading of a merged commit. This run may be a standalone `/pln-pr` with no `PLAN.md` and no `/pln` step behind it: the helper resolves the queue itself on every call, so nothing here waits on one having run.
 
 <!-- pln:include outstanding-sweep -->
 

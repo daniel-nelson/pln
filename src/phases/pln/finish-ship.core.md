@@ -25,7 +25,7 @@ Auto-mode blocked nodes are different: `run-manifest.tsv` carries each concrete 
 3. If notifications are on, fire them first (see Notifications): {{NOTIFY_CALL}}, summarizing the outcome (e.g. "pln: plan done, 8/8 items, gauntlet passed").
 4. Sweep the run's own record for outstanding work (see Follow-ups) before drafting anything. A run that never looks reports whatever it happens to remember.
 5. Final message to the user: one or two sentences saying what changed and what's next, in plain words. This message is the complete answer on its own — no pointer to `PLAN.md` for the rest (see Style's "Ending a message"). If genuine follow-ups remain, list them per the follow-up bar below.
-6. If that message listed any follow-ups, run the to-do-location flow below. Anything it asks or offers is a message of its own — never folded into Step 8's ask.
+6. If that message listed any follow-ups, run the to-do-location flow below. Anything it asks or offers is a message of its own, separate from the ship ask Step 8 makes under `implement only`, an absent field, or a plan predating it. Under either PR-bearing value there is no ask to be separate from: the hand-off is an action, not a question.
 
 ### Step 8. Ship — hand off to `/pln-pr`
 

@@ -43,7 +43,48 @@ Within either bucket the order is date opened, then the items carrying no `opene
 
 ### The detail file
 
-*Not written yet. This section defines the detail file's frontmatter fields and the shape of its body, which together let an agent with no memory of the conversation that filed the item pick it up.*
+One file per item, complete enough that an agent with no memory of the conversation that produced it can pick the item up from this file and the repository alone. The frontmatter carries the machine-readable facts; the body is the packet.
+
+```
+---
+id: cancel-releases-held-dates
+state: "[-]"
+urgent: true
+status: ready
+opened: 2026-08-27
+source: the cancellation change's PR review, adversarial reader
+group: refunds
+depends_on: [receipt-refund-total]
+touches: [app/bookings/, app/calendar/availability.rb]
+holds: [staging-deploy]
+---
+```
+
+- `id` — the item's stable name, and what the detail file's path is derived from, so two items cannot land on one file.
+- `state`, `urgent`, `status` — the three vocabularies above, unchanged. Quote the completion marker: to a YAML reader a bare `[ ]` is an empty list and `[x]` is a one-element one. `urgent` is false when absent.
+- `opened` — the date the item was filed, and the index's first sort key.
+- `source` — where the item came from: the run, the review, the person.
+- `group` — at most one, rendered as described below.
+- `depends_on` — the ids of items this one waits on.
+- `touches`, `holds` — the files the item is expected to write, and the non-file resources it consumes for its duration. What counts as an overlap is below.
+
+**Four fields have to be filled: `id`, `state`, `status` and `source`.** Every other field may be left empty, so an item captured in one sentence in the middle of a run is still a valid item rather than a form to complete.
+
+**`source` is a field and not a sentence in the body.** The failure this queue answers is a follow-up that existed only in a PR body and a review ledger, so an item's provenance has to outlive the run that found it — which a field does and a paragraph anyone may rewrite does not.
+
+**The helper owns the frontmatter.** `mark` sets a field after filing — a `touches` nobody knew at capture time, a status that changed, the urgency flag — so a fast capture is refined rather than refiled, and `claim` records the run holding the item. Nothing else in the body is the helper's to rewrite.
+
+**The body is a task packet**, in the shape one already needs: what exists and where, what to do, what has to be true first, how to tell it worked, and what it relates to. It is never the index line's claim restated and nothing else — the claim is how the item is recognized, the body is what a stranger needs in order to act on it.
+
+**The nested sub-item checklist lives in the body**, and it is what a `[-]` state refers to. Sub-items use the same three completion markers, one per line, so what is left reads off the file with nothing reconstructed from the run's history:
+
+```
+- [x] release the held dates when a booking is cancelled
+- [x] free the rooms already stuck behind a cancellation
+- [ ] the same when the host cancels rather than the guest
+```
+
+Who may check one off, and who may add one, is below.
 
 ### Grouping
 

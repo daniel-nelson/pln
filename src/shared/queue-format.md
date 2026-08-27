@@ -10,7 +10,36 @@ Work that is found and not done now reaches the queue — wherever in a session 
 
 ### The index line
 
-*Not written yet. This section defines what one index line carries — the completion marker, the urgency flag, the status word, the claim, and the path to the detail file — the three vocabularies it shares with the detail file, and the order `pln-queue list` renders lines in.*
+The index is derived from the detail files rather than maintained by hand: `pln-queue list` rebuilds it whole, so a line that disagrees with its detail file is the line that is wrong.
+
+**One line per open item, and nothing between the lines but the group headings.** The line carries five things in this order — how far along the item is, whether it is urgent, whether it can be picked up, what it is, and where the rest of it lives.
+
+```
+## Urgent
+
+- [-] ! ready · a cancelled booking never releases its held dates, so the room stays unbookable → `q/cancel-releases-held-dates.md`
+
+## Refunds
+
+- [ ] decide · a guest charged twice gets one refund, and nobody has said which charge it clears → `q/double-charge-refund.md`
+- [ ] blocked · the refund total on the receipt leaves out the cleaning fee → `q/receipt-refund-total.md`
+```
+
+Three vocabularies meet on that line. They are defined here and nowhere else, and the detail file's `state`, `urgent` and `status` fields carry the same values:
+
+- **How far along** — `[ ]` not done, `[-]` partly done, `[x]` fully done. The nested sub-items a `[-]` refers to live in the detail file.
+- **Urgent or not** — a single `!` between the completion marker and the status word. Two states on purpose, with no levels, and it is absent rather than negated when the item is not urgent. The line still parses with it optional, because the status word comes from a closed set that `!` is not a member of.
+- **Whether it can be picked up** — `ready`, `blocked`, `decide`, `dropped`. There is no `doing` and no `done`: `[x]` covers done, and what a run has in hand is the scope it declared when it started.
+
+The three are orthogonal. Any item at any stage of completion can be urgent, and `[-] ready` and `[-] decide` are both ordinary.
+
+**The claim says what is wrong or what would change, in ordinary words.** Not a title and not an internal name — an identifier, a module, a scenario's name or a term coined in the conversation that filed the item tells a reader who was not there nothing at all. The bar is whether someone who has never seen the item knows what it is about from that one clause.
+
+**The line may not carry detail.** Anything longer than the claim belongs in the detail file. The path is required and relative, so the index and its detail files travel together and an item is found from its line with one file open.
+
+**The order.** Flagged items render in one `## Urgent` section above the group headings; everything else follows under its own heading. Every item appears exactly once, so a flagged item does not appear again beneath its group — `## Urgent` is a bucket derived from the flag, not a group an item belongs to.
+
+Within either bucket the order is date opened, then the items carrying no `opened` date, then `id`. Nothing there is set by hand and nothing records a rank; the last tiebreak exists only so that two `list` runs over an unchanged set of detail files cannot produce two different files.
 
 ### The detail file
 

@@ -138,6 +138,8 @@ Work enters through four doors, and every one of them ends in the same call: `{{
 
 The doors differ only in what triggers them. What each one files and where it lands is the format above.
 
+**A migration accepted at the start of a run is not a fifth door.** What an agent lifts out of a to-do file this project's own instructions named is filed item by item through that same `add`, with `source` naming the file it came from. The file is read and never written — the queue starts beside it, not out of it.
+
 ### Outflow — what a run may change, and where finished work goes
 
 Intake is unguarded because filing costs nothing. Outflow is not: every rule below exists so that what the queue says was finished is something that actually was.

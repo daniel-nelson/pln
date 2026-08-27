@@ -128,7 +128,7 @@ Work enters through four doors, and every one of them ends in the same call: `{{
 
 **A door files a complete item**: an `--id`, a `--status`, a `--source` and a claim. `source` names the run, the review or the person the item came from, because the failure this queue answers is a follow-up whose origin died with the run that found it. Everything else is optional — an item filed with no `touches` is filed with none, and unknown then collides with everything, so it is never reported parallel-safe until someone fills the field in.
 
-**1. The run spinoff — the sweep at either close.** At `/pln`'s Step 7 wrap-up and at whichever `/pln-pr` close hands the PR to the user, the outstanding sweep already assembles the candidates and the follow-up bar already decides which of them the user sees. Each one that clears the bar is filed **before the closing message is drafted**, not after it, so that the message can be written from the queue rather than the queue from the message.
+**1. The run spinoff — the sweep at either close.** At `/pln`'s Step 7 wrap-up and at whichever `/pln-pr` close hands the PR to the user, the outstanding sweep already assembles the candidates and the follow-up bar already decides which of them are filed. Each one that clears the bar is filed **before the closing message is drafted**, not after it, so that the message can be written from the queue rather than the queue from the message.
 
 **2. The explicit user drop.** "File this for a dedicated session", in whatever words, said at any point in a run — mid-interview, mid-review, in the middle of a fix. It is filed in the turn it is said, and it neither pauses the phase it arrived in nor becomes a question. A drop that waits for the close is a drop that survives only in the conversation, which is the state this queue replaces.
 
@@ -164,4 +164,14 @@ Nothing waits on that answer. The candidates are named in the closing message ra
 
 ### Reading the queue back at a close
 
-*Not written yet. This section defines the order — file first, then draft — and the rule that a closing message is rendered from what the queue returns rather than from what the run remembers filing.*
+A closing message once said "Open follow-ups, all filed:" over six items when two were filed. The other four sat in a PR body and a review ledger for twelve hours, until someone was asked to go and check. Every word of that message was written in good faith by a run that believed it. So a close does not describe what it filed. It reads it back.
+
+**File first, then draft.** The sweep gathers, the bar decides, `pln-queue add` files every candidate that clears it, and only then is the closing message written. The message is drafted from the queue; the queue is never assembled from the message. Reversed, the list is a statement of intent with nothing behind it to check it against, which is how those four went missing.
+
+**Render the list, do not compose it.** Run `{{OUTPUT_ROOT}}/bin/pln-queue list` before writing the follow-up bullets. Each `add` printed back the exact `INDEX_LINE` it wrote; `list` prints the whole index between `INDEX_BEGIN` and `INDEX_END`. This run's follow-up bullets are the lines it filed, found there — a follow-up whose line is not between those markers cannot appear in the message, because there is nothing to render it from. This is not a check run over a finished draft; it is where the bullets come from.
+
+**Say where they went, and claim nothing the read does not support.** Name the queue — `list` prints `QUEUE_ROOT` in the same output — and let the count be the number of lines read back. "All filed" then stops being the run's account of its own behavior, which is the sentence that was wrong, and becomes a description of a file. A `list` that fails is a failed read and fails the close with it: it prints `ITEM_COUNT` and `STATUS` even for an empty queue, so an empty read and a broken one are never the same thing.
+
+**None of this touches the bar.** Filing is not a way around it: a candidate that is not true when checked, that is done, or that nobody will have to act on is not filed and not mentioned. The read-back governs only what becomes of a candidate that already cleared it.
+
+**One exception, and it is a floor rather than a way out.** When nothing could be filed at all — `pln-queue` resolved no queue root anywhere, or the root it resolved cannot be written — the run lists the follow-ups inline in the closing message, says plainly that nothing was filed, and says why. A rule against over-claiming must not become a rule against reporting; losing them silently is the failure being fixed. This is the only way a follow-up reaches the user with no index line behind it. It never covers one that could have been filed and was not, and a run that takes it says so rather than letting the inline list read as a queue.

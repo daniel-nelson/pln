@@ -122,7 +122,21 @@ The comparison is pairwise against the set of items a run has declared, never a 
 
 ### Intake — how work reaches the queue
 
-*Not written yet. This section names every door work enters through and states that each one ends in the same `pln-queue add` call.*
+Work enters through four doors, and every one of them ends in the same call: `{{OUTPUT_ROOT}}/bin/pln-queue add`. The helper writes the detail file, rebuilds the index from it, and prints back the `INDEX_LINE` it wrote — so what was filed is something a later step can read rather than something the run remembers doing. Four hand-written appends would be four chances to write the line differently and four chances to skip it.
+
+**Adding never asks.** Filing is the run writing down what it found, not a decision the user has to be present for. No door pauses for permission, and none of them holds an item back for a better moment.
+
+**A door files a complete item**: an `--id`, a `--status`, a `--source` and a claim. `source` names the run, the review or the person the item came from, because the failure this queue answers is a follow-up whose origin died with the run that found it. Everything else is optional — an item filed with no `touches` is filed with none, and unknown then collides with everything, so it is never reported parallel-safe until someone fills the field in.
+
+**1. The run spinoff — the sweep at either close.** At `/pln`'s Step 7 wrap-up and at whichever `/pln-pr` close hands the PR to the user, the outstanding sweep already assembles the candidates and the follow-up bar already decides which of them the user sees. Each one that clears the bar is filed **before the closing message is drafted**, not after it, so that the message can be written from the queue rather than the queue from the message.
+
+**2. The explicit user drop.** "File this for a dedicated session", in whatever words, said at any point in a run — mid-interview, mid-review, in the middle of a fix. It is filed in the turn it is said, and it neither pauses the phase it arrived in nor becomes a question. A drop that waits for the close is a drop that survives only in the conversation, which is the state this queue replaces.
+
+**3. The mid-implementation discovery.** An item worker that finds work outside its item's scope returns it in its result; the **coordinator** files it at the checkpoint. Workers never write the queue themselves — the same rule that keeps them out of `PLAN.md` and the run manifest, and for the same reason: one writer, so two concurrent workers cannot both file the same discovery under two ids.
+
+**4. The recurring cadence.** A `/pln-simplify` map produces bounded candidates, and the ones this run is not taking — struck at the outline checkpoint, or left behind by a run that stops there — are filed rather than ending with the run. `source` names the map. Its own cadence marker is the precedent: an assessment is only worth repeating if what it found outlives it.
+
+The doors differ only in what triggers them. What each one files and where it lands is the format above.
 
 ### Outflow — what a run may change, and where finished work goes
 

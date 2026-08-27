@@ -110,6 +110,7 @@ Both halves run at whichever close hands the PR to the user — Step 8's or Step
 <!-- pln:include outstanding-sweep -->
 
 <!-- pln:include todo-location -->
+<!-- pln:include queue-format -->
 
 ## Failure modes to watch for
 

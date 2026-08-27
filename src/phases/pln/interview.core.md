@@ -10,6 +10,8 @@ Read this file in full before the first interview action. `Phase: interview` per
 
 Before sending any question, write the self-contained question under `Open questions`. After the answer, write the decision and reconcile the item before removing that question. When every active item is resolved, finish every item/detail/dashboard write, set `Phase: review-approval`, then read that phase in full before review or gate work.
 
+**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-queue add` — not by leaving it in prose for the close to remember.
+
 ## Defer / drop / think-offline signals
 
 Three intents the user can express in any phrasing:

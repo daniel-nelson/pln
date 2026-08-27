@@ -10,6 +10,8 @@ Read this file in full before the first implementation action. Rebuild pending w
 
 Keep the cursor here across ordinary item boundaries. On a blocker, first write the handoff and item/dashboard state, then set `Phase: blocker` and load that file. When no runnable implementation or deferred item remains, finish all item outcomes, set `Phase: finish-ship`, and load that phase before verification or shipping.
 
+**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-queue add` — not by leaving it in prose for the close to remember.
+
 ### Step 5. Implementation phase
 
 Before any item dispatch, capture the source state and build the schedule once:

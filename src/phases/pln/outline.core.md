@@ -168,3 +168,5 @@ Per-item detail sections carry:
 - Open questions.
 
 Each item section must be self-contained: a blank-context subagent reading only the dashboard plus that one section must have everything it needs to execute the item. This is the same self-containment discipline applied to interview questions, now applied to item sections, because a subagent is exactly that blank-context reader.
+
+<!-- pln:include queue-format -->

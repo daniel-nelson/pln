@@ -10,6 +10,8 @@ Read this file in full before the first review or approval action. `Phase: revie
 
 A review round remains in this phase until its merge result and all plan repairs/findings are durable. Persist any reopened question before sending it. After explicit adoption, write the Ship choice and PR base, reconcile all open questions/findings, then set `Phase: implementation` and read the implementation phase in full before dispatch. Delegated mode's advance adoption uses the same durable writes before advancing.
 
+**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-queue add` — not by leaving it in prose for the close to remember.
+
 <!-- pln:include assurance-policy -->
 
 ## Consulting a peer model

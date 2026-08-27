@@ -39,7 +39,7 @@ The three are orthogonal. Any item at any stage of completion can be urgent, and
 
 **The order.** Flagged items render in one `## Urgent` section above the group headings; everything else follows under its own heading. Every item appears exactly once, so a flagged item does not appear again beneath its group — `## Urgent` is a bucket derived from the flag, not a group an item belongs to.
 
-Within either bucket the order is date opened, then the items carrying no `opened` date, then `id`. Nothing there is set by hand and nothing records a rank; the last tiebreak exists only so that two `list` runs over an unchanged set of detail files cannot produce two different files.
+The order is the flag, then the group, then date opened, then the items carrying no `opened` date, then `id`. The group orders inside `## Urgent` too, where it renders no heading — two flagged items from one group sit together there, and a flagged item filed later can come first. Nothing in that chain is set by hand and nothing records a rank; the last tiebreak exists only so that two `list` runs over an unchanged set of detail files cannot produce two different files.
 
 ### The detail file
 

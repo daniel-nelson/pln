@@ -19,7 +19,7 @@ The index is derived from the detail files rather than maintained by hand: `pln-
 
 - [-] ! ready · a cancelled booking never releases its held dates, so the room stays unbookable → `q/cancel-releases-held-dates.md`
 
-## Refunds
+## Refunds — money already taken and not yet given back
 
 - [ ] decide · a guest charged twice gets one refund, and nobody has said which charge it clears → `q/double-charge-refund.md`
 - [ ] blocked · the refund total on the receipt leaves out the cleaning fee → `q/receipt-refund-total.md`
@@ -88,7 +88,15 @@ Who may check one off, and who may add one, is below.
 
 ### Grouping
 
-*Not written yet. This section defines the one-level `group` field and how the index renders each group as a heading with its members beneath it.*
+Related items should read as one thing to decide about rather than as three separate asks. What makes a long queue hard is not its length; it is not knowing what to do next, and in what grouping.
+
+**One level, from the `group` field.** The index renders each group as a heading with its member lines beneath it, and the items carrying no group sit last, under `## Everything else`. Groups do not nest: headings inside headings are how a list of work turns into a document nobody reads, and one level is what keeps the index scannable.
+
+**A group heading carries one line saying what its members share, and nothing else** — `## Refunds — money already taken and not yet given back`. The moment that line wants to be a paragraph, the paragraph is an item: give it a detail file and file it.
+
+**Membership is declared on the item.** The `group` field in the detail file is the only record of it, so the index cannot drift from the items it was built out of, and there is no second list to maintain. An item belongs to at most one group.
+
+Urgency does not touch membership. The flag decides where an item's one line renders — `## Urgent` if it is set — and the `group` field decides what the item belongs to, which is why a flagged item is not repeated under its own heading.
 
 ### `touches` and `holds`
 

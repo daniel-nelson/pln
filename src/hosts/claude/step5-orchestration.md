@@ -1,5 +1,7 @@
 Once the schedule is validated, the main session is a thin coordinator: it owns the manifest, `PLAN.md`, git checkpoints/integration, and user interaction, but never item implementation. Use directly addressable Agents rather than Workflow: native Agent isolation supplies separate git worktrees, and a blocked worker must accept another turn.
 
+Before the first wave launches, tell the user once where to watch: each item runs as a named background Agent, and its live activity — the actual tool calls, as they happen — is visible in `/tasks` and the session's agent UI under that name. That view costs the coordinator's context nothing, so it is the way to watch without derailing the run. Name each worker after its item (`item-3-metrics`, not an opaque handle), so those rows read as the plan's items. On the `pln-claude-agent` fallback, say instead that item work will not appear there, and why — native Agent was unavailable or policy-disabled — rather than leaving the absence unexplained.
+
 For each ready manifest wave:
 
 1. For an `isolated` node, launch a stably named non-fork `general-purpose` Agent with `isolation: "worktree"`, background execution, and its one-item brief. Record the returned Agent ID, native worktree path, and `running` state in the manifest before launching the next member. If this host does not expose a durable worktree path, do not parallelize: rebuild that node as a fresh original-tree serial fallback. For an `original` node, run one Agent at a time in the source tree and never overlap it with another writer.

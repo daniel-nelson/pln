@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.44.0 — 2026-08-28
+
+### Fixed
+
+- **Claude's coordinator points the user at live progress again.** Before 1.32.0 moved Step 5 from one Workflow run onto directly addressable background Agents, the coordinator told the user, once, before item work started, that each item's live tool calls were watchable in `/workflows`. The rework kept the visibility — named background Agents appear in `/tasks` and the session's agent UI — but dropped the sentence that told the user so, and a surface nobody is pointed at may as well not exist. Claude's Step 5 now announces where item workers appear before the first wave launches, names each worker after its item so those rows read as the plan's items, and on the `pln-claude-agent` fallback says that item work will not appear there and why. The plan review and `/pln-pr`'s review roster announce their surface the same way: `/workflows` for a Workflow fan-out, `/tasks` for named Agent slots. Claude-only; Codex's progress reporting is unchanged.
+
 ## 1.43.0 — 2026-08-27
 
 ### Added

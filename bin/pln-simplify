@@ -43,6 +43,41 @@ repo_abs() {
   (cd "$1" && pwd -P)
 }
 
+# pln's own follow-up queue is not user-owned dirt. This skips the queue's own
+# paths — its index file, `q/` and `done/` — beneath a root that actually holds a
+# queue, and never the root itself and never the repository top level: a queue
+# root derived from a project-named file can be any directory, and excluding a
+# root there would disable the clean-tree gate for everything under it.
+queue_own_path() {
+  local repo="$1" path="${2%/}" root_rel=''
+  case "$path" in
+    'QUEUE.md' | 'q' | 'q/'* | 'done' | 'done/'*) return 1 ;;
+    */'QUEUE.md') root_rel="${path%/QUEUE.md}" ;;
+    */'q' | */'done') root_rel="${path%/*}" ;;
+    */'q'/*) root_rel="${path%%/q/*}" ;;
+    */'done'/*) root_rel="${path%%/done/*}" ;;
+    *) return 1 ;;
+  esac
+  [ -n "$root_rel" ] || return 1
+  [ -d "$repo/$root_rel" ] && [ ! -L "$repo/$root_rel" ] || return 1
+  [ -f "$repo/$root_rel/QUEUE.md" ] && [ ! -L "$repo/$root_rel/QUEUE.md" ] || return 1
+  head -1 "$repo/$root_rel/QUEUE.md" 2>/dev/null | LC_ALL=C grep -qxF -- '<!-- pln-queue v1'
+}
+
+# `--untracked-files=all` rather than `normal`: an entirely untracked queue is
+# reported as one collapsed directory entry under `normal`, and the exclusion is
+# scoped to the queue's own paths beneath the root, never to the root itself.
+# Listing the files individually never hides dirt — it only names it precisely.
+tree_is_dirty() {
+  local repo="$1" rec path
+  while IFS= read -r -d '' rec; do
+    if [[ "$rec" == ??' '* ]]; then path="${rec:3}"; else continue; fi
+    if queue_own_path "$repo" "$path"; then continue; fi
+    return 0
+  done < <(git -C "$repo" status --porcelain=v1 -z --untracked-files=all)
+  return 1
+}
+
 valid_utc() {
   case "$1" in
     ????-??-??T??:??:??Z) ;;
@@ -195,7 +230,7 @@ case "$cmd" in
     repo=''; completed=''; ref=HEAD
     while [ $# -gt 0 ]; do case "$1" in --repo) repo="${2:-}"; shift 2 ;; --completed) completed="${2:-}"; shift 2 ;; --ref) ref="${2:-}"; shift 2 ;; *) usage ;; esac; done
     [ -n "$repo" ] && [ -n "$completed" ] || usage; repo="$(repo_abs "$repo")"; utc_epoch "$completed" >/dev/null || fail 'completion time must be a valid canonical UTC instant YYYY-MM-DDTHH:MM:SSZ'
-    [ -z "$(git -C "$repo" status --porcelain=v1 --untracked-files=normal)" ] || fail 'marker candidates require a clean non-ignored tree'
+    ! tree_is_dirty "$repo" || fail 'marker candidates require a clean non-ignored tree'
     printf '%s completed=%s content-sha256=%s\n' "$PREFIX" "$completed" "$(content_fingerprint "$repo" "$ref")"
     ;;
   status) status_cmd "$@" ;;

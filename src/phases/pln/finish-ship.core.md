@@ -23,9 +23,9 @@ Auto-mode blocked nodes are different: `run-manifest.tsv` carries each concrete 
 1. Write the exact ordered gauntlet to `evidence/final-verification.commands` and a normalized non-secret environment description to `evidence/final-verification.environment`. Run `bin/pln-assurance fingerprint` and persist all hashes before execution. Spawn one fresh-context agent with `{{SKILL_DIR}}/src/workers/final-verification.md`, those artifacts/fingerprint, `PLAN.md`, the project root, `evidence/final-verification.md`, `results/final-verification.txt`, and a 2048-byte budget. It runs the full gauntlet once, recomputes the fingerprint afterward, and fails if candidate identity moved. Validate its envelope and record only per-command pass/fail plus the exact hashes in the dashboard. Missing, empty, malformed, out-of-root, oversized, skipped, or mismatched results fail verification.
 2. If anything fails: it's now a new item. Don't paper over. Either spawn an agent to fix-and-rerun, or spawn a spinoff if the failure is out-of-scope.
 3. If notifications are on, fire them first (see Notifications): {{NOTIFY_CALL}}, summarizing the outcome (e.g. "pln: plan done, 8/8 items, gauntlet passed").
-4. Sweep the run's own record for outstanding work (see Follow-ups) before drafting anything. A run that never looks reports whatever it happens to remember.
+4. Sweep the run's own record for outstanding work (see Follow-ups) before drafting anything. A run that never looks reports whatever it happens to remember. Then file it: every candidate that clears the follow-up bar goes into the queue here, one `{{OUTPUT_ROOT}}/bin/pln-queue add` per item with `--source` naming this run, before the message below is drafted rather than after it. Close the queue out in the same step: every item this run claimed gets the state its work actually reached, an item it finished is archived with the evidence that closed it, and `pln-queue stale`'s candidates are carried into the message below for the user to confirm — their answer is what archives one of those, and an unanswered candidate is named again at the next close.
 5. Final message to the user: one or two sentences saying what changed and what's next, in plain words. This message is the complete answer on its own — no pointer to `PLAN.md` for the rest (see Style's "Ending a message"). If genuine follow-ups remain, list them per the follow-up bar below.
-6. If that message listed any follow-ups, run the to-do-location flow below. Anything it asks or offers is a message of its own — never folded into Step 8's ask.
+6. The to-do-location flow below is part of drafting that message rather than a step after it, and it is never gated on what the message turned out to list — filing already happened above, so the message is written from the queue. What the flow settles is what that message has to say: where the follow-ups went, and whether this project names a destination pln did not write to. Anything it asks or offers is a message of its own, separate from the ship ask Step 8 makes under `implement only`, an absent field, or a plan predating it. Under either PR-bearing value there is no ask to be separate from: the hand-off is an action, not a question.
 
 ### Step 8. Ship — hand off to `/pln-pr`
 
@@ -35,9 +35,15 @@ If root repository instructions explicitly declare that this repository self-hos
 
 Read the dashboard's `Ship` field — not what the conversation remembers, so a restarted or resumed session doesn't have to recall a choice made turns ago:
 
-- **`draft PR after implementation`** — the Step 4 gate already asked and got a yes, and asked for the PR to be left in draft. Hand off immediately at the end of Step 7's wrap-up, no further prompt, carrying the `draft=keep` argument through (see below) so `/pln-pr` opens the PR as a draft and closes with it still a draft rather than marking it ready on green.
-- **`PR after implementation`** — the Step 4 gate already asked and got a yes. Hand off immediately at the end of Step 7's wrap-up, no further prompt.
+- **`draft PR after implementation`** — the Step 4 gate already asked and got a yes, and asked for the PR to be left in draft. Hand off with no further prompt, on the state condition below, carrying the `draft=keep` argument through (see below) so `/pln-pr` opens the PR as a draft and closes with it still a draft rather than marking it ready on green.
+- **`PR after implementation`** — the Step 4 gate already asked and got a yes. Hand off with no further prompt, on the state condition below.
 - **`implement only`, absent, or the plan predates this field** — ask once, at the end of the Step 7 wrap-up message rather than in a message of its own: open the PR now, or stop here? Skip the ask entirely when there is nothing to put up — no commits ahead of the base branch — or when the user has already said where this run ends. On yes, hand off the same way.
+
+**When the hand-off fires, under either PR-bearing value.** Not at the end of Step 7's wrap-up: that is a position in this file, and a to-do-location question, a compaction, a session restart or a user interruption all leave it behind while the PR still isn't open. The trigger is a condition read out of durable state, the way `Ship` itself was just read. While `Phase: finish-ship` stands and `Ship` names a PR:
+
+- **False until Steps 6 and 7 are recorded done** — every ⏸ deferred item carries the user's revisit/push/drop answer, the dashboard's Verification section carries the gauntlet's per-command results and fingerprint hashes, and the sweep's outcome is recorded in the plan. `Phase: finish-ship` is written before any of that happens, so without this bound a run resumed at that instant ships past its own verification. The wrap-up message leaves no durable mark of its own, so a turn that finds those writes in place and no sign the message went out sends it first and hands off in the same turn — the one thing the hand-off waits behind.
+- **True from there until PR identity is durable** — the `PR identity` field in the `## State` section of the `REVIEW.md` beside this plan, which `/pln-pr` writes as soon as it creates or updates the PR. Without this bound every turn of the review, fix and blocker cycle the hand-off launched reads the same state and is told to hand off again.
+- **While it holds, the hand-off is the first action of the turn,** and no message goes out in its place. The one exception is a question already persisted in the plan and still unanswered: it may be asked and the turn may end on it, and the hand-off is then the first action of the turn that carries the answer. `/pln-pr`'s own asks all come after the hand-off anyway.
 
 Handing off:
 
@@ -62,6 +68,8 @@ Applies at Step 7's wrap-up, and at the equivalent point in `/pln-pr`. The bar a
 **Full detail lives in `PLAN.md`,** not the closing message — the bullet list there names each follow-up, `PLAN.md` (or, in a standalone `/pln-pr` run with no `PLAN.md`, `REVIEW.md`) carries the rest.
 
 <!-- pln:include todo-location -->
+<!-- pln:include queue-format -->
+
 ## Failure modes to watch for
 
 - **Building out the feature under discussion before the plan is adopted** — inline, or by spawning a sub-agent/workflow to do it; delegating is not a loophole. Before any state-changing tool call during Steps 1–4, run Step 3's feature-work-vs-exceptions test. This applies even when the user asked for it directly, named the delegation mechanism themselves, or it targets a different repo. If it happens anyway and the user calls it out — in any words, not just a reference to "pln" or "the interview" — halt immediately: kill any spawned background work, disclose exactly what changed, and offer to revert, rather than acknowledging the pushback and continuing past it.

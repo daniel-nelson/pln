@@ -10,6 +10,8 @@ Read this file in full before the first reviewer or peer action. Keep `Phase: re
 
 After the merged ledger is durable, set `Review status` and then set `Phase: fix` when acted-on findings remain or `Phase: ship-watch` when none remain. Read the mapped phase before its first action.
 
+**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-queue add` — not by leaving it in prose for the close to remember.
+
 <!-- pln:include assurance-policy -->
 
 ## Consulting a peer model

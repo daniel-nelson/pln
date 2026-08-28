@@ -452,8 +452,13 @@ done
 # Native host activity is the progress surface; status prose never detaches
 # accepted work into a future turn. Keeping this in the phase contracts avoids
 # bloating the thin routers while covering /pln and /pln-pr on both hosts.
+# The loop covers all 26 files the fragment reaches, /pln-simplify's two phases
+# included: a clause added here has to be true in every skill it lands in, and
+# leaving one skill out of the loop is how a clause ships unenforced there.
+lifecycle_files=0
 for f in "$real_c"/phases/pln/*.md "$real_x"/phases/pln/*.md \
-  "$real_c"/phases/pln-pr/*.md "$real_x"/phases/pln-pr/*.md; do
+  "$real_c"/phases/pln-pr/*.md "$real_x"/phases/pln-pr/*.md \
+  "$real_c"/phases/pln-simplify/*.md "$real_x"/phases/pln-simplify/*.md; do
   has "$f" 'Host-native activity is the progress surface' \
     "$f does not prefer the host activity UI over chat heartbeats"
   has "$f" 'Before any final response, run the terminal-state audit' \
@@ -462,9 +467,17 @@ for f in "$real_c"/phases/pln/*.md "$real_x"/phases/pln/*.md \
     "$f can still end a turn by describing nonterminal work"
   has "$f" 'peer subprocess' \
     "$f does not account for an in-flight peer at the terminal boundary"
+  # A decided-but-unperformed hand-off to another skill is nonterminal work.
+  # Phrased with no skill and no plan field named, because this fragment lands
+  # in all three skills and the clause has to be true in every one of them.
+  has "$f" 'a hand-off to another skill that durable state records as decided but not yet performed' \
+    "$f lets a turn end on a hand-off that durable state says was never made"
   [ "$(grep -cF '## Active-turn lifecycle' "$f")" = "1" ] \
     || fail "$f does not carry exactly one shared active-turn lifecycle"
+  lifecycle_files=$((lifecycle_files + 1))
 done
+[ "$lifecycle_files" = "26" ] \
+  || fail "the active-turn lifecycle loop read $lifecycle_files files, expected 26"
 
 # A Codex CI watch must remain attached to the current native turn through a
 # resumable exec session. A disowned process recreates the exact invisible-work
@@ -666,6 +679,118 @@ done
 
 has "$real_c/phases/pln/finish-ship.md" '~/.claude/CLAUDE.md' "the claude build reads no global instructions file"
 has "$real_x/phases/pln/finish-ship.md" '$CODEX_HOME/AGENTS.md' "the codex build reads no global instructions file"
+
+# The flow's own ship clause. It used to read "in `/pln`, the Step 8 ship ask is
+# a separate turn" — true of the branch that asks, false of the two PR-bearing
+# branches, which contain no ask at all, and read as a turn boundary in front of
+# every hand-off. The replacement names what the ask is separate from and states
+# the PR-bearing case outright.
+for f in "$real_c/phases/pln/finish-ship.md" "$real_x/phases/pln/finish-ship.md" \
+  "$real_c/phases/pln-pr/ship-watch.md" "$real_x/phases/pln-pr/ship-watch.md"; do
+  has "$f" 'In `/pln` the only ship ask is the one the `implement only`, absent and legacy branches make.' \
+    "$f does not say which branch the ship ask belongs to"
+  has "$f" 'there is no ask at all: the hand-off is an action, not a question' \
+    "$f still implies the PR-bearing branches ask before handing off"
+  hasnt "$f" 'the Step 8 ship ask is a separate turn' \
+    "$f still puts a turn boundary in front of every hand-off"
+done
+# And no bare step number in the fragment itself: it lands inside /pln-pr too,
+# where Step 8 is a different step entirely, so "Step 8" there names the wrong
+# one in two of the four generated targets. Asserted on the sources, because the
+# generated files legitimately carry their own Step 8 headings.
+for f in "$REPO_DIR/src/hosts/claude/todo-location.md" "$REPO_DIR/src/hosts/codex/todo-location.md"; do
+  hasnt "$f" 'Step 8' "$f names a bare Step 8 that resolves to the wrong step inside /pln-pr"
+done
+# The two host copies differ in exactly one line — line 1, the host's own
+# instruction-file paths. An edit that lands in one and not the other makes the
+# two skills disagree about the same flow.
+diff <(tail -n +2 "$REPO_DIR/src/hosts/claude/todo-location.md") \
+     <(tail -n +2 "$REPO_DIR/src/hosts/codex/todo-location.md") >/dev/null \
+  || fail "the two todo-location fragments have drifted apart below line 1"
+
+# The same presupposition sat a second time in the host-neutral core, where one
+# edit covers both hosts.
+for f in "$real_c/phases/pln/finish-ship.md" "$real_x/phases/pln/finish-ship.md"; do
+  has "$f" 'Under either PR-bearing value there is no ask to be separate from' \
+    "$f still asserts a Step 8 ask on the paths that have none"
+  hasnt "$f" 'never folded into Step 8' "$f still folds the to-do flow into an ask that may not exist"
+done
+
+# The ship hand-off fires from durable state rather than from a position in the
+# step sequence: a to-do question, a compaction, a restart or an interruption
+# all leave a positional trigger behind with the PR still unopened. Both bounds
+# are asserted — without the start bound a resumed run ships past its own
+# verification, and without the end bound every turn of the review cycle the
+# hand-off launched is told to hand off again.
+for f in "$real_c/phases/pln/finish-ship.md" "$real_x/phases/pln/finish-ship.md"; do
+  has "$f" 'False until Steps 6 and 7 are recorded done' \
+    "$f has no start bound on the ship hand-off"
+  has "$f" 'True from there until PR identity is durable' \
+    "$f has no end bound on the ship hand-off"
+  has "$f" 'the hand-off is the first action of the turn' \
+    "$f lets a message go out in place of the hand-off"
+  hasnt "$f" 'Hand off immediately at the end of Step 7' \
+    "$f still triggers the hand-off from a position in the step sequence"
+done
+
+# ─── the follow-up queue, and where its format is allowed to land ─────────────
+# One shared fragment, and its reach is a decision rather than an accident. The
+# three cores that render or explain the queue carry the whole format; every
+# other core a door can fire in carries one sentence naming the helper, which
+# fits where the fragment would not; and no router carries either, because the
+# routers are always resident and the ceiling above is what pays for that.
+#
+# Anchored on the section heading and a whole sentence, never on `## Everything
+# else` — the queue's ungrouped catch-all heading is also ordinary prose in
+# ship-watch, so that phrase alone proves nothing about which file it came from.
+queue_marker='## The follow-up queue'
+queue_sentence='Work that is found and not done now reaches the queue'
+door_pointer='is filed in the turn it is named'
+for host_out in "$real_c" "$real_x"; do
+  host_out="$(cd "$host_out" && pwd -P)"
+  for rel in phases/pln/outline.md phases/pln/finish-ship.md phases/pln-pr/ship-watch.md; do
+    has "$host_out/$rel" "$queue_marker" "$host_out/$rel lost the queue format"
+    has "$host_out/$rel" "$queue_sentence" "$host_out/$rel lost the queue's standing invariant"
+    # The whole precedence chain, stated in the one place that defines it. An
+    # earlier wording named only date/undated/id, which skips the group level
+    # `pln-queue` actually sorts on and reads as a contradiction of it — the
+    # kind of drift only an assertion catches, since prose fails silently.
+    has "$host_out/$rel" \
+      'the flag, then the group, then date opened, then the items carrying no `opened` date, then `id`' \
+      "$host_out/$rel does not state the index's full sort precedence"
+  done
+  # Every remaining core a door can fire in: the sentence, and not the format.
+  for rel in phases/pln/interview.md phases/pln/implementation.md phases/pln/blocker.md \
+    phases/pln/review-approval.md phases/pln-pr/scope-baseline.md phases/pln-pr/review.md \
+    phases/pln-pr/fix.md phases/pln-pr/blocker.md phases/pln-simplify/map-synthesize.md; do
+    has "$host_out/$rel" "$door_pointer" \
+      "$host_out/$rel cannot file a follow-up named in the turn it is named"
+    has "$host_out/$rel" 'bin/pln-queue add' "$host_out/$rel names no helper call to file with"
+    hasnt "$host_out/$rel" "$queue_marker" "$host_out/$rel duplicated the whole queue format"
+  done
+  hasnt "$host_out/phases/pln-simplify/verify-record.md" "$queue_marker" \
+    "the queue format reached a phase no door fires in"
+  # Not in any router, on any host. The 60000-byte ceiling above is the reason
+  # this is a rule and not a preference.
+  for router in SKILL.md pln-pr/SKILL.md pln-simplify/SKILL.md; do
+    hasnt "$host_out/$router" "$queue_marker" "$host_out/$router carries the queue format"
+    hasnt "$host_out/$router" "$queue_sentence" "$host_out/$router carries the queue's intake rules"
+  done
+  # The helper is named through the absolute output root baked in at generation
+  # time, never through {{SKILL_DIR}}: on Codex that substitutes to $_PLN_DIR, a
+  # shell variable /pln-simplify's router never sets — so a bare SKILL_DIR would
+  # break door 4 in the very skill this fragment brings into scope.
+  queue_callers=0
+  while IFS= read -r f; do
+    has "$f" "$host_out/bin/pln-queue" \
+      "$f names the queue helper by an unresolved or relative path"
+    hasnt "$f" '_PLN_DIR/bin/pln-queue' "$f reaches the queue helper through a Codex shell variable"
+    hasnt "$f" 'CLAUDE_SKILL_DIR}/bin/pln-queue' "$f reaches the queue helper through a Claude variable"
+    queue_callers=$((queue_callers + 1))
+  done < <(grep -rlF 'bin/pln-queue' "$host_out")
+  [ "$queue_callers" = "12" ] \
+    || fail "$host_out names the queue helper in $queue_callers files, expected 12"
+done
 
 # The peer ladder is one shared source both skills read, and the property that
 # matters is that neither carries probe logic of its own: every build of both

@@ -1,0 +1,1095 @@
+#!/usr/bin/env bash
+# pln-queue — the follow-up queue: resolve where it lives, file into it, read it
+# back, and move records out of it. Host-neutral: bash and git, no network and no
+# agent CLI. There is no delete subcommand — a record is archived, never destroyed.
+set -euo pipefail
+
+INDEX_NAME='QUEUE.md'
+LIVE_DIR='q'
+DONE_DIR='done'
+HEADER_OPEN='<!-- pln-queue v1'
+HEADER_CLOSE='-->'
+DECLARED_KEY='pln-queue'
+
+fail() { echo "pln-queue: $*" >&2; exit 2; }
+refuse() { echo "pln-queue: $*" >&2; exit 3; }
+
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  pln-queue init [--project DIR] [--root PATH] [--answered] [--migration-offered]
+  pln-queue add --id ID --claim TEXT --source TEXT [--status ready|blocked|decide|dropped]
+                [--state "[ ]"|"[-]"|"[x]"] [--urgent] [--group TEXT] [--opened YYYY-MM-DD]
+                [--depends-on CSV] [--touches CSV] [--holds CSV] [--body FILE|-]
+  pln-queue list [--project DIR]
+  pln-queue check --id ID [--against CSV]
+  pln-queue claim --id ID --run TEXT [--against CSV] [--steal HOLDER]
+  pln-queue mark --id ID [--state S] [--status S] [--urgent true|false] [--group TEXT]
+                 [--touches CSV] [--holds CSV] [--depends-on CSV] [--source TEXT]
+                 [--add-sub-item TEXT] [--sub-item-state "[ ]"|"[-]"|"[x]"]
+  pln-queue archive --id ID --disposition completed|dropped|superseded|resolved-elsewhere
+                    --evidence TEXT [--month YYYY-MM]
+  pln-queue stale [--days N]
+
+Global options: [--project DIR] [--no-create]
+
+There is no delete subcommand: a record is archived, never destroyed.
+
+Exit codes: 0 done, 2 usage or failure, 3 refused (a collision, an occupied path,
+no resolvable queue). Every subcommand resolves the queue first and reports
+QUEUE_ROOT, whether it created one, and whether the location question is owed.
+
+Env overrides (for testing):
+  PLN_QUEUE_DATE — the UTC date the helper writes (YYYY-MM-DD)
+EOF
+  exit 2
+}
+
+# ---------------------------------------------------------------- small helpers
+
+today() {
+  local d="${PLN_QUEUE_DATE:-}"
+  [ -n "$d" ] || d="$(date -u '+%Y-%m-%d')"
+  case "$d" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+    *) fail "date must be YYYY-MM-DD: $d" ;;
+  esac
+  printf '%s\n' "$d"
+}
+
+ymd_epoch() {
+  if date -u -j -f '%Y-%m-%d' "$1" '+%s' >/dev/null 2>&1; then
+    date -u -j -f '%Y-%m-%d' "$1" '+%s'
+  else
+    date -u -d "$1" '+%s'
+  fi
+}
+
+epoch_ymd() {
+  if date -u -r "$1" '+%Y-%m-%d' 2>/dev/null; then return 0; fi
+  date -u -d "@$1" '+%Y-%m-%d'
+}
+
+# The date N days before $1. ISO dates compare correctly as strings, so the
+# cutoff is all the staleness pass needs and no arithmetic happens per item.
+cutoff_date() {
+  local base days epoch
+  base="$1"; days="$2"
+  epoch="$(ymd_epoch "$base" 2>/dev/null)" || { printf '%s\n' "$base"; return 0; }
+  epoch_ymd "$(( epoch - days * 86400 ))"
+}
+
+# Resolve git facts from the directory itself, never from an ambient GIT_DIR: an
+# exported GIT_DIR with the working directory elsewhere makes --is-inside-work-tree
+# true while the work tree and the common dir name two different repositories.
+# Discovering both from the same clean resolution makes that disagreement
+# impossible rather than detected after the fact.
+git_clean() {
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_INDEX_FILE \
+      -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES git "$@"
+}
+
+abs_dir() { (cd "$1" && pwd -P); }
+
+single_line() {
+  case "$2" in *$'\n'* | *$'\r'* | *$'\t'*) fail "$1 must be single-line and tab-free" ;; esac
+}
+
+valid_id() {
+  case "$1" in
+    '' | *[!a-z0-9-]* | -* | *-) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+valid_state() {
+  case "$1" in '[ ]' | '[-]' | '[x]') return 0 ;; *) return 1 ;; esac
+}
+
+valid_status() {
+  case "$1" in ready | blocked | decide | dropped) return 0 ;; *) return 1 ;; esac
+}
+
+csv_to_lines() {
+  printf '%s' "$1" | tr ',' '\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -v '^$' || true
+}
+
+lines_to_yaml_list() {
+  local out='' item
+  while IFS= read -r item; do
+    [ -n "$item" ] || continue
+    if [ -z "$out" ]; then out="$item"; else out="$out, $item"; fi
+  done
+  printf '[%s]' "$out"
+}
+
+# ------------------------------------------------------------------- resolution
+
+PROJECT_DIR=''
+PROJECT_TOP=''
+COMMON_DIR=''
+IN_WORKTREE=0
+IS_BARE=0
+QUEUE_ROOT=''
+RESOLVED_BY=''
+CREATED=0
+NOTES=()
+SET_ANSWERED=''
+SET_OFFERED=''
+
+note() { NOTES+=("$1"); }
+
+project_context() {
+  PROJECT_DIR="$(abs_dir "$1")" || fail "project directory does not exist: $1"
+  PROJECT_TOP="$PROJECT_DIR"
+  COMMON_DIR=''
+  IN_WORKTREE=0
+  IS_BARE=0
+  local inside top common bare
+  bare="$(git_clean -C "$PROJECT_DIR" rev-parse --is-bare-repository 2>/dev/null || true)"
+  [ "$bare" != "true" ] || IS_BARE=1
+  inside="$(git_clean -C "$PROJECT_DIR" rev-parse --is-inside-work-tree 2>/dev/null || true)"
+  [ "$inside" = "true" ] || return 0
+  top="$(git_clean -C "$PROJECT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -z "$top" ] || [ ! -d "$top" ]; then return 0; fi
+  IN_WORKTREE=1
+  PROJECT_TOP="$(abs_dir "$top")"
+  common="$(git_clean -C "$PROJECT_TOP" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  if [ -n "$common" ] && [ -d "$common" ] && [ ! -L "$common" ]; then
+    COMMON_DIR="$(abs_dir "$common")"
+  fi
+  return 0
+}
+
+is_gitlink() {
+  # $1 = repo top, $2 = path relative to it
+  [ "$IN_WORKTREE" = 1 ] || return 1
+  local mode
+  mode="$(git_clean -C "$1" ls-files --stage -- "$2" 2>/dev/null | awk 'NR==1 {print $1}')"
+  [ "$mode" = "160000" ]
+}
+
+# Empty, or holding nothing but $2 — the file a project's instructions named,
+# which the derived root is allowed to contain and which is never touched.
+dir_is_empty() {
+  local n
+  if [ -n "${2:-}" ]; then
+    n="$(ls -A "$1" 2>/dev/null | LC_ALL=C grep -v -x -F -- "$2" | LC_ALL=C grep -c '' || true)"
+  else
+    n="$(ls -A "$1" 2>/dev/null | LC_ALL=C grep -c '' || true)"
+  fi
+  [ "${n:-0}" = "0" ]
+}
+
+looks_like_queue() {
+  if [ -f "$1/$INDEX_NAME" ] && [ ! -L "$1/$INDEX_NAME" ]; then return 0; fi
+  dir_is_empty "$1" "${2:-}"
+}
+
+# Adopt an existing candidate root, or say why it was passed over — a name
+# collision in someone else's repository must not make pln write into a
+# directory that belongs to something else.
+# $1 candidate path, $2 leg name, $3 name for the gitlink probe (or ''),
+# $4 a filename inside it that does not count against emptiness (or '')
+adopt_candidate() {
+  local cand="$1" leg="$2" rel="${3:-}" spare="${4:-}"
+  if [ ! -e "$cand" ] && [ ! -L "$cand" ]; then return 1; fi
+  if [ -L "$cand" ]; then
+    note "$leg: $cand is a symlink, not adopted"
+    return 1
+  fi
+  if [ ! -d "$cand" ]; then
+    note "$leg: $cand is not a directory, not adopted"
+    return 1
+  fi
+  if [ -n "$rel" ] && is_gitlink "$PROJECT_TOP" "$rel"; then
+    note "$leg: $cand is a git submodule mountpoint, not adopted"
+    return 1
+  fi
+  if ! looks_like_queue "$cand" "$spare"; then
+    note "$leg: $cand holds something other than a queue, not adopted"
+    return 1
+  fi
+  QUEUE_ROOT="$(abs_dir "$cand")"
+  RESOLVED_BY="$leg"
+  return 0
+}
+
+# The instruction-file leg is a read of prose everywhere else; what a bash helper
+# can recognize deterministically is the one-line declaration pln tells the user
+# to write:  pln-queue: <path>
+declared_path() {
+  local file path
+  for file in "$PROJECT_TOP/CLAUDE.md" "$PROJECT_TOP/AGENTS.md"; do
+    [ -f "$file" ] || continue
+    path="$(LC_ALL=C sed -n -E \
+      "s/^[[:space:]]*(-[[:space:]]+)?\`?${DECLARED_KEY}:\`?[[:space:]]+\`?([^\`]+)\`?[[:space:]]*\$/\\2/p" \
+      "$file" 2>/dev/null | head -1 || true)"
+    path="$(printf '%s' "$path" | sed -e 's/[[:space:]]*$//')"
+    if [ -n "$path" ]; then printf '%s\n' "$path"; return 0; fi
+  done
+  return 1
+}
+
+# Refuse the repository top level and any ancestor of it. A project documenting a
+# root-level TODO.md would otherwise scatter QUEUE.md, q/ and done/ across its top
+# level unasked, and put pln's own dirt exclusion in front of user-owned changes.
+instruction_root_ok() {
+  local root="${1%/}"
+  [ "$IN_WORKTREE" = 1 ] || return 0
+  if [ "$root" = "$PROJECT_TOP" ]; then
+    note "instructions: $root is the repository top level, not adopted"
+    return 1
+  fi
+  case "$PROJECT_TOP/" in
+    "$root"/*)
+      note "instructions: $root contains the repository top level, not adopted"
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+create_queue() {
+  local root="$1"
+  # Never write through a link: an empty `pln` symlink would put the queue
+  # outside the repository while the location answer applied to the link.
+  if [ -L "$root" ]; then return 1; fi
+  mkdir -p "$root/$LIVE_DIR" 2>/dev/null || return 1
+  if [ -L "$root/$LIVE_DIR" ]; then return 1; fi
+  QUEUE_ROOT="$(abs_dir "$root")"
+  if [ ! -e "$QUEUE_ROOT/$INDEX_NAME" ]; then
+    write_index "$QUEUE_ROOT" || return 1
+    CREATED=1
+  fi
+  return 0
+}
+
+instruction_leg() {
+  local cand="$1" spare="${2:-}"
+  instruction_root_ok "$cand" || return 1
+  if [ -e "$cand" ] || [ -L "$cand" ]; then
+    adopt_candidate "$cand" 'instructions' '' "$spare" || return 1
+  else
+    QUEUE_ROOT="$cand"
+  fi
+  if ! instruction_root_ok "$QUEUE_ROOT"; then QUEUE_ROOT=''; RESOLVED_BY=''; return 1; fi
+  if ! create_queue "$QUEUE_ROOT"; then
+    note "instructions: cannot create or write $QUEUE_ROOT"
+    QUEUE_ROOT=''; RESOLVED_BY=''
+    return 1
+  fi
+  RESOLVED_BY='instructions'
+  return 0
+}
+
+# The four legs, in the user's order. $1 = 1 to create when nothing resolves,
+# $2 = an explicit root (an answered location question) or ''.
+resolve_root() {
+  local create="$1" explicit="${2:-}" cand declared named_file
+
+  if [ -n "$explicit" ]; then
+    case "$explicit" in
+      /*) cand="$explicit" ;;
+      '~/'*) cand="$HOME/${explicit#\~/}" ;;
+      *) cand="$PROJECT_DIR/$explicit" ;;
+    esac
+    [ ! -L "$cand" ] || fail "the queue root must not be a symlink: $cand"
+    if [ -e "$cand" ] && [ ! -d "$cand" ]; then fail "the queue root is not a directory: $cand"; fi
+    create_queue "$cand" || fail "cannot create or write the queue at $cand"
+    RESOLVED_BY='explicit'
+    return 0
+  fi
+
+  if adopt_candidate "$PROJECT_TOP/pln" 'project-root' 'pln'; then
+    create_queue "$QUEUE_ROOT" || fail "cannot write the queue at $QUEUE_ROOT"
+    return 0
+  fi
+
+  if [ "$IN_WORKTREE" = 1 ] && [ -n "$COMMON_DIR" ]; then
+    if adopt_candidate "$COMMON_DIR/pln" 'common-dir'; then
+      create_queue "$QUEUE_ROOT" || fail "cannot write the queue at $QUEUE_ROOT"
+      return 0
+    fi
+  fi
+
+  declared="$(declared_path || true)"
+  if [ -n "$declared" ]; then
+    case "$declared" in
+      /*) cand="$declared" ;;
+      '~/'*) cand="$HOME/${declared#\~/}" ;;
+      *) cand="$PROJECT_TOP/$declared" ;;
+    esac
+    # A named file makes its containing directory the root; the file itself is
+    # left untouched, and does not count against the directory being empty —
+    # otherwise a named file could never produce a root and the migration offer
+    # it exists for could never fire.
+    named_file=''
+    if [ -f "$cand" ] && [ ! -L "$cand" ]; then
+      named_file="$(basename "$cand")"
+      cand="$(dirname "$cand")"
+    fi
+    if instruction_leg "$cand" "$named_file"; then
+      if [ -n "$named_file" ]; then note "instructions: derived the root from the named file $named_file, which is left as it is"; fi
+      return 0
+    fi
+  fi
+
+  [ "$create" = 1 ] || return 1
+
+  # Create and ask. The default root is only usable when nothing is already
+  # sitting on it: a `pln` the legs above refused — a symlink, a submodule
+  # mountpoint, someone else's directory — must not be written into here either.
+  cand="$PROJECT_TOP/pln"
+  if [ -e "$cand" ] || [ -L "$cand" ]; then
+    report_notes
+    refuse "the default queue root $cand exists and is not a queue; nothing was written"
+  fi
+  if [ "$IS_BARE" = 1 ]; then
+    report_notes
+    refuse "$PROJECT_DIR is a bare repository; a queue is not created inside one"
+  fi
+  create_queue "$cand" || { report_notes; refuse "no queue root could be created; tried $cand"; }
+  RESOLVED_BY='created'
+  return 0
+}
+
+LOCATION_QUESTION=''
+MIGRATION_OFFERED=''
+
+header_field() {
+  # $1 = index file, $2 = key
+  [ -f "$1" ] || return 0
+  LC_ALL=C awk -v key="$2" -v hopen="$HEADER_OPEN" -v hclose="$HEADER_CLOSE" '
+    NR == 1 { if ($0 != hopen) exit 0; inhdr = 1; next }
+    inhdr && $0 == hclose { exit 0 }
+    inhdr {
+      i = index($0, ":")
+      if (i > 0 && substr($0, 1, i - 1) == key) {
+        v = substr($0, i + 1)
+        sub(/^[ \t]+/, "", v); sub(/[ \t\r]+$/, "", v)
+        print v
+        exit 0
+      }
+    }
+  ' "$1"
+}
+
+load_header() {
+  local answered offered
+  LOCATION_QUESTION='owed'
+  MIGRATION_OFFERED='none'
+  answered="$(header_field "$QUEUE_ROOT/$INDEX_NAME" 'location-answered')"
+  offered="$(header_field "$QUEUE_ROOT/$INDEX_NAME" 'migration-offered')"
+  if [ -n "$answered" ]; then LOCATION_QUESTION='answered'; fi
+  if [ -n "$offered" ]; then MIGRATION_OFFERED="$offered"; fi
+  return 0
+}
+
+report_notes() {
+  local n
+  for n in ${NOTES[@]+"${NOTES[@]}"}; do printf 'NOTE=%s\n' "$n"; done
+}
+
+report_resolution() {
+  local n
+  printf 'QUEUE_ROOT=%s\n' "$QUEUE_ROOT"
+  printf 'INDEX=%s\n' "$QUEUE_ROOT/$INDEX_NAME"
+  printf 'RESOLVED_BY=%s\n' "$RESOLVED_BY"
+  printf 'CREATED=%s\n' "$CREATED"
+  printf 'LOCATION_QUESTION=%s\n' "$LOCATION_QUESTION"
+  printf 'MIGRATION_OFFERED=%s\n' "$MIGRATION_OFFERED"
+  report_notes
+}
+
+# ------------------------------------------------------------------------- lock
+
+LOCK_HELD=''
+
+release_lock() {
+  if [ -n "$LOCK_HELD" ]; then rmdir "$LOCK_HELD" 2>/dev/null || true; fi
+  LOCK_HELD=''
+  return 0
+}
+
+take_lock() {
+  local lock="$QUEUE_ROOT/.lock" tries=0
+  while ! mkdir "$lock" 2>/dev/null; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 25 ] || fail "the queue is locked by another run: $lock"
+    sleep 0.2
+  done
+  LOCK_HELD="$lock"
+  trap 'release_lock' EXIT
+}
+
+# ----------------------------------------------------------- reading the record
+
+detail_path() { printf '%s/%s/%s.md\n' "$QUEUE_ROOT" "$LIVE_DIR" "$1"; }
+
+# One tab-separated record per detail file:
+#   id  state  urgent  status  opened  group  claimed_by  claimed_at  claim
+parse_detail() {
+  local file="$1"
+  LC_ALL=C awk -v file="$file" '
+    function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
+    function unquote(s) { if (s ~ /^".*"$/) s = substr(s, 2, length(s) - 2); return s }
+    NR == 1 { if ($0 != "---") { print "pln-queue: detail file has no frontmatter: " file > "/dev/stderr"; bad = 1; exit 1 } inhdr = 1; next }
+    inhdr && $0 == "---" { inhdr = 0; next }
+    inhdr {
+      i = index($0, ":")
+      if (i > 0) v[trim(substr($0, 1, i - 1))] = unquote(trim(substr($0, i + 1)))
+      next
+    }
+    !claim && /^# / { claim = trim(substr($0, 3)) }
+    END {
+      if (bad) exit 1
+      if (inhdr) { print "pln-queue: unterminated frontmatter: " file > "/dev/stderr"; exit 1 }
+      if (v["id"] == "" || v["state"] == "" || v["status"] == "") {
+        print "pln-queue: detail file is missing id, state or status: " file > "/dev/stderr"; exit 1
+      }
+      if (claim == "") { print "pln-queue: detail file has no leading `# <claim>` heading: " file > "/dev/stderr"; exit 1 }
+      urgent = (v["urgent"] == "true") ? "true" : "false"
+      printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", v["id"], v["state"], urgent, v["status"], \
+        v["opened"], v["group"], v["claimed_by"], v["claimed_at"], claim
+    }
+  ' "$file"
+}
+
+# The values of one list-valued frontmatter field, one per line.
+detail_list() {
+  local file="$1" key="$2"
+  [ -f "$file" ] || return 0
+  LC_ALL=C awk -v key="$key" '
+    NR == 1 { if ($0 != "---") exit 0; inhdr = 1; next }
+    inhdr && $0 == "---" { exit 0 }
+    inhdr {
+      i = index($0, ":")
+      if (i > 0) {
+        k = substr($0, 1, i - 1); sub(/^[ \t]+/, "", k); sub(/[ \t]+$/, "", k)
+        if (k == key) {
+          v = substr($0, i + 1)
+          sub(/^[ \t]*\[/, "", v); sub(/\][ \t\r]*$/, "", v)
+          n = split(v, parts, ",")
+          for (j = 1; j <= n; j++) {
+            p = parts[j]
+            sub(/^[ \t]+/, "", p); sub(/[ \t\r]+$/, "", p)
+            gsub(/^"|"$/, "", p)
+            if (p != "") print p
+          }
+          exit 0
+        }
+      }
+    }
+  ' "$file"
+}
+
+live_records() {
+  local file
+  [ -d "$QUEUE_ROOT/$LIVE_DIR" ] || return 0
+  for file in "$QUEUE_ROOT/$LIVE_DIR"/*.md; do
+    [ -f "$file" ] || continue
+    parse_detail "$file" || return 1
+  done
+  return 0
+}
+
+# --------------------------------------------------------------- the index file
+
+render_index() {
+  local answered offered records
+  answered="$(header_field "$QUEUE_ROOT/$INDEX_NAME" 'location-answered')"
+  offered="$(header_field "$QUEUE_ROOT/$INDEX_NAME" 'migration-offered')"
+  if [ -n "$SET_ANSWERED" ]; then answered="$SET_ANSWERED"; fi
+  if [ -n "$SET_OFFERED" ]; then offered="$SET_OFFERED"; fi
+
+  printf '%s\n' "$HEADER_OPEN"
+  printf 'queue-root: %s\n' "$QUEUE_ROOT"
+  if [ -n "$answered" ]; then printf 'location-answered: %s\n' "$answered"; fi
+  if [ -n "$offered" ]; then printf 'migration-offered: %s\n' "$offered"; fi
+  printf '%s\n\n' "$HEADER_CLOSE"
+
+  records="$(live_records)" || return 1
+  if [ -z "$records" ]; then
+    printf '_No open items._\n'
+    return 0
+  fi
+
+  # bucket \t group \t opened-key \t id \t line — a total order, so two runs over
+  # an unchanged set of detail files cannot produce two different files.
+  printf '%s\n' "$records" | LC_ALL=C awk -F '\t' -v OFS='\t' -v live="$LIVE_DIR" '
+    {
+      id = $1; state = $2; urgent = $3; status = $4; opened = $5; group = $6; claim = $9
+      flag = (urgent == "true") ? "! " : ""
+      line = "- " state " " flag status " · " claim " → `" live "/" id ".md`"
+      bucket = (urgent == "true") ? "0" : (group != "" ? "1" : "2")
+      key = (opened != "") ? "0" opened : "1"
+      print bucket, group, key, id, line
+    }
+  ' | LC_ALL=C sort -t"$(printf '\t')" -k1,1 -k2,2 -k3,3 -k4,4 | LC_ALL=C awk -F '\t' '
+    {
+      heading = ($1 == "0") ? "Urgent" : ($1 == "2" ? "Everything else" : $2)
+      if (heading != current) {
+        if (NR > 1) printf "\n"
+        printf "## %s\n\n", heading
+        current = heading
+      }
+      print $5
+    }
+  '
+}
+
+write_index() {
+  local root="${1:-$QUEUE_ROOT}" tmp
+  QUEUE_ROOT="$root"
+  [ ! -L "$root/$INDEX_NAME" ] || fail "the index file must not be a symlink: $root/$INDEX_NAME"
+  tmp="$(mktemp "$root/.pln-queue-index.XXXXXX")" || return 1
+  if ! render_index > "$tmp"; then rm -f "$tmp"; return 1; fi
+  mv "$tmp" "$root/$INDEX_NAME"
+}
+
+index_line_for() {
+  LC_ALL=C grep -F -- "\`$LIVE_DIR/$1.md\`" "$QUEUE_ROOT/$INDEX_NAME" | head -1
+}
+
+# ----------------------------------------------------------------- the overlap
+
+overlap_report() {
+  # $1 = subject id, $2 = other id. One COLLISION line per shared claim.
+  local a="$1" b="$2" af bf ta tb ha hb x y hit=0
+  af="$(detail_path "$a")"; bf="$(detail_path "$b")"
+  ta="$(detail_list "$af" touches)"
+  tb="$(detail_list "$bf" touches)"
+  ha="$(detail_list "$af" holds)"
+  hb="$(detail_list "$bf" holds)"
+
+  if [ -z "$tb" ]; then
+    printf 'COLLISION\t%s\tunknown\t%s\n' "$b" "$b declares no touches"
+    hit=1
+  elif [ -n "$ta" ]; then
+    while IFS= read -r x; do
+      [ -n "$x" ] || continue
+      x="${x%/}"
+      while IFS= read -r y; do
+        [ -n "$y" ] || continue
+        y="${y%/}"
+        # Prefix containment in either direction: a directory entry is a claim on
+        # a region, not a string to match.
+        if [ "$x" = "$y" ] || [ "${x#"$y"/}" != "$x" ] || [ "${y#"$x"/}" != "$y" ]; then
+          printf 'COLLISION\t%s\tpath\t%s\n' "$b" "$x"
+          hit=1
+        fi
+      done <<EOF
+$tb
+EOF
+    done <<EOF
+$ta
+EOF
+  fi
+
+  if [ -n "$ha" ] && [ -n "$hb" ]; then
+    while IFS= read -r x; do
+      [ -n "$x" ] || continue
+      while IFS= read -r y; do
+        [ -n "$y" ] || continue
+        if [ "$x" = "$y" ]; then
+          printf 'COLLISION\t%s\tresource\t%s\n' "$b" "$x"
+          hit=1
+        fi
+      done <<EOF
+$hb
+EOF
+    done <<EOF
+$ha
+EOF
+  fi
+  [ "$hit" = 0 ] || return 1
+  return 0
+}
+
+claimed_ids() {
+  live_records | LC_ALL=C awk -F '\t' '$7 != "" { print $1 }'
+}
+
+run_check() {
+  # $1 = subject id, $2 = CSV of ids to compare against ('' = the claimed set).
+  local id="$1" against="$2" others other refused=0 subject_touches
+  subject_touches="$(detail_list "$(detail_path "$id")" touches)"
+
+  if [ -n "$against" ]; then
+    others="$(csv_to_lines "$against")"
+  else
+    others="$(claimed_ids)"
+  fi
+
+  # Absent means unknown, and unknown collides with everything: otherwise the
+  # cheapest capture would be the most permissive thing in the queue.
+  if [ -z "$subject_touches" ]; then
+    printf 'COLLISION\t-\tunknown\t%s\n' "$id declares no touches"
+    refused=1
+  fi
+
+  while IFS= read -r other; do
+    [ -n "$other" ] || continue
+    [ "$other" != "$id" ] || continue
+    [ -f "$(detail_path "$other")" ] || fail "no such queue item: $other"
+    if ! overlap_report "$id" "$other"; then refused=1; fi
+  done <<EOF
+$others
+EOF
+
+  if [ "$refused" = 1 ]; then
+    printf 'CHECK=refused\n'
+    return 1
+  fi
+  printf 'CHECK=clear\n'
+  return 0
+}
+
+# ------------------------------------------------------------------ frontmatter
+
+set_field() {
+  # $1 = detail file, $2 = key, $3 = value (already YAML-safe)
+  local file="$1" key="$2" value="$3" tmp
+  tmp="$(mktemp "$(dirname "$file")/.pln-queue-detail.XXXXXX")"
+  LC_ALL=C awk -v key="$key" -v value="$value" '
+    NR == 1 { print; inhdr = 1; next }
+    inhdr && $0 == "---" {
+      if (!done) { print key ": " value; done = 1 }
+      inhdr = 0; print; next
+    }
+    inhdr {
+      i = index($0, ":")
+      if (i > 0) {
+        k = substr($0, 1, i - 1); sub(/^[ \t]+/, "", k); sub(/[ \t]+$/, "", k)
+        if (k == key) { print key ": " value; done = 1; next }
+      }
+      print; next
+    }
+    { print }
+  ' "$file" > "$tmp"
+  mv "$tmp" "$file"
+}
+
+append_sub_item() {
+  local file="$1" text="$2" state="$3" tmp
+  tmp="$(mktemp "$(dirname "$file")/.pln-queue-detail.XXXXXX")"
+  LC_ALL=C awk -v line="- $state $text" '
+    { lines[++n] = $0; if ($0 == "## Sub-items") found = NR }
+    END {
+      if (!found) {
+        while (n > 0 && lines[n] == "") n--
+        for (i = 1; i <= n; i++) print lines[i]
+        print ""
+        print "## Sub-items"
+        print ""
+        print line
+      } else {
+        last = found
+        for (i = found + 1; i <= n; i++) {
+          if (lines[i] ~ /^## /) break
+          if (lines[i] != "") last = i
+        }
+        for (i = 1; i <= last; i++) print lines[i]
+        print line
+        for (i = last + 1; i <= n; i++) print lines[i]
+      }
+    }
+  ' "$file" > "$tmp"
+  mv "$tmp" "$file"
+}
+
+# --------------------------------------------------------------------- dispatch
+
+command="${1:-}"
+[ -n "$command" ] || usage
+shift
+
+project='.'
+create_flag=1
+
+case "$command" in
+  init)
+    explicit=''; answered=0; migration=0
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --project) project="${2:-}"; shift 2 ;;
+        --root) explicit="${2:-}"; shift 2 ;;
+        --answered) answered=1; shift ;;
+        --migration-offered) migration=1; shift ;;
+        --no-create) create_flag=0; shift ;;
+        *) usage ;;
+      esac
+    done
+    project_context "$project"
+    resolve_root "$create_flag" "$explicit" || refuse "no queue could be resolved under $PROJECT_DIR"
+    if [ "$answered" = 1 ] || [ "$migration" = 1 ]; then
+      take_lock
+      if [ "$answered" = 1 ]; then SET_ANSWERED="$(today)"; fi
+      if [ "$migration" = 1 ]; then SET_OFFERED="$(today)"; fi
+      write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
+      release_lock
+    fi
+    load_header
+    report_resolution
+    ;;
+
+  add)
+    id=''; claim=''; source=''; status='ready'; state='[ ]'; urgent='false'
+    group=''; opened=''; depends=''; touches=''; holds=''; body=''
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --project) project="${2:-}"; shift 2 ;;
+        --id) id="${2:-}"; shift 2 ;;
+        --claim) claim="${2:-}"; shift 2 ;;
+        --source) source="${2:-}"; shift 2 ;;
+        --status) status="${2:-}"; shift 2 ;;
+        --state) state="${2:-}"; shift 2 ;;
+        --urgent) urgent='true'; shift ;;
+        --group) group="${2:-}"; shift 2 ;;
+        --opened) opened="${2:-}"; shift 2 ;;
+        --depends-on) depends="${2:-}"; shift 2 ;;
+        --touches) touches="${2:-}"; shift 2 ;;
+        --holds) holds="${2:-}"; shift 2 ;;
+        --body) body="${2:-}"; shift 2 ;;
+        --no-create) create_flag=0; shift ;;
+        *) usage ;;
+      esac
+    done
+    [ -n "$id" ] && [ -n "$claim" ] && [ -n "$source" ] || usage
+    valid_id "$id" || fail "id must be lowercase letters, digits and hyphens: $id"
+    valid_state "$state" || fail "state must be '[ ]', '[-]' or '[x]': $state"
+    valid_status "$status" || fail "status must be ready, blocked, decide or dropped: $status"
+    single_line 'claim' "$claim"
+    single_line 'source' "$source"
+    single_line 'group' "$group"
+    [ -n "$opened" ] || opened="$(today)"
+    case "$opened" in
+      [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+      *) fail "opened must be YYYY-MM-DD: $opened" ;;
+    esac
+
+    project_context "$project"
+    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    take_lock
+
+    detail="$(detail_path "$id")"
+    if [ -e "$detail" ] || [ -L "$detail" ]; then
+      refuse "an item is already filed at $detail; nothing was overwritten"
+    fi
+    mkdir -p "$QUEUE_ROOT/$LIVE_DIR"
+
+    depends_yaml="$(csv_to_lines "$depends" | lines_to_yaml_list)"
+    touches_yaml="$(csv_to_lines "$touches" | lines_to_yaml_list)"
+    holds_yaml="$(csv_to_lines "$holds" | lines_to_yaml_list)"
+
+    tmp="$(mktemp "$QUEUE_ROOT/$LIVE_DIR/.pln-queue-add.XXXXXX")"
+    {
+      printf -- '---\n'
+      printf 'id: %s\n' "$id"
+      printf 'state: "%s"\n' "$state"
+      printf 'urgent: %s\n' "$urgent"
+      printf 'status: %s\n' "$status"
+      printf 'opened: %s\n' "$opened"
+      printf 'source: %s\n' "$source"
+      printf 'group: %s\n' "$group"
+      printf 'depends_on: %s\n' "$depends_yaml"
+      printf 'touches: %s\n' "$touches_yaml"
+      printf 'holds: %s\n' "$holds_yaml"
+      printf -- '---\n\n'
+      printf '# %s\n\n' "$claim"
+      if [ -n "$body" ]; then
+        if [ "$body" = '-' ]; then cat; else cat "$body"; fi
+      else
+        printf '## What exists and where\n\n_Not recorded when this item was filed._\n\n'
+        printf '## What to do\n\n_Not recorded when this item was filed._\n\n'
+        printf '## What has to be true first\n\n_Not recorded when this item was filed._\n\n'
+        printf '## How to tell it worked\n\n_Not recorded when this item was filed._\n\n'
+        printf '## Related\n\n- filed from: %s\n\n' "$source"
+        printf '## Sub-items\n'
+      fi
+    } > "$tmp"
+    # The detail file is canonical, so it lands first: an interruption leaves an
+    # orphan the next rebuild picks up, never a phantom index line.
+    mv "$tmp" "$detail"
+    write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
+    release_lock
+
+    load_header
+    report_resolution
+    printf 'DETAIL_FILE=%s\n' "$detail"
+    line="$(index_line_for "$id")"
+    [ -n "$line" ] || fail "the index was rebuilt without $id"
+    printf 'INDEX_LINE=%s\n' "$line"
+    ;;
+
+  list)
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --project) project="${2:-}"; shift 2 ;;
+        --no-create) create_flag=0; shift ;;
+        *) usage ;;
+      esac
+    done
+    project_context "$project"
+    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    take_lock
+    write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
+    release_lock
+    load_header
+    report_resolution
+    count="$(live_records | LC_ALL=C grep -c '' || true)"
+    [ -n "$count" ] || count=0
+    printf 'ITEM_COUNT=%s\n' "$count"
+    if [ "$count" = "0" ]; then printf 'STATUS=empty\n'; else printf 'STATUS=items\n'; fi
+    # The output is never empty, so a caller can tell an empty queue — a real
+    # read — from a failed call, which must fail the close rather than render
+    # a clean empty follow-up list.
+    printf 'INDEX_BEGIN\n'
+    cat "$QUEUE_ROOT/$INDEX_NAME"
+    printf 'INDEX_END\n'
+    ;;
+
+  check)
+    id=''; against=''
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --project) project="${2:-}"; shift 2 ;;
+        --id) id="${2:-}"; shift 2 ;;
+        --against) against="${2:-}"; shift 2 ;;
+        --no-create) create_flag=0; shift ;;
+        *) usage ;;
+      esac
+    done
+    [ -n "$id" ] || usage
+    project_context "$project"
+    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    load_header
+    report_resolution
+    [ -f "$(detail_path "$id")" ] || fail "no such queue item: $id"
+    # Advisory by contract: two runs can both read a clear result, which is why
+    # `claim` exists and why a refusal here is not an error.
+    run_check "$id" "$against" || true
+    ;;
+
+  claim)
+    id=''; run=''; against=''; steal=''
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --project) project="${2:-}"; shift 2 ;;
+        --id) id="${2:-}"; shift 2 ;;
+        --run) run="${2:-}"; shift 2 ;;
+        --against) against="${2:-}"; shift 2 ;;
+        --steal) steal="${2:-}"; shift 2 ;;
+        --no-create) create_flag=0; shift ;;
+        *) usage ;;
+      esac
+    done
+    [ -n "$id" ] && [ -n "$run" ] || usage
+    single_line 'run' "$run"
+    project_context "$project"
+    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    load_header
+    report_resolution
+    detail="$(detail_path "$id")"
+    [ -f "$detail" ] || fail "no such queue item: $id"
+
+    # One mkdir lock over both the check and the record. A bare check cannot
+    # enforce a refusal: two runs can each read a clear answer and both proceed.
+    take_lock
+    holder="$(parse_detail "$detail" | LC_ALL=C cut -f7)"
+    if [ -n "$holder" ] && [ "$holder" != "$run" ]; then
+      if [ -z "$steal" ]; then
+        printf 'CLAIM=refused\nHELD_BY=%s\n' "$holder"
+        refuse "$id is held by $holder; a stale holder is released only by --steal $holder"
+      fi
+      if [ "$steal" != "$holder" ]; then
+        printf 'CLAIM=refused\nHELD_BY=%s\n' "$holder"
+        refuse "--steal names $steal but $id is held by $holder; nothing was released"
+      fi
+    fi
+    set +e
+    check_out="$(run_check "$id" "$against")"
+    check_rc=$?
+    set -e
+    printf '%s\n' "$check_out"
+    if [ "$check_rc" != 0 ]; then
+      printf 'CLAIM=refused\n'
+      refuse "$id collides with the declared set; it is not parallel-safe yet"
+    fi
+    set_field "$detail" 'claimed_by' "$run"
+    set_field "$detail" 'claimed_at' "$(today)"
+    write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
+    release_lock
+    if [ -n "$holder" ] && [ "$holder" != "$run" ]; then printf 'STOLEN_FROM=%s\n' "$holder"; fi
+    printf 'CLAIM=held\nHELD_BY=%s\n' "$run"
+    ;;
+
+  mark)
+    id=''; sub=''; sub_state='[ ]'
+    set_state=''; set_status=''; set_urgent=''; set_group=''
+    set_touches=''; set_holds=''; set_depends=''; set_source=''
+    have_group=0; have_touches=0; have_holds=0; have_depends=0
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --project) project="${2:-}"; shift 2 ;;
+        --id) id="${2:-}"; shift 2 ;;
+        --state) set_state="${2:-}"; shift 2 ;;
+        --status) set_status="${2:-}"; shift 2 ;;
+        --urgent) set_urgent="${2:-}"; shift 2 ;;
+        --group) set_group="${2:-}"; have_group=1; shift 2 ;;
+        --touches) set_touches="${2:-}"; have_touches=1; shift 2 ;;
+        --holds) set_holds="${2:-}"; have_holds=1; shift 2 ;;
+        --depends-on) set_depends="${2:-}"; have_depends=1; shift 2 ;;
+        --source) set_source="${2:-}"; shift 2 ;;
+        --add-sub-item) sub="${2:-}"; shift 2 ;;
+        --sub-item-state) sub_state="${2:-}"; shift 2 ;;
+        --no-create) create_flag=0; shift ;;
+        *) usage ;;
+      esac
+    done
+    [ -n "$id" ] || usage
+    [ -z "$set_state" ] || valid_state "$set_state" || fail "state must be '[ ]', '[-]' or '[x]': $set_state"
+    [ -z "$set_status" ] || valid_status "$set_status" || fail "status must be ready, blocked, decide or dropped: $set_status"
+    if [ -n "$set_urgent" ]; then
+      case "$set_urgent" in true | false) ;; *) fail "urgent must be true or false: $set_urgent" ;; esac
+    fi
+    [ -z "$sub" ] || valid_state "$sub_state" || fail "sub-item state must be '[ ]', '[-]' or '[x]': $sub_state"
+    single_line 'sub-item' "$sub"
+    single_line 'group' "$set_group"
+
+    project_context "$project"
+    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    detail="$(detail_path "$id")"
+    [ -f "$detail" ] || fail "no such queue item: $id"
+    take_lock
+    # The helper owns the frontmatter and the sub-item checklist it appends to,
+    # and nothing else in the body.
+    [ -z "$set_state" ] || set_field "$detail" 'state' "\"$set_state\""
+    [ -z "$set_status" ] || set_field "$detail" 'status' "$set_status"
+    [ -z "$set_urgent" ] || set_field "$detail" 'urgent' "$set_urgent"
+    [ "$have_group" = 0 ] || set_field "$detail" 'group' "$set_group"
+    [ -z "$set_source" ] || set_field "$detail" 'source' "$set_source"
+    [ "$have_touches" = 0 ] || set_field "$detail" 'touches' "$(csv_to_lines "$set_touches" | lines_to_yaml_list)"
+    [ "$have_holds" = 0 ] || set_field "$detail" 'holds' "$(csv_to_lines "$set_holds" | lines_to_yaml_list)"
+    [ "$have_depends" = 0 ] || set_field "$detail" 'depends_on' "$(csv_to_lines "$set_depends" | lines_to_yaml_list)"
+    [ -z "$sub" ] || append_sub_item "$detail" "$sub" "$sub_state"
+    write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
+    release_lock
+    load_header
+    report_resolution
+    printf 'DETAIL_FILE=%s\n' "$detail"
+    line="$(index_line_for "$id")"
+    [ -n "$line" ] || fail "the index was rebuilt without $id"
+    printf 'INDEX_LINE=%s\n' "$line"
+    ;;
+
+  archive)
+    id=''; disposition=''; evidence=''; month=''
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --project) project="${2:-}"; shift 2 ;;
+        --id) id="${2:-}"; shift 2 ;;
+        --disposition) disposition="${2:-}"; shift 2 ;;
+        --evidence) evidence="${2:-}"; shift 2 ;;
+        --month) month="${2:-}"; shift 2 ;;
+        --no-create) create_flag=0; shift ;;
+        *) usage ;;
+      esac
+    done
+    [ -n "$id" ] && [ -n "$disposition" ] && [ -n "$evidence" ] || usage
+    case "$disposition" in
+      completed | dropped | superseded | resolved-elsewhere) ;;
+      *) fail "disposition must be completed, dropped, superseded or resolved-elsewhere: $disposition" ;;
+    esac
+    single_line 'evidence' "$evidence"
+    if [ -n "$month" ]; then
+      case "$month" in
+        [0-9][0-9][0-9][0-9]-[0-9][0-9]) ;;
+        *) fail "month must be YYYY-MM: $month" ;;
+      esac
+    else
+      month="$(today)"; month="${month%-*}"
+    fi
+
+    project_context "$project"
+    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    detail="$(detail_path "$id")"
+    [ -f "$detail" ] || fail "no such queue item: $id"
+    record="$(parse_detail "$detail")" || fail "cannot read $detail"
+    state="$(printf '%s' "$record" | LC_ALL=C cut -f2)"
+    claim="$(printf '%s' "$record" | LC_ALL=C cut -f9)"
+    if [ "$disposition" = 'completed' ] && [ "$state" != '[x]' ]; then
+      refuse "$id is $state, not [x]; nothing writes a completion nobody verified — mark it, or archive it as resolved-elsewhere"
+    fi
+
+    take_lock
+    dest_dir="$QUEUE_ROOT/$DONE_DIR/$month"
+    dest="$dest_dir/$id.md"
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+      refuse "a record is already archived at $dest; nothing was overwritten"
+    fi
+    mkdir -p "$dest_dir"
+    # Content-preserving order: the record exists at its archive path and its line
+    # is in the month index before anything leaves the live queue.
+    cp "$detail" "$dest"
+    set_field "$dest" 'disposition' "$disposition"
+    set_field "$dest" 'archived' "$(today)"
+    set_field "$dest" 'evidence' "$evidence"
+    month_index="$dest_dir/index.md"
+    if [ ! -e "$month_index" ]; then printf '## %s\n\n' "$month" > "$month_index"; fi
+    printf -- '- %s %s · %s → `%s.md` — %s\n' "$state" "$disposition" "$claim" "$id" "$evidence" >> "$month_index"
+    rm -f "$detail"
+    write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
+    release_lock
+
+    load_header
+    report_resolution
+    printf 'ARCHIVED=%s\nARCHIVE_FILE=%s\nARCHIVE_INDEX=%s\nDISPOSITION=%s\nSTATE=%s\n' \
+      "$id" "$dest" "$month_index" "$disposition" "$state"
+    ;;
+
+  stale)
+    days=30
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --project) project="${2:-}"; shift 2 ;;
+        --days) days="${2:-}"; shift 2 ;;
+        --no-create) create_flag=0; shift ;;
+        *) usage ;;
+      esac
+    done
+    case "$days" in '' | *[!0-9]*) fail "days must be a whole number: $days" ;; esac
+    project_context "$project"
+    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    load_header
+    report_resolution
+    now="$(today)"
+    cutoff="$(cutoff_date "$now" "$days")"
+    records="$(live_records)" || fail "cannot read the queue's detail files"
+    # Report only. Nothing here writes, marks or archives: a record leaves the
+    # live queue on the user's confirmation, never on this helper's judgment.
+    stale_out="$(printf '%s' "$records" | LC_ALL=C awk -F '\t' -v cutoff="$cutoff" '
+      NF >= 9 {
+        id = $1; state = $2; status = $4; opened = $5; by = $7; at = $8
+        reasons = ""
+        if (state == "[x]") reasons = "completed-not-archived"
+        if (status == "dropped") reasons = reasons == "" ? "dropped-not-archived" : reasons ",dropped-not-archived"
+        if (by != "" && at != "" && at <= cutoff)
+          reasons = reasons == "" ? "claim-abandoned" : reasons ",claim-abandoned"
+        if (reasons == "" && opened != "" && opened <= cutoff) reasons = "aged"
+        if (reasons == "") next
+        printf "STALE\t%s\t%s\t%s\n", id, reasons, (by == "" ? "-" : by)
+      }
+    ')"
+    if [ -n "$stale_out" ]; then
+      printf '%s\n' "$stale_out"
+      count="$(printf '%s\n' "$stale_out" | LC_ALL=C grep -c '' || true)"
+    else
+      count=0
+    fi
+    printf 'STALE_COUNT=%s\nSTALE_DAYS=%s\nSTALE_CUTOFF=%s\n' "$count" "$days" "$cutoff"
+    ;;
+
+  *) usage ;;
+esac

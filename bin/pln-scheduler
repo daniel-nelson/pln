@@ -43,6 +43,27 @@ validate_output_path() {
   esac
 }
 
+# pln's own follow-up queue is not user-owned dirt. This skips the queue's own
+# paths — its index file, `q/` and `done/` — beneath a root that actually holds a
+# queue, and never the root itself and never the repository top level: a queue
+# root derived from a project-named file can be any directory, and excluding a
+# root there would disable dirty-state accounting for everything under it.
+queue_own_path() {
+  local repo="$1" path="${2%/}" root_rel=''
+  case "$path" in
+    'QUEUE.md' | 'q' | 'q/'* | 'done' | 'done/'*) return 1 ;;
+    */'QUEUE.md') root_rel="${path%/QUEUE.md}" ;;
+    */'q' | */'done') root_rel="${path%/*}" ;;
+    */'q'/*) root_rel="${path%%/q/*}" ;;
+    */'done'/*) root_rel="${path%%/done/*}" ;;
+    *) return 1 ;;
+  esac
+  [ -n "$root_rel" ] || return 1
+  [ -d "$repo/$root_rel" ] && [ ! -L "$repo/$root_rel" ] || return 1
+  [ -f "$repo/$root_rel/QUEUE.md" ] && [ ! -L "$repo/$root_rel/QUEUE.md" ] || return 1
+  head -1 "$repo/$root_rel/QUEUE.md" 2>/dev/null | LC_ALL=C grep -qxF -- '<!-- pln-queue v1'
+}
+
 snapshot_tree() {
   local repo="$1" out="$2" repo_real out_dir paths tmp path hash
   repo_real="$(real_dir "$repo")"
@@ -56,10 +77,12 @@ snapshot_tree() {
 
   while IFS= read -r -d '' path; do
     single_line "dirty path" "$path"
+    if queue_own_path "$repo_real" "$path"; then continue; fi
     printf '%s\n' "$path" >> "$paths"
   done < <(git -C "$repo_real" diff --name-only -z HEAD --)
   while IFS= read -r -d '' path; do
     single_line "dirty path" "$path"
+    if queue_own_path "$repo_real" "$path"; then continue; fi
     printf '%s\n' "$path" >> "$paths"
   done < <(git -C "$repo_real" ls-files -o --exclude-standard -z)
 

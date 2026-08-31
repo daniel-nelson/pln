@@ -638,6 +638,7 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   has "$f" '### Message shape' "$f lost the shared message shapes"
   has "$f" '### Conversational voice' "$f lost the host voice fragment inside Style"
   has "$f" '### Echoing recorded decisions' "$f lost the shared formatting rules"
+  has "$f" 'never an action not yet taken' "$f lost the shared forward-tense rule"
 done
 
 for host_out in "$real_c" "$real_x"; do

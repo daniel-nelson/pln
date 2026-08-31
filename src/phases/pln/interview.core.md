@@ -36,7 +36,7 @@ One further intent, and the only one scoped to the session rather than to the it
 
 **Every resolution is recorded** in its item's detail section as `**Decision (agent).**` with its cited authority and its reversibility, the way a decide-and-disclose call already is. The user reads them afterwards rather than at a gate, so that record is what they read.
 
-**Adoption is given once, in advance.** The instruction that entered the mode is the adoption signal for the run, so both prompts that would otherwise block are self-adopted: write the Step 2 skeleton and keep going, and move from the finished plan into Step 5 without showing it for approval. Record `Ship: PR after implementation` in the dashboard — the mode takes the implement-and-open-a-PR shape (option b) of Step 4's adopt prompt.
+**Adoption is given once, in advance.** The instruction that entered the mode is the adoption signal for the run, so both prompts that would otherwise block are self-adopted: write the Step 2 skeleton and keep going, and move from the finished plan into Step 5 without showing it for approval. Record `Ship: PR after implementation` in the dashboard — the mode takes the implement-and-open-a-PR shape of Step 4's adopt prompt.
 
 **What still stops the run: one short list, printed before implementation starts.** Three things reach it, each resolved with the user before Step 5 begins:
 
@@ -44,7 +44,7 @@ One further intent, and the only one scoped to the session rather than to the it
 - A Step 3.5 finding the review flagged rather than repaired. Flagged findings are the gate's business, and there is no gate here, so a flagged false factual claim would otherwise be built with nobody having seen it.
 - A question the sources above do not answer.
 
-Print the list, then offer to walk it the way Step 4's adopt prompt offers to walk its triaged entries (its option d) — one question per turn, each item restated in full, per Walking the flagged entries. There is no gate in this mode, so this is where that offer lives. Declining is itself the answer to the list: the user has read it and said go, and Step 5 starts. What the offer replaces is a list the user can only act on by naming entries back at you.
+Print the list, then offer to walk it the way Step 4's adopt prompt offers to walk its triaged entries — one question per turn, each item restated in full, per Walking the flagged entries. There is no gate in this mode, so this is where that offer lives. Declining is itself the answer to the list: the user has read it and said go, and Step 5 starts. What the offer replaces is a list the user can only act on by naming entries back at you.
 
 Nothing waives that list, including a spoken "just go, don't check with me" — that instruction is what entering the mode already means, and the list is what it was traded against. A run with nothing on the list says so in one line and proceeds. Everything else runs without interruption, which is the point of the mode.
 ### Step 3. Interview phase

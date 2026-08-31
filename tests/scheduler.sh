@@ -110,10 +110,32 @@ has "$WORK/plan/run-manifest.tsv" $'\twaiting\t' 'auto-mode dependency wait was 
 recover="$WORK/recover.out"
 "$SCHEDULER" recover --manifest "$WORK/plan/run-manifest.tsv" --item 2 > "$recover"
 has "$recover" 'RECOVERY=continue-handle' 'blocked node lost its live-handle recovery path'
+# `recover` says what comes next, and says it as the whole invocation: `claim`
+# writes --handle and --worktree straight through, so a caller told only to
+# claim can re-claim with placeholders and lose the retained worktree.
+has "$recover" \
+  "NEXT=$SCHEDULER claim --manifest $WORK/plan/run-manifest.tsv --item 2 --handle agent-1 --worktree $WORK/wt-1" \
+  'blocked node did not name the whole claim invocation as its next step'
 "$SCHEDULER" set-handle --manifest "$WORK/plan/run-manifest.tsv" --item 2 --handle - >/dev/null
 "$SCHEDULER" recover --manifest "$WORK/plan/run-manifest.tsv" --item 2 > "$recover"
 has "$recover" 'RECOVERY=fresh-worker' 'blocked node could not recover without a live handle'
 has "$recover" "WORKTREE=$WORK/wt-1" 'handle-free recovery omitted its retained worktree'
+# `-` is a real column value, not a null: a claim carrying it through is the
+# placeholder re-claim that destroys the state `recover` exists to report.
+has "$recover" 'NEXT=first supply a fresh worker for its handle, then run: ' \
+  'handle-free recovery did not name the step that produces the missing handle'
+has "$recover" '--handle <new-handle>' \
+  'handle-free recovery did not mark the handle as a value the caller must supply'
+hasnt "$recover" '--handle -' 'recover proposed a claim that writes a placeholder handle through'
+# A pending isolated node: dispatch, and it has no worktree allocated yet,
+# so that step is named too rather than passed through as `-`.
+"$SCHEDULER" recover --manifest "$WORK/plan/run-manifest.tsv" --item 3 > "$recover"
+has "$recover" 'RECOVERY=dispatch' 'a pending node lost its dispatch recovery path'
+has "$recover" '--worktree ' 'a pending isolated node named no worktree argument at all'
+hasnt "$recover" '--worktree -' 'recover proposed a claim that writes a placeholder worktree through'
+# Read-only diagnostic: no status is rewritten by asking what to do next.
+has "$WORK/plan/run-manifest.tsv" $'\tblocked\t' 'recover mutated the blocked item it reported on'
+has "$WORK/plan/run-manifest.tsv" $'\twaiting\t' 'recover mutated the waiting item it reported on'
 
 "$SCHEDULER" check-dirty --repo "$WORK/repo" \
   --snapshot "$WORK/plan/dirty.tsv" --manifest "$WORK/plan/run-manifest.tsv" \
@@ -216,6 +238,10 @@ if "$SCHEDULER" finish-check --manifest "$WORK/plan/terminal-manifest.tsv" \
 fi
 has "$WORK/finish-check.out" $'ACTIVE\t1\tcheckpointed' \
   'the finish gate did not identify an unintegrated checkpoint'
+"$SCHEDULER" recover --manifest "$WORK/plan/terminal-manifest.tsv" --item 1 > "$recover"
+has "$recover" \
+  "NEXT=$SCHEDULER integrate --manifest $WORK/plan/terminal-manifest.tsv --item 1 --commit abc123" \
+  'a checkpointed node did not name its integration by the commit it recorded'
 "$SCHEDULER" integrate --manifest "$WORK/plan/terminal-manifest.tsv" --item 1 \
   --commit abc123 >/dev/null
 "$SCHEDULER" finish-check --manifest "$WORK/plan/terminal-manifest.tsv" \
@@ -224,6 +250,76 @@ has "$WORK/finish-check.out" 'STATUS=complete' \
   'a fully integrated manifest did not pass the finish gate'
 has "$WORK/finish-check.out" 'ACTIVE_COUNT=0' \
   'the complete finish gate reported active work'
+"$SCHEDULER" recover --manifest "$WORK/plan/terminal-manifest.tsv" --item 1 > "$recover"
+has "$recover" 'NEXT=nothing; this item is integrated' \
+  'an integrated node proposed further work'
+
+# ─── `ready` is a dispatch list, so it withholds a held original tree ─────────
+# One original worktree holds one worker. `block` and `interrupt` write only the
+# status and never release the worktree column, so all four claimed-and-not-yet-
+# integrated statuses hold the tree, not `running` alone. The carve-out: a
+# `reuse` continuation whose immediate cohort predecessor is `checkpointed` is
+# exactly what `ready` exists to release. `claim` keeps its own dependency gate,
+# so a withheld node asked for by number is still claimable.
+cat > "$WORK/plan/hold-nodes.tsv" <<'EOF'
+ITEM	DEPS	LEASES	COHORT	CONTEXT	DIRTY_STATE
+1	-	hold/a	hold-chain	fresh	clean
+2	1	hold/b	hold-chain	reuse	clean
+3	-	hold/c	-	fresh	clean
+EOF
+hold_manifest="$WORK/plan/hold-manifest.tsv"
+hold_ready="$WORK/hold-ready.out"
+build_hold() {
+  "$SCHEDULER" build --root "$WORK/plan" --nodes "$WORK/plan/hold-nodes.tsv" \
+    --manifest "$hold_manifest" --source-root "$WORK/repo" --source-head head \
+    --dirty-snapshot "$WORK/plan/dirty.tsv" --repo-mode non-git >/dev/null
+}
+build_hold
+has "$hold_manifest" $'1\t-\thold/a\thold-chain\tfresh\tclean\t1\toriginal' \
+  'the holding fixture did not build node 1 into the original tree'
+has "$hold_manifest" $'3\t-\thold/c\t-\tfresh\tclean\t3\toriginal' \
+  'the holding fixture did not build node 3 into the original tree'
+"$SCHEDULER" ready --manifest "$hold_manifest" > "$hold_ready"
+has "$hold_ready" $'READY\t1\t' 'an unheld original node was not ready'
+has "$hold_ready" $'READY\t3\t' 'a second unheld original node was not ready'
+
+for holding in running blocked interrupted; do
+  build_hold
+  "$SCHEDULER" claim --manifest "$hold_manifest" --item 1 \
+    --handle hold-agent --worktree "$WORK/hold-wt" >/dev/null
+  case "$holding" in
+    blocked) "$SCHEDULER" block --manifest "$hold_manifest" --item 1 \
+      --handoff handoffs/item-1.md >/dev/null ;;
+    interrupted) "$SCHEDULER" interrupt --manifest "$hold_manifest" --item 1 >/dev/null ;;
+  esac
+  "$SCHEDULER" ready --manifest "$hold_manifest" > "$hold_ready"
+  hasnt "$hold_ready" $'READY\t3\t' \
+    "ready reported a second original node while item 1 was $holding"
+  # The withheld node is still dependency-ready, and `claim` must say so by
+  # claiming it rather than by refusing with a cause that is not true.
+  cp "$hold_manifest" "$WORK/plan/hold-claim.tsv"
+  "$SCHEDULER" claim --manifest "$WORK/plan/hold-claim.tsv" --item 3 \
+    --handle hold-agent-3 --worktree "$WORK/hold-wt-3" > "$WORK/hold-claim.out" \
+    2>"$WORK/hold-claim.err" \
+    || fail "claim refused a withheld but dependency-ready node while item 1 was $holding"
+  has "$WORK/hold-claim.out" 'STATUS=running' \
+    "claim did not run a withheld node while item 1 was $holding"
+  if [ "$holding" = interrupted ]; then
+    has "$hold_ready" $'READY\t1\t' 'an interrupted node lost its own recovery slot'
+  fi
+done
+
+build_hold
+"$SCHEDULER" claim --manifest "$hold_manifest" --item 1 \
+  --handle hold-agent --worktree "$WORK/hold-wt" >/dev/null
+"$SCHEDULER" checkpoint --manifest "$hold_manifest" --item 1 \
+  --result results/item-1.txt --commit ddd444 --actual-profile judgment \
+  --actual-model frontier --actual-effort high >/dev/null
+"$SCHEDULER" ready --manifest "$hold_manifest" > "$hold_ready"
+has "$hold_ready" $'READY\t2\t' \
+  'a checkpointed cohort predecessor did not release its own reuse continuation'
+hasnt "$hold_ready" $'READY\t3\t' \
+  'ready reported an unrelated original node while a checkpoint still held the tree'
 
 # ─── pln's own follow-up queue is not the user's uncommitted work ─────────────
 # A door that files mid-run writes an untracked detail file and rewrites a

@@ -638,6 +638,7 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   has "$f" '### Message shape' "$f lost the shared message shapes"
   has "$f" '### Conversational voice' "$f lost the host voice fragment inside Style"
   has "$f" '### Echoing recorded decisions' "$f lost the shared formatting rules"
+  has "$f" 'never an action not yet taken' "$f lost the shared forward-tense rule"
 done
 
 for host_out in "$real_c" "$real_x"; do
@@ -790,6 +791,17 @@ for host_out in "$real_c" "$real_x"; do
   done < <(grep -rlF 'bin/pln-queue' "$host_out")
   [ "$queue_callers" = "12" ] \
     || fail "$host_out names the queue helper in $queue_callers files, expected 12"
+  # The implementation phase's pre-message readiness check has the same hazard
+  # and the same answer: the absolute output root, never {{SKILL_DIR}}, since
+  # /pln-simplify routes into this phase document and never sets $_PLN_DIR.
+  # Scoped to the `ready` invocation, because the snapshot/build/finish-check
+  # calls in this file are deliberately SKILL_DIR-relative.
+  has "$host_out/phases/pln/implementation.md" "$host_out/bin/pln-scheduler ready" \
+    "$host_out/phases/pln/implementation.md names the readiness check by an unresolved or relative path"
+  hasnt "$host_out/phases/pln/implementation.md" '_PLN_DIR/bin/pln-scheduler ready' \
+    "$host_out/phases/pln/implementation.md reaches the readiness check through a Codex shell variable"
+  hasnt "$host_out/phases/pln/implementation.md" 'CLAUDE_SKILL_DIR}/bin/pln-scheduler ready' \
+    "$host_out/phases/pln/implementation.md reaches the readiness check through a Claude variable"
 done
 
 # The peer ladder is one shared source both skills read, and the property that

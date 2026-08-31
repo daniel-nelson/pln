@@ -63,6 +63,7 @@ This skill follows pln's discipline. Never call the `AskUserQuestion` tool. Surf
 - **Reviewers run in fresh context.** Every reviewer and fix agent is a blank-slate agent. The orchestrator does not read code or apply fixes itself.
 - **Findings are durable, best-effort.** Merged findings live in `REVIEW.md` before any fix runs, and Step 1 resumes an existing ledger rather than re-reviewing from scratch. Resume is best-effort, not transactional: a fix commit lands before its status is written back, so a crash in that narrow window can leave a fixed finding still marked `open` — on resume, re-checking it is cheap and safe, so prefer re-running a possibly-done fix over skipping a possibly-open one.
 - **Commit discipline:** commit only complete, verified work with the co-author trailer; never `--amend`, never `--no-verify`, never `git add -A` (stage fixed files by name).
+<!-- pln:include next-action -->
 
 <!-- pln:include model-routing-policy -->
 

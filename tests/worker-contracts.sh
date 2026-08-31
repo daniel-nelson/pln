@@ -56,6 +56,9 @@ has "$envelope" 'ACTUAL_PROFILE:' 'result envelopes do not attribute the actual 
 has "$envelope" 'ACTUAL_MODEL:' 'result envelopes do not attribute the actual model'
 has "$envelope" 'ACTUAL_EFFORT:' 'result envelopes do not attribute the actual effort'
 has "$envelope" 'ESCALATE:' 'result envelopes do not carry evidence-to-frontier escalation'
+has "$envelope" 'Measure and trim before you finalize' \
+  'envelope contract lost its measure-and-trim step'
+has "$envelope" 'wc -c' 'envelope contract no longer names how to measure the result'
 has "$implementation" 'When it says `worker`' 'implementation contract lost worker commit ownership'
 has "$implementation" 'When it says `coordinator`' 'implementation contract lost coordinator commit ownership'
 has "$implementation" 'host assignment owns which value applies' \

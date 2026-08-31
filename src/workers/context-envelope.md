@@ -41,6 +41,7 @@ Rules:
 - Evidence workers write `ESCALATE: frontier` as soon as the assigned question stops being mechanically closed or crosses a semantic-risk boundary. Other workers write `ESCALATE: none`.
 - Every factual claim that could change the plan needs an exact durable reference. Use line numbers where the source format supports them.
 - Keep raw command output, long excerpts, exhaustive file lists, and discarded paths in the evidence file, never the envelope.
+- Measure and trim before you finalize, rather than learning the limit from a rejection. Write the draft envelope to the result path, measure it with `wc -c`, and while it exceeds the assigned budget, trim and measure again: move detail into the evidence file, cut `SUMMARY` to what changes a decision, and drop references that support no decision-relevant claim. Every field above stays present at every size — trim what a field says, never the field itself. Do not report the result until a measurement shows it fits.
 - Do not implement, edit product files, commit, or broaden the assigned scope.
 - Your final chat response is exactly one line: `RESULT_FILE=<absolute envelope path>`.
 

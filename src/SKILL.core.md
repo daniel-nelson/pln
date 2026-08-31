@@ -59,6 +59,7 @@ If the user gives a single small task, don't engage; just do the work. The skill
 - **When notifications are on, fire them before writing the user-facing text, not after.** Before every turn that waits for user input, {{NOTIFY_CALL}} (it self-gates) in the same turn; also fire it before completion. This includes readiness, outline, adoption, recovery, trust, interview, and blocker questions. This is not a "when convenient" aside: a trailing tool call gets dropped mid-turn. Fire first, then write.
 <!-- pln:endonly -->
 - **Never report the state of pln's own machinery without checking it first.** Why a mechanism did not run — the peer review, a notification, a subagent, a verification step — and what the pipeline did or did not do are readable facts: the helper's own output, `pln-config`, `PLAN.md`, the transcript. Read one before you tell the user; never infer it from what the mechanism was supposed to do. `pln-peer --which` reports `STATUS=ready` on rungs 1 and 2 because one session read the older `STATUS=none` as "no peer available" and skipped a cross-model review with the peer installed, authenticated and consented.
+<!-- pln:include next-action -->
 
 <!-- pln:include style -->
 
@@ -112,9 +113,9 @@ Everything else is the work. Make the least-scope repair that restores what the 
 
 **What "record it" is not: a channel to the user.** Assume they never open `PLAN.md`. The record exists for the implementer who builds from it, the reviewer who argues with it, and for auditing this filter the next time it is wrong. That is exactly why the fork test has to be right rather than generous — nothing that clears it may be left to the record instead.
 
-**Two tells, in both directions.** Too generous: **the user ratifies** — a question or finding answered with "yes, add it", a bare selector, or "sure" had one answer, and the round trip bought nothing. Too tight: the user meets something at implementation and asks why it was decided that way. The first is the common failure by a wide margin; the second is the one that costs more when it happens.
+**Two tells, in both directions.** Too generous: **the user ratifies** — a question or finding answered with "yes, add it", a bare selector, or "sure" had one answer, and the round trip bought nothing. Too tight: the user meets something at implementation and asks why it was decided that way.
 
-**A call that clears the test is said where it is made**, not saved for the gate. The gate carries a decision and its rationale but never the option that lost, so a fork disclosed only there has already vanished by the time the user reads it. One line in the flow — what you are doing, what you are not, and the fact that decides it — requiring no reply (see Style's "A recommendation is a statement, not a question"). The user's corrections in a real interview come as "that's the wrong framing" far more often than as "I pick (b)", and they can only arrive if the framing was visible. It is also repeated at the gate with a number: the flow line lands mid-interview inside a message about something else, and a line read past is not a decision ratified.
+**A call that clears the test is said where it is made**, not saved for the gate. The gate carries a decision and its rationale but never the option that lost, so a fork disclosed only there has already vanished by the time the user reads it. One line in the flow — what you are doing, what you are not, and the fact that decides it — requiring no reply (see Style's "A recommendation is a statement, not a question"). It is also repeated at the gate with a number: the flow line lands mid-interview inside a message about something else, and a line read past is not a decision ratified.
 
 ### One filter, two surfaces
 

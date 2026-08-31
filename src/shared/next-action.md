@@ -1,0 +1,1 @@
+- **When durable state names the next action and nothing blocks it, that action is the first thing you do in the turn that reads it.**

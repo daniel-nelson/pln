@@ -110,10 +110,32 @@ has "$WORK/plan/run-manifest.tsv" $'\twaiting\t' 'auto-mode dependency wait was 
 recover="$WORK/recover.out"
 "$SCHEDULER" recover --manifest "$WORK/plan/run-manifest.tsv" --item 2 > "$recover"
 has "$recover" 'RECOVERY=continue-handle' 'blocked node lost its live-handle recovery path'
+# `recover` says what comes next, and says it as the whole invocation: `claim`
+# writes --handle and --worktree straight through, so a caller told only to
+# claim can re-claim with placeholders and lose the retained worktree.
+has "$recover" \
+  "NEXT=$SCHEDULER claim --manifest $WORK/plan/run-manifest.tsv --item 2 --handle agent-1 --worktree $WORK/wt-1" \
+  'blocked node did not name the whole claim invocation as its next step'
 "$SCHEDULER" set-handle --manifest "$WORK/plan/run-manifest.tsv" --item 2 --handle - >/dev/null
 "$SCHEDULER" recover --manifest "$WORK/plan/run-manifest.tsv" --item 2 > "$recover"
 has "$recover" 'RECOVERY=fresh-worker' 'blocked node could not recover without a live handle'
 has "$recover" "WORKTREE=$WORK/wt-1" 'handle-free recovery omitted its retained worktree'
+# `-` is a real column value, not a null: a claim carrying it through is the
+# placeholder re-claim that destroys the state `recover` exists to report.
+has "$recover" 'NEXT=first supply a fresh worker for its handle, then run: ' \
+  'handle-free recovery did not name the step that produces the missing handle'
+has "$recover" '--handle <new-handle>' \
+  'handle-free recovery did not mark the handle as a value the caller must supply'
+hasnt "$recover" '--handle -' 'recover proposed a claim that writes a placeholder handle through'
+# A pending isolated node: dispatch, and it has no worktree allocated yet,
+# so that step is named too rather than passed through as `-`.
+"$SCHEDULER" recover --manifest "$WORK/plan/run-manifest.tsv" --item 3 > "$recover"
+has "$recover" 'RECOVERY=dispatch' 'a pending node lost its dispatch recovery path'
+has "$recover" '--worktree ' 'a pending isolated node named no worktree argument at all'
+hasnt "$recover" '--worktree -' 'recover proposed a claim that writes a placeholder worktree through'
+# Read-only diagnostic: no status is rewritten by asking what to do next.
+has "$WORK/plan/run-manifest.tsv" $'\tblocked\t' 'recover mutated the blocked item it reported on'
+has "$WORK/plan/run-manifest.tsv" $'\twaiting\t' 'recover mutated the waiting item it reported on'
 
 "$SCHEDULER" check-dirty --repo "$WORK/repo" \
   --snapshot "$WORK/plan/dirty.tsv" --manifest "$WORK/plan/run-manifest.tsv" \
@@ -216,6 +238,10 @@ if "$SCHEDULER" finish-check --manifest "$WORK/plan/terminal-manifest.tsv" \
 fi
 has "$WORK/finish-check.out" $'ACTIVE\t1\tcheckpointed' \
   'the finish gate did not identify an unintegrated checkpoint'
+"$SCHEDULER" recover --manifest "$WORK/plan/terminal-manifest.tsv" --item 1 > "$recover"
+has "$recover" \
+  "NEXT=$SCHEDULER integrate --manifest $WORK/plan/terminal-manifest.tsv --item 1 --commit abc123" \
+  'a checkpointed node did not name its integration by the commit it recorded'
 "$SCHEDULER" integrate --manifest "$WORK/plan/terminal-manifest.tsv" --item 1 \
   --commit abc123 >/dev/null
 "$SCHEDULER" finish-check --manifest "$WORK/plan/terminal-manifest.tsv" \
@@ -224,6 +250,9 @@ has "$WORK/finish-check.out" 'STATUS=complete' \
   'a fully integrated manifest did not pass the finish gate'
 has "$WORK/finish-check.out" 'ACTIVE_COUNT=0' \
   'the complete finish gate reported active work'
+"$SCHEDULER" recover --manifest "$WORK/plan/terminal-manifest.tsv" --item 1 > "$recover"
+has "$recover" 'NEXT=nothing; this item is integrated' \
+  'an integrated node proposed further work'
 
 # ─── `ready` is a dispatch list, so it withholds a held original tree ─────────
 # One original worktree holds one worker. `block` and `interrupt` write only the

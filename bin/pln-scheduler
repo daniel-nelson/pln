@@ -171,6 +171,23 @@ ready_rows() {
   ' "$1"
 }
 
+# The `claim` invocation `recover` should be followed by, printed whole because
+# `claim` writes --handle and --worktree straight through and a retained
+# worktree is a blocked node's only recovery anchor. `-` is a real column value
+# here, never a null, so a missing handle or worktree is named as the step that
+# has to produce it first rather than passed through as an argument.
+recover_claim_next() {
+  local manifest="$1" item="$2" handle="$3" worktree="$4" needs=""
+  if [ "$handle" = "-" ]; then handle="<new-handle>"; needs="a fresh worker for its handle"; fi
+  if [ "$worktree" = "-" ]; then
+    worktree="<worktree>"
+    if [ -n "$needs" ]; then needs="$needs and a worktree"; else needs="a worktree"; fi
+  fi
+  [ -z "$needs" ] || printf 'first supply %s, then run: ' "$needs"
+  printf '%s claim --manifest %s --item %s --handle %s --worktree %s\n' \
+    "$0" "$manifest" "$item" "$handle" "$worktree"
+}
+
 manifest_meta() {
   awk -F '\t' -v key="$2" '$1 == "META" && $2 == key { print $3; found=1 } END { if (!found) exit 1 }' "$1"
 }
@@ -483,20 +500,38 @@ case "$command" in
       blocked)
         [ "$handoff" != "-" ] && [ "$worktree" != "-" ] || fail "blocked item lacks handoff or worktree recovery state"
         if [ "$handle" = "-" ]; then recovery="fresh-worker"; else recovery="continue-handle"; fi
+        next="$(recover_claim_next "$manifest" "$item" "$handle" "$worktree")"
         ;;
       interrupted)
         [ "$worktree" != "-" ] || fail "interrupted item lacks a retained worktree"
         recovery="fresh-worker"
+        # fresh-worker means a new handle whatever the manifest still records.
+        next="$(recover_claim_next "$manifest" "$item" "-" "$worktree")"
         ;;
       running) fail "running item has conflicting recovery state; interrupt or reconcile it first" ;;
-      checkpointed) recovery="integrate" ;;
-      integrated) recovery="complete" ;;
-      pending | waiting) recovery="dispatch" ;;
-      failed) recovery="fresh-worker" ;;
+      checkpointed)
+        recovery="integrate"
+        if [ "$commit" = "-" ]; then
+          next="first record this item's commit, then run: $0 integrate --manifest $manifest --item $item --commit <commit>"
+        else
+          next="$0 integrate --manifest $manifest --item $item --commit $commit"
+        fi
+        ;;
+      integrated) recovery="complete"; next="nothing; this item is integrated" ;;
+      pending | waiting)
+        recovery="dispatch"
+        next="$(recover_claim_next "$manifest" "$item" "-" "$worktree")"
+        ;;
+      failed)
+        recovery="fresh-worker"
+        # The manifest admits no transition out of `failed`, so proposing a
+        # claim here would name a command that cannot run.
+        next="no transition out of failed; reconcile this item in the manifest before any claim"
+        ;;
       *) fail "unknown status for item $item" ;;
     esac
-    printf 'ITEM=%s\nSTATUS=%s\nRECOVERY=%s\nHANDLE=%s\nHANDOFF=%s\nWORKTREE=%s\nRESULT=%s\nCOMMIT=%s\n' \
-      "$item" "$status" "$recovery" "$handle" "$handoff" "$worktree" "$result" "$commit"
+    printf 'ITEM=%s\nSTATUS=%s\nRECOVERY=%s\nHANDLE=%s\nHANDOFF=%s\nWORKTREE=%s\nRESULT=%s\nCOMMIT=%s\nNEXT=%s\n' \
+      "$item" "$status" "$recovery" "$handle" "$handoff" "$worktree" "$result" "$commit" "$next"
     ;;
 
   finish-check)

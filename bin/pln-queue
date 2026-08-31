@@ -22,7 +22,7 @@ Usage:
                 [--state "[ ]"|"[-]"|"[x]"] [--urgent] [--group TEXT] [--opened YYYY-MM-DD]
                 [--depends-on CSV] [--touches CSV] [--holds CSV] [--body FILE|-]
   pln-queue list [--project DIR]
-  pln-queue check --id ID [--against CSV]
+  pln-queue check --id ID [--against CSV] [--run TEXT]
   pln-queue claim --id ID --run TEXT [--against CSV] [--steal HOLDER]
   pln-queue mark --id ID [--state S] [--status S] [--urgent true|false] [--group TEXT]
                  [--touches CSV] [--holds CSV] [--depends-on CSV] [--source TEXT]
@@ -428,7 +428,9 @@ take_lock() {
 detail_path() { printf '%s/%s/%s.md\n' "$QUEUE_ROOT" "$LIVE_DIR" "$1"; }
 
 # One tab-separated record per detail file:
-#   id  state  urgent  status  opened  group  claimed_by  claimed_at  claim
+#   id  state  urgent  status  opened  group  claimed_by  claimed_at  claim  claimed_in
+# `claimed_in` is last because it is additive: a record written before it existed
+# reads back empty, which matches no claiming worktree and so exempts nothing.
 parse_detail() {
   local file="$1"
   LC_ALL=C awk -v file="$file" '
@@ -450,8 +452,8 @@ parse_detail() {
       }
       if (claim == "") { print "pln-queue: detail file has no leading `# <claim>` heading: " file > "/dev/stderr"; exit 1 }
       urgent = (v["urgent"] == "true") ? "true" : "false"
-      printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", v["id"], v["state"], urgent, v["status"], \
-        v["opened"], v["group"], v["claimed_by"], v["claimed_at"], claim
+      printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", v["id"], v["state"], urgent, v["status"], \
+        v["opened"], v["group"], v["claimed_by"], v["claimed_at"], claim, v["claimed_in"]
     }
   ' "$file"
 }
@@ -555,9 +557,26 @@ index_line_for() {
 # ----------------------------------------------------------------- the overlap
 
 overlap_report() {
-  # $1 = subject id, $2 = other id. One COLLISION line per shared claim.
-  local a="$1" b="$2" af bf ta tb ha hb x y hit=0
+  # $1 = subject id, $2 = other id, $3 = the run asking, $4 = the worktree it is
+  # asking from ('' for either = no exemption). One COLLISION line per shared
+  # claim; an EXEMPT line where a path overlap was passed over.
+  #
+  # The exemption lives here, per pair, and never in the derivation of the
+  # compared set: one pair can emit both a `path` and a `resource` collision, so
+  # dropping the item from the set would drop its `holds` check with it. It
+  # covers `path` only — a shared `holds` resource, and an undeclared `touches`,
+  # keep refusing whoever asks.
+  local a="$1" b="$2" run="${3:-}" wt="${4:-}" af bf ta tb ha hb x y hit=0
+  local exempt=0 other_rec other_run other_wt
   af="$(detail_path "$a")"; bf="$(detail_path "$b")"
+  if [ -n "$run" ] && [ -n "$wt" ]; then
+    other_rec="$(parse_detail "$bf")" || other_rec=''
+    other_run="$(printf '%s' "$other_rec" | LC_ALL=C cut -f7)"
+    other_wt="$(printf '%s' "$other_rec" | LC_ALL=C cut -f10)"
+    if [ -n "$other_run" ] && [ "$other_run" = "$run" ] && [ "$other_wt" = "$wt" ]; then
+      exempt=1
+    fi
+  fi
   ta="$(detail_list "$af" touches)"
   tb="$(detail_list "$bf" touches)"
   ha="$(detail_list "$af" holds)"
@@ -576,8 +595,12 @@ overlap_report() {
         # Prefix containment in either direction: a directory entry is a claim on
         # a region, not a string to match.
         if [ "$x" = "$y" ] || [ "${x#"$y"/}" != "$x" ] || [ "${y#"$x"/}" != "$y" ]; then
-          printf 'COLLISION\t%s\tpath\t%s\n' "$b" "$x"
-          hit=1
+          if [ "$exempt" = 1 ]; then
+            printf 'EXEMPT\t%s\tpath\t%s\n' "$b" "$x"
+          else
+            printf 'COLLISION\t%s\tpath\t%s\n' "$b" "$x"
+            hit=1
+          fi
         fi
       done <<EOF
 $tb
@@ -612,12 +635,17 @@ claimed_ids() {
 }
 
 run_check() {
-  # $1 = subject id, $2 = CSV of ids to compare against ('' = the claimed set).
-  local id="$1" against="$2" others other refused=0 subject_touches
+  # $1 = subject id, $2 = CSV of ids to compare against ('' = the claimed set),
+  # $3 = the run asking (or ''), $4 = the worktree it is asking from (or '').
+  local id="$1" against="$2" run="${3:-}" wt="${4:-}"
+  local others other refused=0 subject_touches
   subject_touches="$(detail_list "$(detail_path "$id")" touches)"
 
   if [ -n "$against" ]; then
     others="$(csv_to_lines "$against")"
+    # A caller-named set is honored verbatim: the seam the exemption answers is
+    # in the derivation, and the caller named this set themselves.
+    run=''; wt=''
   else
     others="$(claimed_ids)"
   fi
@@ -633,7 +661,7 @@ run_check() {
     [ -n "$other" ] || continue
     [ "$other" != "$id" ] || continue
     [ -f "$(detail_path "$other")" ] || fail "no such queue item: $other"
-    if ! overlap_report "$id" "$other"; then refused=1; fi
+    if ! overlap_report "$id" "$other" "$run" "$wt"; then refused=1; fi
   done <<EOF
 $others
 EOF
@@ -851,25 +879,29 @@ case "$command" in
     ;;
 
   check)
-    id=''; against=''
+    id=''; against=''; run=''
     while [ $# -gt 0 ]; do
       case "$1" in
         --project) project="${2:-}"; shift 2 ;;
         --id) id="${2:-}"; shift 2 ;;
         --against) against="${2:-}"; shift 2 ;;
+        --run) run="${2:-}"; shift 2 ;;
         --no-create) create_flag=0; shift ;;
         *) usage ;;
       esac
     done
     [ -n "$id" ] || usage
+    [ -z "$run" ] || single_line 'run' "$run"
     project_context "$project"
     resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
     load_header
     report_resolution
     [ -f "$(detail_path "$id")" ] || fail "no such queue item: $id"
     # Advisory by contract: two runs can both read a clear result, which is why
-    # `claim` exists and why a refusal here is not an error.
-    run_check "$id" "$against" || true
+    # `claim` exists and why a refusal here is not an error. Advisory is allowed
+    # to be conservative, never to disagree: without `--run` this reports every
+    # overlap, and `--run R` sees exactly what `claim --run R` would see.
+    run_check "$id" "$against" "$run" "$PROJECT_TOP" || true
     ;;
 
   claim)
@@ -909,7 +941,7 @@ case "$command" in
       fi
     fi
     set +e
-    check_out="$(run_check "$id" "$against")"
+    check_out="$(run_check "$id" "$against" "$run" "$PROJECT_TOP")"
     check_rc=$?
     set -e
     printf '%s\n' "$check_out"
@@ -919,6 +951,10 @@ case "$command" in
     fi
     set_field "$detail" 'claimed_by' "$run"
     set_field "$detail" 'claimed_at' "$(today)"
+    # The worktree travels with the run because a run string is not unique on its
+    # own: two repositories whose instructions declare one queue root can carry
+    # the same `<date>-<slug>` on one day, with no scheduler edge between them.
+    set_field "$detail" 'claimed_in' "$PROJECT_TOP"
     write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
     release_lock
     if [ -n "$holder" ] && [ "$holder" != "$run" ]; then printf 'STOLEN_FROM=%s\n' "$holder"; fi

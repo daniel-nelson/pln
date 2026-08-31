@@ -507,6 +507,115 @@ refused "claiming an item that collides with the held set" claim --project "$R" 
 said 'CHECK=refused' "a colliding claim did not report the collision"
 hasnt "$R/pln/q/overlapping.md" 'claimed_by' "a refused claim recorded a holder anyway"
 
+# ─── the same-run path exemption ──────────────────────────────────────────────
+# A run's own path overlaps are already scheduler ordering, so refusing them a
+# second time stops a plan from claiming the items it exists to do. The exemption
+# is per pair and covers `path` alone: `resource`, `unknown` and a foreign run
+# keep refusing, and the identity that unlocks it is the run string *and* the
+# worktree it claimed from.
+R="$WORK/same-run"
+new_repo "$R"
+mkq() { ok "filing $1" add --project "$R" --id "$1" --claim "$1" --source s "${@:2}"; }
+mkq head --touches 'app/shared.rb'
+mkq tail --touches 'app/shared.rb'
+mkq probe --touches 'app/shared.rb'
+mkq stranger --touches 'app/shared.rb'
+mkq both-a --touches 'app/both.rb' --holds 'staging-deploy'
+mkq both-b --touches 'app/both.rb' --holds 'staging-deploy'
+
+ok "claiming the first item of the run" claim --project "$R" --id head --run plan-1
+said 'CLAIM=held' "the first claim of a run was not granted"
+has "$R/pln/q/head.md" 'claimed_by: plan-1' "the claim did not record the run"
+has "$R/pln/q/head.md" "claimed_in: $R" \
+  "the claim record does not carry the worktree it was claimed from"
+
+# The same run, from the same worktree, on a path-overlapping item.
+ok "claiming a path-overlapping item for the same run" claim --project "$R" --id tail --run plan-1
+said 'CLAIM=held' "a run was refused its own path overlap"
+said $'EXEMPT\thead\tpath\tapp/shared.rb' \
+  "the exempted claim did not name the same-run overlap it passed over"
+said 'CHECK=clear' "an exempted claim did not report the check as clear"
+
+# A shared `holds` resource keeps refusing, including for the pair that shares
+#    a path *and* a resource — the case a set-derivation exemption would drop.
+ok "claiming the first of the two resource holders" claim --project "$R" --id both-a --run plan-1
+refused "claiming a same-run item that shares a holds resource" claim --project "$R" \
+  --id both-b --run plan-1
+said $'COLLISION\tboth-a\tresource\tstaging-deploy' \
+  "a same-run resource collision was not refused, or did not name the resource"
+said $'EXEMPT\tboth-a\tpath\tapp/both.rb' \
+  "the same pair's path overlap was not exempted alongside the resource refusal"
+hasnt "$R/pln/q/both-b.md" 'claimed_by' "a resource-colliding claim recorded a holder anyway"
+
+# A different run is refused, unchanged, naming the item and what it shares.
+refused "claiming a path-overlapping item for a different run" claim --project "$R" \
+  --id stranger --run plan-2
+said $'COLLISION\thead\tpath\tapp/shared.rb' \
+  "a foreign run's path collision was not refused, or did not name the item and path"
+didnt_say 'EXEMPT' "a foreign run's claim reported an exemption"
+
+# `--against` is honored verbatim: the caller named that set, so nothing in it
+#    is exempt.
+ok "checking a same-run pair through an explicit --against" check --project "$R" \
+  --id probe --against head --run plan-1
+said 'CHECK=refused' "--against was given the same-run exemption"
+said $'COLLISION\thead\tpath\tapp/shared.rb' "--against did not report the overlap it was handed"
+
+# `check` never reports clear where `claim` would refuse. Run-less it is
+#    conservative; with `--run` it agrees with `claim --run` exactly.
+ok "checking without a run" check --project "$R" --id probe
+said 'CHECK=refused' "a run-less check passed over an overlap it cannot attribute"
+said $'COLLISION\thead\tpath\tapp/shared.rb' "a run-less check did not name the overlap"
+ok "checking with the run that holds the overlap" check --project "$R" --id probe --run plan-1
+said 'CHECK=clear' "check --run disagreed with what claim --run would grant"
+said $'EXEMPT\thead\tpath\tapp/shared.rb' "check --run did not name the overlap it passed over"
+ok "checking a resource collision with its own run" check --project "$R" --id both-b --run plan-1
+said 'CHECK=refused' "check --run reported clear for a pair claim --run refuses"
+
+# An undeclared `touches` on either side keeps refusing, same run or not: an
+# unknown write set is not a path overlap and inherits nothing from the argument
+# the exemption rests on. Its own queue, so the unknown record cannot make the
+# checks above refuse for a reason they were not testing.
+R="$WORK/same-run-unknown"
+new_repo "$R"
+mkq silent
+mkq vague --touches 'app/vague.rb'
+mkq later --touches 'app/later.rb'
+refused "claiming a same-run item that declares no touches" claim --project "$R" \
+  --id silent --run plan-1
+said 'silent declares no touches' "an item with unknown writes was claimable by its own run"
+ok "claiming an item that later loses its touches" claim --project "$R" --id vague --run plan-1
+ok "clearing the held item's touches" mark --project "$R" --id vague --touches ''
+refused "claiming against a same-run item whose writes are unknown" claim --project "$R" \
+  --id later --run plan-1
+said $'COLLISION\tvague\tunknown' \
+  "a same-run item with no touches was exempted through the unknown branch"
+
+# One run string, two worktrees: two repositories whose instructions declare
+#    one queue root meet in one queue, and the run string alone cannot separate
+#    them. The claiming worktree is what does.
+QROOT="$WORK/shared-root"
+for tree in tree-one tree-two; do
+  new_repo "$WORK/$tree"
+  printf 'pln-queue: %s\n' "$QROOT" > "$WORK/$tree/CLAUDE.md"
+done
+ok "filing into the shared root from the first tree" add --project "$WORK/tree-one" \
+  --id shared-head --claim 'shared head' --source s --touches 'app/shared.rb'
+is QUEUE_ROOT "$QROOT" "the declared root was not adopted from the first tree"
+ok "filing into the shared root from the second tree" add --project "$WORK/tree-two" \
+  --id shared-tail --claim 'shared tail' --source s --touches 'app/shared.rb'
+is QUEUE_ROOT "$QROOT" "the two trees did not resolve to one queue root"
+ok "claiming from the first tree" claim --project "$WORK/tree-one" --id shared-head --run 2026-08-31-x
+has "$QROOT/q/shared-head.md" "claimed_in: $WORK/tree-one" \
+  "the claim did not record which of the two trees it came from"
+refused "claiming the same run's overlap from another worktree" claim \
+  --project "$WORK/tree-two" --id shared-tail --run 2026-08-31-x
+said $'COLLISION\tshared-head\tpath\tapp/shared.rb' \
+  "one run string in two worktrees passed its own overlap"
+ok "claiming the same run's overlap from the worktree that holds it" claim \
+  --project "$WORK/tree-one" --id shared-tail --run 2026-08-31-x
+said 'CLAIM=held' "the claiming worktree was refused its own overlap"
+
 # ─── mark: the three markers, the flag, and the sub-item checklist ────────────
 R="$WORK/marking"
 new_repo "$R"

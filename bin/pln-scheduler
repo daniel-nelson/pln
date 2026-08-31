@@ -131,6 +131,46 @@ verify_manifest() {
   ' "$manifest" || fail "manifest is malformed or incomplete: $manifest"
 }
 
+# Dependency-ready rows. With hold_filter=1 — what the `ready` subcommand
+# prints — an `original`-execution node is withheld while another
+# `original`-execution node is claimed and not yet integrated: `running`,
+# `blocked`, `interrupted` or `checkpointed`, since `block` and `interrupt`
+# write only the status and never release the worktree column. The one
+# carve-out is a `reuse`-context continuation whose immediate cohort
+# predecessor is the `checkpointed` holder — releasing that node is what
+# `ready` exists for. `claim` calls this with hold_filter=0 so its own
+# dependency gate is unchanged and a withheld node stays claimable.
+ready_rows() {
+  awk -F '\t' -v OFS='\t' -v hold_filter="${2:-0}" '
+    $1 ~ /^[1-9][0-9]*$/ { n++; id[n]=$1; deps[n]=$2; cohort[n]=$4; context[n]=$5; wave[n]=$7; execution[n]=$8; status[$1]=$15 }
+    END {
+      for (i=1;i<=n;i++) {
+        if (status[id[i]] !~ /^(pending|waiting|interrupted)$/) continue
+        ok=1
+        if (deps[i] != "-") {
+          c=split(deps[i],a,","); for (k=1;k<=c;k++) {
+            needed="integrated"
+            if (context[i] == "reuse" && i > 1 && cohort[i] != "-" && cohort[i-1] == cohort[i] && a[k] == id[i-1])
+              needed="checkpoint-or-integrated"
+            if (needed == "integrated" && status[a[k]] != "integrated") ok=0
+            if (needed != "integrated" && status[a[k]] !~ /^(checkpointed|integrated)$/) ok=0
+          }
+        }
+        if (ok && hold_filter == 1 && execution[i] == "original") {
+          for (j=1;j<=n;j++) {
+            if (j == i || execution[j] != "original") continue
+            if (status[id[j]] !~ /^(running|blocked|interrupted|checkpointed)$/) continue
+            if (j == i-1 && status[id[j]] == "checkpointed" && context[i] == "reuse" &&
+                cohort[i] != "-" && cohort[i-1] == cohort[i]) continue
+            ok=0
+          }
+        }
+        if (ok) print "READY",id[i],wave[i],execution[i],context[i]
+      }
+    }
+  ' "$1"
+}
+
 manifest_meta() {
   awk -F '\t' -v key="$2" '$1 == "META" && $2 == key { print $3; found=1 } END { if (!found) exit 1 }' "$1"
 }
@@ -357,25 +397,7 @@ case "$command" in
     while [ $# -gt 0 ]; do case "$1" in --manifest) manifest="${2:-}"; shift 2 ;; *) usage ;; esac; done
     [ -n "$manifest" ] || usage
     verify_manifest "$manifest"
-    awk -F '\t' -v OFS='\t' '
-      $1 ~ /^[1-9][0-9]*$/ { n++; id[n]=$1; deps[n]=$2; cohort[n]=$4; context[n]=$5; wave[n]=$7; execution[n]=$8; status[$1]=$15 }
-      END {
-        for (i=1;i<=n;i++) {
-          if (status[id[i]] !~ /^(pending|waiting|interrupted)$/) continue
-          ok=1
-          if (deps[i] != "-") {
-            c=split(deps[i],a,","); for (k=1;k<=c;k++) {
-              needed="integrated"
-              if (context[i] == "reuse" && i > 1 && cohort[i] != "-" && cohort[i-1] == cohort[i] && a[k] == id[i-1])
-                needed="checkpoint-or-integrated"
-              if (needed == "integrated" && status[a[k]] != "integrated") ok=0
-              if (needed != "integrated" && status[a[k]] !~ /^(checkpointed|integrated)$/) ok=0
-            }
-          }
-          if (ok) print "READY",id[i],wave[i],execution[i],context[i]
-        }
-      }
-    ' "$manifest"
+    ready_rows "$manifest" 1
     ;;
 
   claim)
@@ -384,7 +406,8 @@ case "$command" in
       --manifest) manifest="${2:-}"; shift 2 ;; --item) item="${2:-}"; shift 2 ;;
       --handle) handle="${2:-}"; shift 2 ;; --worktree) worktree="${2:-}"; shift 2 ;; *) usage ;; esac; done
     [ -n "$manifest" ] && [ -n "$item" ] && [ -n "$handle" ] && [ -n "$worktree" ] || usage
-    ready_line="$("$0" ready --manifest "$manifest" | awk -F '\t' -v item="$item" '$2 == item { print; exit }')"
+    verify_manifest "$manifest"
+    ready_line="$(ready_rows "$manifest" 0 | awk -F '\t' -v item="$item" '$2 == item { print; exit }')"
     current_status="$(awk -F '\t' -v item="$item" '$1 == item { print $15 }' "$manifest")"
     if [ "$current_status" != "blocked" ] && [ -z "$ready_line" ]; then fail "item $item is not dependency-ready"; fi
     manifest_update "$manifest" "$item" claim "$handle" "$worktree"

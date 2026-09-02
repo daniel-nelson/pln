@@ -439,22 +439,89 @@ report_resolution() {
 # ------------------------------------------------------------------------- lock
 
 LOCK_HELD=''
+LOCK_STALE_GRACE=120
+INDEX_REFRESHED=1
 
 release_lock() {
-  if [ -n "$LOCK_HELD" ]; then rmdir "$LOCK_HELD" 2>/dev/null || true; fi
+  if [ -n "$LOCK_HELD" ]; then
+    rm -f "$LOCK_HELD/owner" 2>/dev/null || true
+    rmdir "$LOCK_HELD" 2>/dev/null || true
+  fi
   LOCK_HELD=''
   return 0
 }
 
+lock_owner() {
+  # pid<TAB>host<TAB>when, or nothing when the holder left no owner file.
+  [ -f "$1/owner" ] || return 1
+  LC_ALL=C head -1 "$1/owner" 2>/dev/null
+}
+
+lock_owner_desc() {
+  local owner pid host when
+  owner="$(lock_owner "$1")" || { printf 'an unidentified run'; return 0; }
+  pid="$(printf '%s' "$owner" | LC_ALL=C cut -f1)"
+  host="$(printf '%s' "$owner" | LC_ALL=C cut -f2)"
+  when="$(printf '%s' "$owner" | LC_ALL=C cut -f3)"
+  printf 'pid %s on %s since %s' "${pid:-?}" "${host:-?}" "${when:-?}"
+}
+
+# A lock is a directory, so a run killed between taking it and releasing it —
+# a sandbox timeout, an OOM, a hard interrupt — leaves one that never expires,
+# and every later call fails against a holder that no longer exists. Break one
+# only where the evidence says the holder is gone: same host, and a pid that is
+# not running. Anything else (another host, an unreadable owner file) is left
+# alone and waited on, then reported, because guessing wrong here means two
+# writers in one queue.
+lock_is_dead() {
+  local lock="$1" owner pid host age
+  owner="$(lock_owner "$lock")" || {
+    # No owner file at all: either a pre-1.50 lock or one taken microseconds
+    # ago by a run that has not written its owner yet. Only the grace period
+    # can tell those apart.
+    age="$(lock_age "$lock")" || return 1
+    [ "$age" -ge "$LOCK_STALE_GRACE" ] || return 1
+    return 0
+  }
+  pid="$(printf '%s' "$owner" | LC_ALL=C cut -f1)"
+  host="$(printf '%s' "$owner" | LC_ALL=C cut -f2)"
+  [ -n "$pid" ] || return 1
+  [ "$host" = "$(hostname)" ] || return 1
+  kill -0 "$pid" 2>/dev/null && return 1
+  return 0
+}
+
+lock_age() {
+  local mtime now
+  mtime="$(stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || true)"
+  [ -n "$mtime" ] || return 1
+  now="$(date +%s)"
+  printf '%s\n' "$((now - mtime))"
+}
+
+# $1 = 1 to fail when the lock cannot be taken, 0 to return non-zero instead.
 take_lock() {
-  local lock="$QUEUE_ROOT/.lock" tries=0
+  local required="${1:-1}" lock="$QUEUE_ROOT/.lock" tries=0
   while ! mkdir "$lock" 2>/dev/null; do
+    if lock_is_dead "$lock"; then
+      note "cleared a lock left behind by $(lock_owner_desc "$lock"), which is no longer running"
+      rm -f "$lock/owner" 2>/dev/null || true
+      rmdir "$lock" 2>/dev/null || true
+      continue
+    fi
     tries=$((tries + 1))
-    [ "$tries" -lt 25 ] || fail "the queue is locked by another run: $lock"
+    if [ "$tries" -ge 25 ]; then
+      [ "$required" = 1 ] || return 1
+      fail "the queue is locked by $(lock_owner_desc "$lock"): $lock
+If that run is gone, clear it with: rmdir $lock
+Do not read $QUEUE_ROOT/$INDEX_NAME by hand instead — the index carries no holder, so it cannot tell you what another run has claimed."
+    fi
     sleep 0.2
   done
+  printf '%s\t%s\t%s\n' "$$" "$(hostname)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$lock/owner" 2>/dev/null || true
   LOCK_HELD="$lock"
   trap 'release_lock' EXIT
+  return 0
 }
 
 # ----------------------------------------------------------- reading the record
@@ -895,11 +962,22 @@ case "$command" in
     done
     project_context "$project"
     resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
-    take_lock
-    write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
-    release_lock
+    # `list` is a read to whoever calls it, and it must never be the thing that
+    # fails: everything it prints is derived from the detail files, and only the
+    # refresh of the on-disk index needs the lock. A caller that cannot read the
+    # queue reaches for `QUEUE.md` by hand, which carries no holder and so
+    # reports another run's claimed items as untaken — the failure this guards.
+    if take_lock 0; then
+      write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
+      release_lock
+      INDEX_REFRESHED=1
+    else
+      note "the queue is locked by $(lock_owner_desc "$QUEUE_ROOT/.lock"), so the index file was not refreshed; everything below is read from the detail files and is current"
+      INDEX_REFRESHED=0
+    fi
     load_header
     report_resolution
+    printf 'INDEX_REFRESHED=%s\n' "$INDEX_REFRESHED"
     count="$(live_records | LC_ALL=C grep -c '' || true)"
     [ -n "$count" ] || count=0
     printf 'ITEM_COUNT=%s\n' "$count"
@@ -908,7 +986,14 @@ case "$command" in
     # read — from a failed call, which must fail the close rather than render
     # a clean empty follow-up list.
     printf 'INDEX_BEGIN\n'
-    cat "$QUEUE_ROOT/$INDEX_NAME"
+    # Refreshed or not, what is printed is derived from the detail files this
+    # instant. Catting an index the lock stopped us rewriting would hand back
+    # the stale file the fallback above exists to keep nobody reading.
+    if [ "$INDEX_REFRESHED" = 1 ]; then
+      cat "$QUEUE_ROOT/$INDEX_NAME"
+    else
+      render_index || fail "cannot render the queue at $QUEUE_ROOT"
+    fi
     printf 'INDEX_END\n'
     ;;
 

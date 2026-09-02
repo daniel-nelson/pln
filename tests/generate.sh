@@ -610,6 +610,7 @@ done
 for host_out in "$real_c" "$real_x"; do
   f="$host_out/SKILL.md"
   outline_file="$host_out/phases/pln/outline.md"
+  review_file_peer="$host_out/phases/pln/review-approval.md"
   interview_file="$host_out/phases/pln/interview.md"
   has "$f" '## Coordinator context firewall' "$f lost the shared context firewall"
   has "$outline_file" 'src/workers/preflight-research.md' "$outline_file does not mandate a pre-flight research worker"
@@ -620,8 +621,30 @@ for host_out in "$real_c" "$real_x"; do
   has "$outline_file" '.git/info/exclude' "$outline_file does not keep local plans out of .gitignore"
   has "$outline_file" 'Outside a git worktree' "$outline_file does not allocate an external non-git run directory"
   hasnt "$f" 'WORKER_ONLY_SENTINEL_' "$f embedded worker-only runtime instructions"
-  has "$outline_file" 'Outside a git worktree, use the external temporary run directory' \
+  has "$outline_file" 'outside one, the external temporary run directory allocated in Step 1' \
     "$outline_file contradicts pre-flight's non-git plan location"
+  # The named-location leg sits above both defaults: a project that keeps plans
+  # outside the repository on purpose otherwise reads as "not ./plans/" and lands
+  # in the temporary directory, which is the one place the work is least safe.
+  # A same-model substitution at R3 is a loss of coverage, so it is reported in
+  # the turn rather than only in the plan file nobody re-reads.
+  has "$review_file_peer" 'A substitution at R3 is said out loud, in the turn it happens' \
+    "$review_file_peer lets an R3 peer substitution stay silent"
+  review_file="$host_out/phases/pln/review-approval.md"
+  # A bounded re-review bounds its roster too: the tier is a property of the
+  # plan, but a round's readers come from what the rewritten items carry.
+  has "$review_file" 'The roster is bounded by the same change the items are' \
+    "$review_file lets a one-item rewrite re-run the whole tier roster"
+  has "$review_file" 'The broad reader always runs' \
+    "$review_file lost the reader a bounded re-review always keeps"
+  has "$review_file" 'never on the tier or on the first pass' \
+    "$review_file lets a bounded roster shrink the tier or the first review pass"
+  has "$outline_file" "A location the project's own instructions name wins over both defaults" \
+    "$outline_file lost the instruction-named plan location"
+  has "$outline_file" 'In a git worktree, and with no such location named' \
+    "$outline_file lets the worktree default outrank an instruction-named plan location"
+  has "$outline_file" 'Outside a git worktree, and with no such location named' \
+    "$outline_file lets the temporary directory outrank an instruction-named plan location"
 done
 hasnt "$real_c/SKILL.md" "Codex's native path" \
   "the claude build explains its blocker mechanics through the other host"

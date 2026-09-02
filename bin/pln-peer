@@ -196,21 +196,56 @@ if [ -z "$PEER_COMMAND" ] && [ -z "$HOST" ] && [ -x "$SELF_DIR/pln-host" ]; then
   HOST="$("$SELF_DIR/pln-host" 2>/dev/null || true)"
 fi
 
-authenticated() { # authenticated <claude|codex>
+# A host that spawns commands without the user's shell profile sees a bare
+# `PATH`, and the peer CLI is commonly installed somewhere only that profile
+# adds — Claude Code's own installer puts `claude` in `~/.local/bin`. Rung 2
+# then finds nothing, the R3 adversarial slot silently falls back to a
+# same-model substitute, and the loss of model-family independence is recorded
+# only in the plan file nobody re-reads. So look in the CLIs' own documented
+# install locations before concluding no peer exists. These are the installers'
+# paths, not one machine's layout: a location that does not exist is skipped,
+# and `peer_command` (rung 1) remains the answer for anything unusual.
+peer_locations() { # peer_locations <claude|codex>
   case "$1" in
+    claude) printf '%s\n' "$HOME/.local/bin/claude" "$HOME/.claude/local/claude" ;;
+    codex) printf '%s\n' "$HOME/.local/bin/codex" "$HOME/.codex/bin/codex" ;;
+  esac
+}
+
+# The runnable path for a candidate: whatever `PATH` resolves, else the first
+# install location that is actually executable. Empty when there is none.
+resolve_candidate() {
+  local candidate="$1" p
+  if p="$(command -v "$candidate" 2>/dev/null)" && [ -n "$p" ]; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    [ -x "$p" ] || continue
+    printf '%s\n' "$p"
+    return 0
+  done <<EOF
+$(peer_locations "$candidate")
+EOF
+  return 1
+}
+
+authenticated() { # authenticated <resolved-command> <claude|codex>
+  case "$2" in
     claude)
       # `claude auth status` prints JSON and exits 0 when signed in. Both halves
       # matter: a future build that reports "not logged in" on exit 0 must not
       # read as usable.
       local out
-      out="$("${PROBE_WRAP[@]+"${PROBE_WRAP[@]}"}" claude auth status 2>/dev/null < /dev/null)" || return 1
+      out="$("${PROBE_WRAP[@]+"${PROBE_WRAP[@]}"}" "$1" auth status 2>/dev/null < /dev/null)" || return 1
       case "$out" in
         *'"loggedIn": false'* | *'"loggedIn":false'*) return 1 ;;
       esac
       [ -n "$out" ] || return 1
       ;;
     codex)
-      "${PROBE_WRAP[@]+"${PROBE_WRAP[@]}"}" codex login status >/dev/null 2>&1 < /dev/null || return 1
+      "${PROBE_WRAP[@]+"${PROBE_WRAP[@]}"}" "$1" login status >/dev/null 2>&1 < /dev/null || return 1
       ;;
     *) return 1 ;;
   esac
@@ -223,9 +258,19 @@ if [ -z "$PEER_COMMAND" ]; then
   # adding a third stays a one-line change.
   for candidate in claude codex; do
     [ "$candidate" = "$HOST" ] && continue
-    command -v "$candidate" >/dev/null 2>&1 || continue
-    authenticated "$candidate" || continue
+    resolved="$(resolve_candidate "$candidate")" || continue
+    [ -n "$resolved" ] || continue
+    authenticated "$resolved" "$candidate" || continue
     PEER="$candidate"
+    # Found off `PATH`: put its directory on `PATH` for the rest of this call so
+    # the agent helper below resolves the same binary the probe just accepted.
+    # Prepending the directory beats threading a path through both helpers —
+    # they each look the CLI up themselves, and a bare `PATH` is exactly the
+    # condition this leg exists to survive.
+    if [ "$resolved" != "$candidate" ]; then
+      PATH="$(dirname "$resolved"):$PATH"
+      export PATH
+    fi
     break
   done
 fi

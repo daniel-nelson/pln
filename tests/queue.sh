@@ -714,6 +714,48 @@ ok "marking it done once it is held again" mark --project "$H" --id contested-cl
 has "$H/pln/q/contested-close.md" 'state: "[x]"' \
   "the holder was refused the completion it had taken back"
 
+# The lock is attributable, a provably dead holder is broken, and a read never
+# fails against a live one — because a caller that cannot read the queue reaches
+# for QUEUE.md by hand, which carries no holder and reports another run's
+# claimed items as untaken.
+L="$WORK/locking"
+new_repo "$L"
+ok "filing an item to read back" add --project "$L" --id locked-item \
+  --claim 'an item to read under a lock' --source s --touches 'app/l.rb'
+ok "claiming it so the record has a holder" claim --project "$L" --id locked-item --run lock-run
+
+# A lock left by a run that is gone is broken, and the break is reported.
+mkdir -p "$L/pln/.lock"
+printf '999999\t%s\t2026-09-02T09:00:00Z\n' "$(hostname)" > "$L/pln/.lock/owner"
+ok "reading past a lock whose holder is not running" list --project "$L"
+said 'no longer running' "a lock left by a dead holder was not reported as cleared"
+said 'pid 999999' "the cleared lock did not name the holder it belonged to"
+is INDEX_REFRESHED 1 "breaking a dead lock did not go on to refresh the index"
+[ ! -d "$L/pln/.lock" ] || fail "the dead holder's lock was left in place"
+
+# An owner file that cannot be read is only stale once it is old: a lock taken
+# microseconds ago has not written its owner yet, and must not be broken.
+mkdir -p "$L/pln/.lock"
+ok "reading past a fresh unattributed lock" list --project "$L"
+is INDEX_REFRESHED 0 "a lock with no owner yet was broken instead of waited on"
+didnt_say 'no longer running' "a fresh unattributed lock was reported as dead"
+
+# A lock held by a live process is never broken, and a read still answers.
+printf '%s\t%s\t2026-09-02T13:00:00Z\n' "$$" "$(hostname)" > "$L/pln/.lock/owner"
+ok "reading while a live run holds the lock" list --project "$L"
+is INDEX_REFRESHED 0 "a read refreshed the index while another run held the lock"
+said 'is current' "the read did not say the listing is derived rather than stale"
+said 'locked-item' "a read under a live lock did not render the queue"
+[ -d "$L/pln/.lock" ] || fail "a live run's lock was broken"
+
+# A write still refuses, names the holder, and says what not to do instead.
+refused "writing while a live run holds the lock" mark --project "$L" \
+  --id locked-item --run lock-run --status ready
+said 'the queue is locked by pid' "a refused write did not name the holder"
+said 'clear it with: rmdir' "a refused write did not say how to clear a lock left behind"
+said 'carries no holder' "a refused write did not warn against reading the index by hand"
+rm -rf "$L/pln/.lock"
+
 # ─── mark: the three markers, the flag, and the sub-item checklist ────────────
 R="$WORK/marking"
 new_repo "$R"

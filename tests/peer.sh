@@ -121,6 +121,10 @@ export FAKE_CLAUDE_ARGS="$WORK/claude.args" FAKE_CLAUDE_STDIN="$WORK/claude.stdi
 export FAKE_CODEX_ARGS="$WORK/codex.args" FAKE_CODEX_STDIN="$WORK/codex.stdin"
 export FAKE_PEER_ARGS="$WORK/peer.args" FAKE_PEER_STDIN="$WORK/peer.stdin"
 
+# The install-location leg reads `$HOME`, so every call gets an empty one: a
+# developer who happens to have `~/.local/bin/claude` must never decide a test.
+FAKE_HOME="$WORK/home"
+mkdir -p "$FAKE_HOME"
 export PLN_STATE_DIR="$WORK/state"
 CONFIG="$PLN_STATE_DIR/config.yaml"
 mkdir -p "$PLN_STATE_DIR"
@@ -144,7 +148,7 @@ OUT=""
 peer() { # peer <path-dir> <args...> — run pln-peer with a chosen PATH
   local dir="$1"; shift
   RC=0
-  OUT="$(env PATH="$dir:$BASE_PATH" "$BIN" "$@" 2>"$WORK/stderr")" || RC=$?
+  OUT="$(env PATH="$dir:$BASE_PATH" HOME="$FAKE_HOME" "$BIN" "$@" 2>"$WORK/stderr")" || RC=$?
 }
 
 field() { sed -n "s/^$1=//p" <<<"$OUT"; }
@@ -175,7 +179,7 @@ nothing_ran() { # nothing_ran <description>
 guard() { # guard <description> <args...>
   local what="$1"; shift
   local rc=0
-  env PATH="$BOTH:$BASE_PATH" "$BIN" "$@" >/dev/null 2>&1 || rc=$?
+  env PATH="$BOTH:$BASE_PATH" HOME="$FAKE_HOME" "$BIN" "$@" >/dev/null 2>&1 || rc=$?
   [ "$rc" -eq 2 ] || fail "$what exited $rc (expected 2)"
 }
 printf '' > "$WORK/blank.md"
@@ -200,6 +204,37 @@ cfg peer_egress -
 fresh
 peer "$NEITHER" --brief "$BRIEF" --out "$WORK/run.out"
 expect 3 none none 3 "no peer on the machine"
+
+# A host that spawns without the user's shell profile sees a bare PATH, and the
+# peer CLI commonly sits somewhere only that profile adds. The install-location
+# leg finds it there; without it the R3 adversarial slot silently substitutes.
+cfg peer_consent true
+cfg peer_egress consent
+mkdir -p "$FAKE_HOME/.local/bin"
+cp "$ONLY_CLAUDE/claude" "$FAKE_HOME/.local/bin/claude"
+chmod +x "$FAKE_HOME/.local/bin/claude"
+fresh
+peer "$NEITHER" --host codex --which
+expect 2 claude ready 0 "a peer installed off PATH was not found in its install location"
+# It must be the same binary that runs, not just the one that answered the probe.
+fresh
+peer "$NEITHER" --host codex --brief "$BRIEF" --out "$WORK/run.out"
+expect 2 claude ok 0 "a peer found off PATH was probed but not invoked"
+[ -s "$WORK/claude.args" ] || fail "the off-PATH peer binary was never actually run"
+# An install location that holds nothing is skipped, not treated as a peer.
+rm -f "$FAKE_HOME/.local/bin/claude"
+fresh
+peer "$NEITHER" --host codex --which
+expect 3 none none 3 "an empty install location was read as a peer"
+# A non-executable file there is not a peer either.
+printf 'not a binary\n' > "$FAKE_HOME/.local/bin/claude"
+chmod -x "$FAKE_HOME/.local/bin/claude"
+fresh
+peer "$NEITHER" --host codex --which
+expect 3 none none 3 "a non-executable install-location file was read as a peer"
+rm -f "$FAKE_HOME/.local/bin/claude"
+cfg peer_consent -
+cfg peer_egress -
 [ -z "$(field RESULT_FILE)" ] || fail "rung 3 named a result file"
 [ -z "$(field LOG_FILE)" ] || fail "rung 3 named a log file"
 nothing_ran "rung 3"
@@ -232,15 +267,15 @@ fi
 
 # Host detection is pln-host's, and pln-peer uses it when --host is absent.
 RC=0
-OUT="$(env PATH="$BOTH:$BASE_PATH" PLN_HOST=codex "$BIN" --which 2>"$WORK/stderr")" || RC=$?
+OUT="$(env PATH="$BOTH:$BASE_PATH" HOME="$FAKE_HOME" PLN_HOST=codex "$BIN" --which 2>"$WORK/stderr")" || RC=$?
 expect 2 claude ready 0 "an undeclared host detected as codex"
 
 # --- an unauthenticated peer falls through to the next rung ------------------
 RC=0
-OUT="$(env PATH="$ONLY_CLAUDE:$BASE_PATH" PLN_TEST_CLAUDE_AUTH=out "$BIN" --host codex --which 2>"$WORK/stderr")" || RC=$?
+OUT="$(env PATH="$ONLY_CLAUDE:$BASE_PATH" HOME="$FAKE_HOME" PLN_TEST_CLAUDE_AUTH=out "$BIN" --host codex --which 2>"$WORK/stderr")" || RC=$?
 expect 3 none none 3 "a claude that reports loggedIn:false on exit 0"
 RC=0
-OUT="$(env PATH="$ONLY_CLAUDE:$BASE_PATH" PLN_TEST_CLAUDE_AUTH=silent "$BIN" --host codex --which 2>"$WORK/stderr")" || RC=$?
+OUT="$(env PATH="$ONLY_CLAUDE:$BASE_PATH" HOME="$FAKE_HOME" PLN_TEST_CLAUDE_AUTH=silent "$BIN" --host codex --which 2>"$WORK/stderr")" || RC=$?
 expect 3 none none 3 "a claude whose auth probe says nothing at all"
 RC=0
 OUT="$(env PATH="$ONLY_CODEX:$BASE_PATH" PLN_TEST_CODEX_AUTH=out "$BIN" --host claude --which 2>"$WORK/stderr")" || RC=$?

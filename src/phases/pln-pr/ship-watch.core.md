@@ -28,7 +28,20 @@ When you do bump: raise the version per the repo's scheme (read recent changelog
 
 ### Step 7. Final gauntlet — once
 
-Write the ordered commands and normalized non-secret environment to artifacts, compute the exact candidate fingerprint, then spawn one fresh-context agent to run the full gauntlet on that candidate—including version/changelog changes. Recompute afterward; any mismatch fails. Record pass/fail per command plus tree/command/environment/candidate hashes in `REVIEW.md`. This is the mandatory post-fix run; the only other full-suite run is the optional baseline. Confirm untrusted commands first.
+Write the ordered commands and normalized non-secret environment to artifacts, compute the exact candidate fingerprint, then spawn one fresh-context agent to run the gauntlet on that candidate—including version/changelog changes. Recompute afterward; any mismatch fails. Record pass/fail per command plus tree/command/environment/candidate hashes in `REVIEW.md`, and which tier each command belongs to. Confirm untrusted commands first.
+
+**The static checks always run here. The behavior suite runs only under an exception below.** The two are not the same purchase. Static checks cost seconds, catch what an agent's edit actually breaks, and a lint or build error that reaches CI burns a whole CI run — every job, every container — to report something a local command reports instantly. The behavior suite costs minutes, and CI runs it across parallel jobs that no single machine matches; running it locally first buys a slower copy of an answer CI is about to produce anyway, and then CI produces it again regardless.
+
+**Running the whole suite locally has exactly two justifications**, and neither is a judgment call:
+
+- **The project's own instructions say to.** A `CLAUDE.md`/`AGENTS.md` that names a full local run before pushing is the answer; follow it. This is the only "unless" — the project knows things about its suite that this run does not.
+- **There is no CI that will run it.** No CI configured, or none on this branch. Then the local run is not a duplicate, it is the only run there will ever be.
+
+Everything else that seems to argue for the suite argues for **targeted tests instead**. When the change touches tests, or touches code the required checks demonstrably do not cover, run *those* tests — the specific files, or the narrowest selector the runner takes — and never the suite to reach them. Changing four specs is a reason to run four specs. This matters most for feature and end-to-end specs: each one drives a real headless browser, the per-test overhead makes local parallelism awkward to configure and rare in practice, and a full local feature run is the single most expensive thing this flow can do. CI parallelizes them across jobs; a laptop mostly does not.
+
+If the project names no static checks at all, there is simply nothing to run here — that is a thin local gate, not a reason to fall back to the suite. Record in `REVIEW.md` what ran and, where the suite ran, which of the two justifications applied.
+
+Outside those, a green static pass plus any targeted tests is what this step certifies, and the suite is CI's job. This is a change in *what is verified locally*, not in how strictly: a red static check still means the branch does not ship, and the candidate fingerprint still covers the commands that actually ran.
 <!-- pln:only codex -->
 Same spawn shape and the same sandbox caveat as Step 2.
 <!-- pln:endonly -->
@@ -103,7 +116,13 @@ This step only runs right after Step 8 created a **brand-new** draft PR (`IS_NEW
 
 **On a red required check:** capture logs file-first and have a fresh judgment worker classify the failure before editing: `infrastructure`, `flaky`, `permission`, or `code`. Infrastructure/flaky/permission failures do not authorize code changes; record evidence and retry/wait/escalate as appropriate. A code failure becomes a verified finding and a new candidate. Dispatch exactly one fresh CI fix cluster with its own `fix-ci-<round>-manifest.tsv`; never reuse a pre-PR worker or manifest.
 
-After a CI code fix, recompute risk and candidate fingerprints, invalidate the earlier review/gauntlet, run the applicable fresh review/post-fix assurance on the changed candidate, and run every local gauntlet command not exactly subsumed by the required CI checks before pushing. Exact subsumption means the same command, inputs, and relevant environment—not a similar check name. Push only the reverified candidate and re-enter the watch loop. Log each round's classification, evidence state, changed fingerprint, local commands, fresh reader attribution, and commit. Retain the same-check three-round stop provisionally.
+After a CI code fix, recompute risk and candidate fingerprints, invalidate the earlier review/gauntlet, run the applicable fresh review/post-fix assurance on the changed candidate, and run **the static checks** before pushing. Push only the reverified candidate and re-enter the watch loop.
+
+The behavior suite does not re-run here, and this is the step where that mattered most: the push at the end of this round starts a fresh CI run that will execute the whole suite in parallel, so running it locally first is paying twice for one answer and delaying the run that produces it. Where the fix touched a specific test or an uncovered path, run that test and only that test. The two whole-suite justifications above still stand and nothing else does. Measured on a real run before this rule existed: one CI round going red made a three-file branch re-run its project's full suite four more times, `pnpm lint` ten times, over eighteen minutes of a forty-two-minute "CI watch" that was barely watching CI.
+
+The old bar here was "not exactly subsumed by the required CI checks", where exact subsumption meant the same command, inputs and relevant environment. That never fired: CI runs in a container on a clean checkout, so a local command is never *exactly* the same environment, so everything always re-ran. A guard that cannot be satisfied is not a guard.
+
+Log each round's classification, evidence state, changed fingerprint, local commands, fresh reader attribution, and commit. Retain the same-check three-round stop provisionally.
 
 **Truly stumped — stop, don't loop forever.** Track, per failing check name, how many consecutive rounds it has gone fix-then-still-red. Stop the loop — do not dispatch another fix cluster — the moment either holds: the **same** check has now failed **three rounds in a row**, or a fix cluster's own return is a `BLOCKED:` (it could not identify a concrete fix, the same shape Step 4's fix agents already use). When that happens, leave the PR in draft, fire the notification channels first, then surface the blocker to the user in the same shape as Step 4's needs-a-decision path — one question, as prose, in the option-message shape — naming the check, how many rounds were tried, and what each round's fix cluster attempted. State that in the question itself; do not point at the CI watch log in `REVIEW.md` for it. Nothing here has an upper bound on *how many* rounds run before that point; only the three-in-a-row (or one-explicitly-stuck) condition ends it.
 
@@ -118,7 +137,8 @@ All of this runs at whichever close hands the PR to the user — Step 8's or Ste
 
 ## Failure modes to watch for
 
-- **Re-running the full gauntlet after each fix cluster.** This is the exact thrash pln-pr exists to prevent. Fixes accumulate; the mandatory gauntlet runs once at Step 7 (plus the optional Step 2 baseline).
+- **Re-running the gauntlet after each fix cluster.** This is the exact thrash pln-pr exists to prevent. Fixes accumulate; the mandatory run happens once at Step 7 (plus the optional Step 2 baseline).
+- **Running the behavior suite locally when CI is about to run it anyway.** The push at the end of a CI-fix round starts a run that executes the whole suite in parallel. Running it first buys a slower copy of an answer CI is going to produce regardless, and delays the run that produces it. Static checks are the local purchase; the suite is CI's.
 - **Treating a failed review as a clean one.** If no reviewer succeeds, that is zero coverage, not zero findings. Fail closed and stop — never write an empty ledger and open the PR.
 - **The orchestrator fixing findings itself.** It dispatches fix agents; it does not read code or edit files. If you catch yourself editing in the orchestrator, stop and spawn the cluster.
 - **Acting on unverified findings.** A finding with no `motivating_code` is a suspicion, not a bug. It stays in the appendix and is not fixed.

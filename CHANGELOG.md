@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.50.0 — 2026-09-02
+
+### Fixed
+
+- **A locked queue no longer pushes callers onto the index file, and a lock left by a dead run clears itself.** Found from a live incident: a `/pln` preflight recorded "`pln-queue list` hit a recurrent lock, so the urgent index was read directly from `QUEUE.md`; no queue items have been claimed" — and then reported items another session held as untaken, because the index carries no holder. Two causes. The lock is a directory, so a run killed between taking it and releasing it left one that never expired and failed every later call, unattributably: the holder now writes its pid, host and time into the lock, and a lock is broken only on evidence that the holder is gone (same host, pid not running), while another host or an unreadable owner file is waited on and then reported with the `rmdir` that clears it. And `list` — a read to whoever calls it — took that exclusive lock only to refresh the on-disk index, so it failed outright when it could not: it now skips the refresh, says so in a `NOTE=`, and renders the listing live from the detail files, which is what it was always derived from. Refusals name the holder and say plainly not to read `QUEUE.md` by hand instead. Measured first: twenty concurrent reads on the real 98-item queue all succeeded, so ordinary contention was never the cause.
+
 ## 1.49.0 — 2026-09-02
 
 ### Changed

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.51.0 — 2026-09-02
+
+### Changed
+
+- **Local verification buys the static checks; the behavior suite stays with CI.** `/pln-pr` treated a project's verification commands as one undifferentiated gauntlet, and Step 9 re-ran "every local gauntlet command not exactly subsumed by the required CI checks" after each CI fix. That bar never fired — CI runs in a container on a clean checkout, so a local command is never *exactly* the same environment, so everything always re-ran. Measured on a real run: a three-file, +60/-2 branch ran its project's full suite **seven times**, four of them after the PR was already open, with `pnpm lint` alone running ten times; eighteen of a forty-two-minute "CI watch" went on local re-runs rather than on watching CI. The commands are now split at discovery into **static checks** (lint, format, type-check, build, generated-artifact freshness) and the **behavior suite** (unit, integration, feature, end-to-end). Static checks run at the baseline, at the final gauntlet, and before every CI-fix push, because they are what an agent's edit actually breaks and a lint error reaching CI wastes an entire CI run to say what a local command says in seconds. The behavior suite runs locally only where CI will not run it: no CI on the branch, a change to the tests themselves or to code the required checks demonstrably miss, a user who asked for a pre-flight, or a project that names no static checks at all. Which exception applied is recorded in `REVIEW.md`. This changes *what* is verified locally, not how strictly — a red static check still stops the branch, and the candidate fingerprint still covers the commands that actually ran.
+
 ## 1.50.0 — 2026-09-02
 
 ### Fixed

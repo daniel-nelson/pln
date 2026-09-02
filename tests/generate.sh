@@ -625,6 +625,15 @@ for host_out in "$real_c" "$real_x"; do
   # The named-location leg sits above both defaults: a project that keeps plans
   # outside the repository on purpose otherwise reads as "not ./plans/" and lands
   # in the temporary directory, which is the one place the work is least safe.
+  review_file="$host_out/phases/pln/review-approval.md"
+  # A bounded re-review bounds its roster too: the tier is a property of the
+  # plan, but a round's readers come from what the rewritten items carry.
+  has "$review_file" 'The roster is bounded by the same change the items are' \
+    "$review_file lets a one-item rewrite re-run the whole tier roster"
+  has "$review_file" 'The broad reader always runs' \
+    "$review_file lost the reader a bounded re-review always keeps"
+  has "$review_file" 'never on the tier or on the first pass' \
+    "$review_file lets a bounded roster shrink the tier or the first review pass"
   has "$outline_file" "A location the project's own instructions name wins over both defaults" \
     "$outline_file lost the instruction-named plan location"
   has "$outline_file" 'In a git worktree, and with no such location named' \

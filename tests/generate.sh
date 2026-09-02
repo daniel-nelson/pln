@@ -620,8 +620,17 @@ for host_out in "$real_c" "$real_x"; do
   has "$outline_file" '.git/info/exclude' "$outline_file does not keep local plans out of .gitignore"
   has "$outline_file" 'Outside a git worktree' "$outline_file does not allocate an external non-git run directory"
   hasnt "$f" 'WORKER_ONLY_SENTINEL_' "$f embedded worker-only runtime instructions"
-  has "$outline_file" 'Outside a git worktree, use the external temporary run directory' \
+  has "$outline_file" 'outside one, the external temporary run directory allocated in Step 1' \
     "$outline_file contradicts pre-flight's non-git plan location"
+  # The named-location leg sits above both defaults: a project that keeps plans
+  # outside the repository on purpose otherwise reads as "not ./plans/" and lands
+  # in the temporary directory, which is the one place the work is least safe.
+  has "$outline_file" "A location the project's own instructions name wins over both defaults" \
+    "$outline_file lost the instruction-named plan location"
+  has "$outline_file" 'In a git worktree, and with no such location named' \
+    "$outline_file lets the worktree default outrank an instruction-named plan location"
+  has "$outline_file" 'Outside a git worktree, and with no such location named' \
+    "$outline_file lets the temporary directory outrank an instruction-named plan location"
 done
 hasnt "$real_c/SKILL.md" "Codex's native path" \
   "the claude build explains its blocker mechanics through the other host"

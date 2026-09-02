@@ -93,6 +93,10 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 
 - (not yet run)
 
+## Queue items
+
+- (not yet declared)
+
 ## Ship
 
 - (not yet decided)
@@ -161,6 +165,7 @@ Top-of-file dashboard carries:
 - **Pre-flight findings** — mandated rules, persistent TODOs, verification commands discovered.
 - **Open questions** — questions asked but not yet answered (deferred sub-questions live here so nothing is lost).
 - **Plan review** — one line per Step 3.5 round: which items it read, who read them, and what it turned up. The round the user is looking at is the last line, and the count is however many lines there are, so a re-showing gate and a resumed session both know how far the review got without reconstructing it from the conversation.
+- **Queue items** — the follow-up-queue ids this run takes, or `none taken`. Written at adoption, so the run has to answer whether it takes any; amended at claim time with each id's claim result, and amended again at the close with each claimed id's outcome. It is the run's own record of what it took, and it never replaces the holder `pln-queue claim` writes into the item's own record, which is what `claim` and `check` read.
 - **Ship** — the Step 4 adopt choice: `draft PR after implementation`, `PR after implementation`, or `implement only`, plus `PR base: <branch>` when a stacking override (item 4) applies. Set once, at adoption, and read back by Step 8 rather than trusted from the conversation — a restarted or resumed session still knows what was decided.
 - **Reversals** — one line per decision in this plan that overturns something already settled or already built: what it reverses, and where that was decided. `/pln-pr` reads it into the PR body, so a reversal reaches the branch's reviewer even when the user adopted the plan without reading it (see Delegated mode).
 - **Verification** — pass/fail per command at task end.

@@ -51,6 +51,9 @@ Every PR that changes skill behavior must include both:
 
 - A version bump in `VERSION`
 - A matching entry in `CHANGELOG.md`
+- A re-stamp of the `skill_version` column in `evals/economy-qualification.tsv`
+
+That third one is not optional and not cosmetic: `bin/pln-eval` validates the column against `VERSION`, so **every** bump fails `tests/evals.sh` with `economy qualification validation failed` until the file is re-stamped. Change only that column — the economy route stays `disabled` with reason `release-behavior-changed-requalification-required`, because a behavioral release is exactly what requires requalification, and `fixture_sha256` seals the corpus rather than the release. Re-qualifying the route for real is a separate piece of work from shipping one.
 
 **Minor bump** (1.0.0 → 1.1.0): new guidance, reworked explanations, new sections, behavioral changes to `/pln`, `/pln-pr`, or `/pln-update`.  
 **Patch bump** (1.0.0 → 1.0.1): typo fixes, factual corrections, wording-only edits that don't change behavior.

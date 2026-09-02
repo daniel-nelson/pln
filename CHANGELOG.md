@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.47.0 — 2026-09-02
+
+### Added
+
+- **The user sets how much review a PR gets, at the adoption gate they are already answering.** `/pln`'s Step 4 adopt prompt now carries a review depth alongside the ship shape — `full`, `broad` (the tier's mandatory broad reviewer alone, no specialists and no adversarial slot), or `none` — offered as one line under the prompt rather than as more lettered options, and recorded in the dashboard's `Ship` field. Step 8 always passes it through as a `review=` argument, so the hand-off never stops to ask. Under `implement only` there is no PR to size a roster for, and the depth rides on the ask Step 8 already makes. Risk classification is untouched: a depth chooses how much of the tier's roster runs, never what the tier is, and `REVIEW.md` records the real tier plus which roster actually ran so nothing downstream reads a `broad` run at R3 as an R3 roster finding nothing. Fix, verification, and post-fix assurance still follow the tier.
+
+- **A standalone `/pln-pr` asks for that depth once, before anything expensive runs.** The measured incident never passed through an adoption gate: "bump the version and open the PR" auto-engaged `/pln-pr` on a 4-file, 90-line, already-green change, which classified R3 on `external-effects` and spent ~10.3M billed input tokens across 67 turns without pushing the branch. The ask lands at the end of scope-baseline Step 1, where the tier, signals and diff size are known and nothing has yet cost more than a few reads, and it fires only when no depth arrived *and* the roster is more than one reviewer — under R1 the full roster is the broad reviewer, so there is nothing to choose and the run continues in silence. A hand-off from `/pln` never reaches it, deliberately: those runs are often left unattended overnight, and one unnecessary question there holds the branch until morning.
+
+- **Why a human gate rather than a smarter classifier.** `external-effects` is a hard R3 matched as a bare signal name with no size consulted, so any diff touching a third-party call gets four readers and a cross-model peer. Narrowing that signal was considered and rejected: the tiers are semantic on purpose, the same overbreadth would resurface under a different signal, and the person typing the ask already knows whether the change deserves the army. Nothing is added to the risk table, and `bin/pln-assurance` is unchanged.
+
+### Fixed
+
+- **A clean rebase no longer invalidates the review, only the verification.** The exact-candidate rule invalidated both on any tree change, but the two answer different questions: verification asks whether this exact tree passes, so incoming base commits can break the build and the gauntlet must re-run, while review asks whether the branch's own changes are sound and its subject is `git diff "$DIFF_BASE"`, which a conflict-free rebase leaves byte-identical. Where the tree fingerprint moves and that diff does not, the existing `REVIEW.md` stands: reverify, do not re-review. It is proven rather than assumed — a rebase that resolved conflicts or moved the diff at all did change the reviewed material and invalidates the review with everything else.
+
+- **A green gauntlet is reused whenever its fingerprint still matches, whatever produced it.** The baseline-reuse rule was gated on the run "immediately following a `/pln`", so a green suite recorded minutes earlier in the same session did not qualify: the incident dispatched a subagent at 21:43:21 to re-run a gauntlet that had gone green at 21:30:36 on the same tree, and got the same answer back 93 seconds later. `bin/pln-assurance fingerprint` over tree, ordered commands and relevant environment was always the real guard; provenance was a second condition sitting on top of it, and it is gone.
+
 ## 1.46.0 — 2026-09-02
 
 ### Added

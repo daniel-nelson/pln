@@ -32,14 +32,16 @@ Write the ordered commands and normalized non-secret environment to artifacts, c
 
 **The static checks always run here. The behavior suite runs only under an exception below.** The two are not the same purchase. Static checks cost seconds, catch what an agent's edit actually breaks, and a lint or build error that reaches CI burns a whole CI run — every job, every container — to report something a local command reports instantly. The behavior suite costs minutes, and CI runs it across parallel jobs that no single machine matches; running it locally first buys a slower copy of an answer CI is about to produce anyway, and then CI produces it again regardless.
 
-Run the behavior suite locally only when one of these holds, and say which one in `REVIEW.md`:
+**Running the whole suite locally has exactly two justifications**, and neither is a judgment call:
 
-- **The repository has no CI**, or none that runs on this branch. Nothing else will ever run these tests, so local is not a duplicate — it is the only run.
-- **The change is to the tests themselves**, or to something the required CI checks demonstrably do not cover. A suite that is not going to be exercised by CI is not being duplicated by running it here.
-- **A CI run is expensive or rate-limited enough that the user has said to pre-flight it**, or asks for it in this run.
-- **The static checks are empty** — a project that names no lint, type-check or build command has only the suite, and skipping it would leave the candidate unverified.
+- **The project's own instructions say to.** A `CLAUDE.md`/`AGENTS.md` that names a full local run before pushing is the answer; follow it. This is the only "unless" — the project knows things about its suite that this run does not.
+- **There is no CI that will run it.** No CI configured, or none on this branch. Then the local run is not a duplicate, it is the only run there will ever be.
 
-Outside those, a green static pass is what this step certifies, and the behavior suite is CI's job. This is a change in *what is verified locally*, not in how strictly: a red static check still means the branch does not ship, and the candidate fingerprint still covers the commands that actually ran.
+Everything else that seems to argue for the suite argues for **targeted tests instead**. When the change touches tests, or touches code the required checks demonstrably do not cover, run *those* tests — the specific files, or the narrowest selector the runner takes — and never the suite to reach them. Changing four specs is a reason to run four specs. This matters most for feature and end-to-end specs: each one drives a real headless browser, the per-test overhead makes local parallelism awkward to configure and rare in practice, and a full local feature run is the single most expensive thing this flow can do. CI parallelizes them across jobs; a laptop mostly does not.
+
+If the project names no static checks at all, there is simply nothing to run here — that is a thin local gate, not a reason to fall back to the suite. Record in `REVIEW.md` what ran and, where the suite ran, which of the two justifications applied.
+
+Outside those, a green static pass plus any targeted tests is what this step certifies, and the suite is CI's job. This is a change in *what is verified locally*, not in how strictly: a red static check still means the branch does not ship, and the candidate fingerprint still covers the commands that actually ran.
 <!-- pln:only codex -->
 Same spawn shape and the same sandbox caveat as Step 2.
 <!-- pln:endonly -->
@@ -116,7 +118,7 @@ This step only runs right after Step 8 created a **brand-new** draft PR (`IS_NEW
 
 After a CI code fix, recompute risk and candidate fingerprints, invalidate the earlier review/gauntlet, run the applicable fresh review/post-fix assurance on the changed candidate, and run **the static checks** before pushing. Push only the reverified candidate and re-enter the watch loop.
 
-The behavior suite does not re-run here, and this is the step where that mattered most: the push at the end of this round starts a fresh CI run that will execute the whole suite in parallel, so running it locally first is paying twice for one answer and delaying the run that produces it. The exceptions above still apply — a repository with no CI, or a fix to the tests themselves, still runs the suite locally, because there the local run is the only one. Measured on a real run before this rule existed: one CI round going red made a three-file branch re-run its project's full suite four more times, `pnpm lint` ten times, over eighteen minutes of a forty-two-minute "CI watch" that was barely watching CI.
+The behavior suite does not re-run here, and this is the step where that mattered most: the push at the end of this round starts a fresh CI run that will execute the whole suite in parallel, so running it locally first is paying twice for one answer and delaying the run that produces it. Where the fix touched a specific test or an uncovered path, run that test and only that test. The two whole-suite justifications above still stand and nothing else does. Measured on a real run before this rule existed: one CI round going red made a three-file branch re-run its project's full suite four more times, `pnpm lint` ten times, over eighteen minutes of a forty-two-minute "CI watch" that was barely watching CI.
 
 The old bar here was "not exactly subsumed by the required CI checks", where exact subsumption meant the same command, inputs and relevant environment. That never fired: CI runs in a container on a clean checkout, so a local command is never *exactly* the same environment, so everything always re-ran. A guard that cannot be satisfied is not a guard.
 

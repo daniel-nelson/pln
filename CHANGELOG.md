@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.48.0 — 2026-09-02
+
+### Fixed
+
+- **The dirty-tree guard no longer aborts when the harness's own agent worktrees sit inside the repository.** `pln-scheduler`'s before/after fingerprint hashes every changed and untracked path, but git reports an untracked *nested repository* as a single directory entry instead of listing its files, and `git hash-object` cannot hash a directory — so the snapshot failed with `could not hash dirty path`, on every isolated-worktree run of a host that checks its agents out inside the repo. Such an entry is now recorded by presence as `NESTED-REPO`: the guard still sees the worktree appear or disappear, and churn inside it is correctly not read as a worker trespassing on the user's bytes, because those bytes are not this repository's working tree. A plain untracked directory is unaffected — git lists its files individually, and each is still hashed.
+
+- **`/pln-pr` files its follow-ups before the push, so they reach the branch a reviewer opens.** Step 8 pushed first and swept second, which is invisible under the `.git` common-dir root but loses the filing under a queue root the project's own instructions place inside the working tree: the items landed as uncommitted files after the run finished, and the pushed `HEAD` carried none of them. The sweep and its `pln-queue add` calls now run ahead of the commit, and the commit names the queue files when the root sits in the working tree.
+
 ## 1.47.0 — 2026-09-02
 
 ### Added

@@ -27,11 +27,19 @@ printf 'user dirty\n' >> "$WORK/repo/user-owned.txt"
 mkdir "$WORK/repo/linked-dir"
 printf 'inner\n' > "$WORK/repo/linked-dir/inner.txt"
 ln -s linked-dir "$WORK/repo/dir-link"
+# An untracked nested repository — the shape the harness's own agent worktrees
+# take. git reports it as one directory entry instead of listing its files.
+git -C "$WORK/repo" init -q nested-worktree
+printf 'agent scratch\n' > "$WORK/repo/nested-worktree/scratch.txt"
 
 "$SCHEDULER" snapshot --repo "$WORK/repo" --out "$WORK/plan/dirty.tsv"
 has "$WORK/plan/dirty.tsv" $'PATH\tHASH' 'dirty snapshot has an unknown header'
 has "$WORK/plan/dirty.tsv" 'user-owned.txt' 'dirty snapshot omitted a modified tracked file'
 has "$WORK/plan/dirty.tsv" 'dir-link' 'dirty snapshot failed on an untracked symlink to a directory'
+has "$WORK/plan/dirty.tsv" 'linked-dir/inner.txt' \
+  'dirty snapshot collapsed a plain untracked directory instead of listing its files'
+has "$WORK/plan/dirty.tsv" $'nested-worktree/\tNESTED-REPO' \
+  'dirty snapshot did not record an untracked nested repository by presence'
 
 cat > "$WORK/plan/nodes.tsv" <<'EOF'
 ITEM	DEPS	LEASES	COHORT	CONTEXT	DIRTY_STATE
@@ -141,6 +149,14 @@ has "$WORK/plan/run-manifest.tsv" $'\twaiting\t' 'recover mutated the waiting it
   --snapshot "$WORK/plan/dirty.tsv" --manifest "$WORK/plan/run-manifest.tsv" \
   --allow-items 1 > "$WORK/dirty-check.out"
 has "$WORK/dirty-check.out" 'DIRTY_STATE=unchanged' 'unchanged user-owned dirty bytes failed validation'
+# A nested repository is recorded by presence, so the harness churning its own
+# agent worktree is not read as a worker trespassing on the user's bytes.
+printf 'more agent scratch\n' >> "$WORK/repo/nested-worktree/scratch.txt"
+"$SCHEDULER" check-dirty --repo "$WORK/repo" \
+  --snapshot "$WORK/plan/dirty.tsv" --manifest "$WORK/plan/run-manifest.tsv" \
+  --allow-items 1 > "$WORK/dirty-check.out"
+has "$WORK/dirty-check.out" 'DIRTY_STATE=unchanged' \
+  'churn inside an untracked nested repository was read as user-owned dirty change'
 mkdir -p "$WORK/repo/src/api"
 printf 'leased worker change\n' > "$WORK/repo/src/api/added.txt"
 "$SCHEDULER" check-dirty --repo "$WORK/repo" \

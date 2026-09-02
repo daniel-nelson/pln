@@ -610,6 +610,7 @@ done
 for host_out in "$real_c" "$real_x"; do
   f="$host_out/SKILL.md"
   outline_file="$host_out/phases/pln/outline.md"
+  review_file_peer="$host_out/phases/pln/review-approval.md"
   interview_file="$host_out/phases/pln/interview.md"
   has "$f" '## Coordinator context firewall' "$f lost the shared context firewall"
   has "$outline_file" 'src/workers/preflight-research.md' "$outline_file does not mandate a pre-flight research worker"
@@ -625,6 +626,10 @@ for host_out in "$real_c" "$real_x"; do
   # The named-location leg sits above both defaults: a project that keeps plans
   # outside the repository on purpose otherwise reads as "not ./plans/" and lands
   # in the temporary directory, which is the one place the work is least safe.
+  # A same-model substitution at R3 is a loss of coverage, so it is reported in
+  # the turn rather than only in the plan file nobody re-reads.
+  has "$review_file_peer" 'A substitution at R3 is said out loud, in the turn it happens' \
+    "$review_file_peer lets an R3 peer substitution stay silent"
   review_file="$host_out/phases/pln/review-approval.md"
   # A bounded re-review bounds its roster too: the tier is a property of the
   # plan, but a round's readers come from what the rewritten items carry.

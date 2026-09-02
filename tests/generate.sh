@@ -630,6 +630,29 @@ for host_out in "$real_c" "$real_x"; do
   # the turn rather than only in the plan file nobody re-reads.
   has "$review_file_peer" 'A substitution at R3 is said out loud, in the turn it happens' \
     "$review_file_peer lets an R3 peer substitution stay silent"
+  ship_file="$host_out/phases/pln-pr/ship-watch.md"
+  scope_file="$host_out/phases/pln-pr/scope-baseline.md"
+  # Local verification buys the static checks; the behavior suite is CI's, which
+  # parallelizes it across jobs a single machine cannot match.
+  has "$scope_file" 'Split what you find into static checks and the behavior suite' \
+    "$scope_file lost the two-tier gauntlet split"
+  has "$ship_file" 'The static checks always run here. The behavior suite runs only under an exception' \
+    "$ship_file lets the final gauntlet run the behavior suite unconditionally"
+  has "$ship_file" 'The behavior suite does not re-run here' \
+    "$ship_file re-runs the behavior suite after a CI fix"
+  has "$ship_file" 'Running the whole suite locally has exactly two justifications' \
+    "$ship_file lost the bar on running the whole suite locally"
+  has "$ship_file" "The project's own instructions say to" \
+    "$ship_file dropped the project's instructions as the whole-suite escape hatch"
+  has "$ship_file" 'There is no CI that will run it' \
+    "$ship_file lost the no-CI justification, where the local run is the only run"
+  # Touching tests buys those tests, never the suite — feature specs least of all.
+  has "$ship_file" 'argues for **targeted tests instead**' \
+    "$ship_file lets a test-touching change escalate to the whole suite"
+  has "$ship_file" 'Changing four specs is a reason to run four specs' \
+    "$ship_file lost the targeted-run rule in concrete terms"
+  hasnt "$ship_file" 'not exactly subsumed by the required CI checks before pushing' \
+    "$ship_file kept the subsumption bar that never fired"
   review_file="$host_out/phases/pln/review-approval.md"
   # A bounded re-review bounds its roster too: the tier is a property of the
   # plan, but a round's readers come from what the rewritten items carry.

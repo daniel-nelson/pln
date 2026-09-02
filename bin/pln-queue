@@ -23,8 +23,9 @@ Usage:
                 [--depends-on CSV] [--touches CSV] [--holds CSV] [--body FILE|-]
   pln-queue list [--project DIR]
   pln-queue check --id ID [--against CSV] [--run TEXT]
-  pln-queue claim --id ID --run TEXT [--against CSV] [--steal HOLDER]
-  pln-queue mark --id ID [--state S] [--status S] [--urgent true|false] [--group TEXT]
+  pln-queue claim --id ID --run TEXT [--touches CSV] [--holds CSV]
+                  [--against CSV] [--steal HOLDER]
+  pln-queue mark --id ID [--run TEXT] [--state S] [--status S] [--urgent true|false] [--group TEXT]
                  [--touches CSV] [--holds CSV] [--depends-on CSV] [--source TEXT]
                  [--add-sub-item TEXT] [--sub-item-state "[ ]"|"[-]"|"[x]"]
   pln-queue archive --id ID --disposition completed|dropped|superseded|resolved-elsewhere
@@ -283,6 +284,35 @@ instruction_leg() {
   return 0
 }
 
+declared_abs() {
+  # The declared path made absolute, or nothing when the instructions declare none.
+  local declared cand
+  declared="$(declared_path || true)"
+  [ -n "$declared" ] || return 1
+  case "$declared" in
+    /*) cand="$declared" ;;
+    '~/'*) cand="$HOME/${declared#\~/}" ;;
+    *) cand="$PROJECT_TOP/$declared" ;;
+  esac
+  printf '%s\n' "$cand"
+}
+
+# An earlier leg wins before the instruction leg is ever tried, so a project that
+# answered "the shared git directory" would never read a to-do location its own
+# instructions declare later, and the one-time offer to migrate what is in that
+# file could never fire. The queue does not move — the offer is about lifting a
+# named file's contents into the queue, not relocating the queue — so the leg
+# still wins and simply reports what it passed over.
+note_declared_elsewhere() {
+  local cand
+  cand="$(declared_abs)" || return 0
+  [ -n "$cand" ] || return 0
+  case "$cand" in "$QUEUE_ROOT" | "$QUEUE_ROOT"/*) return 0 ;; esac
+  DECLARED_TODO="$cand"
+  note "instructions: $cand is declared but the queue already resolved to $QUEUE_ROOT"
+  return 0
+}
+
 # The four legs, in the user's order. $1 = 1 to create when nothing resolves,
 # $2 = an explicit root (an answered location question) or ''.
 resolve_root() {
@@ -303,12 +333,14 @@ resolve_root() {
 
   if adopt_candidate "$PROJECT_TOP/pln" 'project-root' 'pln'; then
     create_queue "$QUEUE_ROOT" || fail "cannot write the queue at $QUEUE_ROOT"
+    note_declared_elsewhere
     return 0
   fi
 
   if [ "$IN_WORKTREE" = 1 ] && [ -n "$COMMON_DIR" ]; then
     if adopt_candidate "$COMMON_DIR/pln" 'common-dir'; then
       create_queue "$QUEUE_ROOT" || fail "cannot write the queue at $QUEUE_ROOT"
+      note_declared_elsewhere
       return 0
     fi
   fi
@@ -356,6 +388,7 @@ resolve_root() {
 
 LOCATION_QUESTION=''
 MIGRATION_OFFERED=''
+DECLARED_TODO=''
 
 header_field() {
   # $1 = index file, $2 = key
@@ -399,6 +432,7 @@ report_resolution() {
   printf 'CREATED=%s\n' "$CREATED"
   printf 'LOCATION_QUESTION=%s\n' "$LOCATION_QUESTION"
   printf 'MIGRATION_OFFERED=%s\n' "$MIGRATION_OFFERED"
+  printf 'DECLARED_TODO=%s\n' "${DECLARED_TODO:--}"
   report_notes
 }
 
@@ -906,11 +940,14 @@ case "$command" in
 
   claim)
     id=''; run=''; against=''; steal=''
+    claim_touches=''; claim_holds=''; have_claim_touches=0; have_claim_holds=0
     while [ $# -gt 0 ]; do
       case "$1" in
         --project) project="${2:-}"; shift 2 ;;
         --id) id="${2:-}"; shift 2 ;;
         --run) run="${2:-}"; shift 2 ;;
+        --touches) claim_touches="${2:-}"; have_claim_touches=1; shift 2 ;;
+        --holds) claim_holds="${2:-}"; have_claim_holds=1; shift 2 ;;
         --against) against="${2:-}"; shift 2 ;;
         --steal) steal="${2:-}"; shift 2 ;;
         --no-create) create_flag=0; shift ;;
@@ -929,17 +966,39 @@ case "$command" in
     # One mkdir lock over both the check and the record. A bare check cannot
     # enforce a refusal: two runs can each read a clear answer and both proceed.
     take_lock
-    holder="$(parse_detail "$detail" | LC_ALL=C cut -f7)"
-    if [ -n "$holder" ] && [ "$holder" != "$run" ]; then
+    holder="$(parse_detail "$detail")" || holder=''
+    holder_wt="$(printf '%s' "$holder" | LC_ALL=C cut -f10)"
+    holder="$(printf '%s' "$holder" | LC_ALL=C cut -f7)"
+    # A run string is not a holder on its own — the same `<date>-<slug>` can be
+    # live in two trees that share one declared root. The pair is what holds,
+    # exactly as the overlap exemption already reads it, so a re-claim is only
+    # the holder's own when both halves match. An older record carrying no
+    # `claimed_in` matches no tree and is released by `--steal` like any other.
+    held_elsewhere=0
+    if [ -n "$holder" ] && { [ "$holder" != "$run" ] || [ "$holder_wt" != "$PROJECT_TOP" ]; }; then
+      held_elsewhere=1
+    fi
+    if [ "$held_elsewhere" = 1 ]; then
+      if [ -n "$holder_wt" ]; then held_desc="$holder in $holder_wt"; else held_desc="$holder"; fi
       if [ -z "$steal" ]; then
-        printf 'CLAIM=refused\nHELD_BY=%s\n' "$holder"
-        refuse "$id is held by $holder; a stale holder is released only by --steal $holder"
+        printf 'CLAIM=refused\nHELD_BY=%s\nHELD_IN=%s\n' "$holder" "${holder_wt:--}"
+        refuse "$id is held by $held_desc; a stale holder is released only by --steal $holder"
       fi
       if [ "$steal" != "$holder" ]; then
-        printf 'CLAIM=refused\nHELD_BY=%s\n' "$holder"
-        refuse "--steal names $steal but $id is held by $holder; nothing was released"
+        printf 'CLAIM=refused\nHELD_BY=%s\nHELD_IN=%s\n' "$holder" "${holder_wt:--}"
+        refuse "--steal names $steal but $id is held by $held_desc; nothing was released"
       fi
     fi
+    # Taking an item is the moment somebody has actually looked at it, so it is
+    # the moment its write set can be declared. Filing stays free — one sentence,
+    # no fields — and the field that answers parallel-safety gets filled by the
+    # run that just read the item, under the same lock the check runs in, so the
+    # check below sees what was declared rather than the empty field it was
+    # filed with.
+    [ "$have_claim_touches" = 0 ] || set_field "$detail" 'touches' \
+      "$(csv_to_lines "$claim_touches" | lines_to_yaml_list)"
+    [ "$have_claim_holds" = 0 ] || set_field "$detail" 'holds' \
+      "$(csv_to_lines "$claim_holds" | lines_to_yaml_list)"
     set +e
     check_out="$(run_check "$id" "$against" "$run" "$PROJECT_TOP")"
     check_rc=$?
@@ -947,6 +1006,9 @@ case "$command" in
     printf '%s\n' "$check_out"
     if [ "$check_rc" != 0 ]; then
       printf 'CLAIM=refused\n'
+      if [ -z "$(detail_list "$detail" touches)" ]; then
+        refuse "$id declares no touches, so nothing can be said about running it beside anything else; declare its write set on the claim: --touches <paths>"
+      fi
       refuse "$id collides with the declared set; it is not parallel-safe yet"
     fi
     set_field "$detail" 'claimed_by' "$run"
@@ -957,12 +1019,15 @@ case "$command" in
     set_field "$detail" 'claimed_in' "$PROJECT_TOP"
     write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
     release_lock
-    if [ -n "$holder" ] && [ "$holder" != "$run" ]; then printf 'STOLEN_FROM=%s\n' "$holder"; fi
+    if [ "$held_elsewhere" = 1 ]; then printf 'STOLEN_FROM=%s\n' "$holder"; fi
     printf 'CLAIM=held\nHELD_BY=%s\n' "$run"
+    # Read the write set back off the record rather than echoing the argument:
+    # what the next claim is checked against is what the file now says.
+    printf 'TOUCHES=%s\n' "$(detail_list "$detail" touches | paste -sd, - )"
     ;;
 
   mark)
-    id=''; sub=''; sub_state='[ ]'
+    id=''; sub=''; sub_state='[ ]'; mark_run=''
     set_state=''; set_status=''; set_urgent=''; set_group=''
     set_touches=''; set_holds=''; set_depends=''; set_source=''
     have_group=0; have_touches=0; have_holds=0; have_depends=0
@@ -970,6 +1035,7 @@ case "$command" in
       case "$1" in
         --project) project="${2:-}"; shift 2 ;;
         --id) id="${2:-}"; shift 2 ;;
+        --run) mark_run="${2:-}"; shift 2 ;;
         --state) set_state="${2:-}"; shift 2 ;;
         --status) set_status="${2:-}"; shift 2 ;;
         --urgent) set_urgent="${2:-}"; shift 2 ;;
@@ -999,6 +1065,23 @@ case "$command" in
     detail="$(detail_path "$id")"
     [ -f "$detail" ] || fail "no such queue item: $id"
     take_lock
+    # Marking is how a run records what it finished, so it may not be done to a
+    # record someone else is holding: `claim --steal` moves a holder without
+    # telling the run it displaced, and without this a displaced run could still
+    # write a completion the queue no longer backs — and its plan would record a
+    # success nobody could reconcile. An unheld record is marked by anyone, as
+    # before. A run that really did the work takes the item back first, which is
+    # also how the run that stole it learns the steal was contested.
+    mark_holder="$(parse_detail "$detail")" || mark_holder=''
+    mark_holder_wt="$(printf '%s' "$mark_holder" | LC_ALL=C cut -f10)"
+    mark_holder="$(printf '%s' "$mark_holder" | LC_ALL=C cut -f7)"
+    if [ -n "$mark_holder" ] \
+      && { [ "$mark_run" != "$mark_holder" ] || [ "$PROJECT_TOP" != "$mark_holder_wt" ]; }; then
+      release_lock
+      printf 'MARK=refused\nHELD_BY=%s\nHELD_IN=%s\n' "$mark_holder" "${mark_holder_wt:--}"
+      if [ -n "$mark_holder_wt" ]; then mark_desc="$mark_holder in $mark_holder_wt"; else mark_desc="$mark_holder"; fi
+      refuse "$id is held by $mark_desc; take it back with claim --steal $mark_holder before marking it"
+    fi
     # The helper owns the frontmatter and the sub-item checklist it appends to,
     # and nothing else in the body.
     [ -z "$set_state" ] || set_field "$detail" 'state' "\"$set_state\""

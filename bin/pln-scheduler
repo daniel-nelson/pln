@@ -511,9 +511,13 @@ case "$command" in
         ;;
       interrupted)
         [ "$worktree" != "-" ] || fail "interrupted item lacks a retained worktree"
-        recovery="fresh-worker"
-        # fresh-worker means a new handle whatever the manifest still records.
-        next="$(recover_claim_next "$manifest" "$item" "-" "$worktree")"
+        # An interruption stops or steers a worker; it does not prove the worker
+        # is gone, and the phase documents say recovery may continue a retained
+        # identity and fall back to a fresh one only when that identity is gone.
+        # So propose the handle the manifest still records — discarding it here
+        # named a fresh worker for an agent that was still answering.
+        if [ "$handle" = "-" ]; then recovery="fresh-worker"; else recovery="continue-handle"; fi
+        next="$(recover_claim_next "$manifest" "$item" "$handle" "$worktree")"
         ;;
       running) fail "running item has conflicting recovery state; interrupt or reconcile it first" ;;
       checkpointed)

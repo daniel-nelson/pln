@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.49.0 — 2026-09-02
+
+### Changed
+
+- **A post-gate review finding earns a question only when the answer is the user's to give.** An audit of twelve sessions had found 56% of all questions landing after the plan was declared finished, and proposed suppressing findings raised against the agent's own repair text. Re-measured across the seven `/pln` sessions from 26 August to 2 September — 69 post-gate questions — that proposal is wrong: half of all post-gate questions caught a defect that would have caused wrong or wasted implementation (a plan anchored to the wrong model, a unique index that would have deadlocked a page permanently, a whole prompt-and-eval workstream built on a phrase never meant as a mechanism), only 19% were about the agent's own repair text, four of the seven sessions had none at all, and suppressing that class would have lost three real defects. The quarter that caught nothing shares a different shape: the user already knew the answer. So the bar is now that test — do not ask when you have already decided and are content with the decision, when you are about to concede the premise, when the user answered it a round ago, when a correction to your own error does not change their answer, or when it is an observation rather than a finding. Repair it and say in one line that you did; nothing is dropped, and a finding that does earn a question is written plainly the first time.
+
+- **A run declares its write set when it takes a queue item, not later.** `touches` is the only thing the queue compares to decide whether two runs can work in parallel, and an absent one means unknown, which collides with everything — but filing is deliberately cheap and files most items with nothing, and the `mark` that was supposed to fill it in later never happened (66 of 94 live items on a real queue declared none). `pln-queue claim` now takes `--touches` and `--holds`, writes them under the same lock the collision check runs in, and reports the write set back off the record; a claim of an item that still declares nothing is refused and names the way out. Intake stays free — the claim is the first moment somebody has read the item and knows what working it will write.
+
+- **Marking is attributable.** `pln-queue mark` now takes `--run` and refuses a record someone else holds, naming the holder and the `claim --steal` that takes it back. `claim --steal` is the only thing that moves a holder and it does not tell the run it displaced, so a run whose item was taken mid-flight could previously still check it off, leaving its plan carrying a success the queue does not back — which 1.46.0's plan-to-queue close made consequential. An unheld record is marked by anyone, as before.
+
+### Fixed
+
+- **The claim holder gate reads the same pair the overlap exemption does.** The exemption already required `claimed_by` *and* `claimed_in` to match; the gate compared the run string alone, so one `<date>-<slug>` live in two trees that share a queue root could re-claim its own held item from either of them and silently move the record. A re-claim is now the holder's own only when both halves match, refusals report `HELD_IN` alongside `HELD_BY`, and an older record carrying no `claimed_in` is released by `--steal` like any other.
+
+- **A declared to-do location is no longer silently ignored.** `resolve_root` tries the project's own `pln/` and the shared git directory before the instruction leg, so a project that once answered "the shared git directory" could never be offered a migration for a to-do file its `CLAUDE.md`/`AGENTS.md` declared afterwards — the earlier leg resolved on every later call. The winning leg now reports `DECLARED_TODO` and a `NOTE=` for a declaration it passed over, and `/pln`'s outline step makes the same one-time migration offer on it. The queue does not move: the offer is about lifting a named file's contents into the queue, not relocating the queue.
+
+- **`pln-scheduler recover` keeps the handle the manifest records for an interrupted node.** Both host fragments say recovery may continue a retained identity and fall back to a fresh worker only when that identity is gone, but `recover` discarded the recorded handle and named a fresh worker unconditionally — an interruption stops or steers a worker, it does not prove the worker is gone. `interrupted` now proposes `continue-handle` whenever a handle is on record, matching `blocked`.
+
+### Documentation
+
+- **What a second worktree actually shares.** `queue-format.md` said each worktree has its own queue and treated one shared root as the exceptional case. The opposite is true: linked worktrees resolve to `git rev-parse --git-common-dir`, which is the same path from every one of them, so sharing is the default and the `claimed_by`/`claimed_in` pair is doing routine work rather than covering a corner. Only a tree whose queue resolved somewhere genuinely separate is invisible to the others.
+
+- **A retained worktree is held exclusively.** Nothing said that a `blocked` or `interrupted` node keeps its tree against every other node until it reaches a terminal status, while staying dispatchable itself — and reading a node's own dispatchability as the tree being free is how two workers end up writing one tree. Stated in the blocker phase, alongside what may still run in isolated trees of its own.
+
+- **`/pln-pr`'s CI-watch close says what it could not push.** Step 8 files ahead of its push, but the Step 9 close runs after the PR is open and, on the green path, already marked ready — where a commit would restart CI on a PR a reviewer has just been handed. Under a queue root tracked inside the working tree, items filed there are local only, and the closing message now says so on its own line, names the files, and gives the commit and push as one command. It is a statement, never a question: this close is reached by unattended runs.
+
 ## 1.48.0 — 2026-09-02
 
 ### Fixed

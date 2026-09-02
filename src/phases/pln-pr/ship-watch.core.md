@@ -37,13 +37,15 @@ If it fails: the branch does not ship. Surface the failure and stop (or spawn on
 
 ### Step 8. Commit, push, and open (or update) the PR
 
-Ensure everything intended is committed (fixed files by name; the version/changelog commit if Step 6 ran). Push the branch: `git push -u origin HEAD`.
+**Sweep and file before you push.** Sweep the run's own record for outstanding work (Follow-ups, below) — this is where the follow-up list is assembled, and both closes below reuse it — and file it now: one `{{OUTPUT_ROOT}}/bin/pln-queue add` per candidate that clears the bar, `--source` naming this review. Order matters because the queue may live *in* the repository: under a root the project's own instructions named, the filed items are tracked files, and a queue write after the push never reaches the pushed `HEAD` — it sits uncommitted on the machine that ran pln-pr while the branch a reviewer opens carries none of it. (Under the `.git` common-dir root, or a root outside the repository, nothing here is pushed either way; filing first is simply always correct.)
+
+Ensure everything intended is committed (fixed files by name; the version/changelog commit if Step 6 ran; the queue files the sweep just wrote, by name, when the queue root sits inside the working tree). Push the branch: `git push -u origin HEAD`.
 <!-- pln:only codex -->
 
 The commits, the push and the `gh`/`glab` calls are the orchestrator's own work — a spawned agent has no network and no writable `.git`, so handing any of this to one produces a silent no-op. If the host asks you to approve a command that leaves the sandbox, ask the user for it rather than routing around it.
 <!-- pln:endonly -->
 
-Sweep the run's own record for outstanding work first (Follow-ups, below) — this is where the follow-up list is assembled, and both closes below reuse it. File it here too, before the body is assembled: one `{{OUTPUT_ROOT}}/bin/pln-queue add` per candidate that clears the bar, `--source` naming this review. Then assemble the PR body: what the branch does, then what's relevant to a reviewer — the final gauntlet result and the genuine follow-ups (Style's "Ending a message" bar), each one line. Drop the rest: a finding that got fixed needs no summary (the commit that fixed it is the record), and there is no "N findings, all fixed" tally. This is the same follow-up list the closing message uses — don't maintain a second one.
+Then assemble the PR body: what the branch does, then what's relevant to a reviewer — the final gauntlet result and the genuine follow-ups (Style's "Ending a message" bar), each one line. Drop the rest: a finding that got fixed needs no summary (the commit that fixed it is the record), and there is no "N findings, all fixed" tally. This is the same follow-up list the closing message uses — don't maintain a second one.
 
 One more section, when the branch came from a `/pln` run whose `PLAN.md` carries a non-empty Reversals list: render those lines under their own heading, one each, saying what the branch overturns and where it was originally decided. A decision that reverses something already settled is the part of a branch a reviewer most needs to see, and `/pln`'s delegated mode can adopt a plan the user never read.
 

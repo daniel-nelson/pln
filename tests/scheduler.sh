@@ -322,6 +322,15 @@ for holding in running blocked interrupted; do
     "claim did not run a withheld node while item 1 was $holding"
   if [ "$holding" = interrupted ]; then
     has "$hold_ready" $'READY\t1\t' 'an interrupted node lost its own recovery slot'
+    # An interruption does not prove the worker is gone: recovery continues the
+    # recorded identity, and only a manifest with no handle asks for a fresh one.
+    "$SCHEDULER" recover --manifest "$hold_manifest" --item 1 > "$WORK/hold-recover.out"
+    has "$WORK/hold-recover.out" 'RECOVERY=continue-handle' \
+      'an interrupted node with a recorded handle was sent to a fresh worker'
+    has "$WORK/hold-recover.out" '--handle hold-agent ' \
+      'recover discarded the handle the manifest still records'
+    hasnt "$WORK/hold-recover.out" 'first supply a fresh worker' \
+      'recover asked for a new handle it already had'
   fi
 done
 

@@ -585,7 +585,7 @@ refused "claiming a same-run item that declares no touches" claim --project "$R"
   --id silent --run plan-1
 said 'silent declares no touches' "an item with unknown writes was claimable by its own run"
 ok "claiming an item that later loses its touches" claim --project "$R" --id vague --run plan-1
-ok "clearing the held item's touches" mark --project "$R" --id vague --touches ''
+ok "clearing the held item's touches" mark --project "$R" --id vague --run plan-1 --touches ''
 refused "claiming against a same-run item whose writes are unknown" claim --project "$R" \
   --id later --run plan-1
 said $'COLLISION\tvague\tunknown' \
@@ -615,6 +615,104 @@ said $'COLLISION\tshared-head\tpath\tapp/shared.rb' \
 ok "claiming the same run's overlap from the worktree that holds it" claim \
   --project "$WORK/tree-one" --id shared-tail --run 2026-08-31-x
 said 'CLAIM=held' "the claiming worktree was refused its own overlap"
+# The holder gate reads the same pair the exemption does: the run string alone
+# does not make a re-claim the holder's own.
+refused "re-claiming a held item from another worktree under the same run string" claim \
+  --project "$WORK/tree-two" --id shared-head --run 2026-08-31-x
+said "HELD_IN=$WORK/tree-one" \
+  "a cross-worktree re-claim was not told which tree holds the item"
+has "$QROOT/q/shared-head.md" "claimed_in: $WORK/tree-one" \
+  "a refused cross-worktree re-claim still moved the holder record"
+ok "re-claiming a held item from the worktree that holds it" claim \
+  --project "$WORK/tree-one" --id shared-head --run 2026-08-31-x
+said 'CLAIM=held' "the holder was refused a re-claim in its own tree"
+ok "filing a disjoint item into the shared root" add --project "$WORK/tree-one" \
+  --id shared-solo --claim 'shared solo' --source s --touches 'app/solo.rb'
+ok "claiming the disjoint item from the first tree" claim \
+  --project "$WORK/tree-one" --id shared-solo --run 2026-08-31-x
+ok "taking a cross-worktree hold with --steal" claim \
+  --project "$WORK/tree-two" --id shared-solo --run 2026-08-31-x --steal 2026-08-31-x
+said 'STOLEN_FROM=2026-08-31-x' "a cross-worktree steal did not name the holder it displaced"
+has "$QROOT/q/shared-solo.md" "claimed_in: $WORK/tree-two" \
+  "a cross-worktree steal did not move the worktree half of the holder record"
+
+# A project that answered "the shared git directory" and later declares a to-do
+# location still hears about it: the leg wins, the queue does not move, and the
+# declaration is reported instead of being silently passed over.
+D="$WORK/declared-later"
+new_repo "$D"
+mkdir -p "$D/.git/pln"
+ok "resolving to the shared git directory" init --project "$D"
+is RESOLVED_BY common-dir "the shared git directory leg did not win"
+is DECLARED_TODO - "a project declaring nothing reported a declaration"
+mkdir -p "$D/notes"
+printf 'a to-do\n' > "$D/notes/TODO.md"
+printf 'pln-queue: notes/TODO.md\n' > "$D/CLAUDE.md"
+ok "resolving again once a to-do location is declared" init --project "$D"
+is RESOLVED_BY common-dir "a later declaration silently moved the queue"
+is QUEUE_ROOT "$D/.git/pln" "a later declaration moved the queue root"
+is DECLARED_TODO "$D/notes/TODO.md" "a declared to-do location was passed over in silence"
+said 'is declared but the queue already resolved to' \
+  "the resolution report did not say what it passed over"
+# A declaration that names the root already in use is not something passed over.
+printf 'pln-queue: .git/pln\n' > "$D/CLAUDE.md"
+ok "declaring the root already in use" init --project "$D"
+is DECLARED_TODO - "the root already in use was reported as a passed-over declaration"
+
+# Pickup is where the write set gets declared: filing stays free, and the run
+# that has just read the item fills the field the collision check depends on.
+P="$WORK/pickup"
+new_repo "$P"
+ok "filing an item with no write set" add --project "$P" --id vague-pickup \
+  --claim 'filed in one sentence' --source s
+refused "claiming an item that still declares no write set" claim \
+  --project "$P" --id vague-pickup --run pick-1
+said 'declares no touches' "the refusal did not name the empty field"
+said '--touches' "the refusal did not name the way out"
+ok "declaring the write set on the claim" claim --project "$P" --id vague-pickup \
+  --run pick-1 --touches 'app/a.rb,app/b.rb' --holds 'port-block'
+said 'CLAIM=held' "declaring a write set at pickup did not take the item"
+said 'TOUCHES=app/a.rb,app/b.rb' "the claim did not read the write set back off the record"
+has "$P/pln/q/vague-pickup.md" 'touches: [app/a.rb, app/b.rb]' \
+  "the claim did not write the declared write set to the record"
+has "$P/pln/q/vague-pickup.md" 'holds: [port-block]' \
+  "the claim did not write the declared resources to the record"
+# What was declared at pickup is what the next claim is checked against.
+ok "filing an overlapping second item" add --project "$P" --id vague-overlap \
+  --claim 'overlaps the first' --source s --touches 'app/b.rb'
+refused "claiming an item that overlaps a set declared at pickup" claim \
+  --project "$P" --id vague-overlap --run pick-2
+said $'COLLISION\tvague-pickup\tpath\tapp/b.rb' \
+  "a write set declared at pickup was not compared against the next claim"
+
+# Marking is attributable: a run that has been stolen from cannot record a
+# completion the queue no longer backs, and an unheld record is marked by anyone.
+H="$WORK/holder-marking"
+new_repo "$H"
+ok "filing an item to be stolen" add --project "$H" --id contested-close \
+  --claim 'an item two runs both want' --source s --touches 'app/c.rb'
+ok "marking an unheld record without naming a run" mark --project "$H" \
+  --id contested-close --status ready
+ok "the first run claiming it" claim --project "$H" --id contested-close --run run-first
+ok "the holder marking its own item" mark --project "$H" --id contested-close \
+  --run run-first --state '[-]'
+refused "marking a held item without naming a run" mark --project "$H" \
+  --id contested-close --state '[x]'
+said 'HELD_BY=run-first' "a refused mark did not name the holder"
+said 'claim --steal run-first' "a refused mark did not say how to take the item back"
+ok "the second run stealing it" claim --project "$H" --id contested-close \
+  --run run-second --steal run-first
+refused "the stolen-from run marking it done" mark --project "$H" \
+  --id contested-close --run run-first --state '[x]'
+said 'HELD_BY=run-second' "the displaced run was not told who holds the item now"
+has "$H/pln/q/contested-close.md" 'state: "[-]"' \
+  "a refused mark still wrote through to the record"
+ok "the run that really did the work taking it back" claim --project "$H" \
+  --id contested-close --run run-first --steal run-second
+ok "marking it done once it is held again" mark --project "$H" --id contested-close \
+  --run run-first --state '[x]'
+has "$H/pln/q/contested-close.md" 'state: "[x]"' \
+  "the holder was refused the completion it had taken back"
 
 # ─── mark: the three markers, the flag, and the sub-item checklist ────────────
 R="$WORK/marking"

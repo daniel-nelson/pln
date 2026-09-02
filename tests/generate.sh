@@ -734,6 +734,91 @@ for f in "$real_c/phases/pln/finish-ship.md" "$real_x/phases/pln/finish-ship.md"
     "$f still triggers the hand-off from a position in the step sequence"
 done
 
+# ─── the queue close, and the declaration it reads ────────────────────────────
+# Step 7's queue close has the same defect the hand-off above was repaired for,
+# and one the hand-off does not: it leaves no durable mark, so a close that
+# never ran reads exactly like one that did. Its trigger is therefore a
+# condition over durable state with both bounds and a turn rule of its own —
+# and the close runs *before* the wrap-up message, the opposite of the hand-off.
+#
+# Each of the last four assertions pins a paragraph a later edit could delete
+# with every other assertion here still passing: the archive-falsification read,
+# the bound's subject noun, the refusal state, and the third state where a
+# declared id carries no claim result at all.
+for f in "$real_c/phases/pln/finish-ship.md" "$real_x/phases/pln/finish-ship.md"; do
+  has "$f" 'False until the sweep has filed' \
+    "$f has no start bound on the queue close"
+  has "$f" 'True from there until every id this run claimed carries an outcome' \
+    "$f has no end bound on the queue close"
+  has "$f" "the close is the turn's first action and precedes the wrap-up message" \
+    "$f lets the wrap-up message go out ahead of the queue close"
+  hasnt "$f" 'Close the queue at the end of Step 7' \
+    "$f still triggers the queue close from a position in the step sequence"
+  # The close has to survive a restart, and the hand-off must not fire on a turn
+  # where it never ran: one list entry and one clause, in two other passages.
+  has "$f" 'Persist verification results, follow-ups, the queue close, Ship choice, PR base' \
+    "$f does not persist the queue close before reporting completion"
+  has "$f" 'the queue close below has run' \
+    "$f lets the ship hand-off fire on a turn where the close never ran"
+  # A plan that lies about its own id is the one direction the queue can
+  # falsify: a genuinely archived record is gone from q/, so its presence there
+  # under this run's holder contradicts the plan's prose.
+  has "$f" 'Also true while any id the plan records as archived still has a live record' \
+    "$f does not falsify a plan's archive claim against the live queue"
+  # The bound is stated over the claimed set, never the declared set — the two
+  # are the same extension only until a refusal, and a refused id must not hold
+  # the run short of Phase: complete.
+  has "$f" "The claimed set is the ids the dashboard's \`## Queue items\` section records as claimed." \
+    "$f does not name the claimed set as the queue close's subject"
+  hasnt "$f" 'until every declared id carries' \
+    "$f states the queue close's bound over the declared set"
+  # Three states, not two: recorded success, recorded refusal, and no record at
+  # all. The third is reachable — the helper writes the holder under its lock
+  # and returns before the plan-side write — and nothing recovers it.
+  has "$f" 'An id whose record there is a refusal' \
+    "$f does not exempt a refused id from the queue close's bound"
+  has "$f" 'An id carrying no recorded claim result at all has not been shown to be outside it either' \
+    "$f lets a declared id with no recorded claim result reach Phase: complete"
+  has "$f" 'Neither state is read off the absence of the other.' \
+    "$f infers a refusal from a missing claim result, or the reverse"
+done
+
+# The declaration the close reads is written in three phases, and only one of
+# them is reached by the dashboard-skeleton section list further down. The other
+# two land here: the write ordered at adoption, and the claim-time result write
+# that is the close's only durable input. Delete either and every assertion
+# above still passes while the close gates on a field nothing fills in.
+for f in "$real_c/phases/pln/outline.md" "$real_x/phases/pln/outline.md"; do
+  has "$f" '- **Queue items** — the follow-up-queue ids this run takes' \
+    "$f does not define the Queue items field under Tracker contents"
+  has "$f" "amended at claim time with each id's claim result, and amended again at the close" \
+    "$f defines Queue items as set once, like Ship, rather than amended three times"
+done
+for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-approval.md"; do
+  has "$f" '`- none taken` when it takes none' \
+    "$f does not give a run taking no queue items an explicit none value to write"
+  # The create-when-missing clause, not a bare Record line: it is the section's
+  # only origin for a plan upgrading into the field, and what narrows the
+  # close's absent-section escape to plans adopted before the field existed.
+  has "$f" 'Create the section above `## Ship` when the plan does not carry one.' \
+    "$f does not create the Queue items section when the plan carries none"
+  has "$f" 'Adoption is not recorded while the section still reads `- (not yet declared)`' \
+    "$f records adoption with the Queue items field left unanswered"
+done
+for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
+  has "$f" "The dashboard's \`## Queue items\` section names what this run takes" \
+    "$f does not read the declared set from the dashboard field"
+  # queue-format is not included into this file, so this clause is the claim
+  # rule's only statement anywhere in the implementation phase for a plan
+  # adopted before the field existed.
+  has "$f" 'A plan adopted before that section existed carries no field to read; declare the items in this turn and claim them the same way.' \
+    "$f leaves the per-item claim rule unstated for a plan carrying no field"
+  has "$f" "Write each attempt's result back beside its declared id as the attempt is made, not later" \
+    "$f does not anchor the claim-result write to the attempt"
+  has "$f" 'the holder from `HELD_BY`, or, when the refusal names no holder, the collision the check reported' \
+    "$f records a refusal in only one of the helper's two refusal forms"
+done
+
 # ─── the follow-up queue, and where its format is allowed to land ─────────────
 # One shared fragment, and its reach is a decision rather than an accident. The
 # three cores that render or explain the queue carry the whole format; every
@@ -865,7 +950,8 @@ for f in "$real_c/phases/pln/outline.md" "$real_x/phases/pln/outline.md"; do
   has "$f" 'Rows are never removed and numbers are never reused' \
     "$f does not say item numbers are permanent"
   for section in '## Status' '## Pre-flight findings' '## Open questions' '## Plan review' \
-    '## Ship' '## Reversals' '## Verification' '## Spinoffs' '## Cross-item notes'; do
+    '## Queue items' '## Ship' '## Reversals' '## Verification' '## Spinoffs' \
+    '## Cross-item notes'; do
     has "$f" "$section" "$f lost '$section' from the dashboard skeleton"
   done
 

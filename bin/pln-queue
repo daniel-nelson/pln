@@ -623,8 +623,21 @@ render_index() {
   printf '%s\n' "$records" | LC_ALL=C awk -F '\t' -v OFS='\t' -v live="$LIVE_DIR" '
     {
       id = $1; state = $2; urgent = $3; status = $4; opened = $5; group = $6; claim = $9
+      by = $7; where = $10
       flag = (urgent == "true") ? "! " : ""
-      line = "- " state " " flag status " · " claim " → `" live "/" id ".md`"
+      # The holder, where there is one. A run string is not unique on its own, so
+      # the worktree it claimed from rides with it — a record written before
+      # `claimed_in` existed names the run alone rather than inventing a tree.
+      held = ""
+      if (by != "") {
+        held = " · held by " by
+        if (where != "") {
+          sub(/\/+$/, "", where)
+          n = split(where, seg, "/")
+          if (seg[n] != "") held = held " in " seg[n]
+        }
+      }
+      line = "- " state " " flag status " · " claim " → `" live "/" id ".md`" held
       bucket = (urgent == "true") ? "0" : (group != "" ? "1" : "2")
       key = (opened != "") ? "0" opened : "1"
       print bucket, group, key, id, line

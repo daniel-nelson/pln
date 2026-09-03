@@ -636,6 +636,17 @@ said 'STOLEN_FROM=2026-08-31-x' "a cross-worktree steal did not name the holder 
 has "$QROOT/q/shared-solo.md" "claimed_in: $WORK/tree-two" \
   "a cross-worktree steal did not move the worktree half of the holder record"
 
+# The rendered index names its holders. The index is the artifact people open by
+# hand, and a claim a reader cannot see is a claim that gets taken twice — which
+# is what two trees of one repository, sharing this root, actually did.
+ok "refreshing the shared index" list --project "$WORK/tree-one"
+line_is "$QROOT/QUEUE.md" \
+  '- [ ] ready · shared head → `q/shared-head.md` · held by 2026-08-31-x in tree-one' \
+  "the index line for a held item did not name its holder and the tree it was claimed from"
+line_is "$QROOT/QUEUE.md" \
+  '- [ ] ready · shared solo → `q/shared-solo.md` · held by 2026-08-31-x in tree-two' \
+  "the index did not follow a cross-worktree steal to the tree that now holds it"
+
 # A project that answered "the shared git directory" and later declares a to-do
 # location still hears about it: the leg wins, the queue does not move, and the
 # declaration is reported instead of being silently passed over.
@@ -684,6 +695,19 @@ refused "claiming an item that overlaps a set declared at pickup" claim \
   --project "$P" --id vague-overlap --run pick-2
 said $'COLLISION\tvague-pickup\tpath\tapp/b.rb' \
   "a write set declared at pickup was not compared against the next claim"
+
+# An item nobody holds ends at its path, and a record written before
+# `claimed_in` existed names its run rather than inventing a tree for it.
+ok "refreshing the pickup index" list --project "$P"
+line_is "$P/pln/QUEUE.md" \
+  '- [ ] ready · overlaps the first → `q/vague-overlap.md`' \
+  "an unheld item did not end at its path"
+LC_ALL=C sed '/^claimed_in:/d' "$P/pln/q/vague-pickup.md" > "$P/pln/q/vague-pickup.md.tmp"
+mv "$P/pln/q/vague-pickup.md.tmp" "$P/pln/q/vague-pickup.md"
+ok "refreshing the index over a record with no worktree recorded" list --project "$P"
+line_is "$P/pln/QUEUE.md" \
+  '- [ ] ready · filed in one sentence → `q/vague-pickup.md` · held by pick-1' \
+  "a holder record predating claimed_in did not name its run alone"
 
 # Marking is attributable: a run that has been stolen from cannot record a
 # completion the queue no longer backs, and an unheld record is marked by anyone.

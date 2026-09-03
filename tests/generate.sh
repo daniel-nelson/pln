@@ -867,6 +867,31 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f records a refusal in only one of the helper's two refusal forms"
 done
 
+# ─── how wide the interview's research fan-out goes ──────────────────────────
+# Item research is read-only and per-item independent, so it is dispatched in
+# waves rather than one worker at a time. The width is a host fact — Claude Code
+# admits 20 concurrent subagents, Codex caps spawned threads per session with a
+# default that is documented two ways — so each build carries its own number and
+# never the other's, and the shared reason lives in the core.
+has "$real_c/phases/pln/interview.md" 'Wave width: up to 15 item workers at once' \
+  "the claude build lost its own research fan-out width"
+hasnt "$real_c/phases/pln/interview.md" 'up to 3 item workers' \
+  "the claude build carries Codex's narrower research fan-out width"
+has "$real_c/phases/pln/interview.md" 'CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS' \
+  "the claude build does not honour a user-configured subagent cap"
+has "$real_x/phases/pln/interview.md" 'Wave width: up to 3 item workers at once' \
+  "the codex build lost its own research fan-out width"
+hasnt "$real_x/phases/pln/interview.md" 'up to 15 item workers' \
+  "the codex build carries Claude Code's wider research fan-out width"
+has "$real_x/phases/pln/interview.md" 'max_concurrent_threads_per_session' \
+  "the codex build does not honour a user-configured thread cap"
+for f in "$real_c/phases/pln/interview.md" "$real_x/phases/pln/interview.md"; do
+  has "$f" 'Dispatch the item workers together in waves, await the wave' \
+    "$f does not dispatch item research concurrently"
+  has "$f" 'is dispatched after the wave that raised it' \
+    "$f does not keep a premise-changing follow-up worker after its wave"
+done
+
 # ─── how each host is told to invoke pln ─────────────────────────────────────
 # Claude Code invokes a skill as a slash command; Codex has none, and invokes a
 # skill by name with a `$` prefix, so `/pln` is an error there. A build that

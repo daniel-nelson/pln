@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.54.0 — 2026-09-03
+
+### Changed
+
+- **Interview research for independent items runs concurrently instead of one worker at a time.** The plan-review phase has always said "independent slots may run concurrently"; the interview phase said nothing of the kind, so a coordinator did the safe thing and spawned one research worker, awaited it, and only then spawned the next. Measured on a real four-item Codex run: `item1` 6.1 min, `item2` 7.4 min, `item3` 13.9 min, strictly end-to-start, with a fourth still running — thirty-two minutes after the outline was approved without a single interview question reaching the user. Item research is read-only and each item's is independent of every other item's, so nothing ordered them; the wall clock should be the slowest worker, not the sum. The phase now dispatches the item workers together in waves, awaits the wave, and walks the items with their envelopes already in hand. Two things stay sequential and are named as such: a follow-up worker for an item whose evidence changed its premise or returned `ESCALATE: frontier` waits for the wave that raised it, and a dispatched worker whose research an answer has already made moot is cancelled out loud rather than landing under a question its own answer would change. The wave width is a host fact and lives in a host fragment: **15 on Claude Code**, under a harness cap of 20 concurrent subagents and lowered to honour `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` where the user has set it smaller; **3 on Codex**, which caps spawned threads per session with `max_concurrent_threads_per_session` (alias `agents.max_threads`) whose unset default is documented both as four-including-the-root and as six, making three the widest wave safe under either, and raised only to an explicitly configured value less one for the coordinator's own thread. Codex's known behavior where a completed agent holds its slot until closed is named too, so a capacity refusal mid-wave is reaped and retried rather than read as a hard ceiling and answered by falling back to serial dispatch.
+
 ## 1.53.0 — 2026-09-03
 
 ### Fixed

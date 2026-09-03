@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.56.0 — 2026-09-03
+
+### Fixed
+
+- **A plan wider than one research wave no longer holds every question until the last wave lands.** 1.54.0 made item research concurrent, but the held-output rule releases when *the work* quiesces, and a wave is work: a plan needing four waves would consume wave one's envelopes silently, dispatch wave two, and keep holding — restoring in full the delay the waves were added to remove, for exactly the plans that can least afford it. The walk now begins when the first wave lands, and the next wave is dispatched as the walk moves into it. A wave still running for items the walk has not reached does not hold back a question about an item already researched: the hold exists so a message the user must read is not buried by later output, and a wave in flight produces no output — its results are consumed silently as they land, which the rule already says. One item is never split from its own research: its envelope is in hand before its question is asked.
+
+- **The pre-flight step no longer forbids the coordinator the instruction file that binds it.** Step 1 said the coordinator "does not inspect manifests, memories, documentation trees, git history, nested instruction files, or source code," which reads as a ban on the root `CLAUDE.md`/`AGENTS.md` too. On a host that injects those it is moot; on one that does not, the coordinator cannot learn the mandates governing its own conduct without reading them, and a repository whose `AGENTS.md` says "read `CLAUDE.md` in full before doing any work here" is owed that reading. Observed: a Codex coordinator read a 1050-line `CLAUDE.md` in four chunks — correctly, against pln's own text, and then correctly loaded the framework skill that file requires. A rule the model must break to behave well is the wrong rule. The exception is now stated, and the line drawn where it belongs: reading *further* on the strength of what the instruction file said is still the worker's job, not the coordinator's.
+
+### Changed
+
+- **The interview says plainly that research is all-items-first.** "Before the first proposal for every active item, classify the needed read" could be read as *each item as the walk reaches it*, which is a wait in front of every question rather than one wait in front of all of them. The intended shape — every active item researched before the walk begins — is now stated as the rule, with the per-item classification following from it.
+
 ## 1.55.0 — 2026-09-03
 
 ### Fixed

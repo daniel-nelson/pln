@@ -616,7 +616,10 @@ for host_out in "$real_c" "$real_x"; do
   has "$outline_file" 'src/workers/preflight-research.md' "$outline_file does not mandate a pre-flight research worker"
   has "$outline_file" '8192-byte ceiling' "$outline_file lost the pre-flight envelope budget"
   has "$interview_file" 'src/workers/interview-research.md' "$interview_file does not mandate per-item research"
-  has "$interview_file" 'Before the first proposal for every active item' "$interview_file makes per-item research optional"
+  # The all-items-first shape, in the words that replaced the ambiguous
+  # "Before the first proposal for every active item".
+  has "$interview_file" 'Every active item is researched before the walk begins' \
+    "$interview_file makes per-item research optional"
   has "$interview_file" 'decision-record-query mode' "$interview_file lost query-scoped prior-decision checks"
   has "$outline_file" '.git/info/exclude' "$outline_file does not keep local plans out of .gitignore"
   has "$outline_file" 'Outside a git worktree' "$outline_file does not allocate an external non-git run directory"
@@ -890,6 +893,32 @@ for f in "$real_c/phases/pln/interview.md" "$real_x/phases/pln/interview.md"; do
     "$f does not dispatch item research concurrently"
   has "$f" 'is dispatched after the wave that raised it' \
     "$f does not keep a premise-changing follow-up worker after its wave"
+done
+
+# ─── a plan wider than one wave still asks its first question early ──────────
+# The held-output rule releases when the work quiesces, and waves made "the
+# work" bigger than the items the walk has reached: a plan needing four waves
+# would hold every question until the last one landed, restoring the whole
+# delay the waves were added to remove.
+for f in "$real_c/phases/pln/interview.md" "$real_x/phases/pln/interview.md"; do
+  has "$f" 'the walk begins when the first wave lands' \
+    "$f waits for every wave before the walk begins"
+  has "$f" 'does not hold back a question about an item already researched' \
+    "$f lets a wave for unreached items hold back an answered item's question"
+  has "$f" 'What is never split is a single item' \
+    "$f does not keep one item's own research ahead of its own question"
+  has "$f" 'Every active item is researched before the walk begins' \
+    "$f no longer says plainly that research is all-items-first"
+done
+
+# The coordinator's pre-flight step may read the root instruction file that
+# governs its own conduct. Forbidding that outright produced a rule the model
+# correctly broke, in any repository whose AGENTS.md says to read CLAUDE.md.
+for f in "$real_c/phases/pln/outline.md" "$real_x/phases/pln/outline.md"; do
+  has "$f" 'The exception is the root instruction file that governs the coordinator' \
+    "$f forbids the coordinator the instruction file that binds it"
+  has "$f" 'reading *further* on the strength of what it found there' \
+    "$f does not draw the line at exploring beyond the root instruction file"
 done
 
 # ─── how each host is told to invoke pln ─────────────────────────────────────

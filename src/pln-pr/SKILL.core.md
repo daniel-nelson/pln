@@ -1,6 +1,6 @@
 ---
 name: pln-pr
-description: Review a branch and put up a pull request, the pln way — a fresh-context review army finds issues, a fix pass clears them under one durable ledger, and the gauntlet runs once before the PR opens. {{REVIEW_ARMY_SHORT}}; findings land in `REVIEW.md`; fixes run as clustered fix agents; verification happens once at the end, not per fix cycle. Universal — depends only on git, {{ORCH_TOOLS}}, and optionally the GitHub/GitLab CLI. No external service, no server, no gstack. Trigger explicitly via `/pln-pr`, or when the user asks to put up / open / create / make a PR or "ship it" — including when that ask is embedded in a larger instruction like "bump the version and open the PR", "and open the PR", or "push this up". Typically right after a `/pln` run, but works standalone on any branch with commits ahead of its base. A larger imperative that ends in opening a PR still routes here; do not push and run `gh pr create` directly for it unless the user explicitly says to skip the review.
+description: Review a branch and put up a pull request, the pln way — a fresh-context review army finds issues, a fix pass clears them under one durable ledger, and the gauntlet runs once before the PR opens. {{REVIEW_ARMY_SHORT}}; findings land in `REVIEW.md`; fixes run as clustered fix agents; verification happens once at the end, not per fix cycle. Universal — depends only on git, {{ORCH_TOOLS}}, and optionally the GitHub/GitLab CLI. No external service, no server, no gstack. Trigger explicitly via `{{PLN_PR_CMD}}`, or when the user asks to put up / open / create / make a PR or "ship it" — including when that ask is embedded in a larger instruction like "bump the version and open the PR", "and open the PR", or "push this up". Typically right after a `{{PLN_CMD}}` run, but works standalone on any branch with commits ahead of its base. A larger imperative that ends in opening a PR still routes here; do not push and run `gh pr create` directly for it unless the user explicitly says to skip the review.
 ---
 
 # pln-pr — review and open a pull request
@@ -8,10 +8,10 @@ description: Review a branch and put up a pull request, the pln way — a fresh-
 You are running the user's personal PR workflow. It is the ship half of a plan: take the work on the current branch, review it with fresh-context reviewers, fix what they find, verify once, and open the pull request. Read every section of this file before starting, then execute. The user tuned this to be lean on purpose — it carries the review intelligence and none of the runtime scaffolding a heavier ship tool drags along. Do not add ceremony it does not ask for.
 
 <!-- pln:only claude -->
-**Resolve pln's helpers**: `/pln-pr` reuses `/pln`'s `bin/` scripts. They live at the pln repo root, one level *above* this skill's own directory, so `${CLAUDE_SKILL_DIR}/bin` does **not** point at them (this skill is a subdirectory of the pln repo, symlinked in as its own command). Find the install once and reuse it:
+**Resolve pln's helpers**: `{{PLN_PR_CMD}}` reuses `{{PLN_CMD}}`'s `bin/` scripts. They live at the pln repo root, one level *above* this skill's own directory, so `${CLAUDE_SKILL_DIR}/bin` does **not** point at them (this skill is a subdirectory of the pln repo, symlinked in as its own command). Find the install once and reuse it:
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-**Resolve pln's helpers**: `/pln-pr` reuses `/pln`'s `bin/` scripts, which live at the pln repo root, one level *above* this skill's own directory. Find the install once and reuse it:
+**Resolve pln's helpers**: `{{PLN_PR_CMD}}` reuses `{{PLN_CMD}}`'s `bin/` scripts, which live at the pln repo root, one level *above* this skill's own directory. Find the install once and reuse it:
 <!-- pln:endonly -->
 
 ```bash
@@ -35,15 +35,15 @@ If `PLN_DIR` is `none`, the helpers aren't found: skip the config-gated notifica
 
 ## When to engage
 
-Engage when the user types `/pln-pr`, or asks to put up / open / create / make a PR or "ship it", on a branch that has commits ahead of its base. Most often this comes right after a `/pln` run completed its own gauntlet; it also works standalone on any feature branch.
+Engage when the user types `{{PLN_PR_CMD}}`, or asks to put up / open / create / make a PR or "ship it", on a branch that has commits ahead of its base. Most often this comes right after a `{{PLN_CMD}}` run completed its own gauntlet; it also works standalone on any feature branch.
 
-**The trigger holds even when the PR ask is one clause of a bigger instruction.** "Bump the version and open the PR", "commit and push this up", "and then open the PR" all route here. Review depth is the user's to set and no one else's: it is `full`, `broad`, or `none`, and it comes from `/pln`'s adoption gate, a `review=` argument, an explicit instruction in the invoking message, or the one ask scope-baseline makes when none of those supplied it. `plan_review=false` never applies to PR review. Honor whatever depth is set, but classify risk first and warn clearly when a depth below the tier's roster is what runs — for `none` at R3, that critical assurance was skipped entirely. A repository's explicit self-hosting rule for the workflow that defines `/pln-pr` counts as that repository's narrow skip only when its named substitute gauntlet/manual-install assurance is performed; never generalize it.
+**The trigger holds even when the PR ask is one clause of a bigger instruction.** "Bump the version and open the PR", "commit and push this up", "and then open the PR" all route here. Review depth is the user's to set and no one else's: it is `full`, `broad`, or `none`, and it comes from `{{PLN_CMD}}`'s adoption gate, a `review=` argument, an explicit instruction in the invoking message, or the one ask scope-baseline makes when none of those supplied it. `plan_review=false` never applies to PR review. Honor whatever depth is set, but classify risk first and warn clearly when a depth below the tier's roster is what runs — for `none` at R3, that critical assurance was skipped entirely. A repository's explicit self-hosting rule for the workflow that defines `{{PLN_PR_CMD}}` counts as that repository's narrow skip only when its named substitute gauntlet/manual-install assurance is performed; never generalize it.
 
 If the branch has no commits ahead of base, say so and stop — there is nothing to put up.
 
 ## Interaction discipline
 
-This skill follows pln's discipline. Never call the `AskUserQuestion` tool. Surface at most one decision at a time, as plain prose. When you record a user's answer, echo it back in one short line before moving on. The Style section below is the same text `/pln` carries, generated from one shared source, and it governs every message this skill produces.
+This skill follows pln's discipline. Never call the `AskUserQuestion` tool. Surface at most one decision at a time, as plain prose. When you record a user's answer, echo it back in one short line before moving on. The Style section below is the same text `{{PLN_CMD}}` carries, generated from one shared source, and it governs every message this skill produces.
 
 <!-- pln:include style -->
 

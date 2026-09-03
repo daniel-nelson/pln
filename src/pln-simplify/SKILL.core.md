@@ -1,6 +1,6 @@
 ---
 name: pln-simplify
-description: Map a codebase's concepts and ownership, identify bounded consolidation or deletion opportunities, execute an adopted simplification through pln's existing lifecycle, verify the exact candidate, and record a portable cadence marker. Use when the user invokes `/pln-simplify` or asks for a deliberate repository simplification, architecture decluttering, duplicate-owner consolidation, obsolete-path retirement, or a recurring lean-codebase assessment. A valid outcome is `nothing worth changing`.
+description: Map a codebase's concepts and ownership, identify bounded consolidation or deletion opportunities, execute an adopted simplification through pln's existing lifecycle, verify the exact candidate, and record a portable cadence marker. Use when the user invokes `{{PLN_SIMPLIFY_CMD}}` or asks for a deliberate repository simplification, architecture decluttering, duplicate-owner consolidation, obsolete-path retirement, or a recurring lean-codebase assessment. A valid outcome is `nothing worth changing`.
 ---
 
 # pln-simplify — map, simplify, verify
@@ -15,9 +15,9 @@ If none exists, stop and ask the user to run this skill's parent `setup`; do not
 
 ## Lifecycle ownership
 
-This skill owns only mapping, simplification synthesis, cadence interpretation, and verified-success recording. Reuse the generated `/pln` router and phase documents for plan location, the initial outline checkpoint, one-question-at-a-time interview, plan review, master-plan approval, scheduling, item implementation, blocker recovery, and exact-candidate assurance. Load those documents when the phase reaches them; do not copy or restate their policies.
+This skill owns only mapping, simplification synthesis, cadence interpretation, and verified-success recording. Reuse the generated `{{PLN_CMD}}` router and phase documents for plan location, the initial outline checkpoint, one-question-at-a-time interview, plan review, master-plan approval, scheduling, item implementation, blocker recovery, and exact-candidate assurance. Load those documents when the phase reaches them; do not copy or restate their policies.
 
-The coordinator never performs worker judgment inline and never edits implementation itself. `/pln-simplify` never invokes `/pln-pr` automatically and never broadens a bounded candidate into unrelated cleanup.
+The coordinator never performs worker judgment inline and never edits implementation itself. `{{PLN_SIMPLIFY_CMD}}` never invokes `{{PLN_PR_CMD}}` automatically and never broadens a bounded candidate into unrelated cleanup.
 
 ## Simplification admission gate
 

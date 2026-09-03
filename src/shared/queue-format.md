@@ -1,12 +1,12 @@
 ## The follow-up queue
 
-Work that is found and not done now reaches the queue — wherever in a session it was found, and whichever of `/pln`, `/pln-pr` and `/pln-simplify` found it. A PR body, a review ledger and a commit message are copies; the queue is the record.
+Work that is found and not done now reaches the queue — wherever in a session it was found, and whichever of `{{PLN_CMD}}`, `{{PLN_PR_CMD}}` and `{{PLN_SIMPLIFY_CMD}}` found it. A PR body, a review ledger and a commit message are copies; the queue is the record.
 
 **There is no queue command.** pln grows no fourth skill and no slash command for this. Anything computed — whether an item can be picked up, whether two items collide, which ones look finished — comes from `{{OUTPUT_ROOT}}/bin/pln-queue`, called during a run. Anything read is read by opening the file.
 
 **The layout, relative to the resolved queue root.** The index is `<queue-root>/QUEUE.md`. Each live item has one detail file at `<queue-root>/q/<slug>.md`. A record that reaches a terminal state moves to `<queue-root>/done/<YYYY-MM>/<slug>.md`, listed in that month's own `index.md`. `pln/` is only the default root's basename — never write a literal `pln/` into one of these paths, because the root is resolved and may sit outside the repository entirely.
 
-**The helper resolves the root; no phase document does.** `pln-queue` resolves the queue's location on every invocation, creates it when nothing is found, and reports whether the location question is still owed. A standalone `/pln-pr` run, a `/pln` run resumed after a restart, and a plan that predates this release all reach the same queue without having run any particular step first.
+**The helper resolves the root; no phase document does.** `pln-queue` resolves the queue's location on every invocation, creates it when nothing is found, and reports whether the location question is still owed. A standalone `{{PLN_PR_CMD}}` run, a `{{PLN_CMD}}` run resumed after a restart, and a plan that predates this release all reach the same queue without having run any particular step first.
 
 ### The index line
 
@@ -134,13 +134,13 @@ Work enters through four doors, and every one of them ends in the same call: `{{
 
 **A door files a complete item**: an `--id`, a `--status`, a `--source` and a claim. `source` names the run, the review or the person the item came from, because the failure this queue answers is a follow-up whose origin died with the run that found it. Everything else is optional — an item filed with no `touches` is filed with none, and unknown then collides with everything, so it is never reported parallel-safe until someone fills the field in.
 
-**1. The run spinoff — the sweep at either close.** At `/pln`'s Step 7 wrap-up and at whichever `/pln-pr` close hands the PR to the user, the outstanding sweep already assembles the candidates and the follow-up bar already decides which of them are filed. Each one that clears the bar is filed **before the closing message is drafted**, not after it, so that the message can be written from the queue rather than the queue from the message.
+**1. The run spinoff — the sweep at either close.** At `{{PLN_CMD}}`'s Step 7 wrap-up and at whichever `{{PLN_PR_CMD}}` close hands the PR to the user, the outstanding sweep already assembles the candidates and the follow-up bar already decides which of them are filed. Each one that clears the bar is filed **before the closing message is drafted**, not after it, so that the message can be written from the queue rather than the queue from the message.
 
 **2. The explicit user drop.** "File this for a dedicated session", in whatever words, said at any point in a run — mid-interview, mid-review, in the middle of a fix. It is filed in the turn it is said, and it neither pauses the phase it arrived in nor becomes a question. A drop that waits for the close is a drop that survives only in the conversation, which is the state this queue replaces.
 
 **3. The mid-implementation discovery.** An item worker that finds work outside its item's scope returns it in its result; the **coordinator** files it at the checkpoint. Workers never write the queue themselves — the same rule that keeps them out of `PLAN.md` and the run manifest, and for the same reason: one writer, so two concurrent workers cannot both file the same discovery under two ids.
 
-**4. The recurring cadence.** A `/pln-simplify` map produces bounded candidates, and the ones this run is not taking — struck at the outline checkpoint, or left behind by a run that stops there — are filed rather than ending with the run. `source` names the map. Its own cadence marker is the precedent: an assessment is only worth repeating if what it found outlives it.
+**4. The recurring cadence.** A `{{PLN_SIMPLIFY_CMD}}` map produces bounded candidates, and the ones this run is not taking — struck at the outline checkpoint, or left behind by a run that stops there — are filed rather than ending with the run. `source` names the map. Its own cadence marker is the precedent: an assessment is only worth repeating if what it found outlives it.
 
 The doors differ only in what triggers them. What each one files and where it lands is the format above.
 

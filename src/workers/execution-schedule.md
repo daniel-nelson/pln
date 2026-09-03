@@ -16,7 +16,7 @@ Use increasing numeric node order. `DEPS` is a comma-separated list of earlier n
 - A cohort is only a contiguous direct-dependency chain where the next node consumes the prior node's discovery in the same subsystem, risk class, required skills, and repository. The first node is `fresh`, later nodes are `reuse`, and no cohort exceeds three nodes.
 - Force `fresh` at subsystem, risk, skill, or repository boundaries; when independence provides assurance; and after malformed output, unexpected writes, conflicts, a corrected premise, or the cohort cap.
 - Dirty-path overlap or uncertainty is recorded even if a node otherwise appears isolated. A node may be `clean` only when its complete lease is proven independent of every dirty path.
-- `/pln-pr` uses one fresh node per fix cluster: every row has `COHORT=-` and `CONTEXT=fresh`. Dependencies may order clusters, but never merge them into a long-lived worker.
+- `{{PLN_PR_CMD}}` uses one fresh node per fix cluster: every row has `COHORT=-` and `CONTEXT=fresh`. Dependencies may order clusters, but never merge them into a long-lived worker.
 
 Write complete reasoning, inspected paths, and counterevidence to the evidence path. Write a concise context-envelope result whose `DECISION_IMPACT` names the node artifact and says it must pass `bin/pln-scheduler build` before dispatch. Include exact references for every dependency, boundary, and lease decision that affects concurrency. Final response: `RESULT_FILE=<absolute result path>`.
 

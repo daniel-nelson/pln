@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.53.0 — 2026-09-03
+
+### Fixed
+
+- **The Codex build no longer tells Codex to type a slash command, which is an error on that host.** Codex has no slash commands: a skill is invoked by name with a `$` prefix. Verified against a live rollout on CLI 0.153.0 — typing `$pln` makes Codex inject a user-role `<skill><name>pln</name><path>…</path>` message carrying the skill body, after a session-start `<skills_instructions>` developer message that lists each skill against a skill-roots table — and against OpenAI's own bundled skills, whose descriptions say things like "when the user invokes $template-creator". pln's text was written in Claude Code's spelling throughout and generated verbatim for both hosts: 85 backticked `/pln`, `/pln-pr`, `/pln-simplify` and `/pln-update` references, including the router descriptions both hosts read when deciding whether to load the skill at all. Two costs, both observed. Step 8 hands the user the command to type next, and on Codex that command errors. And a model told explicit invocation looks like `/pln` cannot match `$pln` to it, so a real explicit invocation is re-derived as an inferred trigger — in the observed run the model engaged off the pasted item list and narrated why it had chosen to, rather than simply doing what it was told. The four command names now travel as `{{PLN_CMD}}`, `{{PLN_PR_CMD}}`, `{{PLN_SIMPLIFY_CMD}}` and `{{PLN_UPDATE_CMD}}` host vars, so each build carries its own host's spelling and neither carries the other's. The Claude build is byte-identical to before. `pln-update/SKILL.md` and `README.md` are hand-maintained rather than generated, so they state both spellings instead. `tests/generate.sh` pins the seam in both directions, and the two existing assertions that pinned a command token are now host-aware.
+
 ## 1.52.0 — 2026-09-02
 
 ### Changed

@@ -1,6 +1,6 @@
 ---
 name: pln
-description: Human-paced planning — one question at a time — with a peer that pushes back. Two distinct phases — first an interview that resolves every per-item question into a complete master plan, then (only after the master plan is approved as a whole) dependency-aware implementation with durable item checkpoints. A thin orchestrator schedules fresh workers, short direct-dependency cohorts, and isolated disjoint waves while PLAN.md plus a local run manifest preserve recovery. No interleaving: implementation never begins while questions are still open. Plans live under `./plans/` in git worktrees and in an external temporary run directory otherwise. Trigger explicitly via `/pln <task>`, or auto-engage when the user says things like "make a plan", "let's tackle this in steps", "work through these", or pastes a numbered list of items to address. Universal — works in any repo. NEVER use the AskUserQuestion tool.
+description: Human-paced planning — one question at a time — with a peer that pushes back. Two distinct phases — first an interview that resolves every per-item question into a complete master plan, then (only after the master plan is approved as a whole) dependency-aware implementation with durable item checkpoints. A thin orchestrator schedules fresh workers, short direct-dependency cohorts, and isolated disjoint waves while PLAN.md plus a local run manifest preserve recovery. No interleaving: implementation never begins while questions are still open. Plans live under `./plans/` in git worktrees and in an external temporary run directory otherwise. Trigger explicitly via `{{PLN_CMD}} <task>`, or auto-engage when the user says things like "make a plan", "let's tackle this in steps", "work through these", or pastes a numbered list of items to address. Universal — works in any repo. NEVER use the AskUserQuestion tool.
 ---
 
 # pln — personal planning workflow
@@ -16,17 +16,17 @@ See Notifications (in Cross-cutting concerns) for the call sites and message for
 <!-- pln:include readiness -->
 
 <!-- pln:only claude -->
-**Agent authorization**: invoking pln — typing `/pln`, or asking for pln-style treatment in plain words, on every invocation in a session rather than only the first — is itself the request for `Agent`, `SendMessage`, and `Workflow`. It authorizes every phase that spawns one, not implementation alone: Step 3's read-only research subagent, the record check included; Step 3.5's plan reviewer; Step 5's implementation workers; and Step 7's verifier. A general standing instruction against launching workflows or subagents unprompted does not outrank it, because that instruction guards against the model starting a fan-out of its own accord. Step 5 carries the fallback for a host where native Agent is absent or disabled.
+**Agent authorization**: invoking pln — typing `{{PLN_CMD}}`, or asking for pln-style treatment in plain words, on every invocation in a session rather than only the first — is itself the request for `Agent`, `SendMessage`, and `Workflow`. It authorizes every phase that spawns one, not implementation alone: Step 3's read-only research subagent, the record check included; Step 3.5's plan reviewer; Step 5's implementation workers; and Step 7's verifier. A general standing instruction against launching workflows or subagents unprompted does not outrank it, because that instruction guards against the model starting a fan-out of its own accord. Step 5 carries the fallback for a host where native Agent is absent or disabled.
 <!-- pln:endonly -->
 <!-- pln:only codex -->
-**Agent authorization**: invoking pln — typing `/pln`, or asking for pln-style treatment in plain words, on every invocation in a session rather than only the first — is itself the request for Codex's native multi-agent tools (`spawn_agent` and the rest). It authorizes every phase that spawns one, not implementation alone: Step 3's read-only research subagent, the record check included; Step 3.5's plan reviewer; Step 5's implementation run; and Step 7's verifier. A general standing instruction against spawning subagents unprompted does not outrank it, because that instruction guards against the model starting a fan-out of its own accord. See Spawning a fresh-context agent for what to do on an install where those tools are switched off.
+**Agent authorization**: invoking pln — typing `{{PLN_CMD}}`, or asking for pln-style treatment in plain words, on every invocation in a session rather than only the first — is itself the request for Codex's native multi-agent tools (`spawn_agent` and the rest). It authorizes every phase that spawns one, not implementation alone: Step 3's read-only research subagent, the record check included; Step 3.5's plan reviewer; Step 5's implementation run; and Step 7's verifier. A general standing instruction against spawning subagents unprompted does not outrank it, because that instruction guards against the model starting a fan-out of its own accord. See Spawning a fresh-context agent for what to do on an install where those tools are switched off.
 <!-- pln:endonly -->
 
 ## When to engage
 
 Engage automatically when the user:
 
-- Types `/pln <task>` (explicit invocation).
+- Types `{{PLN_CMD}} <task>` (explicit invocation).
 - Says "make a plan", "let's tackle this in steps", "work through these", "go through these one at a time", or similar.
 - Pastes a numbered or bulleted list of items they want addressed.
 

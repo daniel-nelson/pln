@@ -1,10 +1,10 @@
 ---
 name: pln-update
-description: Update the pln skill to the latest version from GitHub. Invoke as `/pln-update`, or follow this flow when pln's preamble reports `UPGRADE_AVAILABLE`.
+description: Update the pln skill to the latest version from GitHub. Invoke it by name — `/pln-update` in Claude Code, `$pln-update` in Codex, which has no slash commands — or follow this flow when pln's preamble reports `UPGRADE_AVAILABLE`.
 allowed-tools: Bash, Read, Write
 ---
 
-# /pln-update
+# pln-update
 
 Upgrade pln to the latest version and show what's new.
 
@@ -27,7 +27,7 @@ _AUTO=""
 echo "AUTO_UPGRADE=$_AUTO SKILL_DIR=$_SKILL_DIR"
 ```
 
-**If `AUTO_UPGRADE=true`:** Skip the prompt. Say "Auto-upgrading pln v{old} → v{new}..." and go straight to Step 2. If anything in Step 2–4 fails during an auto-upgrade, restore from backup and warn: "Auto-upgrade failed — restored previous version. Run `/pln-update` to retry."
+**If `AUTO_UPGRADE=true`:** Skip the prompt. Say "Auto-upgrading pln v{old} → v{new}..." and go straight to Step 2. If anything in Step 2–4 fails during an auto-upgrade, restore from backup and warn: "Auto-upgrade failed — restored previous version. Invoke pln-update again to retry."
 
 **Otherwise**, ask in plain text (no `AskUserQuestion`):
 
@@ -36,7 +36,7 @@ echo "AUTO_UPGRADE=$_AUTO SKILL_DIR=$_SKILL_DIR"
 > a) **[recommended] Yes, upgrade now** — fetch and install v{new}
 > b) **Always keep me up to date** — upgrade now and auto-upgrade silently from here on
 > c) **Not now** — remind me later
-> d) **Never ask again** — disable update checks (you can still run `/pln-update` manually)
+> d) **Never ask again** — disable update checks (you can still invoke pln-update manually)
 
 Wait for the answer, then:
 
@@ -71,7 +71,7 @@ Tell the user the snooze duration ("Next reminder in 24h", or 48h, or 1 week, by
 ```bash
 "$_SKILL_DIR/bin/pln-config" set update_check false
 ```
-Say "Update checks disabled. Run `/pln-update` anytime, or re-enable with `~/.pln/bin/pln-config set update_check true`." Continue with the current task.
+Say "Update checks disabled. Invoke pln-update anytime, or re-enable with `~/.pln/bin/pln-config set update_check true`." Continue with the current task.
 
 ### Step 2: Reconcile every installed copy
 
@@ -109,8 +109,8 @@ Read the script's output and relay it:
   (a developer install; leave it, they `git pull` the source clone), `failed`.
 - `SUMMARY <oldmin> -> <new> (<u> upgraded, <c> unchanged, <s> skipped, <f> failed)`.
 
-If any copy is `failed`, tell the user which one and that they can re-run
-`/pln-update`. The script writes the just-upgraded marker and clears the update
+If any copy is `failed`, tell the user which one and that they can invoke
+pln-update again. The script writes the just-upgraded marker and clears the update
 cache itself when at least one copy was upgraded.
 
 **Fallback (only if `NO_APPLY_SCRIPT`):** every installed copy predates this
@@ -148,7 +148,7 @@ copy in context). Continue with whatever the user originally asked for.
 
 ## Standalone usage
 
-When invoked directly as `/pln-update` (not from the preamble):
+When invoked directly by name (not from the preamble):
 
 1. Force a fresh check. The checker scans every installed copy and reports the lowest version, so this catches a stale copy in a root the host doesn't load first:
 ```bash

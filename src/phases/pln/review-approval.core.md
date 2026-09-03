@@ -72,7 +72,7 @@ Every item's detail section is now written, and nobody has read the plan who was
 
 The review runs once on the finished plan. Re-showing the gate does not trigger another pass. A material user rewrite does, bounded as described below; a repair made by the merge worker does not.
 
-**What the plan is checked against** is the tree as it stands before any item runs, and this step finishes before Step 5 starts. A review that overlaps implementation reads a repository the plan no longer describes: an item's own repair comes back as the pre-existing state, the plan is reported as wrong about the world, and the items still unbuilt yield nothing, so the half of the review that is still valid is the half that found nothing. Reviewing what implementation produced is a diff review and belongs to `/pln-pr`.
+**What the plan is checked against** is the tree as it stands before any item runs, and this step finishes before Step 5 starts. A review that overlaps implementation reads a repository the plan no longer describes: an item's own repair comes back as the pre-existing state, the plan is reported as wrong about the world, and the items still unbuilt yield nothing, so the half of the review that is still valid is the half that found nothing. Reviewing what implementation produced is a diff review and belongs to `{{PLN_PR_CMD}}`.
 
 ### Step 4. Master-plan approval gate
 
@@ -110,7 +110,7 @@ Show the user the master plan in one message, with enough in it to adopt on with
 
   When the triage line names no entries, option a has nothing to walk: drop it, letter the three ship shapes a, b and c, and letter the reopen option d, restoring the four-way shape.
 
-  **Review depth rides on the same answer.** A ship option takes the full PR-time roster its risk tier calls for. Adding `light` or `no review` to the letter cuts that to the broad reviewer alone, or skips review entirely. Offer it in one line under the prompt rather than as more lettered options — this is the one moment the user is already deciding how much ceremony the branch gets, and the answer is what keeps `/pln-pr` from stopping to ask later.
+  **Review depth rides on the same answer.** A ship option takes the full PR-time roster its risk tier calls for. Adding `light` or `no review` to the letter cuts that to the broad reviewer alone, or skips review entirely. Offer it in one line under the prompt rather than as more lettered options — this is the one moment the user is already deciding how much ceremony the branch gets, and the answer is what keeps `{{PLN_PR_CMD}}` from stopping to ask later.
 
 **When no review ran** — `plan_review` is off, the user skipped it, or the plan predates review — include no empty findings machinery. For R1/R2 the numbered list is disclosed decisions only. For R3, add one clear warning that critical plan assurance was deliberately skipped; do not claim a reviewer or clean result.
 
@@ -118,8 +118,8 @@ This is the only place implementation-blocking approval lives. Possible response
 
 - *Walk the flagged entries* — the triaged entries one question per turn, per Walking the flagged entries below. Not an adoption: the walk ends back at this prompt.
 - *Adopt* — one of the three shapes below. Whichever it is, every numbered entry not reopened stands as accepted: decisions hold and flagged findings were seen and left alone. Proceed to Step 5.
-  - **Implement and open a draft PR when done.** Record `Ship: draft PR after implementation` in the dashboard's Ship field, plus `PR base: <branch>` when item 4's stacking override applies. This answers Step 8's ask up front: Step 7's wrap-up hands straight to `/pln-pr` with no further prompt. The PR opens as a draft and **stays** one — `/pln-pr` still watches CI and still fixes what goes red, and then closes with the PR in draft instead of marking it ready. On a team, ready is what tells everyone else, and whatever automation waits on ready, that the branch is theirs to look at; this option keeps that signal in the user's hands so they can read the PR first.
-  - **Implement and open a PR when done.** Record `Ship: PR after implementation` in the dashboard's Ship field, plus `PR base: <branch>` when item 4's stacking override applies. Same as the draft-PR option, except `/pln-pr` marks the PR ready once CI is green.
+  - **Implement and open a draft PR when done.** Record `Ship: draft PR after implementation` in the dashboard's Ship field, plus `PR base: <branch>` when item 4's stacking override applies. This answers Step 8's ask up front: Step 7's wrap-up hands straight to `{{PLN_PR_CMD}}` with no further prompt. The PR opens as a draft and **stays** one — `{{PLN_PR_CMD}}` still watches CI and still fixes what goes red, and then closes with the PR in draft instead of marking it ready. On a team, ready is what tells everyone else, and whatever automation waits on ready, that the branch is theirs to look at; this option keeps that signal in the user's hands so they can read the PR first.
+  - **Implement and open a PR when done.** Record `Ship: PR after implementation` in the dashboard's Ship field, plus `PR base: <branch>` when item 4's stacking override applies. Same as the draft-PR option, except `{{PLN_PR_CMD}}` marks the PR ready once CI is green.
   - **Implement only.** Record `Ship: implement only` in the dashboard's Ship field. Step 8 still asks once, at the end of Step 7's wrap-up, exactly as it did before this choice existed.
 
   Under either PR-bearing shape, the same write records the review depth in the Ship field — `Review: full`, `Review: broad`, or `Review: none`, defaulting to `full` when the user named none. Under `implement only` there is no PR to size a roster for; Step 8's later ask carries the depth instead.

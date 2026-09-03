@@ -26,7 +26,7 @@ Open Codex and paste:
 Install pln: run `git clone https://github.com/daniel-nelson/pln.git ~/.agents/skills/pln && cd ~/.agents/skills/pln && ./setup`
 ```
 
-Codex loads skills from both `~/.agents/skills/` and `~/.codex/skills/`. `~/.agents/skills/pln` is the path to use — it is the one Codex documents, and it is where `/pln-update` looks.
+Codex loads skills from both `~/.agents/skills/` and `~/.codex/skills/`. `~/.agents/skills/pln` is the path to use — it is the one Codex documents, and it is where pln-update looks.
 
 ### Install via `npx skills`
 
@@ -41,9 +41,9 @@ Then run `./setup` in the directory it installed to. `npx skills` copies files; 
 ### What gets installed
 
 - `pln` skill in `~/.claude/skills/pln/` (Claude Code) or `~/.agents/skills/pln/` (Codex)
-- `/pln-pr` slash command (symlinked from `pln/pln-pr/`) for reviewing a branch and opening a pull request
-- `/pln-simplify` slash command (symlinked from `pln/pln-simplify/`) for recurring concept and ownership simplification
-- `/pln-update` slash command (symlinked from `pln/pln-update/`) for updating pln
+- `pln-pr` (symlinked from `pln/pln-pr/`) for reviewing a branch and opening a pull request
+- `pln-simplify` (symlinked from `pln/pln-simplify/`) for recurring concept and ownership simplification
+- `pln-update` (symlinked from `pln/pln-update/`) for updating pln
 
 `./setup` also builds the skill files for the host it was installed under, working the host out from the install path. Claude Code and Codex drive agents differently, so each build carries only its own host's mechanics rather than a page of "if you are on the other host, ignore this". That is the one reason the clone alone isn't enough: without `./setup` the skill files are placeholders that say so. If you cloned somewhere the path doesn't name a host, run `PLN_HOST=codex ./setup` (or `PLN_HOST=claude ./setup`).
 
@@ -51,12 +51,14 @@ Everything lives inside your assistant's skills directory. Nothing touches your 
 
 ## What you get
 
-| Skill | How to invoke | Description |
-|-------|--------------|-------------|
-| `/pln` | `/pln` or `/pln <details of what you want to plan>` | Two-phase planning: overview bullet list followed by detailed back and forth with a peer for each item; implementation only after the plan is written |
-| `/pln-pr` | `/pln-pr` or "put up a PR" | Review the current branch with a fresh-context review army, fix findings under one durable ledger, verify once, and open the pull request |
-| `/pln-simplify` | `/pln-simplify` or a deliberate codebase-simplification request | Map concepts and owners, adopt bounded consolidation or retirement, verify an unpublished exact candidate, and record the successful assessment |
-| `/pln-update` | `/pln-update` | Update pln to the latest version (pln also offers this automatically when a new release appears) |
+Claude Code invokes a skill as a slash command; Codex has no slash commands and invokes one by name with a `$` prefix, so `/pln` is an error there. Both spellings are given below.
+
+| Skill | How to invoke (Claude Code) | How to invoke (Codex) | Description |
+|-------|--------------|--------------|-------------|
+| `pln` | `/pln` or `/pln <details of what you want to plan>` | `$pln` or `$pln <details of what you want to plan>` | Two-phase planning: overview bullet list followed by detailed back and forth with a peer for each item; implementation only after the plan is written |
+| `pln-pr` | `/pln-pr` or "put up a PR" | `$pln-pr` or "put up a PR" | Review the current branch with a fresh-context review army, fix findings under one durable ledger, verify once, and open the pull request |
+| `pln-simplify` | `/pln-simplify` or a deliberate codebase-simplification request | `$pln-simplify` or a deliberate codebase-simplification request | Map concepts and owners, adopt bounded consolidation or retirement, verify an unpublished exact candidate, and record the successful assessment |
+| `pln-update` | `/pln-update` | `$pln-update` | Update pln to the latest version (pln also offers this automatically when a new release appears) |
 
 ## How it works
 

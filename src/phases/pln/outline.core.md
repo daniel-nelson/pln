@@ -136,7 +136,7 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 …
 ```
 
-**One row shape, for all five states**: the number first, as the ordered list's own marker, then the summary, then the status at the end of the line. The number is the address every later step uses — the Step 4 gate's reply-by-number, a subagent's brief, a cross-item note — so it is a Markdown list number a client can reference rather than text nested inside a bullet.
+**One row shape, for all five states**: the number first, as the ordered list's own marker, then the summary, then the status at the end of the line. The number is the address every later step uses — the Step 4 gate's reply-by-number, a subagent's brief, a cross-item note — so it is a Markdown list number a client can reference rather than text nested inside a bullet. At that gate a bare item number reopens the whole item; anything settled without the user hangs under the row and is addressed by the same number plus its own letter (`3a`), so both readings of "by number" hold at once and the two rules never compete for one address.
 
 Rows are never removed and numbers are never reused. An item that is dropped or deferred keeps its row and its number, with its status trailing; deleting it would shift every number after it and stale every reference already written down or already spoken.
 

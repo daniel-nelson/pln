@@ -86,7 +86,7 @@ Say what a thing is, not the handle that points at it. An item number, decision 
 
 The rule that follows: **say the thing, don't cite where the thing lives.** Bookkeeping you did inside the plan — a section rewritten, criteria re-derived, a correction applied to your own prose — is not news; it is the work, and it reaches the user only if it changed what gets built.
 
-One thing is exempt, and only it: a list of numbers whose whole job is to index a numbered list printed in the same message — an approval gate's "worth a look: 3, 7, 12" — where the titles are already on screen a few lines above and the point is one thing to scan and one way to reply. An entry inside such a list has no title of its own, so it pairs with its parent item's number and title instead.
+One thing is exempt, and only it: a list of numbers indexing the message's one numbered list — an approval gate's "worth a look: 1a, 4b" — where the titles are on screen a few lines above and the point is one thing to scan and one way to reply. It has to be the only such list, or one number means two things; a nested entry, having no title, carries its parent row's number and title.
 
 This holds everywhere the user reads what you wrote: interview questions, echo lines, blocker questions, approval gates, findings.
 

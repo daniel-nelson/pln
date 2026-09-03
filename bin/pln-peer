@@ -165,6 +165,12 @@ report() { # report <rung> <peer> <status> <result-file> <log-file>
   echo "RUNG=$1"
   echo "PEER=$2"
   echo "STATUS=$3"
+  # Why there is no peer, when there is none. `STATUS=none` cannot tell a peer
+  # that is not installed from one that is installed, logged in, and whose
+  # credential this process cannot read — and those call for opposite actions
+  # from the user. The line is additive: the status vocabulary and the exit
+  # codes are unchanged, so nothing keying on them has to learn a new value.
+  echo "REASON=${PEER_REASON:-none}"
   echo "RESULT_FILE=$4"
   echo "LOG_FILE=$5"
   echo "ACTUAL_PROFILE=$ACTUAL_PROFILE"
@@ -183,6 +189,7 @@ timeout_cmd() { # timeout_cmd <secs> — prints the wrapper, or nothing
   fi
 }
 PROBE_WRAP=()
+PEER_REASON=""
 while IFS= read -r w; do [ -n "$w" ] && PROBE_WRAP+=("$w"); done < <(timeout_cmd 20)
 
 # ── rung 1: the user's own invocation ────────────────────────────────────────
@@ -260,7 +267,15 @@ if [ -z "$PEER_COMMAND" ]; then
     [ "$candidate" = "$HOST" ] && continue
     resolved="$(resolve_candidate "$candidate")" || continue
     [ -n "$resolved" ] || continue
-    authenticated "$resolved" "$candidate" || continue
+    if ! authenticated "$resolved" "$candidate"; then
+      # Installed and reachable, but its own probe says it cannot act. The
+      # common cause is not a logged-out user: it is a sandbox that denies the
+      # credential store the CLI keeps its login in, so the probe answers
+      # truthfully about the process it is running in rather than about the
+      # machine. Recorded, and reported if no other candidate works out.
+      PEER_REASON="${PEER_REASON:+$PEER_REASON; }$candidate-not-authenticated:$resolved"
+      continue
+    fi
     PEER="$candidate"
     # Found off `PATH`: put its directory on `PATH` for the rest of this call so
     # the agent helper below resolves the same binary the probe just accepted.
@@ -277,6 +292,7 @@ fi
 
 # ── rung 3: nobody. The caller's own harness runs the review ─────────────────
 if [ -z "$PEER_COMMAND" ] && [ -z "$PEER" ]; then
+  [ -n "${PEER_REASON:-}" ] || PEER_REASON="no-peer-cli-found"
   report 3 none none "" ""
   exit 3
 fi

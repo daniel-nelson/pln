@@ -70,24 +70,24 @@ chmod +x "$SKILL/bin/pln-generate"
 
 cat > "$SKILL/bin/pln-peer" <<'FAKE_PEER'
 #!/usr/bin/env bash
-# A fake --which: prints the eight-line contract and exits per scenario, so the
+# A fake --which: prints the nine-line contract and exits per scenario, so the
 # test controls exactly what setup's nudge branch sees.
 printf '%s\n' "$*" >> "${FAKE_PEER_LOG:-/dev/null}"
 case "${FAKE_PEER_SCENARIO:?FAKE_PEER_SCENARIO not set}" in
   ready)
-    printf 'RUNG=1\nPEER=fakepeer\nSTATUS=ready\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
+    printf 'RUNG=1\nPEER=fakepeer\nSTATUS=ready\nREASON=none\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
     exit 0 ;;
   consent)
-    printf 'RUNG=2\nPEER=claude\nSTATUS=consent\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
+    printf 'RUNG=2\nPEER=claude\nSTATUS=consent\nREASON=none\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
     exit 5 ;;
   egress)
-    printf 'RUNG=2\nPEER=claude\nSTATUS=egress\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
+    printf 'RUNG=2\nPEER=claude\nSTATUS=egress\nREASON=none\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
     exit 6 ;;
   declined)
-    printf 'RUNG=3\nPEER=none\nSTATUS=declined\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
+    printf 'RUNG=3\nPEER=none\nSTATUS=declined\nREASON=none\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
     exit 3 ;;
   none)
-    printf 'RUNG=3\nPEER=none\nSTATUS=none\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
+    printf 'RUNG=3\nPEER=none\nSTATUS=none\nREASON=none\nRESULT_FILE=\nLOG_FILE=\nACTUAL_PROFILE=judgment\nACTUAL_MODEL=unreported\nACTUAL_EFFORT=unreported\n'
     exit 3 ;;
   *) echo "FAKE_PEER: unknown scenario '$FAKE_PEER_SCENARIO'" >&2; exit 9 ;;
 esac

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.55.0 — 2026-09-03
+
+### Fixed
+
+- **An explicitly requested update actually asks now, instead of answering out of the last upgrade's marker.** `pln-update-check`'s `--force` flag documents itself as busting the cache and the snooze, and it does — but the just-upgraded marker is checked before the fetch and never consulted `FORCE_CHECK` at all. So a forced check found the marker, printed `JUST_UPGRADED <old> <local>`, wrote `UP_TO_DATE <local>` into the cache with its 60-minute TTL, and exited without contacting the remote. With `auto_upgrade` on, that is the common case rather than a corner: an automatic upgrade writes the marker, and the explicit `/pln-update` or `$pln-update` a minute later is a guaranteed no-op that reports success and then silences the next hour of passive checks too. Observed end to end on 2026-09-03 — an explicit Codex update reported 1.52.0 → 1.53.0 without fetching, 43 seconds after 1.54.0 had been published. A forced check now consumes the marker, reports it, and carries on to the remote, so the news and the verdict arrive together.
+
+- **The just-upgraded marker names the install that wrote it, so one host cannot claim another's upgrade.** `~/.pln/just-upgraded-from` is a single file shared by every installed copy, and whichever host read it first consumed it. In the same session as above, Claude Code performed the real 1.53.0 → 1.54.0 upgrade and the next Codex invocation reported it as its own. `pln-update-apply` now records which installs it upgraded alongside the version, and the check reports a writer it did not recognize as `upgraded by <install>` rather than presenting it as this host's work. A marker written before the field existed carries no writer and is given none.
+
+- **A forced version check is no longer answered by a five-minute-old CDN copy.** The remote version is fetched from `raw.githubusercontent.com`, which serves `cache-control: max-age=300` from a Fastly edge — so a release merged and then immediately asked for can legitimately come back as the previous one, which is not how the same repository behaves under `git pull`. A forced check now sends `Cache-Control: no-cache` and varies the URL with a `pln_nocache` parameter so it cannot match a cached key. This is best-effort against a shielded cache rather than a guarantee, and it is built only for an `http(s)` remote: the `PLN_REMOTE_URL` test override is a `file://` path with no edge cache and no query string. The passive preamble check keeps the plain URL, where a five-minute-old answer costs nothing.
+
+### Changed
+
+- **A thirteenth test script.** `tests/update-check.sh` covers `bin/pln-update-check` and the marker `bin/pln-update-apply` writes for it, against a scratch state directory and a `file://` remote, so it needs no network: the passive path is still answered by the marker alone, the forced path reports the marker and still reaches the remote, the cache a forced check leaves behind carries the fetched verdict rather than a false `UP_TO_DATE`, a marker with and without a writer both report correctly, and the cache-buster stays restricted to http(s). It also pins that `UPDIRS` is initialized before the loop that appends to it, because an unset variable there aborts `pln-update-apply` under `set -u` on bash 3.2.
+
 ## 1.54.0 — 2026-09-03
 
 ### Changed

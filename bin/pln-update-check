@@ -123,16 +123,36 @@ build_detail() {
 }
 
 # ─── Step 2: Check "just upgraded" marker ─────────────────────
+# The marker records an upgrade that already happened. On a passive check that
+# is the whole answer and the run stops here. On `--force` it is not: the user
+# asked this question deliberately, and answering it out of a file written
+# before they asked means an explicit update immediately after an automatic one
+# never contacts the remote at all — it reports the earlier upgrade, writes an
+# hour of `UP_TO_DATE` into the cache, and looks like it succeeded. So a forced
+# check consumes the marker, remembers it, and carries on to the fetch.
+#
+# The marker is one file shared by every install, so it also records which
+# install wrote it. A marker another install wrote is reported as that
+# install's upgrade rather than claimed as this one's.
+JUST_UPGRADED_FROM=""
+JUST_UPGRADED_BY=""
 if [ -f "$MARKER_FILE" ]; then
-  OLD="$(cat "$MARKER_FILE" 2>/dev/null | tr -d '[:space:]')"
+  MARKER_RAW="$(cat "$MARKER_FILE" 2>/dev/null || true)"
+  OLD="$(printf '%s' "$MARKER_RAW" | awk 'NR==1{print $1}' | tr -d '[:space:]')"
+  BY="$(printf '%s' "$MARKER_RAW" | awk 'NR==1{$1=""; sub(/^ /, ""); print}')"
   rm -f "$MARKER_FILE" 2>/dev/null || true
   rm -f "$SNOOZE_FILE" 2>/dev/null || true
   mkdir -p "$STATE_DIR" 2>/dev/null || true
-  echo "UP_TO_DATE $LOCAL" > "$CACHE_FILE" 2>/dev/null || true
-  if [ -n "$OLD" ]; then
-    echo "JUST_UPGRADED $OLD $LOCAL"
+  if [ "$FORCE_CHECK" != "true" ]; then
+    echo "UP_TO_DATE $LOCAL" > "$CACHE_FILE" 2>/dev/null || true
+    if [ -n "$OLD" ]; then
+      echo "JUST_UPGRADED $OLD $LOCAL"
+      [ -n "$BY" ] && printf '  upgraded by %s\n' "$BY"
+    fi
+    exit 0
   fi
-  exit 0
+  JUST_UPGRADED_FROM="$OLD"
+  JUST_UPGRADED_BY="$BY"
 fi
 
 # ─── Snooze helper ──────────────────────────────────────────
@@ -227,28 +247,61 @@ fi
 # ─── Step 4: Slow path — fetch remote version ────────────────
 mkdir -p "$STATE_DIR" 2>/dev/null || true
 
+# `raw.githubusercontent.com` serves `cache-control: max-age=300` from a Fastly
+# edge, so a plain fetch can answer with the version from up to five minutes
+# ago — long enough that merging a release and immediately asking for it
+# returns the previous one. A forced check therefore asks the edge not to serve
+# a cached copy and varies the URL so it cannot match a cached key. This is
+# best-effort against a shielded cache, not a guarantee; the passive check
+# keeps the plain URL, where a five-minute-old answer costs nothing.
 REMOTE=""
-REMOTE="$(curl -sf --max-time 5 "$REMOTE_URL" 2>/dev/null || true)"
+case "$REMOTE_URL" in
+  http://*|https://*) HTTP_REMOTE=true ;;
+  *)                  HTTP_REMOTE=false ;;   # a file:// or other override has no edge cache
+esac
+if [ "$FORCE_CHECK" = "true" ] && [ "$HTTP_REMOTE" = "true" ]; then
+  case "$REMOTE_URL" in
+    *\?*) FETCH_URL="$REMOTE_URL&pln_nocache=$(date +%s)" ;;
+    *)    FETCH_URL="$REMOTE_URL?pln_nocache=$(date +%s)" ;;
+  esac
+  REMOTE="$(curl -sf --max-time 5 -H 'Cache-Control: no-cache' -H 'Pragma: no-cache' "$FETCH_URL" 2>/dev/null || true)"
+else
+  REMOTE="$(curl -sf --max-time 5 "$REMOTE_URL" 2>/dev/null || true)"
+fi
 REMOTE="$(echo "$REMOTE" | tr -d '[:space:]')"
+
+# A forced check that consumed a marker still owes the user that news, whatever
+# the fetch then says. It is printed before the verdict, because "you are on
+# 1.54.0" is the answer and "you got here from 1.53.0" is the context for it.
+report_marker() {
+  [ -n "$JUST_UPGRADED_FROM" ] || return 0
+  echo "JUST_UPGRADED $JUST_UPGRADED_FROM $LOCAL"
+  [ -n "$JUST_UPGRADED_BY" ] && printf '  upgraded by %s\n' "$JUST_UPGRADED_BY"
+  return 0
+}
 
 # Validate: must look like a version number (reject HTML error pages)
 if ! echo "$REMOTE" | grep -qE '^[0-9]+\.[0-9.]+$'; then
   # Invalid or empty response — assume up to date
   echo "UP_TO_DATE $LOCAL" > "$CACHE_FILE" 2>/dev/null || true
+  report_marker
   exit 0
 fi
 
 # Any installed copy behind remote? (LOCAL is the lowest across all copies.)
 if ! ver_lt "$LOCAL" "$REMOTE"; then
   echo "UP_TO_DATE $LOCAL" > "$CACHE_FILE" 2>/dev/null || true
+  report_marker
   exit 0
 fi
 
 # Some copy is behind — upgrade available.
 echo "UPGRADE_AVAILABLE $LOCAL $REMOTE" > "$CACHE_FILE" 2>/dev/null || true
 if check_snooze "$REMOTE"; then
+  report_marker
   exit 0  # snoozed — stay quiet
 fi
 
+report_marker
 echo "UPGRADE_AVAILABLE $LOCAL $REMOTE"
 build_detail "$REMOTE"

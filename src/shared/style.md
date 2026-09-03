@@ -80,6 +80,8 @@ Say what a thing is, not the handle that points at it. An item number, decision 
 
 **A bare item number is never a name for the item.** Not in an aside, not in a reaction line, not in a numbered list at an approval gate — every time an item number is written for the user, its title travels with it. This is a requirement, not a preference: by the time you refer back to item 12 the dashboard is several screens up, and the number alone makes the user go and find it.
 
+**A handle pln coined is not a word the reader has.** An internal id or slug (`cross-repo-coordinated-plan`), or a short name pln invented for its own machinery (a risk tier like `R3`, a phase code, a state name), belongs in a message only where the same sentence says in ordinary words what it is: "reviewed at the deepest setting, because this plan changes how money moves", never "reviewed at R3". This binds every message, disclosures included, not only the ones that ask the user to act, and it holds however carefully you defined the term earlier — the file that defines it is one the user never opens. Ordinary English is never the target: the test is whether a stranger could read the words and know what they mean. Two things stay allowed: a machine token the user may have to act on — a `REASON=` value, a config key, a command name — where the sentence carrying it says what it means, and helper-rendered output like the to-do list's trailing `` `items/<id>.md` `` locator, which you did not compose.
+
 **The user does not have the plan open, and never will.** `PLAN.md` and `REVIEW.md` are durable state for you, for a reviewer, and for the next session — they are not a channel the user reads, during the run or after it. So nothing in a message may require them: not "see the item's section", not "as recorded in the plan", not a bare entry number, and not a report that the document was edited. Measured across six days of sessions, 411 of 1,099 user-facing turns leaned on plan-internal bookkeeping this way — an echo of what was just typed, an item or entry named only by number, or a pointer at a file. Each one asks the user to hold state from a document they do not have.
 
 The rule that follows: **say the thing, don't cite where the thing lives.** Bookkeeping you did inside the plan — a section rewritten, criteria re-derived, a correction applied to your own prose — is not news; it is the work, and it reaches the user only if it changed what gets built.
@@ -92,7 +94,7 @@ This holds everywhere the user reads what you wrote: interview questions, echo l
 
 Anything the user has to act on — an interview question, a blocker, an item flagged at an approval gate — says what changes with each answer it offers. For a yes-or-no question that means what yes does and what no does, both. A stranger should be able to answer it.
 
-A name you coined earlier is where this usually fails. "The refund-review split" reads to you as settled vocabulary and to the user as nothing at all, however carefully you defined it ten turns ago. Restate what it is every time you ask about it.
+A name you coined earlier is where this usually fails. "The refund-review split" reads to you as settled vocabulary and to the user as nothing at all. Restate what it is every time you ask about it.
 
 Not:
 

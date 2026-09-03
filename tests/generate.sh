@@ -629,10 +629,10 @@ for host_out in "$real_c" "$real_x"; do
   # The named-location leg sits above both defaults: a project that keeps plans
   # outside the repository on purpose otherwise reads as "not ./plans/" and lands
   # in the temporary directory, which is the one place the work is least safe.
-  # A same-model substitution at R3 is a loss of coverage, so it is reported in
-  # the turn rather than only in the plan file nobody re-reads.
-  has "$review_file_peer" 'A substitution at R3 is said out loud, in the turn it happens' \
-    "$review_file_peer lets an R3 peer substitution stay silent"
+  # A same-model substitution in the adversarial slot is a loss of coverage, so
+  # it is reported in the turn rather than only in the plan file nobody re-reads.
+  has "$review_file_peer" 'A substitution in the adversarial slot is said out loud, in the turn it happens' \
+    "$review_file_peer lets a peer substitution stay silent"
   ship_file="$host_out/phases/pln-pr/ship-watch.md"
   scope_file="$host_out/phases/pln-pr/scope-baseline.md"
   # Local verification buys the static checks; the behavior suite is CI's, which

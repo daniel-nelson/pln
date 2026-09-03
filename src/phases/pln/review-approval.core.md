@@ -8,9 +8,9 @@ name: pln-phase-review-approval
 
 Read this file in full before the first review or approval action. `Phase: review-approval` permits only plan review, plan repair, the approval conversation, and durable adoption writes; no feature implementation may begin here.
 
-A review round remains in this phase until its merge result and all plan repairs/findings are durable. Persist any reopened question before sending it. After explicit adoption, write the Ship choice and PR base, write the queue items this run takes, reconcile all open questions/findings, then set `Phase: implementation` and read the implementation phase in full before dispatch. Delegated mode's advance adoption uses the same durable writes before advancing.
+A review round remains in this phase until its merge result and all plan repairs/findings are durable. Persist any reopened question before sending it. After explicit adoption, write the Ship choice and PR base, write the to-do items this run takes, reconcile all open questions/findings, then set `Phase: implementation` and read the implementation phase in full before dispatch. Delegated mode's advance adoption uses the same durable writes before advancing.
 
-**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-queue add` — not by leaving it in prose for the close to remember.
+**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-todo add` — not by leaving it in prose for the close to remember.
 
 <!-- pln:include assurance-policy -->
 
@@ -124,7 +124,7 @@ This is the only place implementation-blocking approval lives. Possible response
 
   Under either PR-bearing shape, the same write records the review depth in the Ship field — `Review: full`, `Review: broad`, or `Review: none`, defaulting to `full` when the user named none. Under `implement only` there is no PR to size a roster for; Step 8's later ask carries the depth instead.
 
-  Whichever shape it is, the same write fills the dashboard's `## Queue items` section: the follow-up-queue ids this run takes, one per line, or `- none taken` when it takes none. Create the section above `## Ship` when the plan does not carry one. Adoption is not recorded while the section still reads `- (not yet declared)` — answering it is what makes a run that takes queue items say so, and Step 5 claims each id it names.
+  Whichever shape it is, the same write fills the dashboard's `## To-do items` section: the ids from the project to-do list this run takes, one per line, or `- none taken` when it takes none. Create the section above `## Ship` when the plan does not carry one. Adoption is not recorded while the section still reads `- (not yet declared)` — answering it is what makes a run that takes to-do items say so, and Step 5 claims each id it names.
 - *Reopen by number* (e.g. "3, 7, 8") — any entry, of either kind. A **decision** returns to the one-question-at-a-time interview, exactly like Step 3, but starting from the recorded position and its rationale, not a blank question ("I chose X because Y; here's the tradeoff; what would you change?"). A **flagged** finding becomes an interview question of the same shape: what the reviewer found, what it would change, what the user wants done. Resolve each, update `PLAN.md`, re-show, re-prompt. Unlisted entries remain accepted.
 
   A repair is not on the list, so it cannot be reopened by number — but the user can still name one they disagree with in prose, and it is then shown with what it replaced and reverted if they say so. The record in the item's detail section is what makes that one edit instead of a reconstruction; re-read the revert to confirm it landed.

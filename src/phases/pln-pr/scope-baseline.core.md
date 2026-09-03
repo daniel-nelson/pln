@@ -12,7 +12,7 @@ Finish base validation, trust decisions, exact-tree fingerprinting, and any base
 
 Apply the shared three-tier firewall throughout this phase. Fixed-field host/PR identity, validated refs, exact config keys, the cursor, and bounded count/byte metadata are coordinator-direct. Possibly unbounded metadata—dirty-path lists, changed-file maps, diff statistics, manifests, instruction discovery, and captured command logs—goes to files before execution and then to an evidence worker for normalization. Trust decisions, scope sufficiency, contradictory state, and whether a baseline permits shipping are judgment work. Append every route and artifact to `<plan-dir>/routing.tsv`.
 
-**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-queue add` — not by leaving it in prose for the close to remember.
+**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-todo add` — not by leaving it in prose for the close to remember.
 
 ## The workflow (sequential steps)
 

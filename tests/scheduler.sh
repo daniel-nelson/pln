@@ -346,22 +346,24 @@ has "$hold_ready" $'READY\t2\t' \
 hasnt "$hold_ready" $'READY\t3\t' \
   'ready reported an unrelated original node while a checkpoint still held the tree'
 
-# ─── pln's own follow-up queue is not the user's uncommitted work ─────────────
+# ─── pln's own to-do list is not the user's uncommitted work ─────────────
 # A door that files mid-run writes an untracked detail file and rewrites a
 # possibly-tracked index. Both trip the guards that protect user-owned bytes, so
-# a filing into a committed queue would destroy the run it fired from — and
+# a filing into a committed to-do list would destroy the run it fired from — and
 # /pln-simplify's own Step 1 would create the dirt its marker step then refuses.
-# So the guards skip the queue's own paths: the index, `q/` and `done/` beneath
-# a root that actually holds a queue, never the root itself.
-QUEUE_BIN="$REPO_DIR/bin/pln-queue"
+# So the guards skip the list's own paths: the index, its live directory and its
+# archive beneath a root that actually holds one, never the root itself. Both
+# name sets are recognized, because 1.59.0 renamed the files and a repository pln
+# has not touched since still carries the older ones.
+TODO_BIN="$REPO_DIR/bin/pln-todo"
 SIMPLIFY="$REPO_DIR/bin/pln-simplify"
-[ -x "$QUEUE_BIN" ] || fail "missing executable queue helper: $QUEUE_BIN"
+[ -x "$TODO_BIN" ] || fail "missing executable to-do-list helper: $TODO_BIN"
 [ -x "$SIMPLIFY" ] || fail "missing executable simplify helper: $SIMPLIFY"
-export PLN_QUEUE_DATE=2026-08-27
+export PLN_TODO_DATE=2026-08-27
 
-queue_case() { # queue_case <name>  → prints the repo dir, leaves plan state beside it
+todo_case() { # todo_case <name>  → prints the repo dir, leaves plan state beside it
   local name="$1" d
-  d="$WORK/queue-$name"
+  d="$WORK/todo-$name"
   mkdir -p "$d/repo" "$d/plan"
   git -C "$d/repo" init -q
   git -C "$d/repo" config user.email test@example.com
@@ -373,7 +375,7 @@ queue_case() { # queue_case <name>  → prints the repo dir, leaves plan state b
     > "$d/plan/nodes.tsv"
   printf '%s' "$d"
 }
-queue_baseline() { # queue_baseline <dir>
+todo_baseline() { # todo_baseline <dir>
   local d="$1"
   "$SCHEDULER" snapshot --repo "$d/repo" --out "$d/plan/dirty.tsv" >/dev/null
   "$SCHEDULER" build --root "$d/plan" --nodes "$d/plan/nodes.tsv" \
@@ -381,88 +383,103 @@ queue_baseline() { # queue_baseline <dir>
     --source-head "$(git -C "$d/repo" rev-parse HEAD)" \
     --dirty-snapshot "$d/plan/dirty.tsv" --repo-mode git >/dev/null
 }
-# The two guards, run together: nothing the queue wrote may reach either.
-queue_guards_pass() { # queue_guards_pass <dir> <description>
+# The two guards, run together: nothing the to-do list wrote may reach either.
+todo_guards_pass() { # todo_guards_pass <dir> <description>
   local d="$1" what="$2"
   "$SCHEDULER" snapshot --repo "$d/repo" --out "$d/plan/after.tsv" >/dev/null
   cmp -s "$d/plan/dirty.tsv" "$d/plan/after.tsv" \
-    || fail "$what: a queue write changed the scheduler's dirty snapshot"
+    || fail "$what: a to-do-list write changed the scheduler's dirty snapshot"
   "$SCHEDULER" check-dirty --repo "$d/repo" --snapshot "$d/plan/dirty.tsv" \
     --manifest "$d/plan/run-manifest.tsv" --allow-items - > "$d/plan/check.out" \
-    || fail "$what: a queue write failed check-dirty"
+    || fail "$what: a to-do-list write failed check-dirty"
   has "$d/plan/check.out" 'DIRTY_STATE=unchanged' "$what: check-dirty did not report an unchanged tree"
   "$SIMPLIFY" marker --repo "$d/repo" --completed 2026-08-27T00:00:00Z > "$d/plan/marker.out" \
-    || fail "$what: a queue write failed the simplification marker's clean-tree gate"
+    || fail "$what: a to-do-list write failed the simplification marker's clean-tree gate"
   has "$d/plan/marker.out" 'PLN-SIMPLIFY-V1 completed=' "$what: no marker line was produced"
 }
 
 # Answer (a) — committed in the repository, at the default project root. Both
-# halves are exercised: an untracked queue, and a tracked one whose index a
+# halves are exercised: an untracked list, and a tracked one whose index a
 # later filing modifies.
-d="$(queue_case committed)"
-queue_baseline "$d"
-"$QUEUE_BIN" init --project "$d/repo" >/dev/null
-"$QUEUE_BIN" add --project "$d/repo" --id first --claim 'the first follow-up' \
+d="$(todo_case committed)"
+todo_baseline "$d"
+"$TODO_BIN" init --project "$d/repo" >/dev/null
+"$TODO_BIN" add --project "$d/repo" --id first --claim 'the first follow-up' \
   --source 'this run' >/dev/null
-hasnt "$d/plan/dirty.tsv" 'pln/QUEUE.md' 'the baseline snapshot listed the queue index'
-# git itself sees the queue as dirt, which is what makes the assertion below a
+hasnt "$d/plan/dirty.tsv" 'pln/TO-DO.md' 'the baseline snapshot listed the to-do-list index'
+# git itself sees the list as dirt, which is what makes the assertion below a
 # statement about the exclusion rather than about an empty write.
 [ -n "$(git -C "$d/repo" status --porcelain --untracked-files=all -- pln)" ] \
-  || fail 'the untracked-queue case did not actually dirty the working tree'
-queue_guards_pass "$d" 'an untracked queue at the project root'
+  || fail 'the untracked-list case did not actually dirty the working tree'
+todo_guards_pass "$d" 'an untracked to-do list at the project root'
 git -C "$d/repo" add pln
-git -C "$d/repo" commit -qm 'commit the queue'
-queue_baseline "$d"
-"$QUEUE_BIN" add --project "$d/repo" --id second --claim 'the second follow-up' \
+git -C "$d/repo" commit -qm 'commit the to-do list'
+todo_baseline "$d"
+"$TODO_BIN" add --project "$d/repo" --id second --claim 'the second follow-up' \
   --source 'this run' >/dev/null
 [ -n "$(git -C "$d/repo" status --porcelain -- pln)" ] \
-  || fail 'the tracked-queue case did not actually dirty the queue'
-queue_guards_pass "$d" 'a tracked queue whose index a filing modified'
+  || fail 'the tracked-list case did not actually dirty the list'
+todo_guards_pass "$d" 'a tracked to-do list whose index a filing modified'
 
 # An instruction-file-derived root inside the working tree is the same case with
 # the root somewhere else entirely, which is exactly why the exclusion is scoped
-# to the queue's own paths rather than to whatever the root turns out to be.
-d="$(queue_case declared)"
-printf 'pln-queue: docs/queue\n' > "$d/repo/CLAUDE.md"
+# to the list's own paths rather than to whatever the root turns out to be.
+d="$(todo_case declared)"
+printf 'pln-todo: docs/todo\n' > "$d/repo/CLAUDE.md"
 git -C "$d/repo" add CLAUDE.md
-git -C "$d/repo" commit -qm 'declare the queue location'
-queue_baseline "$d"
-"$QUEUE_BIN" add --project "$d/repo" --id declared-item --claim 'filed into the declared root' \
+git -C "$d/repo" commit -qm 'declare the to-do-list location'
+todo_baseline "$d"
+"$TODO_BIN" add --project "$d/repo" --id declared-item --claim 'filed into the declared root' \
   --source 'this run' > "$d/plan/add.out"
-has "$d/plan/add.out" "QUEUE_ROOT=$(cd "$d/repo" && pwd -P)/docs/queue" \
+has "$d/plan/add.out" "TODO_ROOT=$(cd "$d/repo" && pwd -P)/docs/todo" \
   'the declared root did not resolve where this case needs it'
-queue_guards_pass "$d" 'a queue at a root the project instructions declared'
+todo_guards_pass "$d" 'a to-do list at a root the project instructions declared'
 
-# Answers (b) and (c) put the queue outside the working tree, where there is
+# Answers (b) and (c) put the list outside the working tree, where there is
 # nothing to exclude — asserted rather than assumed, because "invisible" is the
 # property the location answer was chosen for.
-d="$(queue_case commondir)"
+d="$(todo_case commondir)"
 mkdir -p "$d/repo/.git/pln"
-queue_baseline "$d"
-"$QUEUE_BIN" add --project "$d/repo" --id in-common-dir --claim 'filed into the shared git dir' \
+todo_baseline "$d"
+"$TODO_BIN" add --project "$d/repo" --id in-common-dir --claim 'filed into the shared git dir' \
   --source 'this run' > "$d/plan/add.out"
 has "$d/plan/add.out" 'RESOLVED_BY=common-dir' 'this case did not resolve to the shared git directory'
-queue_guards_pass "$d" 'a queue in the shared git directory'
+todo_guards_pass "$d" 'a to-do list in the shared git directory'
 
-d="$(queue_case external)"
-mkdir -p "$WORK/outside-queue"
-outside_root="$(cd "$WORK/outside-queue" && pwd -P)"
-printf 'pln-queue: %s\n' "$outside_root" > "$d/repo/CLAUDE.md"
+d="$(todo_case external)"
+mkdir -p "$WORK/outside-todo"
+outside_root="$(cd "$WORK/outside-todo" && pwd -P)"
+printf 'pln-todo: %s\n' "$outside_root" > "$d/repo/CLAUDE.md"
 git -C "$d/repo" add CLAUDE.md
-git -C "$d/repo" commit -qm 'declare an external queue'
-queue_baseline "$d"
-"$QUEUE_BIN" add --project "$d/repo" --id outside --claim 'filed outside the repository' \
+git -C "$d/repo" commit -qm 'declare an external to-do list'
+todo_baseline "$d"
+"$TODO_BIN" add --project "$d/repo" --id outside --claim 'filed outside the repository' \
   --source 'this run' > "$d/plan/add.out"
-has "$d/plan/add.out" "QUEUE_ROOT=$outside_root" 'this case did not resolve outside the repository'
-queue_guards_pass "$d" 'a queue outside the repository'
+has "$d/plan/add.out" "TODO_ROOT=$outside_root" 'this case did not resolve outside the repository'
+todo_guards_pass "$d" 'a to-do list outside the repository'
 
-# The scoping, and it is the load-bearing half: a bare top-level `QUEUE.md`, `q`
-# or `done` is *not* excluded. Were it, a queue root at the repository top level
+# An un-migrated list — the older file names, hand-built, because after 1.59.0
+# the helper itself can no longer produce one: it renames what it finds. Both
+# guards still have to know it, since the dirty-state protection runs in a
+# repository whose list pln has not touched since the rename. The new-name half
+# of this is the helper-written fixtures above, which now write the new names.
+d="$(todo_case legacy)"
+todo_baseline "$d"
+mkdir -p "$d/repo/pln/q" "$d/repo/pln/done/2026-07"
+printf '<!-- pln-queue v1\n-->\n\n_No open items._\n' > "$d/repo/pln/QUEUE.md"
+printf 'an item filed before the rename\n' > "$d/repo/pln/q/legacy-item.md"
+printf '## 2026-07\n' > "$d/repo/pln/done/2026-07/index.md"
+[ -n "$(git -C "$d/repo" status --porcelain --untracked-files=all -- pln)" ] \
+  || fail 'the un-migrated case did not actually dirty the working tree'
+todo_guards_pass "$d" 'an un-migrated to-do list under the older file names'
+
+# The scoping, and it is the load-bearing half: a bare top-level index, live
+# directory or archive — under either name set — is *not* excluded. Were it, a to-do-list root at the repository top level
 # would disable dirty-state accounting and the clean-tree gate for every
 # user-owned change in the repository — which is worse than the failure the
-# exclusion exists to fix, and is why no queue root is ever the top level.
-d="$(queue_case toplevel)"
-queue_baseline "$d"
+# exclusion exists to fix, and is why no to-do-list root is ever the top level.
+d="$(todo_case toplevel)"
+todo_baseline "$d"
 mkdir -p "$d/repo/q" "$d/repo/done/2026-08"
 printf '<!-- pln-queue v1\n-->\n' > "$d/repo/QUEUE.md"
 printf 'a top-level item\n' > "$d/repo/q/item.md"
@@ -471,13 +488,23 @@ printf 'a top-level archive\n' > "$d/repo/done/2026-08/index.md"
 has "$d/plan/after.tsv" 'QUEUE.md' 'a bare top-level QUEUE.md was excluded from the dirty snapshot'
 has "$d/plan/after.tsv" 'q/item.md' 'a bare top-level q/ was excluded from the dirty snapshot'
 has "$d/plan/after.tsv" 'done/2026-08/index.md' 'a bare top-level done/ was excluded from the dirty snapshot'
+# The same under the names 1.59.0 writes, so neither name set can disable
+# dirty-state accounting for a whole repository.
+mkdir -p "$d/repo/items" "$d/repo/archive/2026-08"
+printf '<!-- pln-queue v1\n-->\n' > "$d/repo/TO-DO.md"
+printf 'a top-level item\n' > "$d/repo/items/item.md"
+printf 'a top-level archive\n' > "$d/repo/archive/2026-08/index.md"
+"$SCHEDULER" snapshot --repo "$d/repo" --out "$d/plan/after.tsv" >/dev/null
+has "$d/plan/after.tsv" 'TO-DO.md' 'a bare top-level TO-DO.md was excluded from the dirty snapshot'
+has "$d/plan/after.tsv" 'items/item.md' 'a bare top-level items/ was excluded from the dirty snapshot'
+has "$d/plan/after.tsv" 'archive/2026-08/index.md' 'a bare top-level archive/ was excluded from the dirty snapshot'
 if "$SCHEDULER" check-dirty --repo "$d/repo" --snapshot "$d/plan/dirty.tsv" \
   --manifest "$d/plan/run-manifest.tsv" --allow-items - >"$WORK/out" 2>"$WORK/err"; then
-  fail 'a repository-top-level queue disabled check-dirty for the whole repository'
+  fail 'a repository-top-level to-do list disabled check-dirty for the whole repository'
 fi
 if "$SIMPLIFY" marker --repo "$d/repo" --completed 2026-08-27T00:00:00Z \
   >"$WORK/out" 2>"$WORK/err"; then
-  fail 'a repository-top-level queue disabled the simplification clean-tree gate'
+  fail 'a repository-top-level to-do list disabled the simplification clean-tree gate'
 fi
 has "$WORK/err" 'clean non-ignored tree' 'the marker refused without naming the clean-tree requirement'
 

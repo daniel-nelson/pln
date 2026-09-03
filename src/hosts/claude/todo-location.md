@@ -7,6 +7,6 @@ Whatever this project names and pln did not write to, the closing message names 
 
 A named file is left exactly as it is. The queue root may be derived from the directory that contains it; the file itself is never appended to, rewritten, or moved.
 
-In `/pln` the only ship ask is the one the `implement only`, absent and legacy branches make. Under either PR-bearing `Ship` value there is no ask at all: the hand-off is an action, not a question, and nothing in this flow puts a turn boundary in front of it.
+In `{{PLN_CMD}}` the only ship ask is the one the `implement only`, absent and legacy branches make. Under either PR-bearing `Ship` value there is no ask at all: the hand-off is an action, not a question, and nothing in this flow puts a turn boundary in front of it.
 
 **A PR body, a PR comment and a commit message are copies, never the record.** Each is a place a follow-up gets *mentioned* on the way past; none is where someone goes to find out what is still outstanding. Putting a follow-up in one of them and treating it as filed is the failure this flow exists to prevent, and it reads as done because the text is visibly written somewhere. The queue is the record; everything else quotes it.

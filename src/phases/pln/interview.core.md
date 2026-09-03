@@ -40,7 +40,7 @@ One further intent, and the only one scoped to the session rather than to the it
 
 **What still stops the run: one short list, printed before implementation starts.** Three things reach it, each resolved with the user before Step 5 begins:
 
-- A decision that reverses something already settled or already built, or one that cannot be undone. Record the reversals in the dashboard's Reversals section as well, so `/pln-pr` carries them into the PR body.
+- A decision that reverses something already settled or already built, or one that cannot be undone. Record the reversals in the dashboard's Reversals section as well, so `{{PLN_PR_CMD}}` carries them into the PR body.
 - A Step 3.5 finding the review flagged rather than repaired. Flagged findings are the gate's business, and there is no gate here, so a flagged false factual claim would otherwise be built with nobody having seen it.
 - A question the sources above do not answer.
 
@@ -62,7 +62,7 @@ A discovery *during the interview* that warrants separate work — a fix in anot
 
 None of this exits the interview — not a request to implement the item's own feature work, however phrased ("fix it," "go do X now," "send a sub-agent to do it"), and not a plan decision that merely names something executable ("open a PR for X"). Litmus test for the latter: if the sentence would read naturally as a line inside an item's Decision write-up in `PLAN.md`, capture it silently and keep interviewing — don't ask. Every accepted plan item eventually becomes an executable action; naming one is the interview's whole point, not a signal to leave it.
 
-The only thing that ends the interview early is the user abandoning the plan itself ("stop the plan," "forget the interview, just do it") — and recognizing that language is not itself authorization to act on it. Confirm first: "Really exit `/pln` mode?" Only an explicit yes leaves Step 3; anything else, including silence, means stay. This runs even when the signal reads as unambiguous — unambiguous phrasing is what makes the question worth asking, not a reason to skip it.
+The only thing that ends the interview early is the user abandoning the plan itself ("stop the plan," "forget the interview, just do it") — and recognizing that language is not itself authorization to act on it. Confirm first: "Really exit `{{PLN_CMD}}` mode?" Only an explicit yes leaves Step 3; anything else, including silence, means stay. This runs even when the signal reads as unambiguous — unambiguous phrasing is what makes the question worth asking, not a reason to skip it.
 
 **Research before prose.** Before the first proposal for every active item, classify the needed read through the three tiers. A known-stop exact coordination fact may be direct within the shared budget; a mechanically closed inventory or citation refresh uses `{{SKILL_DIR}}/src/workers/evidence-collection.md`; shaping an approach, tradeoff, scope, or question uses a fresh `judgment` worker with `{{SKILL_DIR}}/src/workers/interview-research.md` in item mode. Give workers the project root, `PLAN.md`, exact item/question scope, source state, applicable root mandates, evidence/result paths, routing attribution, and the 4096-byte ceiling. Record every route in `routing.tsv` and read only a validated envelope. If evidence changes the premise or returns `ESCALATE: frontier`, dispatch a fresh judgment worker over its artifact paths before writing prose. The user sees one coherent response after research, never progress output or raw findings.
 
@@ -86,7 +86,7 @@ No candidate means the mechanically specified locations do not answer the questi
 
 A question the record answers is not asked. It becomes a disclosed decision naming where it was settled, and it reaches the user at the Step 4 gate as overridable like any other, because a prior plan's decision is a citable authority (see "What reaches the user"). A question the record does not answer is asked exactly as it would have been.
 
-**What the check is not.** It is not a test of whether this plan may contradict what was decided before. A `/pln` session exists to change existing behavior, and overturning an earlier decision is routinely the point of the work. So the judgment step never adds a question, never vetoes anything, and never fires on a choice nobody is asking about — its whole job is removing a question, and it either removes one or it changes nothing.
+**What the check is not.** It is not a test of whether this plan may contradict what was decided before. A `{{PLN_CMD}}` session exists to change existing behavior, and overturning an earlier decision is routinely the point of the work. So the judgment step never adds a question, never vetoes anything, and never fires on a choice nobody is asking about — its whole job is removing a question, and it either removes one or it changes nothing.
 
 One thing it does raise. A decision already reflected in the codebase is not changed silently, whoever made it: where the plan reverses one, the item's section says which decision it reverses and where it was made, it gets a line in the dashboard's Reversals section, and it goes to the gate as a disclosure the user can act on rather than as a question that stops the interview.
 

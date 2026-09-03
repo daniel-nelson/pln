@@ -10,3 +10,12 @@ HOST_CLI=codex
 NOTIFY_CALL=run `<resolved _PLN_DIR>/bin/pln-notify-desktop "<message>"`
 ORCH_TOOLS=Codex's native multi-agent tools
 REVIEW_ARMY_SHORT=A semantic R1–R3 roster runs one broad reviewer, up to two risk specialists, and for R3 one local-or-peer adversarial slot
+# Codex has no slash commands: a skill is invoked by name with a `$` prefix, and
+# `/pln` is an error there. Verified against a live rollout (CLI 0.153.0), where
+# typing `$pln` injects `<skill><name>pln</name><path>…</path>` plus the skill
+# body, and against OpenAI's own bundled skills, whose descriptions say things
+# like "when the user invokes $template-creator".
+PLN_CMD=$pln
+PLN_PR_CMD=$pln-pr
+PLN_SIMPLIFY_CMD=$pln-simplify
+PLN_UPDATE_CMD=$pln-update

@@ -1,4 +1,4 @@
-**Notification setup**: nothing to set up on this host, but read this on every `/pln` invocation — a brand-new plan, a "continue the plan we started", a reopened decision, all of it. It is deliberately not part of Step 1 pre-flight below: that step only runs before writing a new plan skeleton, so a "continue" invocation would skip it. pln pulls the user back before every user-input wait and at completion over one channel here:
+**Notification setup**: nothing to set up on this host, but read this on every `{{PLN_CMD}}` invocation — a brand-new plan, a "continue the plan we started", a reopened decision, all of it. It is deliberately not part of Step 1 pre-flight below: that step only runs before writing a new plan skeleton, so a "continue" invocation would skip it. pln pulls the user back before every user-input wait and at completion over one channel here:
 
 - **Local desktop notification**, via `$_PLN_DIR/bin/pln-notify-desktop "<message>"` (macOS/Linux). The helper self-gates on `notify_desktop` and no-ops on an unsupported platform, so the call sites invoke it unconditionally with no probe first.
 

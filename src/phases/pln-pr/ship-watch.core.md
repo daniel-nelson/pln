@@ -60,7 +60,7 @@ The commits, the push and the `gh`/`glab` calls are the orchestrator's own work 
 
 Then assemble the PR body: what the branch does, then what's relevant to a reviewer — the final gauntlet result and the genuine follow-ups (Style's "Ending a message" bar), each one line. Drop the rest: a finding that got fixed needs no summary (the commit that fixed it is the record), and there is no "N findings, all fixed" tally. This is the same follow-up list the closing message uses — don't maintain a second one.
 
-One more section, when the branch came from a `/pln` run whose `PLAN.md` carries a non-empty Reversals list: render those lines under their own heading, one each, saying what the branch overturns and where it was originally decided. A decision that reverses something already settled is the part of a branch a reviewer most needs to see, and `/pln`'s delegated mode can adopt a plan the user never read.
+One more section, when the branch came from a `{{PLN_CMD}}` run whose `PLAN.md` carries a non-empty Reversals list: render those lines under their own heading, one each, saying what the branch overturns and where it was originally decided. A decision that reverses something already settled is the part of a branch a reviewer most needs to see, and `{{PLN_CMD}}`'s delegated mode can adopt a plan the user never read.
 
 **Interpolate safely — never inline refs or the body into a shell command.** The base, branch, title, and PR body can all carry shell metacharacters (`$()`, backticks, quotes); a generated body assembled from findings especially so. Bind the refs to quoted shell variables, and write the body to a temp file passed by path — do not splice `<body>` into the command line:
 
@@ -128,7 +128,7 @@ Log each round's classification, evidence state, changed fingerprint, local comm
 
 ## Follow-ups
 
-All of this runs at whichever close hands the PR to the user — Step 8's or Step 9's — and the order is fixed: sweep, file, then draft. Which candidates the user sees is Style's "Ending a message" bar; every one that clears it is in the queue before the closing message is written, the ones Step 9's watch turns up included. The same close closes the queue out: an item this run claimed is marked from what landed and archived only with the evidence that closed it, and `pln-queue stale`'s candidates are named for the user to confirm, never archived on the run's own reading of a merged commit. This run may be a standalone `/pln-pr` with no `PLAN.md` and no `/pln` step behind it: the helper resolves the queue itself on every call, so nothing here waits on one having run.
+All of this runs at whichever close hands the PR to the user — Step 8's or Step 9's — and the order is fixed: sweep, file, then draft. Which candidates the user sees is Style's "Ending a message" bar; every one that clears it is in the queue before the closing message is written, the ones Step 9's watch turns up included. The same close closes the queue out: an item this run claimed is marked from what landed and archived only with the evidence that closed it, and `pln-queue stale`'s candidates are named for the user to confirm, never archived on the run's own reading of a merged commit. This run may be a standalone `{{PLN_PR_CMD}}` with no `PLAN.md` and no `{{PLN_CMD}}` step behind it: the helper resolves the queue itself on every call, so nothing here waits on one having run.
 
 <!-- pln:include outstanding-sweep -->
 

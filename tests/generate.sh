@@ -734,7 +734,9 @@ has "$real_x/phases/pln/finish-ship.md" '$CODEX_HOME/AGENTS.md' "the codex build
 # the PR-bearing case outright.
 for f in "$real_c/phases/pln/finish-ship.md" "$real_x/phases/pln/finish-ship.md" \
   "$real_c/phases/pln-pr/ship-watch.md" "$real_x/phases/pln-pr/ship-watch.md"; do
-  has "$f" 'In `/pln` the only ship ask is the one the `implement only`, absent and legacy branches make.' \
+  # The command token is the host's own: `/pln` on Claude Code, `$pln` on Codex.
+  case "$f" in *real-codex*) pcmd='$pln' ;; *) pcmd='/pln' ;; esac
+  has "$f" "In \`$pcmd\` the only ship ask is the one the \`implement only\`, absent and legacy branches make." \
     "$f does not say which branch the ship ask belongs to"
   has "$f" 'there is no ask at all: the hand-off is an action, not a question' \
     "$f still implies the PR-bearing branches ask before handing off"
@@ -864,6 +866,34 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
   has "$f" 'the holder from `HELD_BY`, or, when the refusal names no holder, the collision the check reported' \
     "$f records a refusal in only one of the helper's two refusal forms"
 done
+
+# ─── how each host is told to invoke pln ─────────────────────────────────────
+# Claude Code invokes a skill as a slash command; Codex has none, and invokes a
+# skill by name with a `$` prefix, so `/pln` is an error there. A build that
+# tells its own host the wrong token is wrong in the way that costs most: the
+# Step 8 hand-off names the command the user is supposed to type next, and an
+# explicit invocation the skill cannot recognize gets re-derived as an inferred
+# one. So the four command names travel as `{{PLN_*_CMD}}` vars, and neither
+# host's build may carry the other's spelling of any of them.
+for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_c/pln-simplify/SKILL.md" \
+         "$real_c/phases/pln/finish-ship.md" "$real_c/phases/pln-pr/ship-watch.md"; do
+  has "$f" '`/pln' "$f does not carry Claude Code's slash-command spelling"
+  hasnt "$f" '`$pln' "the claude build carries Codex's \$-prefixed spelling: $f"
+done
+for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md" "$real_x/pln-simplify/SKILL.md" \
+         "$real_x/phases/pln/finish-ship.md" "$real_x/phases/pln-pr/ship-watch.md"; do
+  has "$f" '`$pln' "$f does not carry Codex's \$-prefixed spelling"
+  hasnt "$f" '`/pln`' "the codex build tells Codex to type \`/pln\`, which errors there: $f"
+  hasnt "$f" '`/pln-pr`' "the codex build tells Codex to type \`/pln-pr\`: $f"
+  hasnt "$f" '`/pln-simplify`' "the codex build tells Codex to type \`/pln-simplify\`: $f"
+  hasnt "$f" '`/pln <task>`' "the codex build tells Codex to type \`/pln <task>\`: $f"
+done
+# The router's own description is what a host reads when deciding to load the
+# skill at all, so the trigger sentence carries the host's token too.
+has "$real_c/SKILL.md" 'Trigger explicitly via `/pln <task>`' \
+  "the claude router description does not name its own explicit invocation"
+has "$real_x/SKILL.md" 'Trigger explicitly via `$pln <task>`' \
+  "the codex router description does not name its own explicit invocation"
 
 # ─── the follow-up queue, and where its format is allowed to land ─────────────
 # One shared fragment, and its reach is a decision rather than an accident. The
@@ -1082,7 +1112,8 @@ for root in "$real_c" "$real_x"; do
   has "$ship" 'consume any recorded simplification freshness bypass' \
     "$ship can reuse a completed run's freshness bypass"
   has "$finish" 'bin/pln-assurance fingerprint' "$finish lost exact pln verification identity"
-  has "$finish" 'self-hosts `/pln-pr`' "$finish lost the narrow self-hosting exception for pln-pr"
+  case "$root" in *real-codex*) prcmd='$pln-pr' ;; *) prcmd='/pln-pr' ;; esac
+  has "$finish" "self-hosts \`$prcmd\`" "$finish lost the narrow self-hosting exception for pln-pr"
 done
 
 for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do

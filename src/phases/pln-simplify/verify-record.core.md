@@ -6,7 +6,7 @@ name: pln-simplify-phase-verify-record
 
 <!-- pln:include active-turn-lifecycle -->
 
-Enter only after the existing `/pln` implementation phase has checkpointed every adopted simplification item. A `nothing worth changing` assessment enters here with no product commit. Reuse `{{OUTPUT_ROOT}}/src/workers/final-verification.md`, the shared assurance policy, and the plan's exact gauntlet; this phase adds only the unpublished marker candidate and success publication protocol.
+Enter only after the existing `{{PLN_CMD}}` implementation phase has checkpointed every adopted simplification item. A `nothing worth changing` assessment enters here with no product commit. Reuse `{{OUTPUT_ROOT}}/src/workers/final-verification.md`, the shared assurance policy, and the plan's exact gauntlet; this phase adds only the unpublished marker candidate and success publication protocol.
 
 <!-- pln:include assurance-policy -->
 
@@ -24,6 +24,6 @@ After ordinary checkpoints:
 4. On failure, return to the supported branch, delete only the named unpublished candidate ref, record the failure, and stop. Never merge, cherry-pick, amend, or copy its marker into supported ancestry.
 5. On success, verify candidate HEAD still equals the tested commit, return to the supported branch, and fast-forward it with `git merge --ff-only <candidate>`. Verify the supported HEAD equals that exact commit, then delete the temporary ref. Do not rewrite, squash, cherry-pick, or recreate the commit.
 
-Set `Phase: complete` only after the unchanged fast-forward and durable result record. `/pln-simplify` does not auto-run `/pln-pr`; a later ship request follows `/pln-pr`, whose best-effort body propagation never establishes freshness by itself.
+Set `Phase: complete` only after the unchanged fast-forward and durable result record. `{{PLN_SIMPLIFY_CMD}}` does not auto-run `{{PLN_PR_CMD}}`; a later ship request follows `{{PLN_PR_CMD}}`, whose best-effort body propagation never establishes freshness by itself.
 
 Marker selection is deterministic: scan reachable local commit messages; accept only full-line supported V1 markers whose claimed fingerprint matches that marker commit's content; choose the greatest completion timestamp, then the lexicographically greatest exact line for a tie. Unsupported, malformed, non-ancestral, or unverifiable metadata never becomes stale—it yields `unknown` when no valid winner exists.

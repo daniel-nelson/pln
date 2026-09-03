@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.57.0 — 2026-09-03
+
+### Fixed
+
+- **A forced update check resolves the ref instead of trusting a mutable CDN path, so a release merged seconds ago is seen.** 1.55.0 diagnosed the five-minute `raw.githubusercontent.com` edge cache correctly and then tried to talk the edge out of it — a client `Cache-Control: no-cache` and a varied query string — which does not work: a forced check 21 seconds after a merge still returned the previous version, from an install already carrying that fix. The real problem is that `.../<owner>/<repo>/main/VERSION` is a *mutable* path, where the same URL means a different file after every merge and a cached copy is indistinguishable from a current one. A forced check now resolves the ref with `git ls-remote`, which reads GitHub's git endpoint rather than the CDN — this is why `git pull` is never behind — and then reads VERSION at the returned sha, an immutable path where a cached copy can only be the right one. Two round trips, on a check the user explicitly asked for. Every step degrades to the previous behavior rather than failing: no `git`, a remote that is not `raw.githubusercontent.com` (the `PLN_REMOTE_URL` test override, a mirror, a fork served elsewhere), a failed `ls-remote`, or a pinned path that returns nothing all fall back to the plain URL, and a pinned fetch returning nothing is treated as a resolution problem rather than a verdict. The passive preamble check keeps the plain URL always, where a five-minute-old answer costs nothing and a second round trip on every invocation would not be paid for.
+
 ## 1.56.0 — 2026-09-03
 
 ### Fixed

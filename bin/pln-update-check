@@ -248,24 +248,65 @@ fi
 mkdir -p "$STATE_DIR" 2>/dev/null || true
 
 # `raw.githubusercontent.com` serves `cache-control: max-age=300` from a Fastly
-# edge, so a plain fetch can answer with the version from up to five minutes
-# ago — long enough that merging a release and immediately asking for it
-# returns the previous one. A forced check therefore asks the edge not to serve
-# a cached copy and varies the URL so it cannot match a cached key. This is
-# best-effort against a shielded cache, not a guarantee; the passive check
-# keeps the plain URL, where a five-minute-old answer costs nothing.
-REMOTE=""
-case "$REMOTE_URL" in
-  http://*|https://*) HTTP_REMOTE=true ;;
-  *)                  HTTP_REMOTE=false ;;   # a file:// or other override has no edge cache
-esac
-if [ "$FORCE_CHECK" = "true" ] && [ "$HTTP_REMOTE" = "true" ]; then
-  case "$REMOTE_URL" in
-    *\?*) FETCH_URL="$REMOTE_URL&pln_nocache=$(date +%s)" ;;
-    *)    FETCH_URL="$REMOTE_URL?pln_nocache=$(date +%s)" ;;
+# edge, and the path `.../main/VERSION` is *mutable*: the same URL means a
+# different file after every merge. So a plain fetch can answer with the
+# version from up to five minutes ago, and a release merged and immediately
+# asked for comes back as the previous one — which is not how the same
+# repository behaves under `git pull`, and is the whole of why that expectation
+# is reasonable. Asking the edge politely does not help: a client
+# `Cache-Control: no-cache` and a varied query string were both tried in
+# 1.55.0, and a check 21 seconds after a merge still returned the old version.
+#
+# So a forced check stops trusting the mutable path. `git ls-remote` reads the
+# ref from GitHub's git endpoint, which is not edge-cached — that is why a
+# `git pull` is never behind — and the sha it returns names an *immutable* raw
+# path, where a cached copy can only be the right one. Two round trips, on a
+# check the user explicitly asked for.
+#
+# Every part of this degrades to the old behavior rather than failing: no git,
+# an unparseable URL, a failed `ls-remote`, or a fetch that returns nothing all
+# fall back to the plain URL. The passive check keeps the plain URL always,
+# where a five-minute-old answer costs nothing.
+
+# The ref-resolving path is specific to `raw.githubusercontent.com`, whose URL
+# shape is `https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path...>`.
+# Any other remote — the `PLN_REMOTE_URL` test override, a mirror, a fork
+# served elsewhere — takes the plain fetch unchanged.
+RAW_HOST_PREFIX='https://raw.githubusercontent.com/'
+
+# raw_parts <url> — prints "<owner> <repo> <ref> <path...>", or nothing.
+raw_parts() {
+  case "$1" in
+    "$RAW_HOST_PREFIX"*) ;;
+    *) return 0 ;;
   esac
-  REMOTE="$(curl -sf --max-time 5 -H 'Cache-Control: no-cache' -H 'Pragma: no-cache' "$FETCH_URL" 2>/dev/null || true)"
-else
+  printf '%s' "${1#"$RAW_HOST_PREFIX"}" | LC_ALL=C awk -F/ '
+    NF < 4 { exit }
+    { rest = $4; for (i = 5; i <= NF; i++) rest = rest "/" $i
+      printf "%s %s %s %s\n", $1, $2, $3, rest }
+  '
+}
+
+REMOTE=""
+FETCH_URL="$REMOTE_URL"
+if [ "$FORCE_CHECK" = "true" ] && command -v git >/dev/null 2>&1; then
+  PARTS="$(raw_parts "$REMOTE_URL")"
+  if [ -n "$PARTS" ]; then
+    R_OWNER="$(printf '%s' "$PARTS" | LC_ALL=C cut -d' ' -f1)"
+    R_REPO="$(printf '%s' "$PARTS" | LC_ALL=C cut -d' ' -f2)"
+    R_REF="$(printf '%s' "$PARTS" | LC_ALL=C cut -d' ' -f3)"
+    R_PATH="$(printf '%s' "$PARTS" | LC_ALL=C cut -d' ' -f4-)"
+    SHA="$(git ls-remote "https://github.com/$R_OWNER/$R_REPO" "refs/heads/$R_REF" 2>/dev/null \
+           | LC_ALL=C cut -f1 | head -1)"
+    case "$SHA" in
+      [0-9a-f][0-9a-f][0-9a-f][0-9a-f]*)
+        FETCH_URL="$RAW_HOST_PREFIX$R_OWNER/$R_REPO/$SHA/$R_PATH" ;;
+    esac
+  fi
+fi
+REMOTE="$(curl -sf --max-time 5 "$FETCH_URL" 2>/dev/null || true)"
+if [ -z "$REMOTE" ] && [ "$FETCH_URL" != "$REMOTE_URL" ]; then
+  # A pinned path that returns nothing is a resolution problem, not a verdict.
   REMOTE="$(curl -sf --max-time 5 "$REMOTE_URL" 2>/dev/null || true)"
 fi
 REMOTE="$(echo "$REMOTE" | tr -d '[:space:]')"

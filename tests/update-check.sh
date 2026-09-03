@@ -101,14 +101,52 @@ grep -q "printf '%s %s\\\\n' \"\$OLDMIN\" \"\$UPDIRS\" > \"\$STATE_DIR/just-upgr
 grep -q 'UPDIRS=""' "$ROOT/bin/pln-update-apply" \
   || fail "UPDIRS is unset before the loop, which aborts pln-update-apply under set -u"
 
-# ─── the cache-buster is built only for an http(s) remote ────────────────────
-# A `file://` override has no edge cache and no query string, so appending one
-# would break every test above — and the failure would be a silent fall back to
-# "assume up to date".
-grep -q 'http://\*|https://\*) HTTP_REMOTE=true' "$ROOT/bin/pln-update-check" \
-  || fail "pln-update-check no longer restricts the forced-fetch cache-buster to http(s)"
-grep -q 'pln_nocache=' "$ROOT/bin/pln-update-check" \
-  || fail "pln-update-check no longer varies the forced-fetch URL past the CDN cache"
+# ─── a forced check resolves the ref instead of trusting a mutable CDN path ──
+# `raw.githubusercontent.com/<owner>/<repo>/main/VERSION` means a different file
+# after every merge and is served with `max-age=300`, so a check seconds after a
+# release can answer with the previous version — observed 21 seconds after a
+# merge, and not fixed by asking the edge nicely. A forced check resolves the ref
+# with `git ls-remote` (not edge-cached) and reads the immutable sha path.
+#
+# Driven through a fake `git` on `PATH`, never the network.
+FAKEBIN="$WORK/fakebin"; mkdir -p "$FAKEBIN"
+fake_git() { # fake_git <stdout> [exit]
+  cat > "$FAKEBIN/git" <<EOF
+#!/usr/bin/env bash
+printf '%s' "$1"
+exit ${2:-0}
+EOF
+  chmod +x "$FAKEBIN/git"
+}
+
+# The override the other cases use is a file:// URL, which is not the raw host,
+# so the resolving path must leave it alone rather than mangling it.
+fake_git 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef	refs/heads/main'
+clear_state; set_local 1.55.0; set_remote 1.56.0
+OUT="$(PATH="$FAKEBIN:$PATH" PLN_SKILL_DIR="$INSTALL" PLN_STATE_DIR="$STATE" \
+       PLN_REMOTE_URL="file://$REMOTE_FILE" "$INSTALL/bin/pln-update-check" --force 2>&1)"
+said 'UPGRADE_AVAILABLE 1.55.0 1.56.0' \
+  "a non-raw remote was not left alone by the ref-resolving path"
+
+# A `git` that fails resolves nothing, and the check still answers from the
+# plain URL rather than reporting a false up-to-date.
+fake_git '' 1
+clear_state; set_local 1.55.0; set_remote 1.56.0
+OUT="$(PATH="$FAKEBIN:$PATH" PLN_SKILL_DIR="$INSTALL" PLN_STATE_DIR="$STATE" \
+       PLN_REMOTE_URL="file://$REMOTE_FILE" "$INSTALL/bin/pln-update-check" --force 2>&1)"
+said 'UPGRADE_AVAILABLE 1.55.0 1.56.0' "a failed ls-remote lost the upgrade"
+
+# Source properties the fake cannot reach: the resolving path is anchored to the
+# raw host, it asks git for the ref rather than guessing, and a pinned URL that
+# returns nothing falls back to the plain one instead of standing as a verdict.
+grep -q "RAW_HOST_PREFIX='https://raw.githubusercontent.com/'" "$ROOT/bin/pln-update-check" \
+  || fail "the ref-resolving path is no longer anchored to the raw host"
+grep -q 'git ls-remote' "$ROOT/bin/pln-update-check" \
+  || fail "a forced check no longer resolves the ref before fetching"
+grep -q 'FETCH_URL" != "\$REMOTE_URL' "$ROOT/bin/pln-update-check" \
+  || fail "an empty pinned fetch no longer falls back to the plain URL"
+grep -q 'FORCE_CHECK" = "true" \] && command -v git' "$ROOT/bin/pln-update-check" \
+  || fail "the passive check now pays for a ref resolution it does not need"
 
 [ "$FAILED" -eq 0 ] && echo OK
 exit "$FAILED"

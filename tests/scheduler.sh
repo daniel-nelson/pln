@@ -346,7 +346,7 @@ has "$hold_ready" $'READY\t2\t' \
 hasnt "$hold_ready" $'READY\t3\t' \
   'ready reported an unrelated original node while a checkpoint still held the tree'
 
-# ─── pln's own to-do list is not the user's uncommitted work ─────────────
+# ─── pln's own to-do list is not the user's uncommitted work ──────────────────
 # A door that files mid-run writes an untracked detail file and rewrites a
 # possibly-tracked index. Both trip the guards that protect user-owned bytes, so
 # a filing into a committed to-do list would destroy the run it fired from — and
@@ -474,10 +474,11 @@ printf '## 2026-07\n' > "$d/repo/pln/done/2026-07/index.md"
 todo_guards_pass "$d" 'an un-migrated to-do list under the older file names'
 
 # The scoping, and it is the load-bearing half: a bare top-level index, live
-# directory or archive — under either name set — is *not* excluded. Were it, a to-do-list root at the repository top level
-# would disable dirty-state accounting and the clean-tree gate for every
-# user-owned change in the repository — which is worse than the failure the
-# exclusion exists to fix, and is why no to-do-list root is ever the top level.
+# directory or archive — under either name set — is *not* excluded. Were it, a
+# to-do-list root at the repository top level would disable dirty-state
+# accounting and the clean-tree gate for every user-owned change in the
+# repository — which is worse than the failure the exclusion exists to fix, and
+# is why no to-do-list root is ever the top level.
 d="$(todo_case toplevel)"
 todo_baseline "$d"
 mkdir -p "$d/repo/q" "$d/repo/done/2026-08"

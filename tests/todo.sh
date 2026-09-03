@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/to-do list.sh — bin/pln-todo, the helper that owns the project to-do list.
+# tests/todo.sh — bin/pln-todo, the helper that owns the project to-do list.
 #
 # The helper exists because prose gets skipped: a run has to call it, and the
 # closing message renders what it printed back. So the properties under test are
@@ -14,7 +14,7 @@
 # in the sandbox. Dates come from PLN_TODO_DATE, so a month boundary or a
 # staleness cutoff cannot make this script's result depend on the day it runs.
 #
-# Run:  bash tests/to-do list.sh
+# Run:  bash tests/todo.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -117,7 +117,7 @@ is MIGRATION_OFFERED none "a fresh to-do list reported a migration offer"
 has "$R/pln/TO-DO.md" "queue-root: $R/pln" "the index header does not record the resolved root"
 has "$R/pln/TO-DO.md" '_No open items._' "an empty index does not say it is empty"
 
-# ─── resolution, leg 1: an existing to-do list is found again ──────────────────────
+# ─── resolution, leg 1: an existing to-do list is found again ─────────────────
 ok "a second init in the same project" init --project "$R"
 is TODO_ROOT "$R/pln" "the second run resolved a different root"
 is RESOLVED_BY project-root "the second run did not find the existing to-do list"
@@ -1029,7 +1029,7 @@ ok "archiving the finished item" archive --project "$R" --id finished \
 archived="$(field ARCHIVE_FILE)"
 month_index="$(field ARCHIVE_INDEX)"
 [ "$archived" = "$R/pln/archive/2026-08/finished.md" ] \
-  || fail "the archive path is not <to-do list-root>/done/<YYYY-MM>/<slug>.md: $archived"
+  || fail "the archive path is not <to-do-list root>/archive/<YYYY-MM>/<slug>.md: $archived"
 [ "$month_index" = "$R/pln/archive/2026-08/index.md" ] \
   || fail "the month index is not beside the archived record: $month_index"
 is DISPOSITION completed "archive did not report the disposition"

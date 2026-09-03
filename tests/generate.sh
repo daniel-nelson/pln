@@ -785,7 +785,7 @@ for f in "$real_c/phases/pln/finish-ship.md" "$real_x/phases/pln/finish-ship.md"
     "$f still triggers the hand-off from a position in the step sequence"
 done
 
-# ─── the to-do-list close, and the declaration it reads ────────────────────────────
+# ─── the to-do-list close, and the declaration it reads ───────────────────────
 # Step 7's to-do-list close has the same defect the hand-off above was repaired for,
 # and one the hand-off does not: it leaves no durable mark, so a close that
 # never ran reads exactly like one that did. Its trigger is therefore a
@@ -812,7 +812,7 @@ for f in "$real_c/phases/pln/finish-ship.md" "$real_x/phases/pln/finish-ship.md"
   has "$f" 'the to-do-list close below has run' \
     "$f lets the ship hand-off fire on a turn where the close never ran"
   # A plan that lies about its own id is the one direction the to-do list can
-  # falsify: a genuinely archived record is gone from q/, so its presence there
+  # falsify: a genuinely archived record is gone from items/, so its presence there
   # under this run's holder contradicts the plan's prose.
   has "$f" 'Also true while any id the plan records as archived still has a live record' \
     "$f does not falsify a plan's archive claim against the live to-do list"
@@ -841,9 +841,9 @@ done
 # above still passes while the close gates on a field nothing fills in.
 for f in "$real_c/phases/pln/outline.md" "$real_x/phases/pln/outline.md"; do
   has "$f" '- **To-do items** — the ids from the project to-do list this run takes' \
-    "$f does not define the Queue items field under Tracker contents"
+    "$f does not define the To-do items field under Tracker contents"
   has "$f" "amended at claim time with each id's claim result, and amended again at the close" \
-    "$f defines Queue items as set once, like Ship, rather than amended three times"
+    "$f defines To-do items as set once, like Ship, rather than amended three times"
 done
 for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-approval.md"; do
   has "$f" '`- none taken` when it takes none' \
@@ -852,9 +852,9 @@ for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-appr
   # only origin for a plan upgrading into the field, and what narrows the
   # close's absent-section escape to plans adopted before the field existed.
   has "$f" 'Create the section above `## Ship` when the plan does not carry one.' \
-    "$f does not create the Queue items section when the plan carries none"
+    "$f does not create the To-do items section when the plan carries none"
   has "$f" 'Adoption is not recorded while the section still reads `- (not yet declared)`' \
-    "$f records adoption with the Queue items field left unanswered"
+    "$f records adoption with the To-do items field left unanswered"
 done
 for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
   has "$f" "The dashboard's \`## To-do items\` section names what this run takes" \
@@ -870,7 +870,7 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f records a refusal in only one of the helper's two refusal forms"
 done
 
-# ─── how wide the interview's research fan-out goes ──────────────────────────
+# ─── how wide the interview's research fan-out goes ───────────────────────────
 # Item research is read-only and per-item independent, so it is dispatched in
 # waves rather than one worker at a time. The width is a host fact — Claude Code
 # admits 20 concurrent subagents, Codex caps spawned threads per session with a
@@ -895,7 +895,7 @@ for f in "$real_c/phases/pln/interview.md" "$real_x/phases/pln/interview.md"; do
     "$f does not keep a premise-changing follow-up worker after its wave"
 done
 
-# ─── a plan wider than one wave still asks its first question early ──────────
+# ─── a plan wider than one wave still asks its first question early ───────────
 # The held-output rule releases when the work quiesces, and waves made "the
 # work" bigger than the items the walk has reached: a plan needing four waves
 # would hold every question until the last one landed, restoring the whole
@@ -921,7 +921,7 @@ for f in "$real_c/phases/pln/outline.md" "$real_x/phases/pln/outline.md"; do
     "$f does not draw the line at exploring beyond the root instruction file"
 done
 
-# ─── how each host is told to invoke pln ─────────────────────────────────────
+# ─── how each host is told to invoke pln ──────────────────────────────────────
 # Claude Code invokes a skill as a slash command; Codex has none, and invokes a
 # skill by name with a `$` prefix, so `/pln` is an error there. A build that
 # tells its own host the wrong token is wrong in the way that costs most: the
@@ -949,7 +949,7 @@ has "$real_c/SKILL.md" 'Trigger explicitly via `/pln <task>`' \
 has "$real_x/SKILL.md" 'Trigger explicitly via `$pln <task>`' \
   "the codex router description does not name its own explicit invocation"
 
-# ─── the project to-do list, and where its format is allowed to land ─────────────
+# ─── the project to-do list, and where its format is allowed to land ──────────
 # One shared fragment, and its reach is a decision rather than an accident. The
 # three cores that render or explain the list carry the whole format; every
 # other core a door can fire in carries one sentence naming the helper, which

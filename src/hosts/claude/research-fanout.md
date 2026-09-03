@@ -1,0 +1,3 @@
+**Wave width: up to 15 item workers at once.** Claude Code caps concurrently-running subagents at 20, so 15 leaves headroom for the coordinator's own incidental work and for a follow-up worker an envelope forces. A plan with more active items than that runs in successive waves; each wave is awaited whole before the next is dispatched, so a slow worker never holds a slot open behind a finished one.
+
+The cap is user-configurable through `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`. Read it once, in the same shell call that opens the phase, and where it is set below 15 use that number minus one instead. Never raise the width above 15 because the variable is set higher: the number above is about how many results stay reconcilable, not only about what the host will admit.

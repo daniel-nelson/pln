@@ -1,0 +1,5 @@
+**Wave width: up to 3 item workers at once.** Codex caps spawned threads per session with `max_concurrent_threads_per_session` (the older `agents.max_threads` is an alias for it). Its unset default is documented inconsistently — four *including* the root in one place, six in another — so three is the widest wave that stays inside either reading, and it is also where the practitioner consensus on reconcilable concurrent results sits. A plan with more active items runs in successive waves, each awaited whole before the next is dispatched.
+
+Where `~/.codex/config.toml` sets that key explicitly, use its value less one for the coordinator's own thread. Read it once, in the same shell call that opens the phase; an absent `[agents]` section means the default applies and the width stays 3.
+
+A spawn refused for capacity while workers of this wave are known finished is the known Codex behavior where a completed agent holds its slot until it is closed — reap the finished agents and retry that spawn, rather than reading the refusal as a hard ceiling and falling back to one worker at a time.

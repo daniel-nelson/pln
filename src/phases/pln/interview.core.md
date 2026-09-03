@@ -66,6 +66,12 @@ The only thing that ends the interview early is the user abandoning the plan its
 
 **Research before prose.** Before the first proposal for every active item, classify the needed read through the three tiers. A known-stop exact coordination fact may be direct within the shared budget; a mechanically closed inventory or citation refresh uses `{{SKILL_DIR}}/src/workers/evidence-collection.md`; shaping an approach, tradeoff, scope, or question uses a fresh `judgment` worker with `{{SKILL_DIR}}/src/workers/interview-research.md` in item mode. Give workers the project root, `PLAN.md`, exact item/question scope, source state, applicable root mandates, evidence/result paths, routing attribution, and the 4096-byte ceiling. Record every route in `routing.tsv` and read only a validated envelope. If evidence changes the premise or returns `ESCALATE: frontier`, dispatch a fresh judgment worker over its artifact paths before writing prose. The user sees one coherent response after research, never progress output or raw findings.
 
+**Research every active item before the walk begins, and dispatch it concurrently.** The classification above is per item; the dispatch is not. Item research is read-only and each item's is independent of every other item's, so nothing orders them — and a run that researches one item at a time makes the user wait the sum of every item before the first question, rather than the slowest one. Dispatch the item workers together in waves, await the wave, then walk the items with their envelopes already in hand. Measured on a real four-item run: 6.1 + 7.4 + 13.9 minutes serially, where the wall clock could have been the longest of the three.
+
+Two things stay sequential, and neither is a reason to serialize the wave. A follow-up worker for an item whose evidence changed its premise, or which returned `ESCALATE: frontier`, is dispatched after the wave that raised it. And where an answer already given makes a dispatched item's research moot, say so and cancel that worker rather than letting it land under a question its own answer would change.
+
+<!-- pln:include research-fanout -->
+
 Walk every item, in order, gathering what the implementer needs to do the work without doing something the user would veto: intent, constraints, and the decisions only the user can make. Not a prescription of reversible mechanics. For each item:
 
 1. Use the item's validated research envelope to ground a concrete approach (file paths, behavior, touchpoints, consumers, constraints, and tests). The coordinator reads no surrounding code.

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.52.0 — 2026-09-02
+
+### Changed
+
+- **A held queue item says so in the index, where people actually read it.** `render_index` emitted state, the urgency flag, status, the claim and the path, and nothing about `claimed_by` or `claimed_in` — so `QUEUE.md` showed every item another run was holding exactly as it showed a free one. 1.49.0 removed the *pressure* to read that file by hand (a locked `list` renders live, a dead holder's lock clears itself, refusals say not to) but left the property itself in place, and the incident that found it had the shape the property predicts: three items held by a run in one worktree read as untaken from a second worktree of the same repository, which resolves to the same shared queue. A held item's line now ends `· held by <run> in <worktree>`, after the path; an unheld item ends at its path, unchanged. The worktree rides with the run string because `<YYYY-MM-DD>-<slug>` is not unique across the trees that share one queue — it is that tree's own directory name, with the full path kept in the record — and a record claimed before `claimed_in` existed names its run alone rather than inventing a tree for it. The index stays derived: `list` rebuilds it whole, so a holder shown there is one a detail file carries.
+
+- **Codex dispatches an R3 peer before it waits on the same-model readers, rather than merely being allowed to.** `plan-review-invoke` said a peer call "may run before the `wait_agent` mailbox loop", which is permission and not an instruction, and a real 2026-09-02 Codex run read it that way: the three same-model readers went out at 18:19:11/18:19:16/18:19:22 and were awaited at 18:19:24, and the adversarial slot followed at 18:22:05 — after. A peer sent out once the readers have been awaited costs the sum of the two rather than the slower of them, which is the entire reason the slot runs beside them. The fragment now says to dispatch it first, and to say which happened where the shell call genuinely cannot overlap. This orders the dispatch; it does not yet assert that the overlap works under Codex, which stays unrecorded until a run shows it.
+
 ## 1.51.0 — 2026-09-02
 
 ### Changed

@@ -23,7 +23,8 @@
 #   - a peer that is absent, unauthenticated, empty, failed, timed out, or
 #     answering with malformed output is a fallback or a failed run, never a
 #     review.
-#   - the eight-line stdout contract, including truthful routing attribution.
+#   - the nine-line stdout contract, including truthful routing attribution
+#     and which of the two kinds of "no peer" a rung-3 answer is.
 #
 # Prints OK and exits 0 on success; any failed assertion aborts with a message.
 #
@@ -158,7 +159,7 @@ expect() { # expect <rung> <peer> <status> <rc> <description>
   [ "$(field RUNG)" = "$1" ] || fail "$5 — RUNG=$(field RUNG) (expected $1)"
   [ "$(field PEER)" = "$2" ] || fail "$5 — PEER=$(field PEER) (expected $2)"
   [ "$(field STATUS)" = "$3" ] || fail "$5 — STATUS=$(field STATUS) (expected $3)"
-  [ "$(wc -l <<<"$OUT")" -eq 8 ] || fail "$5 — printed $(wc -l <<<"$OUT") lines, not the eight-line contract"
+  [ "$(wc -l <<<"$OUT")" -eq 9 ] || fail "$5 — printed $(wc -l <<<"$OUT") lines, not the nine-line contract"
 }
 
 fresh() { # fresh — forget every recorded run
@@ -280,6 +281,40 @@ expect 3 none none 3 "a claude whose auth probe says nothing at all"
 RC=0
 OUT="$(env PATH="$ONLY_CODEX:$BASE_PATH" PLN_TEST_CODEX_AUTH=out "$BIN" --host claude --which 2>"$WORK/stderr")" || RC=$?
 expect 3 none none 3 "a codex that is installed but not logged in"
+
+# --- and says which of the two kinds of "no peer" it is -----------------------
+# `STATUS=none` cannot tell a peer that is not installed from one that is
+# installed, logged in, and whose credential this process cannot read. On macOS
+# under a sandboxed host those are the same six lines and opposite user
+# actions: the second is a peer walled off from its keychain, not a missing
+# install. Verified in the field — `claude auth status` prints loggedIn:false
+# inside Codex's seatbelt and true outside it, because the credential lives in
+# the login keychain the sandbox denies.
+case "$OUT" in
+  *"REASON=codex-not-authenticated:"*) ;;
+  *) fail "an installed-but-unauthenticated peer did not say so"$'\n'"  output was: $OUT" ;;
+esac
+RC=0
+OUT="$(env PATH="$NEITHER:$BASE_PATH" HOME="$FAKE_HOME" "$BIN" --host codex --which 2>"$WORK/stderr")" || RC=$?
+expect 3 none none 3 "no peer CLI installed at all"
+case "$OUT" in
+  *'REASON=no-peer-cli-found'*) ;;
+  *) fail "an absent peer did not say it was absent"$'\n'"  output was: $OUT" ;;
+esac
+# The status vocabulary and exit codes are unchanged, so nothing keying on them
+# has to learn a new value; the reason is additive.
+case "$OUT" in
+  *'STATUS=none'*) ;;
+  *) fail "the reason line changed the status vocabulary" ;;
+esac
+# A peer that works reports no reason at all.
+RC=0
+OUT="$(env PATH="$ONLY_CLAUDE:$BASE_PATH" HOME="$FAKE_HOME" "$BIN" --host codex --which 2>"$WORK/stderr")" || RC=$?
+case "$OUT" in
+  *'REASON=none'*) ;;
+  *'REASON='*) fail "a usable peer reported a reason it does not have"$'\n'"  output was: $OUT" ;;
+  *) ;;
+esac
 
 # --- the one-time consent gate ------------------------------------------------
 # Unset: a peer is named so the caller's question can name it, and nothing moves.
@@ -461,7 +496,7 @@ OUT="$(env PATH="$BOTH:$BASE_PATH" "$COPY/pln-peer" --host codex \
   --brief "$BRIEF" --out "$WORK/run.out" 2>"$WORK/stderr")" || RC=$?
 [ "$(field RUNG)" = "2" ] || fail "a malformed helper answer changed the rung"
 [ "$(field STATUS)" = "ok" ] && fail "malformed helper output was reported as a review"
-[ "$(wc -l <<<"$OUT")" -eq 8 ] || fail "a malformed helper answer broke the eight-line contract"
+[ "$(wc -l <<<"$OUT")" -eq 9 ] || fail "a malformed helper answer broke the nine-line contract"
 grep -q 'chatter' <<<"$OUT" && fail "the helper's own output leaked into pln-peer's stdout"
 
 echo "OK"

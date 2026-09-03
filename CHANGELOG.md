@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.58.0 — 2026-09-03
+
+### Fixed
+
+- **`pln-peer` says which of the two kinds of "no peer" it found, and they call for opposite things from the user.** `STATUS=none` covered both a machine with no second CLI on it and a peer that is installed, logged in, and whose credential the calling process cannot read — six identical lines, one meaning "install something" and the other "your host is sandboxing it". The root cause of a real run's seven consecutive `STATUS=none` results turned out to be the second: `claude auth status` prints `"loggedIn": false` and exits 1 inside Codex's seatbelt sandbox and `true` outside it, because Claude Code keeps its credential in the macOS login keychain and the sandbox denies that item (`security find-generic-password` exits 44 there and succeeds outside). The probe was telling the truth about the process it ran in; nothing carried that truth to the user, so five separate investigations read it as a missing or unreachable install. The result contract gains a `REASON=` line — `no-peer-cli-found`, or `<peer>-not-authenticated:<resolved-path>` — making it nine lines rather than eight, always present and `none` when a peer is usable. The status vocabulary and every exit code are unchanged, so nothing keying on them learns a new value. The R3 substitution announcement now relays the reason rather than the bare status, because "pln could not find a peer" is both wrong and unactionable when a peer is installed, logged in, and merely walled off.
+
+- **The R3 adversarial slot is dispatched with the rest of the roster whether a peer or a substitute fills it.** 1.52.0 told Codex to dispatch an R3 *peer call* before entering the wait loop, and named only the peer call — so the same-model substitute, which is what fills the slot whenever no peer is available, inherited no ordering at all. That is not the rare case: it is every run on a host whose sandbox hides the peer, which the fix above shows is the normal state of a sandboxed Codex session on macOS. Observed in a live run: three same-model readers spawned at 5463s, 5467s and 5472s, awaited at 5474s, and the adversarial substitute spawned at 5725s — adding that reader's entire runtime to the round rather than overlapping it. The rule now covers the slot rather than its occupant: a peer's shell call goes out before the wait loop, a substitute's spawn goes out among the other spawns, and the slot is the fourth reader either way.
+
 ## 1.57.0 — 2026-09-03
 
 ### Fixed

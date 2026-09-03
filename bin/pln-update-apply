@@ -154,7 +154,7 @@ trap cleanup EXIT
 
 run_setup() { [ "${PLN_NO_SETUP:-}" = "1" ] && return 0; ( cd "$1" && ./setup >/dev/null 2>&1 ); }
 
-UP=0; UNCH=0; SKIP=0; FAIL=0
+UP=0; UNCH=0; SKIP=0; FAIL=0; UPDIRS=""
 OLDMIN=""
 
 while IFS= read -r dir; do
@@ -223,6 +223,7 @@ while IFS= read -r dir; do
   else
     echo "COPY $(disp "$dir") $old -> $new ${status:-upgraded}"
     UP=$((UP + 1))
+    UPDIRS="${UPDIRS:+$UPDIRS, }$(disp "$dir")"
   fi
 done < <(list_install_dirs)
 
@@ -232,7 +233,10 @@ echo "SUMMARY $OLDMIN -> $REMOTE ($UP upgraded, $UNCH unchanged, $SKIP skipped, 
 # Write the just-upgraded marker + clear caches only on a real run that changed something.
 if ! $PLAN && [ "$UP" -gt 0 ]; then
   mkdir -p "$STATE_DIR" 2>/dev/null || true
-  echo "$OLDMIN" > "$STATE_DIR/just-upgraded-from" 2>/dev/null || true
+  # The marker is one file shared by every install, so it records who wrote it:
+  # without that, whichever host reads it first reports another install's
+  # upgrade as its own. Second field onward is free text for a human.
+  printf '%s %s\n' "$OLDMIN" "$UPDIRS" > "$STATE_DIR/just-upgraded-from" 2>/dev/null || true
   rm -f "$STATE_DIR/last-update-check" "$STATE_DIR/update-snoozed" 2>/dev/null || true
 fi
 

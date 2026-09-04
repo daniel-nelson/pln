@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.65.0 — 2026-09-04
+
+### Fixed
+
+- **The post-fix verifier judges the fix instead of rebuilding what it already proved.** A trivial R3 follow-up still gets a fresh reader, and should: the coordinator validated the fix and may not also certify that no deeper review was needed, which is the whole reason that reader is fresh. But independence is in who judges, not in who re-executes a passing test. Measured on a real run: a two-file, one-line follow-up spent 3.6 minutes on a fresh frontier reader that rebuilt the review, the repository and its own context in order to re-run a focused suite the fix worker had run minutes earlier, and reported the same 27/27 already on record. Where the fix worker's validated result carries regression-first evidence for the same candidate — the failure the new test produced before the change, the exact command and count after it — and the recomputed fingerprint matches the one that evidence was produced under, the verifier now rules on triviality and residual risk from that evidence, the bounded diff and the recorded structural checks. It reruns a suite only where the evidence is absent, incomparable, or produced under a different fingerprint, and names which of those applied.
+
+- **The fix phase says its briefs are inline, so a run stops hunting for a contract that does not exist.** `{{PLN_PR_CMD}}`'s fix phase carries its worker briefs in the phase file; there is no `pr-fix` or `post-fix-verification` contract in the installed `src/workers/`. Nothing said so, and a real run searched that directory for one, found nothing, and paid a round trip for it — a mistake this release very nearly repeated in the fix for it. The phase now states that its briefs are inline and names the only two contracts it does reference, each where it applies.
+
+- **No fix worker is sent to an isolated worktree any more.** 1.60.0 made execution linear and `pln-scheduler build` emit the source tree for every node, but the Claude fix brief still told a worker to "edit only the assigned isolated worktree" — a tree the coordinator no longer creates. It now names the working tree the worker was given and the leased paths within it. This is the third stale parallel-era instruction found in this phase since the revert; `tests/generate.sh` now fails on the phrase.
+
 ## 1.64.0 — 2026-09-04
 
 ### Fixed

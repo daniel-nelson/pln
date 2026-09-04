@@ -900,6 +900,28 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f records a refusal in only one of the helper's two refusal forms"
 done
 
+# ─── the post-fix verifier judges rather than re-executes ────────────────────
+# A trivial R3 follow-up still gets a fresh reader — the coordinator validated
+# the fix and may not certify its own triviality. But a fresh reader that
+# rebuilds its context to re-run tests the fix worker ran minutes earlier spends
+# its whole cost before reaching the judgment. Observed: 3.6 min on a two-file
+# change, ending in the same 27/27 already on record.
+for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
+  has "$f" 'That verifier judges; it does not rebuild what the fix already proved' \
+    "$f re-runs evidence the fix worker already produced"
+  has "$f" 'reruns a suite only where the evidence is absent, incomparable, or produced under a different fingerprint' \
+    "$f drops the cases where re-running is still required"
+  has "$f" 'may not also certify that no deeper review was needed' \
+    "$f lost why the post-fix reader is fresh"
+  # The phase inlines its briefs; a run that searches src/workers/ for this
+  # phase's contract finds nothing and pays a round trip for it.
+  has "$f" 'there is no separate contract file for a fix or a post-fix verifier' \
+    "$f leaves a run to hunt src/workers/ for a contract that is not there"
+  # Execution is linear since 1.60.0: no isolated worktree is assigned.
+  hasnt "$f" 'assigned isolated worktree' \
+    "$f still sends a fix worker to an isolated worktree execution no longer creates"
+done
+
 # ─── one node is not a scheduling problem ────────────────────────────────────
 # The schedule worker exists to make judgments the coordinator must not invent:
 # order, leases, cohort boundaries. With a single node none of those exist, and

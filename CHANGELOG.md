@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.61.0 — 2026-09-03
+
+### Fixed
+
+- **A question about the run's own bookkeeping never reaches the user.** The ask/decide/defer filter routes on authority and reversibility, and the fork test then asks whether the consequence is *material* — but never whether the user is better placed to answer than the agent. So a real `/pln` run put its own verification scaffolding to the user as an a)/b)/c) question: whether a shell check carried forward from a previous run should be annotated, edited in place, or dropped. It looked material — carried literally, one of those checks read as a permanent ban on ever editing a file — and the reply was "I don't understand any of this. Explain it simply." Two of the filter's own rules should have caught it. Its ask lane requires the deciding reason to live "in the user's head: domain fact, taste, risk appetite, business context", and none of those bear on a carried shell check. And its strongest tell, *you have a preference*, was firing: the turn spent a paragraph explaining which check was "the one worth your attention" and why it was a run-scoped promise misfiled as an invariant. The fork test now says what *theirs* excludes — this run's own apparatus, its scaffolding, records, and how state carries between runs — on the ground that its evidence is entirely in front of the agent. Incomprehension joins "sure" and "your call" as a miscalibration tell, as the worst of them. Room for the rule came out of the same section: a sentence that justified having one test rather than stating a rule.
+
 ## 1.60.0 — 2026-09-03
 
 ### Changed

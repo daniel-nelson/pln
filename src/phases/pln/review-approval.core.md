@@ -20,6 +20,8 @@ Some of this skill's work is worth putting to a **peer**: a model other than the
 
 <!-- pln:include peer-consult -->
 
+<!-- pln:include peer-sandbox-remedy -->
+
 ## The plan review switch
 
 Before the approval gate, the finished plan itself goes under review (Step 3.5): a reader that never saw the interview argues with the plan and checks its claims against the files it names. It is on by default, and exactly two things turn it off — a standing preference in config, and an instruction in the session. Nothing else does. **The size of the plan never does:** a two-item plan and a twelve-item plan get the same review. There is no small-plan shortcut, because the reviewer's cost is reading the plan and checking its claims, which already scales with the plan, and because the short plan is regularly the dangerous one — two items that change how every future run behaves are worth more scrutiny than nine items of one-line edits.

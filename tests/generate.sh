@@ -900,6 +900,29 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f records a refusal in only one of the helper's two refusal forms"
 done
 
+# ─── a request typed mid-run is dispatched, not typed into the tree ──────────
+# The hard constraint covered adopted items, and the whole dispatch apparatus is
+# built around them — so a follow-up the user types matched no path and the
+# coordinator just edited. Measured: 18 source-file edits by a coordinator that
+# also delegated 8 subagents, context at 198k of a 258k window, and a two-word
+# follow-up costing 20 minutes inside one inference.
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+  has "$f" 'A change the user asks for after adoption is an item' \
+    "$f lets a mid-run request bypass the never-inline constraint"
+done
+for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
+  has "$f" 'becomes a node; it is not the coordinator' \
+    "$f leaves a mid-run change request with no dispatch path"
+  has "$f" 'A one-line change is not an exception' \
+    "$f lets the smallest request be the one done inline"
+  has "$f" 'exists only in the transcript' \
+    "$f does not say a typed-in change escapes the durable record"
+done
+for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
+  has "$f" 'becomes a cluster of its own' \
+    "$f leaves a mid-run change request with no cluster path"
+done
+
 # ─── the post-fix verifier judges rather than re-executes ────────────────────
 # A trivial R3 follow-up still gets a fresh reader — the coordinator validated
 # the fix and may not certify its own triviality. But a fresh reader that

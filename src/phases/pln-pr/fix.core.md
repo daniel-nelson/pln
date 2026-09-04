@@ -6,7 +6,7 @@ name: pln-pr-phase-fix
 
 <!-- pln:include active-turn-lifecycle -->
 
-Read this file in full before the first fix decision or dispatch. Rebuild open clusters from `REVIEW.md`, not memory. Keep the cursor here while fixes and their narrow verification/checkpoints complete.
+Read this file in full before the first fix decision or dispatch. Rebuild open clusters from `REVIEW.md`, not memory. **This phase carries its worker briefs inline, below — there is no separate contract file for a fix or a post-fix verifier.** The installed `src/workers/` directory holds contracts for other phases; searching it for this one's finds nothing and costs a round trip, which a real run spent. `execution-schedule.md` and `behavior-preservation.md` are the only contracts this phase names, and each is named where it applies. Keep the cursor here while fixes and their narrow verification/checkpoints complete.
 
 Before asking a decision or handing off a blocked cluster, write it and all partial-state pointers durably, then set `Phase: blocker` and load that phase. Once every finding is durably fixed/skipped and the post-fix result is recorded, set `Phase: ship-watch` and load that phase before versioning, the final gauntlet, push, PR, or CI work.
 
@@ -39,7 +39,7 @@ Before dispatch, snapshot the source tree and build `<plan-dir>/fix-manifest.tsv
 4. Run lightweight verification only (type-check + lint on touched files, not the full suite). Fix on failure — nothing here is staged, since `git` writes are not yours to make.
    For a structural finding, also run its repeatable structural reference check and remap its direct and indirect consumers. For an authorized removal, replacement, or consolidation, preserve the exact repository-native discovery commands, admitted behavior-suite command/scenario, pre-change outcome, equivalent post-change outcome, and comparison required by `{{SKILL_DIR}}/src/workers/behavior-preservation.md` so the merge/verifier can prove both consumer closure and retained behavior.
 <!-- pln:only claude -->
-5. Do not commit — the coordinator owns the cluster checkpoint and integration. Edit only the assigned isolated worktree and leased paths, then name them in your final message.
+5. Do not commit — the coordinator owns the cluster checkpoint and integration. Edit only the working tree you were given and the leased paths within it, then name them in your final message.
 6. Do not edit `REVIEW.md` — it is a shared checkpoint file and concurrent writes would race even when code leases are disjoint. Say in your final message which findings the cluster cleared; the orchestrator updates their statuses and commit hashes after it checkpoints the cluster."
 <!-- pln:endonly -->
 <!-- pln:only codex -->
@@ -51,7 +51,9 @@ Before dispatch, snapshot the source tree and build `<plan-dir>/fix-manifest.tsv
 
 ### Step 5. Post-fix assurance
 
-Every fix creates a new candidate; recompute its exact fingerprint before assurance. R1 narrowly verifies the finding and targeted tests. R2 runs one fresh post-fix verifier across the fixes and specialist risks. R3 runs a full fresh red-team pass after nontrivial fixes; this is separate from the four-reader pre-fix cap. A trivial R3 fix still gets a fresh verifier plus explicit evidence for why a full red team was unnecessary.
+Every fix creates a new candidate; recompute its exact fingerprint before assurance. R1 narrowly verifies the finding and targeted tests. R2 runs one fresh post-fix verifier across the fixes and specialist risks. R3 runs a full fresh red-team pass after nontrivial fixes; this is separate from the four-reader pre-fix cap. A trivial R3 fix still gets a fresh verifier plus explicit evidence for why a full red team was unnecessary — the coordinator validated the fix and may not also certify that no deeper review was needed, which is the whole reason that reader is fresh.
+
+**That verifier judges; it does not rebuild what the fix already proved.** Where the fix worker's validated result carries regression-first evidence for this same candidate — the failure the new test produced before the change, the exact command and count after it — and the recomputed fingerprint matches the one that evidence was produced under, the verifier rules on triviality and residual risk from that evidence, the bounded diff, and the recorded structural checks. It reruns a suite only where the evidence is absent, incomparable, or produced under a different fingerprint, and names which of those applied. Independence is in who judges, not in who re-executes a passing test: a fresh reader that rebuilds the review, the repository and its own context in order to re-run tests the fix worker ran minutes earlier spends its whole cost before reaching the judgment it exists to make. Observed: 3.6 minutes on a two-file, one-line follow-up, ending in the same 27/27 the fix worker had already recorded.
 
 At the repair's semantic risk tier, every post-fix path must rerun the structural reference check and consumer map (including direct and indirect consumers) for each structural finding and compare the recorded before/after owners, paths, and knobs. For a removal, replacement, or consolidation, it also rechecks repository-native discovery, bounded closure, and the post-change result from the same admitted behavior suite against its actual pre-change outcome under `{{SKILL_DIR}}/src/workers/behavior-preservation.md`; deletion additionally rechecks private reachability. Missing, changed, flaky, or incomparable proof reopens the same structural repair key and fails closed; do not treat passing post-change or implementation-detail tests alone as structural assurance. Step 7 still runs the full repository gauntlet once after assurance is clean.
 

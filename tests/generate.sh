@@ -893,6 +893,43 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f records a refusal in only one of the helper's two refusal forms"
 done
 
+# ─── a setup gap survives to somewhere the user will actually read it ────────
+# Said only in the turn it happens, the substitution notice is lost behind hours
+# of unattended output — the same disappearance as writing it to the review
+# record and nowhere else, moved from a file nobody reopens into a transcript
+# nobody scrolls back through.
+for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-approval.md" \
+         "$real_c/phases/pln-pr/review.md" "$real_x/phases/pln-pr/review.md"; do
+  has "$f" 'say it again at the next place the run actually stops' \
+    "$f leaves the substitution notice in scrollback"
+  has "$f" 'whichever comes first' "$f does not name where the carried notice lands"
+  has "$f" 'Say it once at that stop and drop it' \
+    "$f turns a carried notice into a repeated one"
+done
+
+# ─── the not-authenticated remedy is concrete on the host that needs it ──────
+# `REASON=<peer>-not-authenticated` means installed, logged in, and walled off
+# from its credential store. On macOS that is Codex's sandbox denying the login
+# keychain, and the fix is one config key — so the Codex build names it and the
+# Claude build, which has no such boundary, carries the portable sentence only.
+for f in "$real_x/phases/pln/review-approval.md" "$real_x/phases/pln-pr/review.md"; do
+  has "$f" 'network_access = true' "$f does not name the setting that restores a walled-off peer"
+  has "$f" 'so it is the user' "$f recommends a sandbox change instead of offering it"
+  has "$f" 'Never edit their configuration' "$f lets the run change the sandbox settings itself"
+done
+for f in "$real_c/phases/pln/review-approval.md" "$real_c/phases/pln-pr/review.md"; do
+  hasnt "$f" 'network_access' "the claude build carries a Codex-only sandbox remedy"
+  has "$f" 'installed and answered its own probe with a refusal' \
+    "$f lost the portable not-authenticated explanation"
+done
+
+# ─── the Codex fragment now asserts the overlap, because a run proved it ─────
+# It was deliberately silent from 1.25.0 until a real run existed.
+has "$real_x/phases/pln/review-approval.md" 'Verified on a real Codex run' \
+  'the codex plan review no longer records whether the peer overlap works'
+hasnt "$real_c/phases/pln/review-approval.md" 'Verified on a real Codex run' \
+  "the claude build carries Codex's run evidence"
+
 # ─── a plan directory outside the repository gets a writable artifact root ───
 # A native subagent inherits the coordinator's write boundary, and neither host
 # extends it for a child. So a project whose instructions put plans in

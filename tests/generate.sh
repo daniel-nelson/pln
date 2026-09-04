@@ -893,6 +893,29 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f records a refusal in only one of the helper's two refusal forms"
 done
 
+# ─── a plan directory outside the repository gets a writable artifact root ───
+# A native subagent inherits the coordinator's write boundary, and neither host
+# extends it for a child. So a project whose instructions put plans in
+# ~/Documents left native reviewers able to read the plan and unable to write
+# beside it, and the run improvised a location per worker.
+for f in "$real_c/phases/pln/outline.md" "$real_x/phases/pln/outline.md"; do
+  has "$f" 'not writable by a worker, so allocate an artifact directory that is' \
+    "$f sends workers at a plan directory they cannot write"
+  has "$f" 'pln-artifacts-' "$f names no writable artifact root"
+  has "$f" 'the plan directory remains the record' \
+    "$f lets the artifact directory hold something durable"
+done
+for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
+  has "$f" 'the directory the worker could actually write' \
+    "$f validates envelopes against a root the worker may not have reached"
+done
+
+# ─── an optional review field is omitted, never abbreviated ──────────────────
+for f in "$real_c/phases/pln-pr/review.md" "$real_x/phases/pln-pr/review.md"; do
+  has "$f" 'Omit either object entirely rather than emitting a partial one' \
+    "$f lets a partial optional object take its whole artifact down"
+done
+
 # ─── the ask lane is about who can answer, not only what is at stake ─────────
 # A real /pln run put its own verification bookkeeping to the user as an a)/b)/c)
 # question — whether a carried-forward shell check should be annotated, edited or

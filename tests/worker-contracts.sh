@@ -103,6 +103,25 @@ verification="$REPO_DIR/src/workers/final-verification.md"
 has "$verification" 'full gauntlet' 'verification contract lost the full gauntlet'
 has "$verification" 'Recompute the fingerprint' 'verification contract lost exact-candidate invalidation'
 
+# The final gauntlet is exact-once, so a command that cannot run here destroys
+# the attempt rather than failing it. One run spent four attempts learning its
+# commands' requirements from inside the fingerprinted run: a worker has no
+# terminal, and network, filesystem and browser access are settled at a first
+# invocation or not at all.
+has "$verification" 'Establish that the gauntlet can run before you run it' \
+  'final-verification contract learns its requirements from a burned attempt'
+has "$verification" 'you have no terminal' \
+  'final-verification contract does not say the run is non-interactive'
+has "$verification" 'An environment refusal is not a verification result' \
+  'final-verification contract reports environment denials as failed verification'
+# No toolchain is named: a project states the unattended form of its own
+# commands, and pln does not learn one package manager or one browser.
+for banned in 'CI=true' pnpm Puppeteer Firefox npm yarn; do
+  hasnt "$verification" "$banned" \
+    "final-verification contract hardcodes $banned instead of reading the project's instructions"
+done
+
+
 assurance="$REPO_DIR/src/workers/assurance-classification.md"
 has "$assurance" 'Classify meaning, not line count' 'assurance worker regressed to size-only risk'
 has "$assurance" 'Unknown or conflicting risk' 'assurance worker no longer fails closed'

@@ -185,7 +185,15 @@ ready_rows() {
             ok=0
           }
         }
-        if (ok) print "READY",id[i],wave[i],execution[i],context[i]
+        # One at a time. `ready` names the next item, never a set: a caller
+        # that reads two lines here dispatches two workers into one tree. Only
+        # the `ready` caller stops at the first row — `claim` shares this query
+        # with hold_filter=0 and still needs to answer about any node it is
+        # asked about, not merely the next one.
+        if (ok) {
+          print "READY",id[i],wave[i],execution[i],context[i]
+          if (hold_filter == 1) exit 0
+        }
       }
     }
   ' "$1"
@@ -317,10 +325,6 @@ case "$command" in
         n=split(s,a,","); for (k=1;k<=n;k++) if (!done[a[k]]) return 0
         return 1
       }
-      function can_pair(idx, selected, count,    k) {
-        for (k=1;k<=count;k++) if (leases_overlap(leases[idx],leases[selected[k]])) return 0
-        return 1
-      }
       NR == 1 {
         if ($0 != "ITEM\tDEPS\tLEASES\tCOHORT\tCONTEXT\tDIRTY_STATE") die("nodes file has an unknown header")
         next
@@ -366,36 +370,27 @@ case "$command" in
               die("cohort reuse must be a contiguous direct-dependency chain: " cohort[i])
           }
         }
+        # Linear execution: one item at a time, in the working tree the
+        # coordinator was given. Concurrency used to be computed here, and the
+        # price was a worktree per isolated node — a bare checkout with no
+        # installed dependencies, no environment file, no database and no port
+        # block. Every worker then rebuilt that for itself, and none of it is
+        # anything git tracks, so no lease could see it and no dirty snapshot
+        # could protect it. One observed run left thirty databases and 3.2 GB of
+        # worktrees behind, and spent an entire scheduled item repairing the
+        # dependency state another worker had broken. Dependencies still order
+        # the graph and cycles are still fatal; nothing selects a second node to
+        # run beside the first.
         remaining=n; wave_no=0
         while (remaining) {
           ready_count=0
           for (i=1;i<=n;i++) if (!done[item[i]] && deps_done(deps[i])) ready[++ready_count]=i
           if (!ready_count) die("dependency graph contains a cycle")
-          first=ready[1]; selected_count=0; force=""
-          if (mode == "non-git" || dirty[first] != "clean" || leases[first] == "UNKNOWN") force="original"
-          if (context[first] == "reuse") force=execution[first-1]
-          if (force == "isolated") {
-            selected[++selected_count]=first
-            for (r=2;r<=ready_count;r++) {
-              idx=ready[r]
-              if (dirty[idx] == "clean" && leases[idx] != "UNKNOWN" && context[idx] == "fresh" && can_pair(idx,selected,selected_count))
-                selected[++selected_count]=idx
-            }
-          } else if (force == "") {
-            selected[++selected_count]=first
-            for (r=2;r<=ready_count;r++) {
-              idx=ready[r]
-              if (dirty[idx] == "clean" && leases[idx] != "UNKNOWN" && context[idx] == "fresh" && can_pair(idx,selected,selected_count))
-                selected[++selected_count]=idx
-            }
-            if (selected_count < 2) force="original"; else force="isolated"
-          } else selected[++selected_count]=first
+          first=ready[1]
           wave_no++
-          for (s=1;s<=selected_count;s++) {
-            idx=selected[s]; wave[idx]=wave_no; execution[idx]=force
-            if (context[idx] == "reuse") execution[idx]=execution[idx-1]
-            done[item[idx]]=1; remaining--
-          }
+          wave[first]=wave_no
+          execution[first]="original"
+          done[item[first]]=1; remaining--
         }
         print "PLN_RUN_MANIFEST", "1"
         print "META", "SOURCE_ROOT", source_root
@@ -404,7 +399,7 @@ case "$command" in
         print "META", "REPO_MODE", mode
         print "ITEM", "DEPS", "LEASES", "COHORT", "CONTEXT", "DIRTY_STATE", "WAVE", "EXECUTION", "WORKTREE", "REQUESTED_PROFILE", "ACTUAL_PROFILE", "ACTUAL_MODEL", "ACTUAL_EFFORT", "HANDLE", "STATUS", "HANDOFF", "RESULT", "COMMIT", "INTEGRATION_ORDER"
         for (i=1;i<=n;i++) {
-          wt=(execution[i] == "original" ? source_root : "-")
+          wt=source_root
           print item[i],deps[i],leases[i],cohort[i],context[i],dirty[i],wave[i],execution[i],wt,"judgment","-","-","-","-","pending","-","-","-",i
         }
       }

@@ -103,6 +103,16 @@ verification="$REPO_DIR/src/workers/final-verification.md"
 has "$verification" 'full gauntlet' 'verification contract lost the full gauntlet'
 has "$verification" 'Recompute the fingerprint' 'verification contract lost exact-candidate invalidation'
 
+# A cross-model peer is another vendor's model following your instruction as
+# best it reads it. The brief already says "no code fence"; the first Codex run
+# with a working peer still discarded a complete adversarial review because the
+# payload arrived fenced, losing model-family independence to three backticks.
+merge_contract="$REPO_DIR/src/workers/pr-review-merge.md"
+has "$merge_contract" 'A single enclosing Markdown code fence is transport, not content' \
+  'the merge contract still fails a reader over an enclosing code fence'
+has "$merge_contract" 'reject what is still unparseable' \
+  'stripping a fence was allowed to soften the rest of validation'
+
 # The final gauntlet is exact-once, so a command that cannot run here destroys
 # the attempt rather than failing it. One run spent four attempts learning its
 # commands' requirements from inside the fingerprinted run: a worker has no

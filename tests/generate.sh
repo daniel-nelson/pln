@@ -893,6 +893,13 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f records a refusal in only one of the helper's two refusal forms"
 done
 
+# ─── the Codex fragment now asserts the overlap, because a run proved it ─────
+# It was deliberately silent from 1.25.0 until a real run existed.
+has "$real_x/phases/pln/review-approval.md" 'Verified on a real Codex run' \
+  'the codex plan review no longer records whether the peer overlap works'
+hasnt "$real_c/phases/pln/review-approval.md" 'Verified on a real Codex run' \
+  "the claude build carries Codex's run evidence"
+
 # ─── a plan directory outside the repository gets a writable artifact root ───
 # A native subagent inherits the coordinator's write boundary, and neither host
 # extends it for a child. So a project whose instructions put plans in

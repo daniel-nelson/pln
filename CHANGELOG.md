@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.63.0 — 2026-09-04
+
+### Changed
+
+- **The Codex plan review now says the peer overlap works, because a run finally proved it.** `src/hosts/codex/plan-review-invoke.md` had been deliberately silent on this since 1.25.0, under the rule that a host fragment asserts only what has been verified — and no run existed, because on macOS the peer CLI's credential lives in the login keychain and Codex's sandbox denies it. With `sandbox_workspace_write.network_access = true` the peer resolves, and a real run then answered the question outright: three same-model readers spawned at 31.49m, 31.58m and 31.65m, the peer's shell call went out at 31.78m as a background cell before any await, the peer returned at 41.75m, and the readers were awaited after it at 42.36m. The round cost the slower of the two rather than their sum, which is the whole reason the slot runs beside them. The fragment records the run.
+
+### Fixed
+
+- **A cross-model peer's findings survive an enclosing code fence.** The reviewer brief already ends "No preamble, no code fence, no summary, no commentary", and a same-model reader obeys it. A peer is another vendor's model reading that instruction as best it can, and cannot be made to comply. On the first run where a peer was actually reachable, its adversarial review came back complete, on time and schema-shaped — wrapped in ```` ```json ````. The merge worker rejected the artifact as unparseable, the reader slot counted as failed, and the round lost model-family independence to three backticks while a same-model substitute re-did work the peer had already done. The merge contract now treats a single enclosing fence as transport rather than content: strip one leading fence and its matching trailer before parsing, say so, and reject what is still unparseable. Nothing else about validation softens — missing, empty, malformed, wrong-tree and uncited inputs remain failed readers after stripping.
+
 ## 1.62.0 — 2026-09-03
 
 ### Fixed

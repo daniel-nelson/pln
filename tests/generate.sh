@@ -893,6 +893,20 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f records a refusal in only one of the helper's two refusal forms"
 done
 
+# ─── a setup gap survives to somewhere the user will actually read it ────────
+# Said only in the turn it happens, the substitution notice is lost behind hours
+# of unattended output — the same disappearance as writing it to the review
+# record and nowhere else, moved from a file nobody reopens into a transcript
+# nobody scrolls back through.
+for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-approval.md" \
+         "$real_c/phases/pln-pr/review.md" "$real_x/phases/pln-pr/review.md"; do
+  has "$f" 'say it again at the next place the run actually stops' \
+    "$f leaves the substitution notice in scrollback"
+  has "$f" 'whichever comes first' "$f does not name where the carried notice lands"
+  has "$f" 'Say it once at that stop and drop it' \
+    "$f turns a carried notice into a repeated one"
+done
+
 # ─── the not-authenticated remedy is concrete on the host that needs it ──────
 # `REASON=<peer>-not-authenticated` means installed, logged in, and walled off
 # from its credential store. On macOS that is Codex's sandbox denying the login

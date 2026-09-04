@@ -10,7 +10,7 @@ Read this file in full before the first blocker action. Enter only after the wor
 
 Persist the blocking question in `Open questions` before sending it. After the answer, write the decision and remove the open question, retain the recorded partial state, set `Phase: implementation`, then read the implementation phase in full before continuing the same worker or its documented fresh-worker fallback. Recompute readiness from the manifest; never jump to a remembered next item.
 
-**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-queue add` — not by leaving it in prose for the close to remember.
+**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-todo add` — not by leaving it in prose for the close to remember.
 
 ## Cross-cutting concerns
 

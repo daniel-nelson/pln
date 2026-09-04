@@ -1,35 +1,35 @@
 #!/usr/bin/env bash
-# tests/queue.sh — bin/pln-queue, the helper that owns the follow-up queue.
+# tests/todo.sh — bin/pln-todo, the helper that owns the project to-do list.
 #
 # The helper exists because prose gets skipped: a run has to call it, and the
 # closing message renders what it printed back. So the properties under test are
 # the ones a close depends on and cannot check for itself — that `add` returns
 # the exact line it wrote, that `list` fails loudly rather than rendering an
-# empty follow-up list, that nothing destroys a record, and that the queue is
+# empty follow-up list, that nothing destroys a record, and that the list is
 # found again on the next run wherever the user put it.
 #
 # Everything runs against a scratch tree: bash and git only, no network, no
 # agent CLI, no credentials. HOME is redirected into the scratch directory, so
-# nothing reads the developer's own state and a `~/`-relative queue root lands
-# in the sandbox. Dates come from PLN_QUEUE_DATE, so a month boundary or a
+# nothing reads the developer's own state and a `~/`-relative to-do-list root lands
+# in the sandbox. Dates come from PLN_TODO_DATE, so a month boundary or a
 # staleness cutoff cannot make this script's result depend on the day it runs.
 #
-# Run:  bash tests/queue.sh
+# Run:  bash tests/todo.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-QUEUE="$REPO_DIR/bin/pln-queue"
+TODO="$REPO_DIR/bin/pln-todo"
 
 # Resolved with `pwd -P`: the helper reports absolute physical paths, and on
 # macOS the default TMPDIR is itself a symlink, so an unresolved scratch root
 # would make every path comparison below fail for the wrong reason.
-WORK="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/pln-queue-test.XXXXXX")" && pwd -P)"
+WORK="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/pln-todo-test.XXXXXX")" && pwd -P)"
 trap 'rm -rf "$WORK"' EXIT
 
 export HOME="$WORK/home"
 mkdir -p "$HOME"
-export PLN_QUEUE_DATE=2026-08-27
+export PLN_TODO_DATE=2026-08-27
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 has() { grep -qF -- "$2" "$1" || fail "$3"; }
@@ -38,14 +38,14 @@ line_is() { grep -qxF -- "$2" "$1" || fail "$3"; }
 said() { case "$Q_OUT$Q_ERR" in *"$1"*) ;; *) fail "$2" ;; esac; }
 didnt_say() { case "$Q_OUT$Q_ERR" in *"$1"*) fail "$2" ;; esac; return 0; }
 
-[ -x "$QUEUE" ] || fail "missing executable queue helper: $QUEUE"
+[ -x "$TODO" ] || fail "missing executable to-do-list helper: $TODO"
 
 # Every call keeps its streams on disk, so a byte comparison is possible and a
 # non-zero exit is a fact under test rather than an abort.
 Q_OUT=''; Q_ERR=''; Q_RC=0
 q() {
   set +e
-  "$QUEUE" "$@" >"$WORK/out" 2>"$WORK/err"
+  "$TODO" "$@" >"$WORK/out" 2>"$WORK/err"
   Q_RC=$?
   set -e
   Q_OUT="$(cat "$WORK/out")"
@@ -95,32 +95,36 @@ appears_before() {
 # ─── resolution, leg 4: create and ask ────────────────────────────────────────
 # Nothing to find, so the helper creates the default root and reports the
 # location question as still owed — the only state that records an answer lives
-# in the queue's own header, so a run that never asks leaves it saying so.
+# in the list's own header, so a run that never asks leaves it saying so.
 R="$WORK/created"
 new_repo "$R"
-ok "init in a project with no queue" init --project "$R"
-is QUEUE_ROOT "$R/pln" "init did not create the default queue root"
-is RESOLVED_BY created "init did not report that it created the queue"
+ok "init in a project with no to-do list" init --project "$R"
+is TODO_ROOT "$R/pln" "init did not create the default to-do-list root"
+is RESOLVED_BY created "init did not report that it created the to-do list"
 is CREATED 1 "init did not report the creation"
-is LOCATION_QUESTION owed "a created queue did not report the location question as owed"
-is MIGRATION_OFFERED none "a fresh queue reported a migration offer"
-[ -d "$R/pln/q" ] || fail "init created no live-item directory"
+is LOCATION_QUESTION owed "a created to-do list did not report the location question as owed"
+is MIGRATION_OFFERED none "a fresh to-do list reported a migration offer"
+[ -d "$R/pln/items" ] || fail "init created no live-item directory"
 
 # The header sentinel is the first line, exactly, and it is what every other
-# reader keys on — pln-scheduler and pln-simplify identify a queue root by it.
-[ "$(sed -n 1p "$R/pln/QUEUE.md")" = '<!-- pln-queue v1' ] \
+# reader keys on — pln-scheduler and pln-simplify identify a to-do-list root by
+# it. It and the `queue-root:` header key keep their older spelling on purpose:
+# they are a format version and a machine-read field, never printed to anyone,
+# and renaming either would strand both guards and root resolution against every
+# list already on disk.
+[ "$(sed -n 1p "$R/pln/TO-DO.md")" = '<!-- pln-queue v1' ] \
   || fail "the index does not open with the '<!-- pln-queue v1' sentinel"
-has "$R/pln/QUEUE.md" "queue-root: $R/pln" "the index header does not record the resolved root"
-has "$R/pln/QUEUE.md" '_No open items._' "an empty index does not say it is empty"
+has "$R/pln/TO-DO.md" "queue-root: $R/pln" "the index header does not record the resolved root"
+has "$R/pln/TO-DO.md" '_No open items._' "an empty index does not say it is empty"
 
-# ─── resolution, leg 1: an existing queue is found again ──────────────────────
+# ─── resolution, leg 1: an existing to-do list is found again ─────────────────
 ok "a second init in the same project" init --project "$R"
-is QUEUE_ROOT "$R/pln" "the second run resolved a different root"
-is RESOLVED_BY project-root "the second run did not find the existing queue"
-is CREATED 0 "the second run created a queue over one that already existed"
+is TODO_ROOT "$R/pln" "the second run resolved a different root"
+is RESOLVED_BY project-root "the second run did not find the existing to-do list"
+is CREATED 0 "the second run created a to-do list over one that already existed"
 
 # The answered question and the migration offer are recorded in that header and
-# nowhere else, so no state exists outside the queue.
+# nowhere else, so no state exists outside the to-do list.
 ok "recording the answered location question" init --project "$R" --answered --migration-offered
 is LOCATION_QUESTION answered "the answered location question was not recorded"
 is MIGRATION_OFFERED 2026-08-27 "the migration offer was not dated"
@@ -134,29 +138,29 @@ is MIGRATION_OFFERED 2026-08-27 "the recorded migration offer did not survive a 
 R="$WORK/commondir"
 new_repo "$R"
 mkdir -p "$R/.git/pln"
-printf 'pln-queue: %s\n' "$WORK/declared-loser" > "$R/CLAUDE.md"
-ok "init with a queue in the common dir" init --project "$R"
-is RESOLVED_BY common-dir "the common-dir leg did not resolve the queue"
-is QUEUE_ROOT "$R/.git/pln" "the common-dir leg resolved the wrong root"
+printf 'pln-todo: %s\n' "$WORK/declared-loser" > "$R/CLAUDE.md"
+ok "init with a to-do list in the common dir" init --project "$R"
+is RESOLVED_BY common-dir "the common-dir leg did not resolve the to-do list"
+is TODO_ROOT "$R/.git/pln" "the common-dir leg resolved the wrong root"
 [ ! -e "$WORK/declared-loser" ] || fail "the instruction-file leg ran ahead of the common dir"
 mkdir -p "$R/deep/sub"
 ok "init from a subdirectory" init --project "$R/deep/sub"
-is QUEUE_ROOT "$R/.git/pln" "the common-dir root differs when resolved from a subdirectory"
+is TODO_ROOT "$R/.git/pln" "the common-dir root differs when resolved from a subdirectory"
 
-# Leg 1 sits above leg 2: a queue at the project root wins even when the common
+# Leg 1 sits above leg 2: a to-do list at the project root wins even when the common
 # dir holds one too, which is why an applied answer has to move what it left.
 mkdir -p "$R/pln"
-ok "init with queues in both places" init --project "$R"
-is RESOLVED_BY project-root "the common dir shadowed a queue at the project root"
+ok "init with to-do lists in both places" init --project "$R"
+is RESOLVED_BY project-root "the common dir shadowed a to-do list at the project root"
 
 # ─── resolution, leg 3: the project's own instruction files ───────────────────
 # A named directory becomes the root.
 R="$WORK/named-dir"
 new_repo "$R"
-printf '# Project\n\n- `pln-queue:` `docs/queue`\n' > "$R/CLAUDE.md"
+printf '# Project\n\n- `pln-todo:` `docs/todo`\n' > "$R/CLAUDE.md"
 ok "init with a declared directory" init --project "$R"
-is RESOLVED_BY instructions "the declared directory did not resolve the queue"
-is QUEUE_ROOT "$R/docs/queue" "the declared directory produced the wrong root"
+is RESOLVED_BY instructions "the declared directory did not resolve the to-do list"
+is TODO_ROOT "$R/docs/todo" "the declared directory produced the wrong root"
 
 # A named *file* makes its containing directory the root, and the file itself is
 # never touched — it is what item 13's migration offer reads.
@@ -165,10 +169,10 @@ new_repo "$R"
 mkdir -p "$R/notes"
 printf 'an existing unstructured to-do file\n' > "$R/notes/TODO.md"
 before="$(cat "$R/notes/TODO.md")"
-printf 'pln-queue: notes/TODO.md\n' > "$R/AGENTS.md"
+printf 'pln-todo: notes/TODO.md\n' > "$R/AGENTS.md"
 ok "init with a declared file" init --project "$R"
-is RESOLVED_BY instructions "the declared file did not resolve the queue"
-is QUEUE_ROOT "$R/notes" "the declared file did not make its directory the root"
+is RESOLVED_BY instructions "the declared file did not resolve the to-do list"
+is TODO_ROOT "$R/notes" "the declared file did not make its directory the root"
 said 'derived the root from the named file TODO.md' \
   "init did not report which named file the root came from"
 [ "$(cat "$R/notes/TODO.md")" = "$before" ] || fail "the named to-do file was written to"
@@ -176,21 +180,21 @@ said 'derived the root from the named file TODO.md' \
 # `~/` in a declaration resolves against HOME, which this script owns.
 R="$WORK/named-home"
 new_repo "$R"
-printf 'pln-queue: ~/followups\n' > "$R/CLAUDE.md"
+printf 'pln-todo: ~/followups\n' > "$R/CLAUDE.md"
 ok "init with a home-relative declaration" init --project "$R"
-is QUEUE_ROOT "$HOME/followups" "a ~/-relative declaration did not resolve against HOME"
+is TODO_ROOT "$HOME/followups" "a ~/-relative declaration did not resolve against HOME"
 
 # Only the declaration form counts. Prose that merely mentions the helper is not
-# a location, or leg 3 would turn every passing reference into a queue root.
+# a location, or leg 3 would turn every passing reference into a to-do-list root.
 R="$WORK/prose"
 new_repo "$R"
-printf 'Follow-ups are filed with pln-queue, somewhere under docs.\n' > "$R/CLAUDE.md"
+printf 'Follow-ups are filed with pln-todo, somewhere under docs.\n' > "$R/CLAUDE.md"
 ok "init with prose that names no path" init --project "$R"
 is RESOLVED_BY created "prose mentioning the helper was read as a declaration"
 
 # ─── resolution: what is never adopted ────────────────────────────────────────
 # A `pln` that is something else is passed over *and* refused as a creation
-# target: writing into it would put the queue somewhere nobody chose.
+# target: writing into it would put the to-do list somewhere nobody chose.
 for kind in symlink other-content gitlink; do
   R="$WORK/refuse-$kind"
   new_repo "$R"
@@ -203,7 +207,7 @@ for kind in symlink other-content gitlink; do
     other-content)
       mkdir -p "$R/pln"
       printf 'someone else lives here\n' > "$R/pln/README.md"
-      needle='holds something other than a queue, not adopted'
+      needle='holds something other than a to-do list, not adopted'
       ;;
     gitlink)
       mkdir -p "$R/pln"
@@ -216,32 +220,32 @@ for kind in symlink other-content gitlink; do
   refused "init against a $kind at pln/" init --project "$R"
   said "$needle" "init did not say why the $kind at pln/ was passed over"
   said 'nothing was written' "init did not say that nothing was written for the $kind case"
-  [ ! -e "$R/pln/QUEUE.md" ] || fail "init wrote an index into the $kind at pln/"
+  [ ! -e "$R/pln/TO-DO.md" ] || fail "init wrote an index into the $kind at pln/"
 done
 
-# The repository top level is refused as a queue root under either shape it can
-# arrive in. Adopting it would scatter QUEUE.md, q/ and done/ across the top
+# The repository top level is refused as a to-do-list root under either shape it can
+# arrive in. Adopting it would scatter TO-DO.md, items/ and archive/ across the top
 # level and put pln's own dirt exclusion in front of every user-owned change.
 R="$WORK/top-level-file"
 new_repo "$R"
 printf 'old todos\n' > "$R/TODO.md"
-printf 'pln-queue: TODO.md\n' > "$R/CLAUDE.md"
+printf 'pln-todo: TODO.md\n' > "$R/CLAUDE.md"
 ok "init with a declared file at the repository top level" init --project "$R"
 said 'is the repository top level, not adopted' \
-  "a top-level declared file was adopted as the queue root"
-is QUEUE_ROOT "$R/pln" "a refused top-level root did not fall through to the default"
+  "a top-level declared file was adopted as the to-do-list root"
+is TODO_ROOT "$R/pln" "a refused top-level root did not fall through to the default"
 
 R="$WORK/top-level-dir"
 new_repo "$R"
-printf '<!-- pln-queue v1\n-->\n' > "$R/QUEUE.md"
-printf 'pln-queue: .\n' > "$R/CLAUDE.md"
+printf '<!-- pln-queue v1\n-->\n' > "$R/TO-DO.md"
+printf 'pln-todo: .\n' > "$R/CLAUDE.md"
 ok "init with the repository top level declared" init --project "$R"
 said 'is the repository top level, not adopted' \
-  "the declared repository top level was adopted as the queue root"
-is QUEUE_ROOT "$R/pln" "a refused top-level root did not fall through to the default"
+  "the declared repository top level was adopted as the to-do-list root"
+is TODO_ROOT "$R/pln" "a refused top-level root did not fall through to the default"
 
 # A bare repository has a common dir and no work tree, so there is nowhere for a
-# queue to live: it must fall through rather than write inside the git dir.
+# to-do list to live: it must fall through rather than write inside the git dir.
 git init -q --bare "$WORK/bare.git"
 refused "init in a bare repository" init --project "$WORK/bare.git"
 said 'bare repository' "init in a bare repository did not say why it refused"
@@ -250,7 +254,168 @@ said 'bare repository' "init in a bare repository did not say why it refused"
 R="$WORK/nocreate"
 new_repo "$R"
 refused "init --no-create with nothing to find" init --project "$R" --no-create
-[ ! -e "$R/pln" ] || fail "init --no-create created a queue"
+[ ! -e "$R/pln" ] || fail "init --no-create created a to-do list"
+
+# ─── the one-time migration off the older file names ──────────────────────────
+# 1.59.0 renamed the index, the live directory and the archive. A list written
+# before it is renamed in place on first touch — every leg, ahead of any
+# creation — and after that only the new names exist. The old names survive in
+# the recognition probe alone, which is what lets the migration fire at all.
+legacy_store() { # legacy_store <root> [with-archive]
+  local root="$1"
+  mkdir -p "$root/q"
+  cat > "$root/QUEUE.md" <<'EOF'
+<!-- pln-queue v1
+queue-root: written-by-an-older-pln
+-->
+
+## Everything else
+
+- [ ] ready · an item filed before the rename → `q/legacy-item.md`
+EOF
+  cat > "$root/q/legacy-item.md" <<'EOF'
+---
+id: legacy-item
+state: "[ ]"
+urgent: false
+status: ready
+opened: 2026-07-01
+source: a run that predates the rename
+group:
+depends_on: []
+touches: [app/legacy.rb]
+holds: []
+---
+
+# an item filed before the rename
+
+## Sub-items
+EOF
+  [ "${2:-}" = 'with-archive' ] || return 0
+  mkdir -p "$root/done/2026-07"
+  printf '## 2026-07\n\n- [x] completed · older work → `earlier.md` — commit 0000000\n' \
+    > "$root/done/2026-07/index.md"
+  printf -- '---\nid: earlier\nstate: "[x]"\nstatus: ready\n---\n\n# older work\n' \
+    > "$root/done/2026-07/earlier.md"
+}
+
+R="$WORK/migrate"
+new_repo "$R"
+legacy_store "$R/pln" with-archive
+ok "the first touch of a list written under the older names" init --project "$R"
+is TODO_ROOT "$R/pln" "the migration did not resolve the list it migrated"
+is RESOLVED_BY project-root "an older list was not adopted at the project-root leg"
+is CREATED 0 "the migration reported creating a list rather than renaming one"
+said 'renamed once' "the migration was not reported back"
+for old in QUEUE.md q done; do
+  [ ! -e "$R/pln/$old" ] || fail "the migration left $old behind"
+done
+[ -f "$R/pln/items/legacy-item.md" ] || fail "the migration lost the live record"
+[ -f "$R/pln/archive/2026-07/earlier.md" ] || fail "the migration lost the archived record"
+[ -f "$R/pln/archive/2026-07/index.md" ] || fail "the migration lost the month index"
+
+# The raw index body, before any `list` runs: `list` rebuilds the index, so a
+# renamed-but-unrebuilt body would be repaired before a later assertion could
+# see it — and until it is rebuilt every locator in it names a directory that no
+# longer exists.
+has "$R/pln/TO-DO.md" 'items/legacy-item.md' \
+  "the migration renamed the files without rebuilding the index body"
+hasnt "$R/pln/TO-DO.md" 'q/legacy-item.md' "the index body still names the old live directory"
+
+ok "listing a migrated list" list --project "$R"
+is ITEM_COUNT 1 "the migrated item is not in the listing"
+ok "marking a migrated item done" mark --project "$R" --id legacy-item --state '[x]'
+ok "archiving a migrated item" archive --project "$R" --id legacy-item \
+  --disposition completed --evidence 'commit abc1234'
+[ -f "$R/pln/archive/2026-08/legacy-item.md" ] \
+  || fail "an item that came through the migration did not archive under the new name"
+
+# A second run has nothing left to do, and says nothing about a rename.
+ok "a later run over a migrated list" init --project "$R"
+didnt_say 'renamed once' "the migration ran a second time"
+
+# The explicit leg never calls the adoption probe, so a migration hooked into
+# adoption alone would miss `init --root` — the command a user runs to point pln
+# at a list that already exists — and would manufacture the both-present state
+# itself. A store that has never archived is a valid input: two entries move,
+# not three.
+mkdir -p "$WORK/legacy-explicit"
+legacy_store "$WORK/legacy-explicit"
+E="$WORK/explicit"
+new_repo "$E"
+ok "adopting an older list with init --root" init --project "$E" --root "$WORK/legacy-explicit"
+is TODO_ROOT "$WORK/legacy-explicit" "init --root resolved somewhere else"
+is CREATED 0 "init --root created a list over one that already existed"
+[ -f "$WORK/legacy-explicit/TO-DO.md" ] || fail "init --root did not migrate the index"
+[ -d "$WORK/legacy-explicit/items" ] || fail "init --root did not migrate the live directory"
+[ ! -e "$WORK/legacy-explicit/QUEUE.md" ] || fail "init --root left the old index behind"
+[ ! -e "$WORK/legacy-explicit/q" ] || fail "init --root left the old live directory behind"
+[ ! -e "$WORK/legacy-explicit/archive" ] \
+  || fail "a list that had never archived gained an archive directory"
+
+# Two complete lists under one root are never merged and never guessed at.
+T="$WORK/two-lists"
+new_repo "$T"
+legacy_store "$T/pln"
+mkdir -p "$T/pln/items"
+printf '<!-- pln-queue v1\n-->\n\n_No open items._\n' > "$T/pln/TO-DO.md"
+refused "resolving a root that holds both an older and a newer list" init --project "$T"
+said 'holds two to-do lists' "the refusal did not say what it found"
+said 'QUEUE.md' "the refusal did not name the older list"
+said 'TO-DO.md' "the refusal did not name the newer list"
+[ -f "$T/pln/QUEUE.md" ] || fail "a refused root lost its older index"
+[ -f "$T/pln/q/legacy-item.md" ] || fail "a refused root lost an older record"
+
+# ─── the declaration key: the old one still works, and a disagreement stops ───
+# `pln-queue: <path>` is a line users wrote into their own instruction files, so
+# renaming the key may not invalidate it. Two keys naming two different places
+# fail closed rather than letting whichever file is scanned first win quietly.
+R="$WORK/old-declaration"
+new_repo "$R"
+printf 'pln-queue: docs/declared-long-ago\n' > "$R/CLAUDE.md"
+ok "init with the older declaration key" init --project "$R"
+is TODO_ROOT "$R/docs/declared-long-ago" "the older declaration key stopped resolving"
+
+R="$WORK/agreeing-declarations"
+new_repo "$R"
+printf 'pln-todo: docs/agreed\n' > "$R/CLAUDE.md"
+printf 'pln-queue: docs/agreed\n' > "$R/AGENTS.md"
+ok "init with both keys naming one place" init --project "$R"
+is TODO_ROOT "$R/docs/agreed" "two declarations naming one place did not resolve to it"
+
+R="$WORK/disagreeing-declarations"
+new_repo "$R"
+printf 'pln-todo: docs/the-new-one\n' > "$R/CLAUDE.md"
+printf 'pln-queue: docs/the-old-one\n' > "$R/AGENTS.md"
+refused "init with two declarations that disagree" init --project "$R"
+said 'they disagree' "the refusal did not say the declarations disagree"
+said 'CLAUDE.md' "the refusal did not name the file holding the newer key"
+said 'AGENTS.md' "the refusal did not name the file holding the older key"
+said 'docs/the-new-one' "the refusal did not name the newer declaration's path"
+said 'docs/the-old-one' "the refusal did not name the older declaration's path"
+[ ! -e "$R/docs" ] || fail "a refused disagreement still wrote a to-do list"
+
+# ─── a list that cannot be written is still read ──────────────────────────────
+# A read of the to-do list never fails, and the migration is a write. On a root
+# that cannot be written the older names are read in place and said out loud;
+# only the subcommands that write refuse. Skipped for root, which `-w` never
+# refuses.
+if [ "$(id -u)" != "0" ]; then
+  R="$WORK/unwritable"
+  new_repo "$R"
+  legacy_store "$R/pln"
+  chmod a-w "$R/pln"
+  ok "listing a list that cannot be migrated" list --project "$R"
+  said 'cannot be written' "a read of an unmigratable list did not say why nothing moved"
+  is ITEM_COUNT 1 "a read of an unmigratable list did not find its item"
+  said 'an item filed before the rename' "a read of an unmigratable list rendered nothing"
+  ok "reporting staleness over a list that cannot be migrated" stale --project "$R"
+  refused "filing into a list that cannot be migrated" add --project "$R" \
+    --id blocked-by-permissions --claim 'cannot be filed' --source s
+  said 'cannot be written' "a refused write did not say the list could not be migrated"
+  [ -f "$R/pln/QUEUE.md" ] || fail "an unwritable list was migrated anyway"
+  chmod u+w "$R/pln"
+fi
 
 # ─── add: the detail file is canonical, and it lands first ────────────────────
 R="$WORK/filing"
@@ -262,16 +427,16 @@ ok "filing the first item" add --project "$R" \
   --group refunds --touches 'app/bookings/,app/calendar/availability.rb' \
   --holds staging-deploy
 detail="$(field DETAIL_FILE)"
-[ "$detail" = "$R/pln/q/cancel-releases-held-dates.md" ] \
+[ "$detail" = "$R/pln/items/cancel-releases-held-dates.md" ] \
   || fail "the detail file's path is not derived from the item's id: $detail"
 
 # The read-back rule is a render of this line, so it has to be the line that is
 # in the file — not a reconstruction of it.
 add_line="$(field INDEX_LINE)"
 [ -n "$add_line" ] || fail "add printed no INDEX_LINE"
-line_is "$R/pln/QUEUE.md" "$add_line" "add's INDEX_LINE is not verbatim in the index"
+line_is "$R/pln/TO-DO.md" "$add_line" "add's INDEX_LINE is not verbatim in the index"
 case "$add_line" in
-  '- [ ] ready · a cancelled booking never releases its held dates → `q/cancel-releases-held-dates.md`') ;;
+  '- [ ] ready · a cancelled booking never releases its held dates → `items/cancel-releases-held-dates.md`') ;;
   *) fail "add composed an unexpected index line: $add_line" ;;
 esac
 
@@ -303,29 +468,29 @@ line_is "$detail" '# a cancelled booking never releases its held dates' \
 # interruption leave a recoverable orphan instead of a phantom line. Injecting a
 # malformed detail file makes the index rebuild fail, so the write that did land
 # before it is the one under test.
-printf 'not a detail file\n' > "$R/pln/q/broken.md"
+printf 'not a detail file\n' > "$R/pln/items/broken.md"
 refused "an add whose index rebuild fails" add --project "$R" \
   --id second-item --claim 'the second item' --source s
-[ -f "$R/pln/q/second-item.md" ] \
+[ -f "$R/pln/items/second-item.md" ] \
   || fail "add lost the detail file when the index write failed — the index is written first"
-hasnt "$R/pln/QUEUE.md" 'q/second-item.md' "a failed add left a phantom index line"
+hasnt "$R/pln/TO-DO.md" 'items/second-item.md' "a failed add left a phantom index line"
 didnt_say 'INDEX_LINE=' "a failed add still reported an index line"
 
-# `list` fails closed while the queue cannot be read. A close renders its
+# `list` fails closed while the to-do list cannot be read. A close renders its
 # follow-up bullets from this call, so a silent empty result would reproduce the
-# exact failure the queue exists to fix.
+# exact failure the to-do list exists to fix.
 refused "list over an unreadable detail file" list --project "$R"
 didnt_say 'INDEX_BEGIN' "a failed list still emitted an index"
 
 # With the malformed file gone, the orphan is adopted by the rebuild.
-rm "$R/pln/q/broken.md"
+rm "$R/pln/items/broken.md"
 ok "list after the orphan became readable" list --project "$R"
-has "$WORK/out" 'q/second-item.md' "the rebuild did not adopt the orphaned detail file"
+has "$WORK/out" 'items/second-item.md' "the rebuild did not adopt the orphaned detail file"
 
 # And a line with no detail file behind it does not survive the rebuild.
-printf -- '- [ ] ready · a phantom → `q/ghost.md`\n' >> "$R/pln/QUEUE.md"
+printf -- '- [ ] ready · a phantom → `items/ghost.md`\n' >> "$R/pln/TO-DO.md"
 ok "list after a hand-edited index" list --project "$R"
-hasnt "$R/pln/QUEUE.md" 'q/ghost.md' "the rebuild kept an index line with no detail file"
+hasnt "$R/pln/TO-DO.md" 'items/ghost.md' "the rebuild kept an index line with no detail file"
 
 # ─── list: the derived order, and the same bytes every time ───────────────────
 R="$WORK/order"
@@ -344,17 +509,17 @@ add_item refund-undated 'a refund item with no date' --group refunds
 add_item loose-c 'the third ungrouped item'
 add_item loose-b 'the second ungrouped item'
 add_item loose-a 'the first ungrouped item'
-sed -i.bak 's/^opened: .*/opened:/' "$R/pln/q/refund-undated.md"
+sed -i.bak 's/^opened: .*/opened:/' "$R/pln/items/refund-undated.md"
 rm -f "$R/pln/q"/*.bak
 
-ok "listing the whole queue" list --project "$R"
+ok "listing the whole to-do list" list --project "$R"
 is ITEM_COUNT 8 "list miscounted the live items"
-is STATUS items "list did not report that the queue has items"
+is STATUS items "list did not report that the to-do list has items"
 index_payload "$WORK/out" "$WORK/payload-1"
-cmp -s "$WORK/payload-1" "$R/pln/QUEUE.md" \
+cmp -s "$WORK/payload-1" "$R/pln/TO-DO.md" \
   || fail "list's INDEX_BEGIN/INDEX_END payload is not the index file's bytes"
 
-idx="$R/pln/QUEUE.md"
+idx="$R/pln/TO-DO.md"
 appears_before "$idx" '## Urgent' '## refunds' "the Urgent section is not above the group headings"
 appears_before "$idx" '## refunds' '## Everything else' \
   "the ungrouped catch-all is not last"
@@ -363,38 +528,38 @@ appears_before "$idx" '## refunds' '## Everything else' \
 hasnt "$idx" '## zulu' "a flagged item's group got a heading of its own"
 hasnt "$idx" '## alpha' "a flagged item's group got a heading of its own"
 for id in urgent-old urgent-new refund-early refund-late refund-undated loose-a loose-b loose-c; do
-  [ "$(grep -cF "q/$id.md" "$idx")" = "1" ] \
+  [ "$(grep -cF "items/$id.md" "$idx")" = "1" ] \
     || fail "$id does not appear exactly once in the index"
 done
-has "$idx" '- [ ] ! ready · urgent, opened first → `q/urgent-old.md`' \
+has "$idx" '- [ ] ! ready · urgent, opened first → `items/urgent-old.md`' \
   "the urgency flag does not render as a single ! before the status word"
 
 # The whole precedence chain, one assertion per level, with nothing hand-set
-# anywhere in it (src/shared/queue-format.md:42): the flag, then the group, then
+# anywhere in it (src/shared/todo-format.md:42): the flag, then the group, then
 # date opened, then the items carrying no `opened` date, then `id`. The fixture
 # above is built so that each level has to do the work — drop any one of them
 # and one of these five flips.
 #
 # 1. The flag outranks the group. `urgent-old` is in `zulu` and `refund-early`
 #    is in `refunds`, so on group alone the refund would come first.
-appears_before "$idx" 'q/urgent-old.md' 'q/refund-early.md' \
+appears_before "$idx" 'items/urgent-old.md' 'items/refund-early.md' \
   "an unflagged item sorts above a flagged one"
 # 2. The group outranks the date, inside `## Urgent` as well, where it renders
 #    no heading: `urgent-new` is in `alpha` and was opened five months after
 #    `urgent-old` in `zulu`, and it still comes first.
-appears_before "$idx" 'q/urgent-new.md' 'q/urgent-old.md' \
+appears_before "$idx" 'items/urgent-new.md' 'items/urgent-old.md' \
   "the group does not order flagged items above date opened"
 # 3. The date orders within one group.
-appears_before "$idx" 'q/refund-early.md' 'q/refund-late.md' \
+appears_before "$idx" 'items/refund-early.md' 'items/refund-late.md' \
   "a group's items are not ordered by date opened"
 # 4. The undated follow the dated rather than sorting as if they were oldest.
-appears_before "$idx" 'q/refund-late.md' 'q/refund-undated.md' \
+appears_before "$idx" 'items/refund-late.md' 'items/refund-undated.md' \
   "an item with no date opened does not sort after the dated ones"
 # 5. `id` is the last tiebreak, and it is what orders three items filed in one
 #    run, which share one `opened` and would otherwise tie with nothing left.
-appears_before "$idx" 'q/loose-a.md' 'q/loose-b.md' \
+appears_before "$idx" 'items/loose-a.md' 'items/loose-b.md' \
   "three items filed in one run are not ordered by id"
-appears_before "$idx" 'q/loose-b.md' 'q/loose-c.md' \
+appears_before "$idx" 'items/loose-b.md' 'items/loose-c.md' \
   "three items filed in one run are not ordered by id"
 
 # Two runs over an unchanged set of detail files produce the same bytes, and a
@@ -402,20 +567,20 @@ appears_before "$idx" 'q/loose-b.md' 'q/loose-c.md' \
 ok "listing a second time" list --project "$R"
 index_payload "$WORK/out" "$WORK/payload-2"
 cmp -s "$WORK/payload-1" "$WORK/payload-2" \
-  || fail "two list runs over an unchanged queue produced different bytes"
+  || fail "two list runs over an unchanged to-do list produced different bytes"
 printf 'stray prose\n' >> "$idx"
 sed -i.bak '/loose-a/d' "$idx" && rm -f "$idx.bak"
 ok "listing after the index was mangled" list --project "$R"
 cmp -s "$WORK/payload-1" "$idx" \
   || fail "the rebuild did not restore the index to its derived bytes"
 
-# An empty queue is a real read, and says so — the output is never empty, so a
-# close can tell an empty queue from a failed call.
+# An empty to-do list is a real read, and says so — the output is never empty, so a
+# close can tell an empty to-do list from a failed call.
 R="$WORK/empty"
 new_repo "$R"
-ok "listing an empty queue" list --project "$R"
-is ITEM_COUNT 0 "an empty queue did not report a zero item count"
-is STATUS empty "an empty queue did not report STATUS=empty"
+ok "listing an empty to-do list" list --project "$R"
+is ITEM_COUNT 0 "an empty to-do list did not report a zero item count"
+is STATUS empty "an empty to-do list did not report STATUS=empty"
 said 'INDEX_BEGIN' "an empty list emitted no index markers"
 said '_No open items._' "an empty index does not say it is empty"
 
@@ -466,15 +631,15 @@ R="$WORK/claiming"
 new_repo "$R"
 ok "filing the contested item" add --project "$R" --id contested --claim 'the contested item' \
   --source s --touches 'app/contested.rb'
-ok "warming the queue" list --project "$R"
+ok "warming the to-do list" list --project "$R"
 
 # Two runs racing for one item. A bare check cannot enforce a refusal — both can
 # read a clear answer — so exactly one of these must come away holding it.
 # `set +e` inside each subshell: the loser exits non-zero, and under `set -e`
 # that would abort the subshell before it could record which one it was.
-( set +e; "$QUEUE" claim --project "$R" --id contested --run run-a >"$WORK/claim-a" 2>&1
+( set +e; "$TODO" claim --project "$R" --id contested --run run-a >"$WORK/claim-a" 2>&1
   echo "$?" > "$WORK/claim-a.rc" ) &
-( set +e; "$QUEUE" claim --project "$R" --id contested --run run-b >"$WORK/claim-b" 2>&1
+( set +e; "$TODO" claim --project "$R" --id contested --run run-b >"$WORK/claim-b" 2>&1
   echo "$?" > "$WORK/claim-b.rc" ) &
 wait
 held="$(grep -l 'CLAIM=held' "$WORK/claim-a" "$WORK/claim-b" | wc -l | tr -d '[:space:]')"
@@ -487,7 +652,7 @@ fi
 [ "$loser_rc" != "0" ] || fail "the losing claim exited 0"
 has "$loser" 'CLAIM=refused' "the losing claim did not report a refusal"
 has "$loser" "HELD_BY=$winner" "the losing claim did not name the run that holds the item"
-has "$R/pln/q/contested.md" "claimed_by: $winner" \
+has "$R/pln/items/contested.md" "claimed_by: $winner" \
   "the holder was not recorded in the item's own record"
 
 # A stale claim is released only by naming the holder it displaces.
@@ -497,7 +662,7 @@ said 'nothing was released' "a mis-aimed steal did not say the claim stands"
 ok "stealing under the right holder" claim --project "$R" --id contested --run run-c --steal "$winner"
 said "STOLEN_FROM=$winner" "a steal did not name the holder it displaced"
 said 'CLAIM=held' "a steal did not record the new holder"
-has "$R/pln/q/contested.md" 'claimed_by: run-c' "a steal did not rewrite the holder"
+has "$R/pln/items/contested.md" 'claimed_by: run-c' "a steal did not rewrite the holder"
 
 # A claim that collides is refused and records nothing.
 ok "filing an overlapping item" add --project "$R" --id overlapping --claim 'overlapping work' \
@@ -505,7 +670,7 @@ ok "filing an overlapping item" add --project "$R" --id overlapping --claim 'ove
 refused "claiming an item that collides with the held set" claim --project "$R" \
   --id overlapping --run run-d
 said 'CHECK=refused' "a colliding claim did not report the collision"
-hasnt "$R/pln/q/overlapping.md" 'claimed_by' "a refused claim recorded a holder anyway"
+hasnt "$R/pln/items/overlapping.md" 'claimed_by' "a refused claim recorded a holder anyway"
 
 # ─── the same-run path exemption ──────────────────────────────────────────────
 # A run's own path overlaps are already scheduler ordering, so refusing them a
@@ -525,8 +690,8 @@ mkq both-b --touches 'app/both.rb' --holds 'staging-deploy'
 
 ok "claiming the first item of the run" claim --project "$R" --id head --run plan-1
 said 'CLAIM=held' "the first claim of a run was not granted"
-has "$R/pln/q/head.md" 'claimed_by: plan-1' "the claim did not record the run"
-has "$R/pln/q/head.md" "claimed_in: $R" \
+has "$R/pln/items/head.md" 'claimed_by: plan-1' "the claim did not record the run"
+has "$R/pln/items/head.md" "claimed_in: $R" \
   "the claim record does not carry the worktree it was claimed from"
 
 # The same run, from the same worktree, on a path-overlapping item.
@@ -545,7 +710,7 @@ said $'COLLISION\tboth-a\tresource\tstaging-deploy' \
   "a same-run resource collision was not refused, or did not name the resource"
 said $'EXEMPT\tboth-a\tpath\tapp/both.rb' \
   "the same pair's path overlap was not exempted alongside the resource refusal"
-hasnt "$R/pln/q/both-b.md" 'claimed_by' "a resource-colliding claim recorded a holder anyway"
+hasnt "$R/pln/items/both-b.md" 'claimed_by' "a resource-colliding claim recorded a holder anyway"
 
 # A different run is refused, unchanged, naming the item and what it shares.
 refused "claiming a path-overlapping item for a different run" claim --project "$R" \
@@ -574,7 +739,7 @@ said 'CHECK=refused' "check --run reported clear for a pair claim --run refuses"
 
 # An undeclared `touches` on either side keeps refusing, same run or not: an
 # unknown write set is not a path overlap and inherits nothing from the argument
-# the exemption rests on. Its own queue, so the unknown record cannot make the
+# the exemption rests on. Its own to-do list, so the unknown record cannot make the
 # checks above refuse for a reason they were not testing.
 R="$WORK/same-run-unknown"
 new_repo "$R"
@@ -592,21 +757,21 @@ said $'COLLISION\tvague\tunknown' \
   "a same-run item with no touches was exempted through the unknown branch"
 
 # One run string, two worktrees: two repositories whose instructions declare
-#    one queue root meet in one queue, and the run string alone cannot separate
+#    one to-do-list root meet in one to-do list, and the run string alone cannot separate
 #    them. The claiming worktree is what does.
 QROOT="$WORK/shared-root"
 for tree in tree-one tree-two; do
   new_repo "$WORK/$tree"
-  printf 'pln-queue: %s\n' "$QROOT" > "$WORK/$tree/CLAUDE.md"
+  printf 'pln-todo: %s\n' "$QROOT" > "$WORK/$tree/CLAUDE.md"
 done
 ok "filing into the shared root from the first tree" add --project "$WORK/tree-one" \
   --id shared-head --claim 'shared head' --source s --touches 'app/shared.rb'
-is QUEUE_ROOT "$QROOT" "the declared root was not adopted from the first tree"
+is TODO_ROOT "$QROOT" "the declared root was not adopted from the first tree"
 ok "filing into the shared root from the second tree" add --project "$WORK/tree-two" \
   --id shared-tail --claim 'shared tail' --source s --touches 'app/shared.rb'
-is QUEUE_ROOT "$QROOT" "the two trees did not resolve to one queue root"
+is TODO_ROOT "$QROOT" "the two trees did not resolve to one to-do-list root"
 ok "claiming from the first tree" claim --project "$WORK/tree-one" --id shared-head --run 2026-08-31-x
-has "$QROOT/q/shared-head.md" "claimed_in: $WORK/tree-one" \
+has "$QROOT/items/shared-head.md" "claimed_in: $WORK/tree-one" \
   "the claim did not record which of the two trees it came from"
 refused "claiming the same run's overlap from another worktree" claim \
   --project "$WORK/tree-two" --id shared-tail --run 2026-08-31-x
@@ -621,7 +786,7 @@ refused "re-claiming a held item from another worktree under the same run string
   --project "$WORK/tree-two" --id shared-head --run 2026-08-31-x
 said "HELD_IN=$WORK/tree-one" \
   "a cross-worktree re-claim was not told which tree holds the item"
-has "$QROOT/q/shared-head.md" "claimed_in: $WORK/tree-one" \
+has "$QROOT/items/shared-head.md" "claimed_in: $WORK/tree-one" \
   "a refused cross-worktree re-claim still moved the holder record"
 ok "re-claiming a held item from the worktree that holds it" claim \
   --project "$WORK/tree-one" --id shared-head --run 2026-08-31-x
@@ -633,22 +798,22 @@ ok "claiming the disjoint item from the first tree" claim \
 ok "taking a cross-worktree hold with --steal" claim \
   --project "$WORK/tree-two" --id shared-solo --run 2026-08-31-x --steal 2026-08-31-x
 said 'STOLEN_FROM=2026-08-31-x' "a cross-worktree steal did not name the holder it displaced"
-has "$QROOT/q/shared-solo.md" "claimed_in: $WORK/tree-two" \
+has "$QROOT/items/shared-solo.md" "claimed_in: $WORK/tree-two" \
   "a cross-worktree steal did not move the worktree half of the holder record"
 
 # The rendered index names its holders. The index is the artifact people open by
 # hand, and a claim a reader cannot see is a claim that gets taken twice — which
 # is what two trees of one repository, sharing this root, actually did.
 ok "refreshing the shared index" list --project "$WORK/tree-one"
-line_is "$QROOT/QUEUE.md" \
-  '- [ ] ready · shared head → `q/shared-head.md` · held by 2026-08-31-x in tree-one' \
+line_is "$QROOT/TO-DO.md" \
+  '- [ ] ready · shared head → `items/shared-head.md` · held by 2026-08-31-x in tree-one' \
   "the index line for a held item did not name its holder and the tree it was claimed from"
-line_is "$QROOT/QUEUE.md" \
-  '- [ ] ready · shared solo → `q/shared-solo.md` · held by 2026-08-31-x in tree-two' \
+line_is "$QROOT/TO-DO.md" \
+  '- [ ] ready · shared solo → `items/shared-solo.md` · held by 2026-08-31-x in tree-two' \
   "the index did not follow a cross-worktree steal to the tree that now holds it"
 
 # A project that answered "the shared git directory" and later declares a to-do
-# location still hears about it: the leg wins, the queue does not move, and the
+# location still hears about it: the leg wins, the to-do list does not move, and the
 # declaration is reported instead of being silently passed over.
 D="$WORK/declared-later"
 new_repo "$D"
@@ -658,15 +823,15 @@ is RESOLVED_BY common-dir "the shared git directory leg did not win"
 is DECLARED_TODO - "a project declaring nothing reported a declaration"
 mkdir -p "$D/notes"
 printf 'a to-do\n' > "$D/notes/TODO.md"
-printf 'pln-queue: notes/TODO.md\n' > "$D/CLAUDE.md"
+printf 'pln-todo: notes/TODO.md\n' > "$D/CLAUDE.md"
 ok "resolving again once a to-do location is declared" init --project "$D"
-is RESOLVED_BY common-dir "a later declaration silently moved the queue"
-is QUEUE_ROOT "$D/.git/pln" "a later declaration moved the queue root"
+is RESOLVED_BY common-dir "a later declaration silently moved the to-do list"
+is TODO_ROOT "$D/.git/pln" "a later declaration moved the to-do-list root"
 is DECLARED_TODO "$D/notes/TODO.md" "a declared to-do location was passed over in silence"
-said 'is declared but the queue already resolved to' \
+said 'is declared but the to-do list already resolved to' \
   "the resolution report did not say what it passed over"
 # A declaration that names the root already in use is not something passed over.
-printf 'pln-queue: .git/pln\n' > "$D/CLAUDE.md"
+printf 'pln-todo: .git/pln\n' > "$D/CLAUDE.md"
 ok "declaring the root already in use" init --project "$D"
 is DECLARED_TODO - "the root already in use was reported as a passed-over declaration"
 
@@ -684,9 +849,9 @@ ok "declaring the write set on the claim" claim --project "$P" --id vague-pickup
   --run pick-1 --touches 'app/a.rb,app/b.rb' --holds 'port-block'
 said 'CLAIM=held' "declaring a write set at pickup did not take the item"
 said 'TOUCHES=app/a.rb,app/b.rb' "the claim did not read the write set back off the record"
-has "$P/pln/q/vague-pickup.md" 'touches: [app/a.rb, app/b.rb]' \
+has "$P/pln/items/vague-pickup.md" 'touches: [app/a.rb, app/b.rb]' \
   "the claim did not write the declared write set to the record"
-has "$P/pln/q/vague-pickup.md" 'holds: [port-block]' \
+has "$P/pln/items/vague-pickup.md" 'holds: [port-block]' \
   "the claim did not write the declared resources to the record"
 # What was declared at pickup is what the next claim is checked against.
 ok "filing an overlapping second item" add --project "$P" --id vague-overlap \
@@ -699,18 +864,18 @@ said $'COLLISION\tvague-pickup\tpath\tapp/b.rb' \
 # An item nobody holds ends at its path, and a record written before
 # `claimed_in` existed names its run rather than inventing a tree for it.
 ok "refreshing the pickup index" list --project "$P"
-line_is "$P/pln/QUEUE.md" \
-  '- [ ] ready · overlaps the first → `q/vague-overlap.md`' \
+line_is "$P/pln/TO-DO.md" \
+  '- [ ] ready · overlaps the first → `items/vague-overlap.md`' \
   "an unheld item did not end at its path"
-LC_ALL=C sed '/^claimed_in:/d' "$P/pln/q/vague-pickup.md" > "$P/pln/q/vague-pickup.md.tmp"
-mv "$P/pln/q/vague-pickup.md.tmp" "$P/pln/q/vague-pickup.md"
+LC_ALL=C sed '/^claimed_in:/d' "$P/pln/items/vague-pickup.md" > "$P/pln/items/vague-pickup.md.tmp"
+mv "$P/pln/items/vague-pickup.md.tmp" "$P/pln/items/vague-pickup.md"
 ok "refreshing the index over a record with no worktree recorded" list --project "$P"
-line_is "$P/pln/QUEUE.md" \
-  '- [ ] ready · filed in one sentence → `q/vague-pickup.md` · held by pick-1' \
+line_is "$P/pln/TO-DO.md" \
+  '- [ ] ready · filed in one sentence → `items/vague-pickup.md` · held by pick-1' \
   "a holder record predating claimed_in did not name its run alone"
 
 # Marking is attributable: a run that has been stolen from cannot record a
-# completion the queue no longer backs, and an unheld record is marked by anyone.
+# completion the to-do list no longer backs, and an unheld record is marked by anyone.
 H="$WORK/holder-marking"
 new_repo "$H"
 ok "filing an item to be stolen" add --project "$H" --id contested-close \
@@ -729,18 +894,18 @@ ok "the second run stealing it" claim --project "$H" --id contested-close \
 refused "the stolen-from run marking it done" mark --project "$H" \
   --id contested-close --run run-first --state '[x]'
 said 'HELD_BY=run-second' "the displaced run was not told who holds the item now"
-has "$H/pln/q/contested-close.md" 'state: "[-]"' \
+has "$H/pln/items/contested-close.md" 'state: "[-]"' \
   "a refused mark still wrote through to the record"
 ok "the run that really did the work taking it back" claim --project "$H" \
   --id contested-close --run run-first --steal run-second
 ok "marking it done once it is held again" mark --project "$H" --id contested-close \
   --run run-first --state '[x]'
-has "$H/pln/q/contested-close.md" 'state: "[x]"' \
+has "$H/pln/items/contested-close.md" 'state: "[x]"' \
   "the holder was refused the completion it had taken back"
 
 # The lock is attributable, a provably dead holder is broken, and a read never
-# fails against a live one — because a caller that cannot read the queue reaches
-# for QUEUE.md by hand, which carries no holder and reports another run's
+# fails against a live one — because a caller that cannot read the to-do list reaches
+# for TO-DO.md by hand, which carries no holder and reports another run's
 # claimed items as untaken.
 L="$WORK/locking"
 new_repo "$L"
@@ -769,13 +934,13 @@ printf '%s\t%s\t2026-09-02T13:00:00Z\n' "$$" "$(hostname)" > "$L/pln/.lock/owner
 ok "reading while a live run holds the lock" list --project "$L"
 is INDEX_REFRESHED 0 "a read refreshed the index while another run held the lock"
 said 'is current' "the read did not say the listing is derived rather than stale"
-said 'locked-item' "a read under a live lock did not render the queue"
+said 'locked-item' "a read under a live lock did not render the to-do list"
 [ -d "$L/pln/.lock" ] || fail "a live run's lock was broken"
 
 # A write still refuses, names the holder, and says what not to do instead.
 refused "writing while a live run holds the lock" mark --project "$L" \
   --id locked-item --run lock-run --status ready
-said 'the queue is locked by pid' "a refused write did not name the holder"
+said 'the to-do list is locked by pid' "a refused write did not name the holder"
 said 'clear it with: rmdir' "a refused write did not say how to clear a lock left behind"
 said 'carries no holder' "a refused write did not warn against reading the index by hand"
 rm -rf "$L/pln/.lock"
@@ -784,7 +949,7 @@ rm -rf "$L/pln/.lock"
 R="$WORK/marking"
 new_repo "$R"
 ok "filing an item to mark" add --project "$R" --id partly --claim 'an item done in parts' --source s
-detail="$R/pln/q/partly.md"
+detail="$R/pln/items/partly.md"
 for state in '[ ]' '[-]' '[x]'; do
   ok "marking $state" mark --project "$R" --id "partly" --state "$state"
   line_is "$detail" "state: \"$state\"" "mark did not set the completion marker to $state"
@@ -820,13 +985,13 @@ case "$(field INDEX_LINE)" in
   '- [-] ! '*) ;;
   *) fail "the index line does not carry the ! flag mark just set" ;;
 esac
-has "$R/pln/QUEUE.md" '## Urgent' "a flagged item did not move into the Urgent section"
+has "$R/pln/TO-DO.md" '## Urgent' "a flagged item did not move into the Urgent section"
 ok "clearing the flag" mark --project "$R" --id partly --urgent false
 line_is "$detail" 'urgent: false' "mark did not clear the urgency flag"
 case "$(field INDEX_LINE)" in
   '- [-] ! '*) fail "the index line still carries the ! flag after it was cleared" ;;
 esac
-hasnt "$R/pln/QUEUE.md" '## Urgent' "the Urgent section survived its last item being cleared"
+hasnt "$R/pln/TO-DO.md" '## Urgent' "the Urgent section survived its last item being cleared"
 
 # The other frontmatter fields a refinement sets.
 ok "refining the rest of the frontmatter" mark --project "$R" --id partly \
@@ -836,7 +1001,7 @@ for f in 'status: blocked' 'group: refunds' 'holds: [staging-deploy]' \
   'depends_on: [other-item]' 'source: the review that found it'; do
   line_is "$detail" "$f" "mark did not set '$f'"
 done
-has "$R/pln/QUEUE.md" '## refunds' "a regrouped item did not move under its group heading"
+has "$R/pln/TO-DO.md" '## refunds' "a regrouped item did not move under its group heading"
 
 # The helper owns the frontmatter and the checklist it appends to, and nothing
 # else in the body.
@@ -848,7 +1013,7 @@ line_is "$detail" 'A paragraph a person wrote.' "mark rewrote body prose it did 
 R="$WORK/archiving"
 new_repo "$R"
 ok "filing an item to finish" add --project "$R" --id finished --claim 'work that landed' --source s
-printf '\nEvidence a person wrote into the packet.\n' >> "$R/pln/q/finished.md"
+printf '\nEvidence a person wrote into the packet.\n' >> "$R/pln/items/finished.md"
 
 # `completed` is refused for a record nobody marked `[x]`: the marking and the
 # evidence cannot come apart.
@@ -856,23 +1021,23 @@ refused "archiving an unfinished item as completed" archive --project "$R" --id 
   --disposition completed --evidence 'the commit that closed it'
 said 'nothing writes a completion nobody verified' \
   "an unverified completion was refused without saying why"
-[ -f "$R/pln/q/finished.md" ] || fail "a refused archive removed the live record"
+[ -f "$R/pln/items/finished.md" ] || fail "a refused archive removed the live record"
 
 ok "marking the item done" mark --project "$R" --id finished --state '[x]'
 ok "archiving the finished item" archive --project "$R" --id finished \
   --disposition completed --evidence 'commit abc1234'
 archived="$(field ARCHIVE_FILE)"
 month_index="$(field ARCHIVE_INDEX)"
-[ "$archived" = "$R/pln/done/2026-08/finished.md" ] \
-  || fail "the archive path is not <queue-root>/done/<YYYY-MM>/<slug>.md: $archived"
-[ "$month_index" = "$R/pln/done/2026-08/index.md" ] \
+[ "$archived" = "$R/pln/archive/2026-08/finished.md" ] \
+  || fail "the archive path is not <to-do-list root>/archive/<YYYY-MM>/<slug>.md: $archived"
+[ "$month_index" = "$R/pln/archive/2026-08/index.md" ] \
   || fail "the month index is not beside the archived record: $month_index"
 is DISPOSITION completed "archive did not report the disposition"
 is STATE '[x]' "archive did not report the state the record kept"
 
 # The record exists at the archive path and nowhere else, with its body intact.
-[ ! -e "$R/pln/q/finished.md" ] || fail "the record is still in the live queue after archiving"
-hasnt "$R/pln/QUEUE.md" 'q/finished.md' "the archived item still has a live index line"
+[ ! -e "$R/pln/items/finished.md" ] || fail "the record is still in the live to-do list after archiving"
+hasnt "$R/pln/TO-DO.md" 'items/finished.md' "the archived item still has a live index line"
 line_is "$archived" '# work that landed' "the archived record lost its claim"
 line_is "$archived" 'Evidence a person wrote into the packet.' "the archived record lost its body"
 for f in 'disposition: completed' 'archived: 2026-08-27' 'evidence: commit abc1234'; do
@@ -902,29 +1067,29 @@ refused "archiving over an existing record" archive --project "$R" --id finished
   --disposition completed --evidence 'a second commit'
 said 'nothing was overwritten' "a refused archive did not say the record was untouched"
 line_is "$archived" '# work that landed' "a refused archive overwrote the archived record"
-[ -f "$R/pln/q/finished.md" ] || fail "a refused archive removed the live record"
+[ -f "$R/pln/items/finished.md" ] || fail "a refused archive removed the live record"
 
 # There is no delete subcommand, and an unknown one is refused rather than
 # guessed at.
 refused "a delete subcommand" delete --project "$R" --id finished
 has "$WORK/err" 'There is no delete subcommand' \
   "the usage text does not say that a record is archived, never destroyed"
-hasnt "$WORK/err" 'pln-queue delete' "the usage text advertises a delete subcommand"
-[ -f "$R/pln/q/finished.md" ] || fail "a refused subcommand removed a record"
+hasnt "$WORK/err" 'pln-todo delete' "the usage text advertises a delete subcommand"
+[ -f "$R/pln/items/finished.md" ] || fail "a refused subcommand removed a record"
 
 # ─── stale: candidates, and not one write ─────────────────────────────────────
 R="$WORK/staleness"
 new_repo "$R"
-PLN_QUEUE_DATE=2026-01-01 ok "filing an aged item" add --project "$R" --id aged \
+PLN_TODO_DATE=2026-01-01 ok "filing an aged item" add --project "$R" --id aged \
   --claim 'filed long ago' --source s --touches 'a.rb'
-PLN_QUEUE_DATE=2026-01-01 ok "filing an item to abandon" add --project "$R" --id abandoned \
+PLN_TODO_DATE=2026-01-01 ok "filing an item to abandon" add --project "$R" --id abandoned \
   --claim 'claimed and left' --source s --touches 'b.rb'
-PLN_QUEUE_DATE=2026-01-01 ok "abandoning a claim" claim --project "$R" --id abandoned --run gone-run
+PLN_TODO_DATE=2026-01-01 ok "abandoning a claim" claim --project "$R" --id abandoned --run gone-run
 ok "filing a finished item nobody archived" add --project "$R" --id done-not-archived \
-  --claim 'marked done and left in the live queue' --source s
+  --claim 'marked done and left in the live to-do list' --source s
 ok "marking it done" mark --project "$R" --id done-not-archived --state '[x]'
 ok "filing a dropped item" add --project "$R" --id dropped-not-archived \
-  --claim 'dropped and left in the live queue' --source s
+  --claim 'dropped and left in the live to-do list' --source s
 ok "dropping it" mark --project "$R" --id dropped-not-archived --status dropped
 ok "filing a fresh item" add --project "$R" --id fresh --claim 'filed today' --source s
 
@@ -932,17 +1097,17 @@ before="$(cd "$R/pln" && find . -type f | sort | xargs shasum)"
 ok "reporting staleness" stale --project "$R" --days 30
 is STALE_DAYS 30 "stale did not report the window it used"
 is STALE_CUTOFF 2026-07-28 "stale did not report the cutoff it computed"
-said $'STALE\taged\taged\t-' "an aged item was not reported"
-said $'STALE\tabandoned\tclaim-abandoned\tgone-run' \
-  "an abandoned claim was not reported with the run that holds it"
-said $'STALE\tdone-not-archived\tcompleted-not-archived' \
-  "a completed but unarchived record was not reported"
-said $'STALE\tdropped-not-archived\tdropped-not-archived' \
-  "a dropped but unarchived record was not reported"
+said $'STALE\taged\taged\t-\tfiled long ago' "an aged item was not reported, or its line carries no claim"
+said $'STALE\tabandoned\tclaim-abandoned\tgone-run\tclaimed and left' \
+  "an abandoned claim was not reported with its holder and its claim"
+said $'STALE\tdone-not-archived\tcompleted-not-archived\t-\tmarked done and left in the live to-do list' \
+  "a completed but unarchived record was not reported with its claim"
+said $'STALE\tdropped-not-archived\tdropped-not-archived\t-\tdropped and left in the live to-do list' \
+  "a dropped but unarchived record was not reported with its claim"
 didnt_say $'STALE\tfresh' "a fresh item was reported stale"
 is STALE_COUNT 4 "stale reported the wrong number of candidates"
 after="$(cd "$R/pln" && find . -type f | sort | xargs shasum)"
-[ "$before" = "$after" ] || fail "stale wrote to the queue; it reports and never writes"
+[ "$before" = "$after" ] || fail "stale wrote to the to-do list; it reports and never writes"
 
 # ─── the scratch tree is the only thing that was written ──────────────────────
 [ ! -e "$HOME/.pln" ] || fail "the helper wrote to the developer's pln state directory"

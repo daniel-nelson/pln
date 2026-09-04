@@ -45,8 +45,6 @@ That is not an option list, it costs three lines, and it can be overruled with o
 
 **Never under a header.** "Two calls I made rather than asking, both overridable:" is the tell that the bar dropped — a heading over a list exists because there is a list, and a list gets filled by lowering the threshold rather than by two genuine forks landing in the same turn. Each disclosure rides in the sentence where its choice is made, and a message that seems to want three of them is a message whose calls mostly were not forks at all and belong in the record unsaid. Two can legitimately land together; a heading over them cannot. The disclosure has to read as a thing you said because it mattered, not as a ritual the message performs before getting to the question.
 
-The measurement, from six days of real sessions: of 170 recommendation-marked questions with a traceable reply, 68 picked the marked option, **3 picked a different one, and 99 — 58% — did not answer with a letter at all.** They corrected the framing, challenged the premise, or supplied a fact the options did not contain: "Where did that come from?", "is a misinterpretation of the changes", "not a real break — listen, major version bump is reserved for real, intentional changes." So the ladder was almost never used as a ladder, and what earned its keep was the disclosure inside it. Keep that; drop the rest. Twice, pushed to restate such a question plainly, the agent concluded the question was its own to answer — "that wasn't a fair question to put to you, and it's mine to decide."
-
 The tells that a question is really a disclosure, any one of which is enough:
 
 - You wrote a sentence beginning "I'd take", "I lean", "I recommend", or "what tips me to".

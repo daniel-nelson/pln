@@ -12,7 +12,7 @@ Finish base validation, trust decisions, exact-tree fingerprinting, and any base
 
 Apply the shared three-tier firewall throughout this phase. Fixed-field host/PR identity, validated refs, exact config keys, the cursor, and bounded count/byte metadata are coordinator-direct. Possibly unbounded metadata—dirty-path lists, changed-file maps, diff statistics, manifests, instruction discovery, and captured command logs—goes to files before execution and then to an evidence worker for normalization. Trust decisions, scope sufficiency, contradictory state, and whether a baseline permits shipping are judgment work. Append every route and artifact to `<plan-dir>/routing.tsv`.
 
-**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-queue add` — not by leaving it in prose for the close to remember.
+**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-todo add` — not by leaving it in prose for the close to remember.
 
 ## The workflow (sequential steps)
 
@@ -72,7 +72,7 @@ After the maps are durable, dispatch `src/workers/assurance-classification.md`. 
 
 **Ask for a review depth when none arrived, here, before anything expensive runs.** `REVIEW.md` now carries the tier, the signals, and the diff's size, and nothing has yet cost more than a few reads — this is the last cheap moment and the only place this question is ever asked. Ask when *both* hold: no `review=` argument and no instruction in the invoking message set a depth (Step 0), and the tier's roster is more than the one broad reviewer. Under R1 the full roster *is* the broad reviewer, so there is nothing to choose; record `full` and continue in silence.
 
-One message, in the option-message shape, naming the tier, the signal that drove it, the diff's size, and what the roster would be — then full, broad only, or skip. Record the answer in `Review depth` and continue. A classification that reads as heavy for the change in front of it is exactly what this question is for: the tier is semantic and never falls with size, so a small diff on a critical signal gets the whole roster unless a human says otherwise.
+One message, in the option-message shape, naming the concrete signal that drove the depth rather than the tier it produced — "the deepest setting, because this branch changes how money moves"; where the change could not be classified, that the deepest setting is the fail-closed default rather than a risk anyone found — plus the diff's size and what the roster would be, then full, broad only, or skip. Record the answer in `Review depth` and continue. A classification that reads as heavy for the change in front of it is exactly what this question is for: the tier is semantic and never falls with size, so a small diff on a critical signal gets the whole roster unless a human says otherwise.
 
 **A hand-off from `{{PLN_CMD}}` never reaches this ask**, because Step 4's adoption already answered it and Step 8 always passes it through. That is deliberate: those runs are often left unattended overnight, and a question here would hold the branch until morning. Never introduce a second stop between this point and a green PR.
 

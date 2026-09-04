@@ -623,7 +623,14 @@ has "$real_x/phases/pln-pr/review.md" 'Start independent slots concurrently' \
   "the Codex fix phase lost native concurrency semantics"
 for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
   has "$f" 'fix-manifest.tsv' "$f lost dependency-aware fix scheduling"
-  has "$f" 'cohorts/context reuse are forbidden' "$f may reuse a PR fix worker across clusters"
+  # 1.60.0 allowed a cohort across clusters the schedule had to *order*, since
+  # those collide on one surface rather than being independent work that fresh
+  # context protects. Independent clusters still start fresh. This file said
+  # "forbidden" for one release after the schedule contract stopped saying it.
+  has "$f" 'Independent clusters start fresh' \
+    "$f lets an independent PR fix cluster inherit another cluster's reasoning"
+  has "$f" 'clusters the schedule had to order may share a worker' \
+    "$f still forbids reuse across clusters that collide on one surface"
   has "$f" 'workers touch neither git nor `REVIEW.md`' "$f lets fix workers race shared ledgers"
 done
 
@@ -891,6 +898,23 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f does not anchor the claim-result write to the attempt"
   has "$f" 'the holder from `HELD_BY`, or, when the refusal names no holder, the collision the check reported' \
     "$f records a refusal in only one of the helper's two refusal forms"
+done
+
+# ─── one node is not a scheduling problem ────────────────────────────────────
+# The schedule worker exists to make judgments the coordinator must not invent:
+# order, leases, cohort boundaries. With a single node none of those exist, and
+# a real run spent 3.6 minutes of frontier effort answering a question with one
+# possible answer while the user waited for a one-file fix.
+for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
+  has "$f" 'A single cluster is not a scheduling problem' \
+    "$f spawns a scheduling worker for one cluster"
+  has "$f" 'With two or more clusters' "$f drops the scheduling worker where it is needed"
+  hasnt "$f" 'Parallelize only one manifest wave' \
+    "$f still describes parallel fix waves that execution no longer has"
+done
+for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
+  has "$f" 'With one pending item, write its one-node artifact directly and skip this step' \
+    "$f spawns a scheduling worker for a single item"
 done
 
 # ─── a setup gap survives to somewhere the user will actually read it ────────

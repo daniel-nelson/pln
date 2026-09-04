@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.64.0 — 2026-09-04
+
+### Fixed
+
+- **One node is not a scheduling problem.** Both the implementation phase and `{{PLN_PR_CMD}}`'s fix phase spawned a fresh `judgment`-profile worker on the execution-schedule contract unconditionally, before any work could start. That worker exists to make judgments the coordinator must not invent — order, write leases, cohort boundaries — and with a single node none of them exist: there is nothing to order, no boundary to place, and the lease is that node's own declared write set, which the ledger already holds. Measured on a real run: from the user's "yes, make it consistent" to the fix worker actually starting was 5.4 minutes, of which 3.6 were a frontier-effort subagent deciding the execution order of one file. The coordinator now writes the one-node artifact directly and skips the worker; two or more nodes are unchanged, because that is where the judgment is real and where inventing it would be the older, worse failure.
+
+- **The fix phase no longer describes parallel waves execution does not have.** 1.60.0 made execution linear and `pln-scheduler build` emit one node per wave, but `fix.core.md` still read "Parallelize only one manifest wave of isolated, pairwise-disjoint clusters" — instructing something the helper structurally cannot do. It also still said "cohorts/context reuse are forbidden" a release after the schedule contract began allowing a cohort across clusters the schedule had to *order*, so the two files disagreed about the same rule. Both now say what execution actually does: independent clusters start fresh, clusters ordered because they collide on one surface may share a worker, and one cluster runs at a time in the working tree the run was launched in.
+
 ## 1.63.0 — 2026-09-04
 
 ### Changed

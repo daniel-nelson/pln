@@ -496,7 +496,7 @@ has "$real_c/phases/pln-pr/ship-watch.md" 'keep the same parent turn active' \
 
 has "$real_x/phases/pln/implementation.md" 'pln-scheduler finish-check' \
   "the codex implementation phase has no manifest-backed finish gate"
-has "$real_x/phases/pln/implementation.md" 'run `list_agents` after every quiet timeout' \
+has "$real_x/phases/pln/implementation.md" '`list_agents` after every quiet timeout' \
   "the codex implementation phase can miss a completion between waits"
 has "$real_x/phases/pln/implementation.md" 'Never send a final response from `Phase: implementation`' \
   "the codex implementation phase can still end while work is active"
@@ -586,7 +586,21 @@ has "$real_x/phases/pln/implementation.md" 'followup_task' \
   "the Codex implementation phase lost item 2 native mechanics"
 for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
   has "$f" 'run-manifest.tsv' "$f lost durable execution state"
-  has "$f" 'provisional cohort cap is three' "$f lost bounded same-context reuse"
+  # Same-context reuse is still bounded — by where the work stops being the
+  # same work, which is what every other boundary in that sentence already is.
+  has "$f" 'A cohort ends where the work stops being the same work' \
+    "$f lost bounded same-context reuse"
+  hasnt "$f" 'provisional cohort cap is three' \
+    "$f still bounds a cohort by an unexplained count"
+  # Linear execution, in the tree the run was launched in.
+  has "$f" 'Items run one at a time, in the working tree the coordinator was given' \
+    "$f no longer runs items serially in the given tree"
+  has "$f" 'no worktree for the coordinator to create' \
+    "$f still lets the coordinator hand a worker a bare checkout"
+  has "$f" 'no worker ever builds one' \
+    "$f does not stop a worker provisioning its own environment"
+  has "$f" 'Whoever moves the tree re-syncs it' \
+    "$f leaves a lockfile change with no owner to reconcile it"
   has "$f" 'Unknown dependencies or leases serialize' "$f no longer fails closed on scheduling uncertainty"
   has "$f" 'coordinator alone updates `PLAN.md`' "$f lets item workers race the plan ledger"
 done
@@ -868,6 +882,18 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f does not anchor the claim-result write to the attempt"
   has "$f" 'the holder from `HELD_BY`, or, when the refusal names no holder, the collision the check reported' \
     "$f records a refusal in only one of the helper's two refusal forms"
+done
+
+# ─── a wait with no news produces no message ─────────────────────────────────
+# The lifecycle fragment already forbade manufactured heartbeats, and a real run
+# sent 77 of them at a median 1.1 minutes apart anyway — each a full turn over
+# the whole session context to report that nothing had happened. A prohibition
+# with no test for the case that triggers it is a prohibition that loses.
+for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md" \
+         "$real_c/phases/pln/interview.md" "$real_x/phases/pln-pr/review.md"; do
+  has "$f" 'A wait that returns nothing new earns no message' \
+    "$f lets a quiet wait produce a status message"
+  has "$f" 'wait again' "$f does not say what to do instead of narrating"
 done
 
 # ─── how wide the interview's research fan-out goes ───────────────────────────

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.66.0 — 2026-09-04
+
+### Fixed
+
+- **A change the user asks for mid-run is dispatched to a worker, not typed into the tree by the coordinator.** "Implementation runs through subagents; the orchestrator never does an item's work inline" has always been a hard constraint, and the whole dispatch apparatus — schedule, manifest, lease, checkpoint, integrate — is built around items adopted at the gate and, in `{{PLN_PR_CMD}}`, around clusters derived from `REVIEW.md` findings. A follow-up the user types mid-run is neither. It arrives as conversation, matches no dispatch path, and the coordinator does the obvious thing and edits the file. Measured on a real run: a coordinator that had correctly delegated eight subagents also made **eighteen edits to twelve repository source files itself** — `Dream.ts`, `Query.ts`, both transaction builders, `package.json` and the rest — alongside its legitimate fourteen edits to `REVIEW.md`. The constraint's own stated reason is what then happened: inline work "defeats the fresh-context guarantee and fills the orchestrator's context across the run", and that context reached 198k tokens of a 258k window, after which a two-word follow-up cost twenty minutes inside a single inference. Such a request now becomes a node with an item number, a detail section, a write lease and a fresh worker — or a cluster of its own in the fix phase, recorded in `REVIEW.md` — and the coordinator's part stays what it always is: brief, validate, commit, integrate. A one-line change is named as not an exception, because that is the case where the inline edit looks cheapest and the context cost is identical. It also gives the request a durable record: typed straight into the tree it exists only in the transcript, so a restarted session cannot tell it happened and the ledger disagrees with the commits.
+
 ## 1.65.0 — 2026-09-04
 
 ### Fixed

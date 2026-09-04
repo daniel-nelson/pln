@@ -62,16 +62,25 @@ build_out="$WORK/build.out"
 has "$build_out" 'NODE_COUNT=5' 'build did not report every node'
 has "$WORK/plan/run-manifest.tsv" $'META\tSOURCE_HEAD\t' 'manifest omitted source HEAD'
 has "$WORK/plan/run-manifest.tsv" $'META\tDIRTY_SNAPSHOT\t' 'manifest omitted dirty snapshot'
-has "$WORK/plan/run-manifest.tsv" $'1\t-\tsrc/api\tapi-chain\tfresh\tclean\t1\tisolated' \
-  'first disjoint node was not assigned to an isolated wave'
-has "$WORK/plan/run-manifest.tsv" $'3\t-\tdocs/guide\t-\tfresh\tclean\t1\tisolated' \
-  'second disjoint node did not share the isolated wave'
-has "$WORK/plan/run-manifest.tsv" $'2\t1\tsrc/client\tapi-chain\treuse\tclean\t2\tisolated' \
-  'same-context cohort did not retain its isolated lane'
-has "$WORK/plan/run-manifest.tsv" $'4\t1,2,3\tUNKNOWN\t-\tfresh\tunknown\t3\toriginal' \
+# Execution is linear: every node runs alone, in the tree the coordinator was
+# given. Two disjoint nodes with non-overlapping leases used to share an
+# isolated wave, and the worktree that bought each one was a bare checkout the
+# worker then had to provision — installs, databases, ports, none of it tracked
+# by git and none of it visible to a lease. Waves now number the serial order.
+has "$WORK/plan/run-manifest.tsv" $'1\t-\tsrc/api\tapi-chain\tfresh\tclean\t1\toriginal' \
+  'the first node did not run alone in the original tree'
+has "$WORK/plan/run-manifest.tsv" $'2\t1\tsrc/client\tapi-chain\treuse\tclean\t2\toriginal' \
+  'the cohort continuation did not follow serially in the original tree'
+has "$WORK/plan/run-manifest.tsv" $'3\t-\tdocs/guide\t-\tfresh\tclean\t3\toriginal' \
+  'a node with a disjoint lease was still paired into a shared wave'
+has "$WORK/plan/run-manifest.tsv" $'4\t1,2,3\tUNKNOWN\t-\tfresh\tunknown\t4\toriginal' \
   'unknown writes were not serialized behind all earlier nodes'
-has "$WORK/plan/run-manifest.tsv" $'5\t1,4\tsrc/api/generated\t-\tfresh\tclean\t4\toriginal' \
+has "$WORK/plan/run-manifest.tsv" $'5\t1,4\tsrc/api/generated\t-\tfresh\tclean\t5\toriginal' \
   'unknown/ancestor relations did not add conservative dependency edges'
+hasnt "$WORK/plan/run-manifest.tsv" $'\tisolated\t' 'a node was scheduled into an isolated worktree'
+# Leases keep earning their place: they still order overlapping work, and they
+# still bound what a worker may write in the user's own tree.
+has "$WORK/plan/run-manifest.tsv" $'5\t1,4\t' 'a lease overlap no longer adds a dependency edge'
 
 if "$SCHEDULER" finish-check --manifest "$WORK/plan/run-manifest.tsv" \
   >"$WORK/finish-check.out" 2>"$WORK/finish-check.err"; then
@@ -86,8 +95,10 @@ has "$WORK/finish-check.err" 'implementation remains; keep the coordinator turn 
 
 ready="$WORK/ready.out"
 "$SCHEDULER" ready --manifest "$WORK/plan/run-manifest.tsv" > "$ready"
-has "$ready" $'READY\t1\t1\tisolated\tfresh' 'node 1 was not initially ready'
-has "$ready" $'READY\t3\t1\tisolated\tfresh' 'node 3 was not initially ready'
+# `ready` names the next item and stops. A caller that read two lines here
+# would dispatch two workers into one working tree.
+has "$ready" $'READY\t1\t1\toriginal\tfresh' 'node 1 was not initially ready'
+[ "$(grep -c '^READY' "$ready")" -eq 1 ] || fail 'ready named more than one dispatchable node'
 hasnt "$ready" $'READY\t2\t' 'dependent cohort node was ready too early'
 
 "$SCHEDULER" claim --manifest "$WORK/plan/run-manifest.tsv" --item 1 \
@@ -96,7 +107,7 @@ hasnt "$ready" $'READY\t2\t' 'dependent cohort node was ready too early'
   --result results/item-1.txt --commit aaa111 \
   --actual-profile judgment --actual-model frontier --actual-effort high >/dev/null
 "$SCHEDULER" ready --manifest "$WORK/plan/run-manifest.tsv" > "$ready"
-has "$ready" $'READY\t2\t2\tisolated\treuse' \
+has "$ready" $'READY\t2\t2\toriginal\treuse' \
   'a checkpointed direct predecessor did not release its cohort continuation'
 if "$SCHEDULER" integrate --manifest "$WORK/plan/run-manifest.tsv" --item 3 \
   --commit ccc333 >"$WORK/out" 2>"$WORK/err"; then
@@ -112,7 +123,7 @@ has "$WORK/err" 'earlier integration order is not complete' \
 "$SCHEDULER" block --manifest "$WORK/plan/run-manifest.tsv" --item 2 \
   --handoff handoffs/item-2.md >/dev/null
 "$SCHEDULER" wait --manifest "$WORK/plan/run-manifest.tsv" --item 5 >/dev/null
-has "$WORK/plan/run-manifest.tsv" $'5\t1,4\tsrc/api/generated\t-\tfresh\tclean\t4\toriginal\t' \
+has "$WORK/plan/run-manifest.tsv" $'5\t1,4\tsrc/api/generated\t-\tfresh\tclean\t5\toriginal\t' \
   'waiting dependency node disappeared from the manifest'
 has "$WORK/plan/run-manifest.tsv" $'\twaiting\t' 'auto-mode dependency wait was not persisted'
 recover="$WORK/recover.out"
@@ -207,10 +218,10 @@ EOF
   --source-head head --dirty-snapshot "$WORK/plan/dirty.tsv" --repo-mode git >/dev/null
 has "$WORK/plan/dirty-manifest.tsv" $'1\t-\tuser-owned.txt\t-\tfresh\toverlap\t1\toriginal' \
   'a dirty-overlap node did not stay serial in the source tree'
-has "$WORK/plan/dirty-manifest.tsv" $'2\t-\tdocs/a\t-\tfresh\tclean\t2\tisolated' \
-  'a dirty-independent node did not enter an isolated wave'
-has "$WORK/plan/dirty-manifest.tsv" $'3\t-\tdocs/b\t-\tfresh\tclean\t2\tisolated' \
-  'dirty-independent nodes did not share an isolated wave'
+has "$WORK/plan/dirty-manifest.tsv" $'2\t-\tdocs/a\t-\tfresh\tclean\t2\toriginal' \
+  'a dirty-independent node did not run serially in the original tree'
+has "$WORK/plan/dirty-manifest.tsv" $'3\t-\tdocs/b\t-\tfresh\tclean\t3\toriginal' \
+  'dirty-independent nodes were paired instead of ordered'
 
 cat > "$WORK/plan/too-long.tsv" <<'EOF'
 ITEM	DEPS	LEASES	COHORT	CONTEXT	DIRTY_STATE
@@ -297,7 +308,9 @@ has "$hold_manifest" $'3\t-\thold/c\t-\tfresh\tclean\t3\toriginal' \
   'the holding fixture did not build node 3 into the original tree'
 "$SCHEDULER" ready --manifest "$hold_manifest" > "$hold_ready"
 has "$hold_ready" $'READY\t1\t' 'an unheld original node was not ready'
-has "$hold_ready" $'READY\t3\t' 'a second unheld original node was not ready'
+# One line, always: the next item. Node 3 is dependency-ready too, and under
+# linear execution that is not an invitation to dispatch it alongside node 1.
+[ "$(grep -c '^READY' "$hold_ready")" -eq 1 ] || fail 'ready named more than the next node'
 
 for holding in running blocked interrupted; do
   build_hold
@@ -311,6 +324,10 @@ for holding in running blocked interrupted; do
   "$SCHEDULER" ready --manifest "$hold_manifest" > "$hold_ready"
   hasnt "$hold_ready" $'READY\t3\t' \
     "ready reported a second original node while item 1 was $holding"
+  if [ "$holding" != interrupted ]; then
+    [ "$(grep -c '^READY' "$hold_ready")" -eq 0 ] \
+      || fail "ready dispatched into a tree item 1 was still $holding"
+  fi
   # The withheld node is still dependency-ready, and `claim` must say so by
   # claiming it rather than by refusing with a cause that is not true.
   cp "$hold_manifest" "$WORK/plan/hold-claim.tsv"

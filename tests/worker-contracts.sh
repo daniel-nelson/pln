@@ -78,7 +78,22 @@ has "$implementation" 'non-binding reversible mechanics' \
   'implementation worker may treat reversible plan mechanics as immutable'
 has "$scheduling" $'ITEM\tDEPS\tLEASES\tCOHORT\tCONTEXT\tDIRTY_STATE' \
   'scheduling contract lost its deterministic node schema'
-has "$scheduling" 'no cohort exceeds three nodes' 'scheduling contract lost the cohort cap'
+# A cohort ends at a semantic boundary, not a count. The old rule capped every
+# cohort at three nodes with no stated reason, in a list where every other
+# boundary — subsystem, risk, skill, repository, corrected premise — is about
+# what the work is. The number is now a backstop against a pathological plan,
+# and says so.
+has "$scheduling" 'A cohort ends where the work stops being the same work, not at a count' \
+  'scheduling contract no longer bounds cohorts by the work rather than a number'
+has "$scheduling" 'not the criterion' \
+  'scheduling contract presents its numeric backstop as the criterion'
+hasnt "$scheduling" 'no cohort exceeds three nodes' \
+  'scheduling contract still caps cohorts at an unexplained three'
+# Linear execution: the schedule decides order, writes and context reuse only.
+has "$scheduling" 'Execution is linear' \
+  'scheduling contract no longer says execution is linear'
+has "$scheduling" 'nothing you record decides concurrency' \
+  'scheduling contract still implies its output selects concurrent work'
 has "$scheduling" 'Unknown targets or uncertain independence use `UNKNOWN`' \
   'scheduling contract no longer serializes uncertainty'
 has "$scheduling" 'Known consolidation, replacement, or retirement targets' \

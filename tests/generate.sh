@@ -884,6 +884,21 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f records a refusal in only one of the helper's two refusal forms"
 done
 
+# ─── the ask lane is about who can answer, not only what is at stake ─────────
+# A real /pln run put its own verification bookkeeping to the user as an a)/b)/c)
+# question — whether a carried-forward shell check should be annotated, edited or
+# dropped — and got back "I don't understand any of this." The fork test asked
+# whether the consequence was material, which it looked, and never whether the
+# user was better placed to answer than the agent, which they were not.
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+  has "$f" "rules out this run's own apparatus" \
+    "$f still lets a question about the run's own bookkeeping reach the user"
+  has "$f" 'they cannot answer it better than you can' \
+    "$f does not test who is better placed to answer"
+  has "$f" "I don't understand any of this" \
+    "$f lost the strongest tell that the ask lane is miscalibrated"
+done
+
 # ─── a wait with no news produces no message ─────────────────────────────────
 # The lifecycle fragment already forbade manufactured heartbeats, and a real run
 # sent 77 of them at a median 1.1 minutes apart anyway — each a full turn over

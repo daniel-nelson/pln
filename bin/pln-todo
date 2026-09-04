@@ -1,47 +1,61 @@
 #!/usr/bin/env bash
-# pln-queue — the follow-up queue: resolve where it lives, file into it, read it
+# pln-todo — the follow-up to-do list: resolve where it lives, file into it, read it
 # back, and move records out of it. Host-neutral: bash and git, no network and no
 # agent CLI. There is no delete subcommand — a record is archived, never destroyed.
 set -euo pipefail
 
-INDEX_NAME='QUEUE.md'
-LIVE_DIR='q'
-DONE_DIR='done'
+INDEX_NAME='TO-DO.md'
+LIVE_DIR='items'
+DONE_DIR='archive'
+# The names this store was written under before 1.59.0. They survive in exactly
+# one place — the recognition probe inside root resolution, which decides between
+# migrating, refusing a root that holds two lists, and creating a new one. Past
+# that decision nothing downstream names an old name.
+OLD_INDEX_NAME='QUEUE.md'
+OLD_LIVE_DIR='q'
+OLD_DONE_DIR='done'
+# A format version rather than a printed string, so it is not renamed: it is what
+# `pln-scheduler` and `pln-simplify` identify a to-do-list root by, and what
+# `header_field` requires on the first line of every store already on disk.
 HEADER_OPEN='<!-- pln-queue v1'
 HEADER_CLOSE='-->'
-DECLARED_KEY='pln-queue'
+DECLARED_KEY='pln-todo'
+# The declaration users have already written into their own instruction files.
+# Renaming the key would invalidate data pln does not own, so the old one keeps
+# working; two declarations that disagree fail closed rather than picking one.
+OLD_DECLARED_KEY='pln-queue'
 
-fail() { echo "pln-queue: $*" >&2; exit 2; }
-refuse() { echo "pln-queue: $*" >&2; exit 3; }
+fail() { echo "pln-todo: $*" >&2; exit 2; }
+refuse() { echo "pln-todo: $*" >&2; exit 3; }
 
 usage() {
   cat >&2 <<'EOF'
 Usage:
-  pln-queue init [--project DIR] [--root PATH] [--answered] [--migration-offered]
-  pln-queue add --id ID --claim TEXT --source TEXT [--status ready|blocked|decide|dropped]
-                [--state "[ ]"|"[-]"|"[x]"] [--urgent] [--group TEXT] [--opened YYYY-MM-DD]
-                [--depends-on CSV] [--touches CSV] [--holds CSV] [--body FILE|-]
-  pln-queue list [--project DIR]
-  pln-queue check --id ID [--against CSV] [--run TEXT]
-  pln-queue claim --id ID --run TEXT [--touches CSV] [--holds CSV]
-                  [--against CSV] [--steal HOLDER]
-  pln-queue mark --id ID [--run TEXT] [--state S] [--status S] [--urgent true|false] [--group TEXT]
-                 [--touches CSV] [--holds CSV] [--depends-on CSV] [--source TEXT]
-                 [--add-sub-item TEXT] [--sub-item-state "[ ]"|"[-]"|"[x]"]
-  pln-queue archive --id ID --disposition completed|dropped|superseded|resolved-elsewhere
-                    --evidence TEXT [--month YYYY-MM]
-  pln-queue stale [--days N]
+  pln-todo init [--project DIR] [--root PATH] [--answered] [--migration-offered]
+  pln-todo add --id ID --claim TEXT --source TEXT [--status ready|blocked|decide|dropped]
+               [--state "[ ]"|"[-]"|"[x]"] [--urgent] [--group TEXT] [--opened YYYY-MM-DD]
+               [--depends-on CSV] [--touches CSV] [--holds CSV] [--body FILE|-]
+  pln-todo list [--project DIR]
+  pln-todo check --id ID [--against CSV] [--run TEXT]
+  pln-todo claim --id ID --run TEXT [--touches CSV] [--holds CSV]
+                 [--against CSV] [--steal HOLDER]
+  pln-todo mark --id ID [--run TEXT] [--state S] [--status S] [--urgent true|false] [--group TEXT]
+                [--touches CSV] [--holds CSV] [--depends-on CSV] [--source TEXT]
+                [--add-sub-item TEXT] [--sub-item-state "[ ]"|"[-]"|"[x]"]
+  pln-todo archive --id ID --disposition completed|dropped|superseded|resolved-elsewhere
+                   --evidence TEXT [--month YYYY-MM]
+  pln-todo stale [--days N]
 
 Global options: [--project DIR] [--no-create]
 
 There is no delete subcommand: a record is archived, never destroyed.
 
 Exit codes: 0 done, 2 usage or failure, 3 refused (a collision, an occupied path,
-no resolvable queue). Every subcommand resolves the queue first and reports
-QUEUE_ROOT, whether it created one, and whether the location question is owed.
+no resolvable to-do list). Every subcommand resolves the to-do list first and reports
+TODO_ROOT, whether it created one, and whether the location question is owed.
 
 Env overrides (for testing):
-  PLN_QUEUE_DATE — the UTC date the helper writes (YYYY-MM-DD)
+  PLN_TODO_DATE — the UTC date the helper writes (YYYY-MM-DD)
 EOF
   exit 2
 }
@@ -49,7 +63,7 @@ EOF
 # ---------------------------------------------------------------- small helpers
 
 today() {
-  local d="${PLN_QUEUE_DATE:-}"
+  local d="${PLN_TODO_DATE:-}"
   [ -n "$d" ] || d="$(date -u '+%Y-%m-%d')"
   case "$d" in
     [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
@@ -131,16 +145,25 @@ PROJECT_TOP=''
 COMMON_DIR=''
 IN_WORKTREE=0
 IS_BARE=0
-QUEUE_ROOT=''
+TODO_ROOT=''
 RESOLVED_BY=''
 CREATED=0
 NOTES=()
 SET_ANSWERED=''
 SET_OFFERED=''
+# `list`, `check` and `stale` are reads to whoever calls them, and a read of the
+# to-do list never fails. They are the three that fall back to reading an
+# unmigratable store in place rather than refusing it.
+READ_ONLY_CMD=0
 
 note() { NOTES+=("$1"); }
 
 project_context() {
+  scan_project_context "$1"
+  check_declarations
+}
+
+scan_project_context() {
   PROJECT_DIR="$(abs_dir "$1")" || fail "project directory does not exist: $1"
   PROJECT_TOP="$PROJECT_DIR"
   COMMON_DIR=''
@@ -182,8 +205,16 @@ dir_is_empty() {
   [ "${n:-0}" = "0" ]
 }
 
-looks_like_queue() {
-  if [ -f "$1/$INDEX_NAME" ] && [ ! -L "$1/$INDEX_NAME" ]; then return 0; fi
+# The recognition probe, and the one place an old name is read. A helper that
+# knew only the new index name would decline a store written before 1.59.0 as
+# "something other than a to-do list", refuse at the project-root leg and create
+# a second list at the common-dir leg — so recognition answers to either name and
+# the migration below is what removes the old one.
+has_index() { [ -f "$1/$2" ] && [ ! -L "$1/$2" ]; }
+
+looks_like_todo() {
+  if has_index "$1" "$INDEX_NAME"; then return 0; fi
+  if has_index "$1" "$OLD_INDEX_NAME"; then return 0; fi
   dir_is_empty "$1" "${2:-}"
 }
 
@@ -207,33 +238,75 @@ adopt_candidate() {
     note "$leg: $cand is a git submodule mountpoint, not adopted"
     return 1
   fi
-  if ! looks_like_queue "$cand" "$spare"; then
-    note "$leg: $cand holds something other than a queue, not adopted"
+  if ! looks_like_todo "$cand" "$spare"; then
+    note "$leg: $cand holds something other than a to-do list, not adopted"
     return 1
   fi
-  QUEUE_ROOT="$(abs_dir "$cand")"
+  TODO_ROOT="$(abs_dir "$cand")"
   RESOLVED_BY="$leg"
   return 0
 }
 
 # The instruction-file leg is a read of prose everywhere else; what a bash helper
 # can recognize deterministically is the one-line declaration pln tells the user
-# to write:  pln-queue: <path>
-declared_path() {
-  local file path
+# to write:  pln-todo: <path>
+# One key, scanned across both instruction files in that order. Prints
+# "<file>\t<path>", or nothing.
+declared_for_key() {
+  local key="$1" file path
   for file in "$PROJECT_TOP/CLAUDE.md" "$PROJECT_TOP/AGENTS.md"; do
     [ -f "$file" ] || continue
     path="$(LC_ALL=C sed -n -E \
-      "s/^[[:space:]]*(-[[:space:]]+)?\`?${DECLARED_KEY}:\`?[[:space:]]+\`?([^\`]+)\`?[[:space:]]*\$/\\2/p" \
+      "s/^[[:space:]]*(-[[:space:]]+)?\`?${key}:\`?[[:space:]]+\`?([^\`]+)\`?[[:space:]]*\$/\\2/p" \
       "$file" 2>/dev/null | head -1 || true)"
     path="$(printf '%s' "$path" | sed -e 's/[[:space:]]*$//')"
-    if [ -n "$path" ]; then printf '%s\n' "$path"; return 0; fi
+    if [ -n "$path" ]; then printf '%s\t%s\n' "$file" "$path"; return 0; fi
   done
   return 1
 }
 
+# A declared path made absolute, so two declarations are compared as locations
+# rather than as the strings someone happened to type.
+abs_declared() {
+  case "$1" in
+    /*) printf '%s\n' "$1" ;;
+    '~/'*) printf '%s\n' "$HOME/${1#\~/}" ;;
+    *) printf '%s\n' "$PROJECT_TOP/$1" ;;
+  esac
+}
+
+# Both keys are read, because `pln-queue: <path>` is a string users have already
+# written into their own instruction files and renaming it would invalidate data
+# pln does not own. Where both are declared and they name different locations
+# this fails closed and says which file holds which, rather than letting a stale
+# declaration in one file win quietly over a current one in the other.
+declared_path() {
+  local new old
+  new="$(declared_for_key "$DECLARED_KEY" || true)"
+  if [ -n "$new" ]; then printf '%s\n' "$(printf '%s' "$new" | LC_ALL=C cut -f2)"; return 0; fi
+  old="$(declared_for_key "$OLD_DECLARED_KEY" || true)"
+  if [ -n "$old" ]; then printf '%s\n' "$(printf '%s' "$old" | LC_ALL=C cut -f2)"; return 0; fi
+  return 1
+}
+
+# Run once, from `project_context`, and never inside a command substitution: a
+# refusal raised in a subshell would print and be discarded by the caller's
+# `|| true`, which is the shape every `declared_path` call site has.
+check_declarations() {
+  local new old new_file old_file new_path old_path
+  new="$(declared_for_key "$DECLARED_KEY" || true)"
+  old="$(declared_for_key "$OLD_DECLARED_KEY" || true)"
+  [ -n "$new" ] && [ -n "$old" ] || return 0
+  new_file="$(printf '%s' "$new" | LC_ALL=C cut -f1)"
+  old_file="$(printf '%s' "$old" | LC_ALL=C cut -f1)"
+  new_path="$(abs_declared "$(printf '%s' "$new" | LC_ALL=C cut -f2)")"
+  old_path="$(abs_declared "$(printf '%s' "$old" | LC_ALL=C cut -f2)")"
+  [ "$new_path" != "$old_path" ] || return 0
+  refuse "two to-do-list locations are declared and they disagree: $new_file says \`$DECLARED_KEY: $new_path\` and $old_file says \`$OLD_DECLARED_KEY: $old_path\`; nothing was written until one of them goes"
+}
+
 # Refuse the repository top level and any ancestor of it. A project documenting a
-# root-level TODO.md would otherwise scatter QUEUE.md, q/ and done/ across its top
+# root-level TODO.md would otherwise scatter TO-DO.md, items/ and archive/ across its top
 # level unasked, and put pln's own dirt exclusion in front of user-owned changes.
 instruction_root_ok() {
   local root="${1%/}"
@@ -251,16 +324,109 @@ instruction_root_ok() {
   return 0
 }
 
-create_queue() {
+# One-way, once, on first touch. A store written before 1.59.0 carries the old
+# index, live-directory and archive names; this renames them in place and then
+# rebuilds the index, after which nothing on disk answers to an old name.
+#
+# It runs from `create_todo`, ahead of that function's own `mkdir -p` and index
+# write, because those run on all five resolution legs and would otherwise put an
+# empty new live directory in front of the migration — a bare `mv` would then move
+# the old directory *inside* the new one, silently and at exit 0. The explicit leg
+# never calls `adopt_candidate`, so hooking the probe into adoption alone would
+# miss `pln-todo init --root PATH`, which is the command for adopting a list that
+# already exists.
+#
+# Each rename is individually atomic and the whole thing is resumable: a run
+# killed between two of them leaves a root a later run finishes, which is why the
+# refusal below is written against two *complete* lists — two index files — and
+# not against any old name standing beside any new one.
+#
+# The lock is taken here, before adoption, because resolution runs ahead of every
+# subcommand's own `take_lock` and `check` and `stale` never lock at all. Without
+# it two linked worktrees sharing one root can meet inside the rename window, and
+# `list` rewrites the index to `_No open items._` over a store whose detail files
+# are all still in the old directory.
+migrate_store() {
+  local root="$1" old new pair present=''
+  [ -d "$root" ] && [ ! -L "$root" ] || return 0
+
+  # Only inside something that is already a to-do list, under either name set. The
+  # explicit leg adopts a path the user typed with no adoption probe in front of
+  # it, and a `done/` or `q/` of theirs in an unrelated directory is not pln's to
+  # rename. A run killed after the index rename leaves the new index and the old
+  # directories, which is why the new name counts here too: that is the state a
+  # later run has to be able to finish.
+  has_index "$root" "$OLD_INDEX_NAME" || has_index "$root" "$INDEX_NAME" || return 0
+
+  for pair in "$OLD_INDEX_NAME:$INDEX_NAME" "$OLD_LIVE_DIR:$LIVE_DIR" "$OLD_DONE_DIR:$DONE_DIR"; do
+    old="${pair%%:*}"
+    if [ -e "$root/$old" ] || [ -L "$root/$old" ]; then present="$present$pair "; fi
+  done
+  [ -n "$present" ] || return 0
+
+  if has_index "$root" "$INDEX_NAME" && has_index "$root" "$OLD_INDEX_NAME"; then
+    report_notes
+    refuse "$root holds two to-do lists — one at $root/$INDEX_NAME and an older one at $root/$OLD_INDEX_NAME; nothing was written, and nothing is merged or guessed at: keep one of them"
+  fi
+  for pair in $present; do
+    old="${pair%%:*}"; new="${pair#*:}"
+    if [ -e "$root/$new" ] || [ -L "$root/$new" ]; then
+      report_notes
+      refuse "$root holds both $root/$old and $root/$new; nothing was written, and nothing is merged or guessed at: keep one of them"
+    fi
+  done
+
+  # A read of the to-do list never fails, so a store on a read-only mount or under
+  # an unwritable parent is still read — under its old names, in place, said out
+  # loud. Only the subcommands that write refuse, because writing is what cannot
+  # be done there at all.
+  if [ ! -w "$root" ]; then
+    if [ "$READ_ONLY_CMD" = 1 ]; then
+      INDEX_NAME="$OLD_INDEX_NAME"; LIVE_DIR="$OLD_LIVE_DIR"; DONE_DIR="$OLD_DONE_DIR"
+      note "$root cannot be written, so its older file names were read in place and nothing was migrated"
+      return 0
+    fi
+    report_notes
+    refuse "$root still carries the older file names and cannot be written, so it cannot be migrated; nothing was written"
+  fi
+
+  TODO_ROOT="$(abs_dir "$root")"
+  if ! take_lock "$([ "$READ_ONLY_CMD" = 1 ] && echo 0 || echo 1)"; then
+    INDEX_NAME="$OLD_INDEX_NAME"; LIVE_DIR="$OLD_LIVE_DIR"; DONE_DIR="$OLD_DONE_DIR"
+    note "$TODO_ROOT is locked by $(lock_owner_desc "$TODO_ROOT/.lock"), so its older file names were read in place and nothing was migrated"
+    return 0
+  fi
+  for pair in $present; do
+    old="${pair%%:*}"; new="${pair#*:}"
+    [ -e "$TODO_ROOT/$old" ] || [ -L "$TODO_ROOT/$old" ] || continue
+    mv "$TODO_ROOT/$old" "$TODO_ROOT/$new" \
+      || fail "cannot rename $TODO_ROOT/$old to $TODO_ROOT/$new"
+  done
+  # Moving the files is not enough: the live directory's name is literal text in
+  # every index row, and `add` recovers the line it wrote by grepping for it. The
+  # month indexes are the opposite case and travel with the archive unrewritten —
+  # their lines carry no directory prefix.
+  if [ -f "$TODO_ROOT/$INDEX_NAME" ]; then
+    write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
+  fi
+  release_lock
+  note "$TODO_ROOT was renamed once from the older file names: it now uses $INDEX_NAME, $LIVE_DIR/ and $DONE_DIR/, and a pln older than 1.59.0 cannot read it"
+  return 0
+}
+
+create_todo() {
   local root="$1"
-  # Never write through a link: an empty `pln` symlink would put the queue
+  # Never write through a link: an empty `pln` symlink would put the to-do list
   # outside the repository while the location answer applied to the link.
   if [ -L "$root" ]; then return 1; fi
+  # Before anything is created: an existing store under the older names is
+  # migrated here, on every leg, or the creation below would race it.
+  migrate_store "$root"
   mkdir -p "$root/$LIVE_DIR" 2>/dev/null || return 1
   if [ -L "$root/$LIVE_DIR" ]; then return 1; fi
-  QUEUE_ROOT="$(abs_dir "$root")"
-  if [ ! -e "$QUEUE_ROOT/$INDEX_NAME" ]; then
-    write_index "$QUEUE_ROOT" || return 1
+  TODO_ROOT="$(abs_dir "$root")"
+  if [ ! -e "$TODO_ROOT/$INDEX_NAME" ]; then
+    write_index "$TODO_ROOT" || return 1
     CREATED=1
   fi
   return 0
@@ -272,12 +438,12 @@ instruction_leg() {
   if [ -e "$cand" ] || [ -L "$cand" ]; then
     adopt_candidate "$cand" 'instructions' '' "$spare" || return 1
   else
-    QUEUE_ROOT="$cand"
+    TODO_ROOT="$cand"
   fi
-  if ! instruction_root_ok "$QUEUE_ROOT"; then QUEUE_ROOT=''; RESOLVED_BY=''; return 1; fi
-  if ! create_queue "$QUEUE_ROOT"; then
-    note "instructions: cannot create or write $QUEUE_ROOT"
-    QUEUE_ROOT=''; RESOLVED_BY=''
+  if ! instruction_root_ok "$TODO_ROOT"; then TODO_ROOT=''; RESOLVED_BY=''; return 1; fi
+  if ! create_todo "$TODO_ROOT"; then
+    note "instructions: cannot create or write $TODO_ROOT"
+    TODO_ROOT=''; RESOLVED_BY=''
     return 1
   fi
   RESOLVED_BY='instructions'
@@ -300,16 +466,16 @@ declared_abs() {
 # An earlier leg wins before the instruction leg is ever tried, so a project that
 # answered "the shared git directory" would never read a to-do location its own
 # instructions declare later, and the one-time offer to migrate what is in that
-# file could never fire. The queue does not move — the offer is about lifting a
-# named file's contents into the queue, not relocating the queue — so the leg
+# file could never fire. The to-do list does not move — the offer is about lifting a
+# named file's contents into the to-do list, not relocating the to-do list — so the leg
 # still wins and simply reports what it passed over.
 note_declared_elsewhere() {
   local cand
   cand="$(declared_abs)" || return 0
   [ -n "$cand" ] || return 0
-  case "$cand" in "$QUEUE_ROOT" | "$QUEUE_ROOT"/*) return 0 ;; esac
+  case "$cand" in "$TODO_ROOT" | "$TODO_ROOT"/*) return 0 ;; esac
   DECLARED_TODO="$cand"
-  note "instructions: $cand is declared but the queue already resolved to $QUEUE_ROOT"
+  note "instructions: $cand is declared but the to-do list already resolved to $TODO_ROOT"
   return 0
 }
 
@@ -324,22 +490,22 @@ resolve_root() {
       '~/'*) cand="$HOME/${explicit#\~/}" ;;
       *) cand="$PROJECT_DIR/$explicit" ;;
     esac
-    [ ! -L "$cand" ] || fail "the queue root must not be a symlink: $cand"
-    if [ -e "$cand" ] && [ ! -d "$cand" ]; then fail "the queue root is not a directory: $cand"; fi
-    create_queue "$cand" || fail "cannot create or write the queue at $cand"
+    [ ! -L "$cand" ] || fail "the to-do-list root must not be a symlink: $cand"
+    if [ -e "$cand" ] && [ ! -d "$cand" ]; then fail "the to-do-list root is not a directory: $cand"; fi
+    create_todo "$cand" || fail "cannot create or write the to-do list at $cand"
     RESOLVED_BY='explicit'
     return 0
   fi
 
   if adopt_candidate "$PROJECT_TOP/pln" 'project-root' 'pln'; then
-    create_queue "$QUEUE_ROOT" || fail "cannot write the queue at $QUEUE_ROOT"
+    create_todo "$TODO_ROOT" || fail "cannot write the to-do list at $TODO_ROOT"
     note_declared_elsewhere
     return 0
   fi
 
   if [ "$IN_WORKTREE" = 1 ] && [ -n "$COMMON_DIR" ]; then
     if adopt_candidate "$COMMON_DIR/pln" 'common-dir'; then
-      create_queue "$QUEUE_ROOT" || fail "cannot write the queue at $QUEUE_ROOT"
+      create_todo "$TODO_ROOT" || fail "cannot write the to-do list at $TODO_ROOT"
       note_declared_elsewhere
       return 0
     fi
@@ -375,13 +541,13 @@ resolve_root() {
   cand="$PROJECT_TOP/pln"
   if [ -e "$cand" ] || [ -L "$cand" ]; then
     report_notes
-    refuse "the default queue root $cand exists and is not a queue; nothing was written"
+    refuse "the default to-do-list root $cand exists and is not a to-do list; nothing was written"
   fi
   if [ "$IS_BARE" = 1 ]; then
     report_notes
-    refuse "$PROJECT_DIR is a bare repository; a queue is not created inside one"
+    refuse "$PROJECT_DIR is a bare repository; a to-do list is not created inside one"
   fi
-  create_queue "$cand" || { report_notes; refuse "no queue root could be created; tried $cand"; }
+  create_todo "$cand" || { report_notes; refuse "no to-do-list root could be created; tried $cand"; }
   RESOLVED_BY='created'
   return 0
 }
@@ -412,8 +578,8 @@ load_header() {
   local answered offered
   LOCATION_QUESTION='owed'
   MIGRATION_OFFERED='none'
-  answered="$(header_field "$QUEUE_ROOT/$INDEX_NAME" 'location-answered')"
-  offered="$(header_field "$QUEUE_ROOT/$INDEX_NAME" 'migration-offered')"
+  answered="$(header_field "$TODO_ROOT/$INDEX_NAME" 'location-answered')"
+  offered="$(header_field "$TODO_ROOT/$INDEX_NAME" 'migration-offered')"
   if [ -n "$answered" ]; then LOCATION_QUESTION='answered'; fi
   if [ -n "$offered" ]; then MIGRATION_OFFERED="$offered"; fi
   return 0
@@ -426,8 +592,8 @@ report_notes() {
 
 report_resolution() {
   local n
-  printf 'QUEUE_ROOT=%s\n' "$QUEUE_ROOT"
-  printf 'INDEX=%s\n' "$QUEUE_ROOT/$INDEX_NAME"
+  printf 'TODO_ROOT=%s\n' "$TODO_ROOT"
+  printf 'INDEX=%s\n' "$TODO_ROOT/$INDEX_NAME"
   printf 'RESOLVED_BY=%s\n' "$RESOLVED_BY"
   printf 'CREATED=%s\n' "$CREATED"
   printf 'LOCATION_QUESTION=%s\n' "$LOCATION_QUESTION"
@@ -472,7 +638,7 @@ lock_owner_desc() {
 # only where the evidence says the holder is gone: same host, and a pid that is
 # not running. Anything else (another host, an unreadable owner file) is left
 # alone and waited on, then reported, because guessing wrong here means two
-# writers in one queue.
+# writers in one to-do list.
 lock_is_dead() {
   local lock="$1" owner pid host age
   owner="$(lock_owner "$lock")" || {
@@ -501,7 +667,7 @@ lock_age() {
 
 # $1 = 1 to fail when the lock cannot be taken, 0 to return non-zero instead.
 take_lock() {
-  local required="${1:-1}" lock="$QUEUE_ROOT/.lock" tries=0
+  local required="${1:-1}" lock="$TODO_ROOT/.lock" tries=0
   while ! mkdir "$lock" 2>/dev/null; do
     if lock_is_dead "$lock"; then
       note "cleared a lock left behind by $(lock_owner_desc "$lock"), which is no longer running"
@@ -512,9 +678,9 @@ take_lock() {
     tries=$((tries + 1))
     if [ "$tries" -ge 25 ]; then
       [ "$required" = 1 ] || return 1
-      fail "the queue is locked by $(lock_owner_desc "$lock"): $lock
+      fail "the to-do list is locked by $(lock_owner_desc "$lock"): $lock
 If that run is gone, clear it with: rmdir $lock
-Do not read $QUEUE_ROOT/$INDEX_NAME by hand instead — the index carries no holder, so it cannot tell you what another run has claimed."
+Do not read $TODO_ROOT/$INDEX_NAME by hand instead — the index carries no holder, so it cannot tell you what another run has claimed."
     fi
     sleep 0.2
   done
@@ -526,7 +692,7 @@ Do not read $QUEUE_ROOT/$INDEX_NAME by hand instead — the index carries no hol
 
 # ----------------------------------------------------------- reading the record
 
-detail_path() { printf '%s/%s/%s.md\n' "$QUEUE_ROOT" "$LIVE_DIR" "$1"; }
+detail_path() { printf '%s/%s/%s.md\n' "$TODO_ROOT" "$LIVE_DIR" "$1"; }
 
 # One tab-separated record per detail file:
 #   id  state  urgent  status  opened  group  claimed_by  claimed_at  claim  claimed_in
@@ -537,7 +703,7 @@ parse_detail() {
   LC_ALL=C awk -v file="$file" '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
     function unquote(s) { if (s ~ /^".*"$/) s = substr(s, 2, length(s) - 2); return s }
-    NR == 1 { if ($0 != "---") { print "pln-queue: detail file has no frontmatter: " file > "/dev/stderr"; bad = 1; exit 1 } inhdr = 1; next }
+    NR == 1 { if ($0 != "---") { print "pln-todo: detail file has no frontmatter: " file > "/dev/stderr"; bad = 1; exit 1 } inhdr = 1; next }
     inhdr && $0 == "---" { inhdr = 0; next }
     inhdr {
       i = index($0, ":")
@@ -547,11 +713,11 @@ parse_detail() {
     !claim && /^# / { claim = trim(substr($0, 3)) }
     END {
       if (bad) exit 1
-      if (inhdr) { print "pln-queue: unterminated frontmatter: " file > "/dev/stderr"; exit 1 }
+      if (inhdr) { print "pln-todo: unterminated frontmatter: " file > "/dev/stderr"; exit 1 }
       if (v["id"] == "" || v["state"] == "" || v["status"] == "") {
-        print "pln-queue: detail file is missing id, state or status: " file > "/dev/stderr"; exit 1
+        print "pln-todo: detail file is missing id, state or status: " file > "/dev/stderr"; exit 1
       }
-      if (claim == "") { print "pln-queue: detail file has no leading `# <claim>` heading: " file > "/dev/stderr"; exit 1 }
+      if (claim == "") { print "pln-todo: detail file has no leading `# <claim>` heading: " file > "/dev/stderr"; exit 1 }
       urgent = (v["urgent"] == "true") ? "true" : "false"
       printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", v["id"], v["state"], urgent, v["status"], \
         v["opened"], v["group"], v["claimed_by"], v["claimed_at"], claim, v["claimed_in"]
@@ -589,8 +755,8 @@ detail_list() {
 
 live_records() {
   local file
-  [ -d "$QUEUE_ROOT/$LIVE_DIR" ] || return 0
-  for file in "$QUEUE_ROOT/$LIVE_DIR"/*.md; do
+  [ -d "$TODO_ROOT/$LIVE_DIR" ] || return 0
+  for file in "$TODO_ROOT/$LIVE_DIR"/*.md; do
     [ -f "$file" ] || continue
     parse_detail "$file" || return 1
   done
@@ -601,13 +767,13 @@ live_records() {
 
 render_index() {
   local answered offered records
-  answered="$(header_field "$QUEUE_ROOT/$INDEX_NAME" 'location-answered')"
-  offered="$(header_field "$QUEUE_ROOT/$INDEX_NAME" 'migration-offered')"
+  answered="$(header_field "$TODO_ROOT/$INDEX_NAME" 'location-answered')"
+  offered="$(header_field "$TODO_ROOT/$INDEX_NAME" 'migration-offered')"
   if [ -n "$SET_ANSWERED" ]; then answered="$SET_ANSWERED"; fi
   if [ -n "$SET_OFFERED" ]; then offered="$SET_OFFERED"; fi
 
   printf '%s\n' "$HEADER_OPEN"
-  printf 'queue-root: %s\n' "$QUEUE_ROOT"
+  printf 'queue-root: %s\n' "$TODO_ROOT"
   if [ -n "$answered" ]; then printf 'location-answered: %s\n' "$answered"; fi
   if [ -n "$offered" ]; then printf 'migration-offered: %s\n' "$offered"; fi
   printf '%s\n\n' "$HEADER_CLOSE"
@@ -656,16 +822,16 @@ render_index() {
 }
 
 write_index() {
-  local root="${1:-$QUEUE_ROOT}" tmp
-  QUEUE_ROOT="$root"
+  local root="${1:-$TODO_ROOT}" tmp
+  TODO_ROOT="$root"
   [ ! -L "$root/$INDEX_NAME" ] || fail "the index file must not be a symlink: $root/$INDEX_NAME"
-  tmp="$(mktemp "$root/.pln-queue-index.XXXXXX")" || return 1
+  tmp="$(mktemp "$root/.pln-todo-index.XXXXXX")" || return 1
   if ! render_index > "$tmp"; then rm -f "$tmp"; return 1; fi
   mv "$tmp" "$root/$INDEX_NAME"
 }
 
 index_line_for() {
-  LC_ALL=C grep -F -- "\`$LIVE_DIR/$1.md\`" "$QUEUE_ROOT/$INDEX_NAME" | head -1
+  LC_ALL=C grep -F -- "\`$LIVE_DIR/$1.md\`" "$TODO_ROOT/$INDEX_NAME" | head -1
 }
 
 # ----------------------------------------------------------------- the overlap
@@ -765,7 +931,7 @@ run_check() {
   fi
 
   # Absent means unknown, and unknown collides with everything: otherwise the
-  # cheapest capture would be the most permissive thing in the queue.
+  # cheapest capture would be the most permissive thing in the to-do list.
   if [ -z "$subject_touches" ]; then
     printf 'COLLISION\t-\tunknown\t%s\n' "$id declares no touches"
     refused=1
@@ -774,7 +940,7 @@ run_check() {
   while IFS= read -r other; do
     [ -n "$other" ] || continue
     [ "$other" != "$id" ] || continue
-    [ -f "$(detail_path "$other")" ] || fail "no such queue item: $other"
+    [ -f "$(detail_path "$other")" ] || fail "no such to-do item: $other"
     if ! overlap_report "$id" "$other" "$run" "$wt"; then refused=1; fi
   done <<EOF
 $others
@@ -793,7 +959,7 @@ EOF
 set_field() {
   # $1 = detail file, $2 = key, $3 = value (already YAML-safe)
   local file="$1" key="$2" value="$3" tmp
-  tmp="$(mktemp "$(dirname "$file")/.pln-queue-detail.XXXXXX")"
+  tmp="$(mktemp "$(dirname "$file")/.pln-todo-detail.XXXXXX")"
   LC_ALL=C awk -v key="$key" -v value="$value" '
     NR == 1 { print; inhdr = 1; next }
     inhdr && $0 == "---" {
@@ -815,7 +981,7 @@ set_field() {
 
 append_sub_item() {
   local file="$1" text="$2" state="$3" tmp
-  tmp="$(mktemp "$(dirname "$file")/.pln-queue-detail.XXXXXX")"
+  tmp="$(mktemp "$(dirname "$file")/.pln-todo-detail.XXXXXX")"
   LC_ALL=C awk -v line="- $state $text" '
     { lines[++n] = $0; if ($0 == "## Sub-items") found = NR }
     END {
@@ -850,6 +1016,8 @@ shift
 project='.'
 create_flag=1
 
+case "$command" in list | check | stale) READ_ONLY_CMD=1 ;; esac
+
 case "$command" in
   init)
     explicit=''; answered=0; migration=0
@@ -864,12 +1032,12 @@ case "$command" in
       esac
     done
     project_context "$project"
-    resolve_root "$create_flag" "$explicit" || refuse "no queue could be resolved under $PROJECT_DIR"
+    resolve_root "$create_flag" "$explicit" || refuse "no to-do list could be resolved under $PROJECT_DIR"
     if [ "$answered" = 1 ] || [ "$migration" = 1 ]; then
       take_lock
       if [ "$answered" = 1 ]; then SET_ANSWERED="$(today)"; fi
       if [ "$migration" = 1 ]; then SET_OFFERED="$(today)"; fi
-      write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
+      write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
       release_lock
     fi
     load_header
@@ -912,20 +1080,20 @@ case "$command" in
     esac
 
     project_context "$project"
-    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
     take_lock
 
     detail="$(detail_path "$id")"
     if [ -e "$detail" ] || [ -L "$detail" ]; then
       refuse "an item is already filed at $detail; nothing was overwritten"
     fi
-    mkdir -p "$QUEUE_ROOT/$LIVE_DIR"
+    mkdir -p "$TODO_ROOT/$LIVE_DIR"
 
     depends_yaml="$(csv_to_lines "$depends" | lines_to_yaml_list)"
     touches_yaml="$(csv_to_lines "$touches" | lines_to_yaml_list)"
     holds_yaml="$(csv_to_lines "$holds" | lines_to_yaml_list)"
 
-    tmp="$(mktemp "$QUEUE_ROOT/$LIVE_DIR/.pln-queue-add.XXXXXX")"
+    tmp="$(mktemp "$TODO_ROOT/$LIVE_DIR/.pln-todo-add.XXXXXX")"
     {
       printf -- '---\n'
       printf 'id: %s\n' "$id"
@@ -954,7 +1122,7 @@ case "$command" in
     # The detail file is canonical, so it lands first: an interruption leaves an
     # orphan the next rebuild picks up, never a phantom index line.
     mv "$tmp" "$detail"
-    write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
+    write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
     release_lock
 
     load_header
@@ -974,18 +1142,18 @@ case "$command" in
       esac
     done
     project_context "$project"
-    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
     # `list` is a read to whoever calls it, and it must never be the thing that
     # fails: everything it prints is derived from the detail files, and only the
     # refresh of the on-disk index needs the lock. A caller that cannot read the
-    # queue reaches for `QUEUE.md` by hand, which carries no holder and so
+    # to-do list reaches for `TO-DO.md` by hand, which carries no holder and so
     # reports another run's claimed items as untaken — the failure this guards.
     if take_lock 0; then
-      write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
+      write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
       release_lock
       INDEX_REFRESHED=1
     else
-      note "the queue is locked by $(lock_owner_desc "$QUEUE_ROOT/.lock"), so the index file was not refreshed; everything below is read from the detail files and is current"
+      note "the to-do list is locked by $(lock_owner_desc "$TODO_ROOT/.lock"), so the index file was not refreshed; everything below is read from the detail files and is current"
       INDEX_REFRESHED=0
     fi
     load_header
@@ -995,7 +1163,7 @@ case "$command" in
     [ -n "$count" ] || count=0
     printf 'ITEM_COUNT=%s\n' "$count"
     if [ "$count" = "0" ]; then printf 'STATUS=empty\n'; else printf 'STATUS=items\n'; fi
-    # The output is never empty, so a caller can tell an empty queue — a real
+    # The output is never empty, so a caller can tell an empty to-do list — a real
     # read — from a failed call, which must fail the close rather than render
     # a clean empty follow-up list.
     printf 'INDEX_BEGIN\n'
@@ -1003,9 +1171,9 @@ case "$command" in
     # instant. Catting an index the lock stopped us rewriting would hand back
     # the stale file the fallback above exists to keep nobody reading.
     if [ "$INDEX_REFRESHED" = 1 ]; then
-      cat "$QUEUE_ROOT/$INDEX_NAME"
+      cat "$TODO_ROOT/$INDEX_NAME"
     else
-      render_index || fail "cannot render the queue at $QUEUE_ROOT"
+      render_index || fail "cannot render the to-do list at $TODO_ROOT"
     fi
     printf 'INDEX_END\n'
     ;;
@@ -1025,10 +1193,10 @@ case "$command" in
     [ -n "$id" ] || usage
     [ -z "$run" ] || single_line 'run' "$run"
     project_context "$project"
-    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
     load_header
     report_resolution
-    [ -f "$(detail_path "$id")" ] || fail "no such queue item: $id"
+    [ -f "$(detail_path "$id")" ] || fail "no such to-do item: $id"
     # Advisory by contract: two runs can both read a clear result, which is why
     # `claim` exists and why a refusal here is not an error. Advisory is allowed
     # to be conservative, never to disagree: without `--run` this reports every
@@ -1055,11 +1223,11 @@ case "$command" in
     [ -n "$id" ] && [ -n "$run" ] || usage
     single_line 'run' "$run"
     project_context "$project"
-    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
     load_header
     report_resolution
     detail="$(detail_path "$id")"
-    [ -f "$detail" ] || fail "no such queue item: $id"
+    [ -f "$detail" ] || fail "no such to-do item: $id"
 
     # One mkdir lock over both the check and the record. A bare check cannot
     # enforce a refusal: two runs can each read a clear answer and both proceed.
@@ -1112,10 +1280,10 @@ case "$command" in
     set_field "$detail" 'claimed_by' "$run"
     set_field "$detail" 'claimed_at' "$(today)"
     # The worktree travels with the run because a run string is not unique on its
-    # own: two repositories whose instructions declare one queue root can carry
+    # own: two repositories whose instructions declare one to-do-list root can carry
     # the same `<date>-<slug>` on one day, with no scheduler edge between them.
     set_field "$detail" 'claimed_in' "$PROJECT_TOP"
-    write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
+    write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
     release_lock
     if [ "$held_elsewhere" = 1 ]; then printf 'STOLEN_FROM=%s\n' "$holder"; fi
     printf 'CLAIM=held\nHELD_BY=%s\n' "$run"
@@ -1159,14 +1327,14 @@ case "$command" in
     single_line 'group' "$set_group"
 
     project_context "$project"
-    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
     detail="$(detail_path "$id")"
-    [ -f "$detail" ] || fail "no such queue item: $id"
+    [ -f "$detail" ] || fail "no such to-do item: $id"
     take_lock
     # Marking is how a run records what it finished, so it may not be done to a
     # record someone else is holding: `claim --steal` moves a holder without
     # telling the run it displaced, and without this a displaced run could still
-    # write a completion the queue no longer backs — and its plan would record a
+    # write a completion the to-do list no longer backs — and its plan would record a
     # success nobody could reconcile. An unheld record is marked by anyone, as
     # before. A run that really did the work takes the item back first, which is
     # also how the run that stole it learns the steal was contested.
@@ -1191,7 +1359,7 @@ case "$command" in
     [ "$have_holds" = 0 ] || set_field "$detail" 'holds' "$(csv_to_lines "$set_holds" | lines_to_yaml_list)"
     [ "$have_depends" = 0 ] || set_field "$detail" 'depends_on' "$(csv_to_lines "$set_depends" | lines_to_yaml_list)"
     [ -z "$sub" ] || append_sub_item "$detail" "$sub" "$sub_state"
-    write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
+    write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
     release_lock
     load_header
     report_resolution
@@ -1230,9 +1398,9 @@ case "$command" in
     fi
 
     project_context "$project"
-    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
     detail="$(detail_path "$id")"
-    [ -f "$detail" ] || fail "no such queue item: $id"
+    [ -f "$detail" ] || fail "no such to-do item: $id"
     record="$(parse_detail "$detail")" || fail "cannot read $detail"
     state="$(printf '%s' "$record" | LC_ALL=C cut -f2)"
     claim="$(printf '%s' "$record" | LC_ALL=C cut -f9)"
@@ -1241,14 +1409,14 @@ case "$command" in
     fi
 
     take_lock
-    dest_dir="$QUEUE_ROOT/$DONE_DIR/$month"
+    dest_dir="$TODO_ROOT/$DONE_DIR/$month"
     dest="$dest_dir/$id.md"
     if [ -e "$dest" ] || [ -L "$dest" ]; then
       refuse "a record is already archived at $dest; nothing was overwritten"
     fi
     mkdir -p "$dest_dir"
     # Content-preserving order: the record exists at its archive path and its line
-    # is in the month index before anything leaves the live queue.
+    # is in the month index before anything leaves the live to-do list.
     cp "$detail" "$dest"
     set_field "$dest" 'disposition' "$disposition"
     set_field "$dest" 'archived' "$(today)"
@@ -1257,7 +1425,7 @@ case "$command" in
     if [ ! -e "$month_index" ]; then printf '## %s\n\n' "$month" > "$month_index"; fi
     printf -- '- %s %s · %s → `%s.md` — %s\n' "$state" "$disposition" "$claim" "$id" "$evidence" >> "$month_index"
     rm -f "$detail"
-    write_index "$QUEUE_ROOT" || fail "cannot write $QUEUE_ROOT/$INDEX_NAME"
+    write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
     release_lock
 
     load_header
@@ -1278,17 +1446,17 @@ case "$command" in
     done
     case "$days" in '' | *[!0-9]*) fail "days must be a whole number: $days" ;; esac
     project_context "$project"
-    resolve_root "$create_flag" '' || refuse "no queue could be resolved under $PROJECT_DIR"
+    resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
     load_header
     report_resolution
     now="$(today)"
     cutoff="$(cutoff_date "$now" "$days")"
-    records="$(live_records)" || fail "cannot read the queue's detail files"
+    records="$(live_records)" || fail "cannot read the to-do list's detail files"
     # Report only. Nothing here writes, marks or archives: a record leaves the
-    # live queue on the user's confirmation, never on this helper's judgment.
+    # live to-do list on the user's confirmation, never on this helper's judgment.
     stale_out="$(printf '%s' "$records" | LC_ALL=C awk -F '\t' -v cutoff="$cutoff" '
       NF >= 9 {
-        id = $1; state = $2; status = $4; opened = $5; by = $7; at = $8
+        id = $1; state = $2; status = $4; opened = $5; by = $7; at = $8; claim = $9
         reasons = ""
         if (state == "[x]") reasons = "completed-not-archived"
         if (status == "dropped") reasons = reasons == "" ? "dropped-not-archived" : reasons ",dropped-not-archived"
@@ -1296,7 +1464,9 @@ case "$command" in
           reasons = reasons == "" ? "claim-abandoned" : reasons ",claim-abandoned"
         if (reasons == "" && opened != "" && opened <= cutoff) reasons = "aged"
         if (reasons == "") next
-        printf "STALE\t%s\t%s\t%s\n", id, reasons, (by == "" ? "-" : by)
+        # The claim rides with every candidate, because these ids go straight
+        # into a closing message and an id is a filename nobody has read.
+        printf "STALE\t%s\t%s\t%s\t%s\n", id, reasons, (by == "" ? "-" : by), claim
       }
     ')"
     if [ -n "$stale_out" ]; then

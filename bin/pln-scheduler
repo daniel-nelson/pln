@@ -43,25 +43,38 @@ validate_output_path() {
   esac
 }
 
-# pln's own follow-up queue is not user-owned dirt. This skips the queue's own
-# paths — its index file, `q/` and `done/` — beneath a root that actually holds a
-# queue, and never the root itself and never the repository top level: a queue
-# root derived from a project-named file can be any directory, and excluding a
-# root there would disable dirty-state accounting for everything under it.
-queue_own_path() {
-  local repo="$1" path="${2%/}" root_rel=''
+# pln's own project to-do list is not user-owned dirt. This skips the list's own
+# paths — its index file, its live-item directory and its archive — beneath a root
+# that actually holds one, and never the root itself and never the repository top
+# level: a to-do-list root derived from a project-named file can be any directory,
+# and excluding a root there would disable dirty-state accounting for everything under it.
+#
+# Both name sets are recognized. 1.59.0 renamed the files, and a repository whose
+# list pln has not touched since still carries the older names — the marker on the
+# index's first line is a format version rather than a printed string, so it is
+# what identifies a root under either set.
+todo_own_path() {
+  local repo="$1" path="${2%/}" root_rel='' index=''
   case "$path" in
-    'QUEUE.md' | 'q' | 'q/'* | 'done' | 'done/'*) return 1 ;;
+    'TO-DO.md' | 'items' | 'items/'* | 'archive' | 'archive/'* \
+      | 'QUEUE.md' | 'q' | 'q/'* | 'done' | 'done/'*) return 1 ;;
+    */'TO-DO.md') root_rel="${path%/TO-DO.md}" ;;
     */'QUEUE.md') root_rel="${path%/QUEUE.md}" ;;
-    */'q' | */'done') root_rel="${path%/*}" ;;
+    */'items' | */'archive' | */'q' | */'done') root_rel="${path%/*}" ;;
+    */'items'/*) root_rel="${path%%/items/*}" ;;
+    */'archive'/*) root_rel="${path%%/archive/*}" ;;
     */'q'/*) root_rel="${path%%/q/*}" ;;
     */'done'/*) root_rel="${path%%/done/*}" ;;
     *) return 1 ;;
   esac
   [ -n "$root_rel" ] || return 1
   [ -d "$repo/$root_rel" ] && [ ! -L "$repo/$root_rel" ] || return 1
-  [ -f "$repo/$root_rel/QUEUE.md" ] && [ ! -L "$repo/$root_rel/QUEUE.md" ] || return 1
-  head -1 "$repo/$root_rel/QUEUE.md" 2>/dev/null | LC_ALL=C grep -qxF -- '<!-- pln-queue v1'
+  for index in 'TO-DO.md' 'QUEUE.md'; do
+    [ -f "$repo/$root_rel/$index" ] && [ ! -L "$repo/$root_rel/$index" ] || continue
+    if head -1 "$repo/$root_rel/$index" 2>/dev/null \
+      | LC_ALL=C grep -qxF -- '<!-- pln-queue v1'; then return 0; fi
+  done
+  return 1
 }
 
 snapshot_tree() {
@@ -77,12 +90,12 @@ snapshot_tree() {
 
   while IFS= read -r -d '' path; do
     single_line "dirty path" "$path"
-    if queue_own_path "$repo_real" "$path"; then continue; fi
+    if todo_own_path "$repo_real" "$path"; then continue; fi
     printf '%s\n' "$path" >> "$paths"
   done < <(git -C "$repo_real" diff --name-only -z HEAD --)
   while IFS= read -r -d '' path; do
     single_line "dirty path" "$path"
-    if queue_own_path "$repo_real" "$path"; then continue; fi
+    if todo_own_path "$repo_real" "$path"; then continue; fi
     printf '%s\n' "$path" >> "$paths"
   done < <(git -C "$repo_real" ls-files -o --exclude-standard -z)
 

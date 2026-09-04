@@ -10,7 +10,7 @@ Read this file in full before the first interview action. `Phase: interview` per
 
 Before sending any question, write the self-contained question under `Open questions`. After the answer, write the decision and reconcile the item before removing that question. When every active item is resolved, finish every item/detail/dashboard write, set `Phase: review-approval`, then read that phase in full before review or gate work.
 
-**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-queue add` — not by leaving it in prose for the close to remember.
+**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-todo add` — not by leaving it in prose for the close to remember.
 
 That covers the user handing you something to file — "file this for a dedicated session", "that's its own piece of work, don't lose it" — in whatever words they use. It is filed without asking, with an `--id`, a `--status`, a `--source` naming this run and a claim; then the interview continues from where it was. It is not an interview question, not a plan item, and not a reason to leave the interview. The three signals below are a different thing: they scope an item or a question already under discussion, while this is work that leaves the plan behind entirely.
 

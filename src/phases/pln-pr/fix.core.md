@@ -10,7 +10,7 @@ Read this file in full before the first fix decision or dispatch. Rebuild open c
 
 Before asking a decision or handing off a blocked cluster, write it and all partial-state pointers durably, then set `Phase: blocker` and load that phase. Once every finding is durably fixed/skipped and the post-fix result is recorded, set `Phase: ship-watch` and load that phase before versioning, the final gauntlet, push, PR, or CI work.
 
-**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-queue add` — not by leaving it in prose for the close to remember.
+**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-todo add` — not by leaving it in prose for the close to remember.
 
 <!-- pln:include assurance-policy -->
 

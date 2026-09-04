@@ -629,10 +629,10 @@ for host_out in "$real_c" "$real_x"; do
   # The named-location leg sits above both defaults: a project that keeps plans
   # outside the repository on purpose otherwise reads as "not ./plans/" and lands
   # in the temporary directory, which is the one place the work is least safe.
-  # A same-model substitution at R3 is a loss of coverage, so it is reported in
-  # the turn rather than only in the plan file nobody re-reads.
-  has "$review_file_peer" 'A substitution at R3 is said out loud, in the turn it happens' \
-    "$review_file_peer lets an R3 peer substitution stay silent"
+  # A same-model substitution in the adversarial slot is a loss of coverage, so
+  # it is reported in the turn rather than only in the plan file nobody re-reads.
+  has "$review_file_peer" 'A substitution in the adversarial slot is said out loud, in the turn it happens' \
+    "$review_file_peer lets a peer substitution stay silent"
   ship_file="$host_out/phases/pln-pr/ship-watch.md"
   scope_file="$host_out/phases/pln-pr/scope-baseline.md"
   # Local verification buys the static checks; the behavior suite is CI's, which
@@ -785,8 +785,8 @@ for f in "$real_c/phases/pln/finish-ship.md" "$real_x/phases/pln/finish-ship.md"
     "$f still triggers the hand-off from a position in the step sequence"
 done
 
-# ─── the queue close, and the declaration it reads ────────────────────────────
-# Step 7's queue close has the same defect the hand-off above was repaired for,
+# ─── the to-do-list close, and the declaration it reads ───────────────────────
+# Step 7's to-do-list close has the same defect the hand-off above was repaired for,
 # and one the hand-off does not: it leaves no durable mark, so a close that
 # never ran reads exactly like one that did. Its trigger is therefore a
 # condition over durable state with both bounds and a turn rule of its own —
@@ -798,36 +798,36 @@ done
 # declared id carries no claim result at all.
 for f in "$real_c/phases/pln/finish-ship.md" "$real_x/phases/pln/finish-ship.md"; do
   has "$f" 'False until the sweep has filed' \
-    "$f has no start bound on the queue close"
+    "$f has no start bound on the to-do-list close"
   has "$f" 'True from there until every id this run claimed carries an outcome' \
-    "$f has no end bound on the queue close"
+    "$f has no end bound on the to-do-list close"
   has "$f" "the close is the turn's first action and precedes the wrap-up message" \
-    "$f lets the wrap-up message go out ahead of the queue close"
-  hasnt "$f" 'Close the queue at the end of Step 7' \
-    "$f still triggers the queue close from a position in the step sequence"
+    "$f lets the wrap-up message go out ahead of the to-do-list close"
+  hasnt "$f" 'Close the to-do list at the end of Step 7' \
+    "$f still triggers the to-do-list close from a position in the step sequence"
   # The close has to survive a restart, and the hand-off must not fire on a turn
   # where it never ran: one list entry and one clause, in two other passages.
-  has "$f" 'Persist verification results, follow-ups, the queue close, Ship choice, PR base' \
-    "$f does not persist the queue close before reporting completion"
-  has "$f" 'the queue close below has run' \
+  has "$f" 'Persist verification results, follow-ups, the to-do-list close, Ship choice, PR base' \
+    "$f does not persist the to-do-list close before reporting completion"
+  has "$f" 'the to-do-list close below has run' \
     "$f lets the ship hand-off fire on a turn where the close never ran"
-  # A plan that lies about its own id is the one direction the queue can
-  # falsify: a genuinely archived record is gone from q/, so its presence there
+  # A plan that lies about its own id is the one direction the to-do list can
+  # falsify: a genuinely archived record is gone from items/, so its presence there
   # under this run's holder contradicts the plan's prose.
   has "$f" 'Also true while any id the plan records as archived still has a live record' \
-    "$f does not falsify a plan's archive claim against the live queue"
+    "$f does not falsify a plan's archive claim against the live to-do list"
   # The bound is stated over the claimed set, never the declared set — the two
   # are the same extension only until a refusal, and a refused id must not hold
   # the run short of Phase: complete.
-  has "$f" "The claimed set is the ids the dashboard's \`## Queue items\` section records as claimed." \
-    "$f does not name the claimed set as the queue close's subject"
+  has "$f" "The claimed set is the ids the dashboard's \`## To-do items\` section records as claimed." \
+    "$f does not name the claimed set as the to-do-list close's subject"
   hasnt "$f" 'until every declared id carries' \
-    "$f states the queue close's bound over the declared set"
+    "$f states the to-do-list close's bound over the declared set"
   # Three states, not two: recorded success, recorded refusal, and no record at
   # all. The third is reachable — the helper writes the holder under its lock
   # and returns before the plan-side write — and nothing recovers it.
   has "$f" 'An id whose record there is a refusal' \
-    "$f does not exempt a refused id from the queue close's bound"
+    "$f does not exempt a refused id from the to-do-list close's bound"
   has "$f" 'An id carrying no recorded claim result at all has not been shown to be outside it either' \
     "$f lets a declared id with no recorded claim result reach Phase: complete"
   has "$f" 'Neither state is read off the absence of the other.' \
@@ -840,26 +840,26 @@ done
 # that is the close's only durable input. Delete either and every assertion
 # above still passes while the close gates on a field nothing fills in.
 for f in "$real_c/phases/pln/outline.md" "$real_x/phases/pln/outline.md"; do
-  has "$f" '- **Queue items** — the follow-up-queue ids this run takes' \
-    "$f does not define the Queue items field under Tracker contents"
+  has "$f" '- **To-do items** — the ids from the project to-do list this run takes' \
+    "$f does not define the To-do items field under Tracker contents"
   has "$f" "amended at claim time with each id's claim result, and amended again at the close" \
-    "$f defines Queue items as set once, like Ship, rather than amended three times"
+    "$f defines To-do items as set once, like Ship, rather than amended three times"
 done
 for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-approval.md"; do
   has "$f" '`- none taken` when it takes none' \
-    "$f does not give a run taking no queue items an explicit none value to write"
+    "$f does not give a run taking no to-do items an explicit none value to write"
   # The create-when-missing clause, not a bare Record line: it is the section's
   # only origin for a plan upgrading into the field, and what narrows the
   # close's absent-section escape to plans adopted before the field existed.
   has "$f" 'Create the section above `## Ship` when the plan does not carry one.' \
-    "$f does not create the Queue items section when the plan carries none"
+    "$f does not create the To-do items section when the plan carries none"
   has "$f" 'Adoption is not recorded while the section still reads `- (not yet declared)`' \
-    "$f records adoption with the Queue items field left unanswered"
+    "$f records adoption with the To-do items field left unanswered"
 done
 for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
-  has "$f" "The dashboard's \`## Queue items\` section names what this run takes" \
+  has "$f" "The dashboard's \`## To-do items\` section names what this run takes" \
     "$f does not read the declared set from the dashboard field"
-  # queue-format is not included into this file, so this clause is the claim
+  # todo-format is not included into this file, so this clause is the claim
   # rule's only statement anywhere in the implementation phase for a plan
   # adopted before the field existed.
   has "$f" 'A plan adopted before that section existed carries no field to read; declare the items in this turn and claim them the same way.' \
@@ -870,7 +870,7 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f records a refusal in only one of the helper's two refusal forms"
 done
 
-# ─── how wide the interview's research fan-out goes ──────────────────────────
+# ─── how wide the interview's research fan-out goes ───────────────────────────
 # Item research is read-only and per-item independent, so it is dispatched in
 # waves rather than one worker at a time. The width is a host fact — Claude Code
 # admits 20 concurrent subagents, Codex caps spawned threads per session with a
@@ -895,7 +895,7 @@ for f in "$real_c/phases/pln/interview.md" "$real_x/phases/pln/interview.md"; do
     "$f does not keep a premise-changing follow-up worker after its wave"
 done
 
-# ─── a plan wider than one wave still asks its first question early ──────────
+# ─── a plan wider than one wave still asks its first question early ───────────
 # The held-output rule releases when the work quiesces, and waves made "the
 # work" bigger than the items the walk has reached: a plan needing four waves
 # would hold every question until the last one landed, restoring the whole
@@ -921,7 +921,7 @@ for f in "$real_c/phases/pln/outline.md" "$real_x/phases/pln/outline.md"; do
     "$f does not draw the line at exploring beyond the root instruction file"
 done
 
-# ─── how each host is told to invoke pln ─────────────────────────────────────
+# ─── how each host is told to invoke pln ──────────────────────────────────────
 # Claude Code invokes a skill as a slash command; Codex has none, and invokes a
 # skill by name with a `$` prefix, so `/pln` is an error there. A build that
 # tells its own host the wrong token is wrong in the way that costs most: the
@@ -949,27 +949,27 @@ has "$real_c/SKILL.md" 'Trigger explicitly via `/pln <task>`' \
 has "$real_x/SKILL.md" 'Trigger explicitly via `$pln <task>`' \
   "the codex router description does not name its own explicit invocation"
 
-# ─── the follow-up queue, and where its format is allowed to land ─────────────
+# ─── the project to-do list, and where its format is allowed to land ──────────
 # One shared fragment, and its reach is a decision rather than an accident. The
-# three cores that render or explain the queue carry the whole format; every
+# three cores that render or explain the list carry the whole format; every
 # other core a door can fire in carries one sentence naming the helper, which
 # fits where the fragment would not; and no router carries either, because the
 # routers are always resident and the ceiling above is what pays for that.
 #
 # Anchored on the section heading and a whole sentence, never on `## Everything
-# else` — the queue's ungrouped catch-all heading is also ordinary prose in
+# else` — the list's ungrouped catch-all heading is also ordinary prose in
 # ship-watch, so that phrase alone proves nothing about which file it came from.
-queue_marker='## The follow-up queue'
-queue_sentence='Work that is found and not done now reaches the queue'
+todo_marker='## The project to-do list'
+todo_sentence='Work that is found and not done now reaches the to-do list'
 door_pointer='is filed in the turn it is named'
 for host_out in "$real_c" "$real_x"; do
   host_out="$(cd "$host_out" && pwd -P)"
   for rel in phases/pln/outline.md phases/pln/finish-ship.md phases/pln-pr/ship-watch.md; do
-    has "$host_out/$rel" "$queue_marker" "$host_out/$rel lost the queue format"
-    has "$host_out/$rel" "$queue_sentence" "$host_out/$rel lost the queue's standing invariant"
+    has "$host_out/$rel" "$todo_marker" "$host_out/$rel lost the to-do-list format"
+    has "$host_out/$rel" "$todo_sentence" "$host_out/$rel lost the list's standing invariant"
     # The whole precedence chain, stated in the one place that defines it. An
     # earlier wording named only date/undated/id, which skips the group level
-    # `pln-queue` actually sorts on and reads as a contradiction of it — the
+    # `pln-todo` actually sorts on and reads as a contradiction of it — the
     # kind of drift only an assertion catches, since prose fails silently.
     has "$host_out/$rel" \
       'the flag, then the group, then date opened, then the items carrying no `opened` date, then `id`' \
@@ -981,31 +981,31 @@ for host_out in "$real_c" "$real_x"; do
     phases/pln-pr/fix.md phases/pln-pr/blocker.md phases/pln-simplify/map-synthesize.md; do
     has "$host_out/$rel" "$door_pointer" \
       "$host_out/$rel cannot file a follow-up named in the turn it is named"
-    has "$host_out/$rel" 'bin/pln-queue add' "$host_out/$rel names no helper call to file with"
-    hasnt "$host_out/$rel" "$queue_marker" "$host_out/$rel duplicated the whole queue format"
+    has "$host_out/$rel" 'bin/pln-todo add' "$host_out/$rel names no helper call to file with"
+    hasnt "$host_out/$rel" "$todo_marker" "$host_out/$rel duplicated the whole to-do-list format"
   done
-  hasnt "$host_out/phases/pln-simplify/verify-record.md" "$queue_marker" \
-    "the queue format reached a phase no door fires in"
+  hasnt "$host_out/phases/pln-simplify/verify-record.md" "$todo_marker" \
+    "the to-do-list format reached a phase no door fires in"
   # Not in any router, on any host. The 60000-byte ceiling above is the reason
   # this is a rule and not a preference.
   for router in SKILL.md pln-pr/SKILL.md pln-simplify/SKILL.md; do
-    hasnt "$host_out/$router" "$queue_marker" "$host_out/$router carries the queue format"
-    hasnt "$host_out/$router" "$queue_sentence" "$host_out/$router carries the queue's intake rules"
+    hasnt "$host_out/$router" "$todo_marker" "$host_out/$router carries the to-do-list format"
+    hasnt "$host_out/$router" "$todo_sentence" "$host_out/$router carries the list's intake rules"
   done
   # The helper is named through the absolute output root baked in at generation
   # time, never through {{SKILL_DIR}}: on Codex that substitutes to $_PLN_DIR, a
   # shell variable /pln-simplify's router never sets — so a bare SKILL_DIR would
   # break door 4 in the very skill this fragment brings into scope.
-  queue_callers=0
+  todo_callers=0
   while IFS= read -r f; do
-    has "$f" "$host_out/bin/pln-queue" \
-      "$f names the queue helper by an unresolved or relative path"
-    hasnt "$f" '_PLN_DIR/bin/pln-queue' "$f reaches the queue helper through a Codex shell variable"
-    hasnt "$f" 'CLAUDE_SKILL_DIR}/bin/pln-queue' "$f reaches the queue helper through a Claude variable"
-    queue_callers=$((queue_callers + 1))
-  done < <(grep -rlF 'bin/pln-queue' "$host_out")
-  [ "$queue_callers" = "12" ] \
-    || fail "$host_out names the queue helper in $queue_callers files, expected 12"
+    has "$f" "$host_out/bin/pln-todo" \
+      "$f names the to-do-list helper by an unresolved or relative path"
+    hasnt "$f" '_PLN_DIR/bin/pln-todo' "$f reaches the to-do-list helper through a Codex shell variable"
+    hasnt "$f" 'CLAUDE_SKILL_DIR}/bin/pln-todo' "$f reaches the to-do-list helper through a Claude variable"
+    todo_callers=$((todo_callers + 1))
+  done < <(grep -rlF 'bin/pln-todo' "$host_out")
+  [ "$todo_callers" = "12" ] \
+    || fail "$host_out names the to-do-list helper in $todo_callers files, expected 12"
   # The implementation phase's pre-message readiness check has the same hazard
   # and the same answer: the absolute output root, never {{SKILL_DIR}}, since
   # /pln-simplify routes into this phase document and never sets $_PLN_DIR.
@@ -1080,7 +1080,7 @@ for f in "$real_c/phases/pln/outline.md" "$real_x/phases/pln/outline.md"; do
   has "$f" 'Rows are never removed and numbers are never reused' \
     "$f does not say item numbers are permanent"
   for section in '## Status' '## Pre-flight findings' '## Open questions' '## Plan review' \
-    '## Queue items' '## Ship' '## Reversals' '## Verification' '## Spinoffs' \
+    '## To-do items' '## Ship' '## Reversals' '## Verification' '## Spinoffs' \
     '## Cross-item notes'; do
     has "$f" "$section" "$f lost '$section' from the dashboard skeleton"
   done

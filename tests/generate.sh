@@ -521,10 +521,19 @@ has "$real_x/phases/pln-pr/review.md" 'before entering the shared `wait_agent` m
 has "$real_x/phases/pln-pr/review.md" 'nested CLI processes share the login boundary' \
   "the codex build lost fallback-only serialization"
 
-# This is a regression ceiling on the always-resident coordinator prompt, not a
-# target. The worker-owned contracts below are deliberately outside it. The
-# ceiling leaves a narrow allowance over this release's 133–137 KB builds while
-# preventing a return to the prior 152–156 KB coordinator.
+# A regression ceiling on the always-resident coordinator prompt, not a target.
+# The router is the one file a run holds for its whole length; phase files
+# rotate in and out beside it, and the worker-owned contracts below are
+# deliberately outside it. So this caps accretion where accretion is paid for
+# on every turn, and hitting it is meant to send content into a phase file or
+# out of the build rather than to move the number.
+#
+# It governs the smaller half of what a phase actually holds: `finish-ship.md`
+# is larger than this ceiling and `outline.md` is close to it, both uncapped,
+# so a phase carries roughly twice this figure. That is a known gap, recorded
+# here rather than left for the next reader to rediscover — and not an argument
+# for raising the ceiling, which is the only thing currently holding the
+# resident half down.
 for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
   bytes="$(LC_ALL=C wc -c < "$f")"
   bytes="${bytes//[[:space:]]/}"

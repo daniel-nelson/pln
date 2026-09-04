@@ -80,6 +80,29 @@ grep -q '^ACTUAL_EFFORT=inherited-unreported$' <<<"$res" || fail "default inheri
 [ "$(wc -l <<<"$res")" -eq 7 ] || fail "helper printed something other than its seven lines"
 grep -q 'thread.started' "$out.events" || fail "event stream was not captured to the events file"
 
+# --- --out never collides with the envelope path the brief assigns -----------
+# `--out` captures the agent's final chat message, which is only ever a
+# `RESULT_FILE=` pointer; the worker writes its bounded envelope to the path its
+# brief assigns. A brief that names one path for both loses the envelope to the
+# pointer, silently, after the work succeeded — a real run had to re-run a
+# completed evidence worker for exactly this.
+COLLIDE_BRIEF="$WORK/collide-brief.md"
+COLLIDE_OUT="$WORK/results/envelope.txt"
+mkdir -p "$WORK/results"
+printf 'Write your bounded envelope to %s and nothing else.\n' "$COLLIDE_OUT" > "$COLLIDE_BRIEF"
+if "$BIN" --brief "$COLLIDE_BRIEF" --out "$COLLIDE_OUT" --dry-run >"$WORK/collide.out" 2>"$WORK/collide.err"; then
+  fail "--out was accepted on a path the brief also names"
+fi
+grep -q 'is a path the brief also names' "$WORK/collide.err" \
+  || fail "the refusal did not say why the two paths cannot be one"
+grep -q 'separate capture path' "$WORK/collide.err" \
+  || fail "the refusal did not name the way out"
+[ -s "$COLLIDE_OUT" ] || [ ! -e "$COLLIDE_OUT" ] \
+  || fail "the refused run still truncated the envelope path"
+# A distinct capture path is unaffected.
+"$BIN" --brief "$COLLIDE_BRIEF" --out "$WORK/results/envelope.agent.txt" --dry-run >/dev/null 2>&1 \
+  || fail "a distinct capture path was refused"
+
 # --- the brief travels on stdin, not argv ------------------------------------
 cmp -s "$BRIEF" "$WORK/stdin" || fail "the brief did not reach codex on stdin"
 grep -q -- '-$' "$WORK/args" || fail "codex was not told to read the prompt from stdin"

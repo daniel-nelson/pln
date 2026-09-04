@@ -159,6 +159,22 @@ for f in "$OUT" "$EVENTS"; do
   d="$(dirname "$f")"
   [ -d "$d" ] || mkdir -p "$d" || { echo "pln-codex-agent: cannot create '$d'" >&2; exit 2; }
 done
+# `--out` is the wrapper's capture of the agent's final chat message, which is
+# only ever a `RESULT_FILE=` pointer. The worker writes its own bounded envelope
+# to the path its brief assigns. When a brief names the same path for both, this
+# truncation and the final write land on top of the envelope, and the envelope
+# reader then gets back the pointer line instead of the decision it was sent for
+# — silently, after the work succeeded. Observed on a real run: a completed
+# evidence worker had to be re-run because its envelope had been overwritten by
+# the pointer to itself. Two artifacts, two paths.
+if [ -f "$BRIEF" ] && LC_ALL=C grep -qF -- "$OUT" "$BRIEF" 2>/dev/null; then
+  echo "pln-codex-agent: --out '$OUT' is a path the brief also names." >&2
+  echo "  --out captures the agent's final message; the brief's own result path" >&2
+  echo "  receives the worker's envelope. Writing both to one path destroys the" >&2
+  echo "  envelope. Give --out a separate capture path, e.g. '<name>.agent.txt'." >&2
+  exit 2
+fi
+
 # A stale result from a previous spawn must never be mistaken for this one's.
 : > "$OUT" || { echo "pln-codex-agent: cannot write '$OUT'" >&2; exit 2; }
 : > "$EVENTS" || { echo "pln-codex-agent: cannot write '$EVENTS'" >&2; exit 2; }

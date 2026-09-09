@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.68.0 — 2026-09-09
+
+### Fixed
+
+- **A Codex interview question carries the situation it is asking about.** Every rule bearing on question length points one way — Style cuts derivation, sends evidence to `PLAN.md`, and deletes any sentence that does not change the pick, all of it written against Claude's padding — and Codex, which does not pad, follows them past the floor. Measured on a real run: the first interview question was `Which fix should define the regression contract?` over three options written entirely in codebase vocabulary, with no line saying what breaks, what the user sees today, or that one option reverses a protection shipped two releases earlier — a fact the same run had already found and recorded. The one question shape Codex renders well is the `{{PLN_PR_CMD}}` risk gate, where the skill supplies the lead-in sentence; every question it composes itself came out stripped. Codex's voice fragment now sets the floor the cutting rules assume: one sentence of ground before the options in the user's own words, an option description that names what the user gets rather than only what the code does, and no asking about a term coined in the same turn. It stays in the Codex fragment because the failure is Codex's, and it is a question-shape rule rather than a register one — the evidence is a Codex transcript, per the repo's own bar for touching that file.
+
 ## 1.67.0 — 2026-09-09
 
 ### Fixed

@@ -900,6 +900,23 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f records a refusal in only one of the helper's two refusal forms"
 done
 
+# ─── the held set is ordered, and the heaviest unit is not deferred ──────────
+# "Send the first unit" never said which is first, so a run sent a one-line
+# leftover question and wrote "that comes to you next" about a verification
+# result contradicting half a decision the user had made — the one thing the
+# filter's override says reaches them regardless.
+for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md" \
+         "$real_c/phases/pln/interview.md" "$real_x/phases/pln-pr/fix.md"; do
+  has "$f" 'Which unit goes first is not arbitrary' "$f leaves the held set unordered"
+  has "$f" 'lands on a decision the user already made goes first' \
+    "$f does not put a unit landing on a user decision first"
+  has "$f" 'is the tell' "$f does not name deferral of the heavier unit"
+  has "$f" 'The question repeats what it is about, in the question' \
+    "$f lets a question point at scrollback instead of restating its subject"
+  has "$f" 'scrolled past the last ten minutes without stopping' \
+    "$f does not test the question against a user who was not watching"
+done
+
 # ─── both hosts have a deterministic turn boundary, not just Codex ───────────
 # The finish-check gate shipped in the Codex fragment only. The Claude build had
 # the shared prose rule and no mechanical gate, and a real run ended 151 turns

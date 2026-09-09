@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.69.0 — 2026-09-09
+
+### Known
+
+- **The held set is ordered before anything is sent, and the unit that outranks the rest is not deferred.** 1.41.0 said to hold findings and questions until the work quiesces and then "send the first unit" — without ever saying which unit is first. So first became whichever was cheapest. Observed: a run that had just recorded a verification result contradicting half of a decision the user had made sent a one-line leftover question about a different item instead, and wrote that the contradiction "comes to you next either way". That contradiction is precisely what the ask/decide filter's override covers — *anything landing on a decision the user made* reaches them regardless of the fork test — and the user may be acting on that decision while it waits behind an answer they have no reason to hurry. The held set is now ordered: a unit landing on a decision the user already made goes first, a blocker that stops work next, a long-open leftover question after both, however tempting it is to clear the cheap one. "That comes to you next", written about a unit that outranks the one being sent, is named as the tell that the wrong unit is going out. And a question whose grounds sit in the plan file has not been sent — the record is not a channel, so a unit carries its own evidence into the message or it is not ready to go.
+
 ## 1.68.0 — 2026-09-09
 
 ### Fixed
@@ -11,7 +17,6 @@
 ### Known
 
 - The two `/pln` routers are within 130 bytes of the 60000 ceiling. The next change to any shared or router-resident prose has to move content into a phase file, or move the ceiling deliberately.
-- **The held set is ordered before anything is sent, and the unit that outranks the rest is not deferred.** 1.41.0 said to hold findings and questions until the work quiesces and then "send the first unit" — without ever saying which unit is first. So first became whichever was cheapest. Observed: a run that had just recorded a verification result contradicting half of a decision the user had made sent a one-line leftover question about a different item instead, and wrote that the contradiction "comes to you next either way". That contradiction is precisely what the ask/decide filter's override covers — *anything landing on a decision the user made* reaches them regardless of the fork test — and the user may be acting on that decision while it waits behind an answer they have no reason to hurry. The held set is now ordered: a unit landing on a decision the user already made goes first, a blocker that stops work next, a long-open leftover question after both, however tempting it is to clear the cheap one. "That comes to you next", written about a unit that outranks the one being sent, is named as the tell that the wrong unit is going out. And a question whose grounds sit in the plan file has not been sent — the record is not a channel, so a unit carries its own evidence into the message or it is not ready to go.
 
 ## 1.67.0 — 2026-09-09
 

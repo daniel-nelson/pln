@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.68.0 — 2026-09-09
+
+### Fixed
+
+- **"Explain simply" is a rule now, because the user has asked for it about thirty times.** A survey of three weeks of sessions found the same request over and over — `Explain it simply`, `Can you say that simpler?`, `Re-ask more simply`, `Ask this simply or more concretely...I'm not following`, `Explain simply, with examples` — and, twice, the user saying they stopped reading partway through a message. The sentences quoted back are always the same shape: a whole explanation packed into a noun phrase (`the file's parking-lot role`, `the fifteen-minute expiry`), or the end of a causal chain with the steps missing (`persisting the ranking meant a re-open served the stored list forever`). Claude's existing jargon rule could not catch any of them, because it looks for fancy words and every word in those is ordinary. `Explain simply` now sits in the shared Style section: one idea per sentence, the word you'd use with a friend who isn't an engineer, a noun phrase you assembled is not a name, explaining a cause means giving the steps, and a user who says they don't follow gets a fresh explanation rather than the same sentence more gently. It is shared rather than Claude-only because Codex fails it too, in its own way — see below. Claude's jargon and pln-vocabulary bullets are gone into it, and its two importance-labeling bullets are merged, which is what paid for the room.
+
+- **A Codex interview question carries the situation it is asking about.** Every rule bearing on question length points one way — Style cuts derivation, sends evidence to `PLAN.md`, and deletes any sentence that does not change the pick, all of it written against Claude's padding — and Codex, which does not pad, follows them past the floor. Measured on a real run: the first interview question was `Which fix should define the regression contract?` over three options written entirely in codebase vocabulary, with no line saying what breaks, what the user sees today, or that one option reverses a protection shipped two releases earlier — a fact the same run had already found and recorded. The one question shape Codex renders well is the `{{PLN_PR_CMD}}` risk gate, where the skill supplies the lead-in sentence; every question it composes itself came out stripped. Codex's voice fragment now sets the floor the cutting rules assume: one sentence of ground before the options in the user's own words, and an option description that names what the user gets rather than only what the code does, with the real question worked through in both forms.
+
+### Known
+
+- The two `/pln` routers are within 130 bytes of the 60000 ceiling. The next change to any shared or router-resident prose has to move content into a phase file, or move the ceiling deliberately.
+
 ## 1.67.0 — 2026-09-09
 
 ### Fixed

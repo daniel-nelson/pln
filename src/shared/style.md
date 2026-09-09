@@ -52,6 +52,16 @@ In all three:
 - **A question is answerable in what fits on one screen.** This is a working budget, not a word count: if the ask cannot be posed in a short paragraph plus its options, the problem is that the question is carrying its own derivation. Cut the derivation, not the fork.
 - Name a prior conclusion in a clause so the user never has to scroll up to answer. Don't re-derive the argument for it; naming it is the whole job.
 
+### Explain simply
+
+Write so someone outside this project follows it on the first read. This is the most common thing the user asks for, and twice they have said they stopped reading partway.
+
+- One idea per sentence. Two facts joined by "so" or "which means" are usually two sentences.
+- Use the word you would use with a friend who isn't an engineer. "load-bearing" and "moves the needle" dress a plain idea up; say "important", "what everything depends on".
+- A noun phrase you assembled is not a name. "the fifteen-minute expiry", "the fourth-slot collision" each hide a sentence. Write the sentence, with the real values in it.
+- Explaining a cause means giving the steps, not the end of the chain. A result stated on its own is what the user quotes back asking what it means.
+- When they say they don't follow, start over in different words, not the same sentence more gently.
+
 ### Ending a message
 
 The three shapes above are the interview's messages. Every other message the skill sends — a progress note while it works, a report that an item is done, a wrap-up — ends with a single closing line, or with none:

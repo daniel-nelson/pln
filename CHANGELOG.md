@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.67.0 — 2026-09-09
+
+### Fixed
+
+- **Claude gets the deterministic implementation turn boundary Codex has had all along.** The manifest-backed gate — never send a final response from `Phase: implementation`, reconcile every worker, run `pln-scheduler finish-check`, and treat `STATUS=active` as "the turn stays alive" — shipped in the Codex orchestration fragment and never in Claude's. The Claude build carried the shared lifecycle prose and no mechanical check, and the difference shows: on a real eighteen-item run the coordinator ended **151 turns** back at the user, in the shape "Three of sixteen committed", "Four of sixteen done. Item 8 is now running", "Five of eighteen done" — several of them announcing that the next item was already running and then sending a final response anyway, which is precisely what the lifecycle rule forbids. Every one of those handed control back for nothing and required the user to restart the run. `bin/pln-scheduler finish-check` is host-neutral and was already installed; only the instruction to use it was missing. The Claude fragment now carries the same gate, phrased for its own reconciliation surface, and names the failure shape directly: an item finished and the next one dispatchable is a dispatch call, not a progress report — prose about it comes after that call or not at all.
+
 ## 1.66.0 — 2026-09-04
 
 ### Fixed

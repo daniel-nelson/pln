@@ -900,6 +900,19 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f records a refusal in only one of the helper's two refusal forms"
 done
 
+# ─── both hosts have a deterministic turn boundary, not just Codex ───────────
+# The finish-check gate shipped in the Codex fragment only. The Claude build had
+# the shared prose rule and no mechanical gate, and a real run ended 151 turns
+# back at the user — several announcing that the next item was already running.
+for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
+  has "$f" 'Manifest-backed turn boundary' "$f has no deterministic implementation turn boundary"
+  has "$f" 'Never send a final response from' "$f permits a final response mid-implementation"
+  has "$f" 'pln-scheduler finish-check' "$f ends the phase without the deterministic gate"
+done
+# The named failure shape is Claude's; the run that produced it was Claude's.
+has "$real_c/phases/pln/implementation.md" 'is the shape to recognise and not send' \
+  "the claude build does not name the progress-report stop it actually makes"
+
 # ─── a request typed mid-run is dispatched, not typed into the tree ──────────
 # The hard constraint covered adopted items, and the whole dispatch apparatus is
 # built around them — so a follow-up the user types matched no path and the

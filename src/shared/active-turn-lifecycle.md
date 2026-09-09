@@ -26,6 +26,12 @@ When the work quiesces, send the first unit — its finding, its evidence, its q
 
 **A finding that raises no question does not earn a turn of its own.** It goes into the durable record and reaches the user where the run already surfaces such things — the approval gate, the walk through flagged entries, the closing message's sweep. Attaching it to an unrelated question's message is the same conflation from the other end.
 
+**Which unit goes first is not arbitrary, and the heaviest one is not deferred.** Order the held set before sending. A unit that lands on a decision the user already made goes first — the filter's own override says it reaches them regardless of everything else, and they may be acting on that decision while it waits. A blocker that stops work comes next. A leftover question that has been open a while comes after both, however tempting it is to clear it: it is the cheapest thing to send and that is not a reason.
+
+**"That comes to you next" is the tell.** Written about a unit that outranks the one being sent, it is not sequencing, it is the wrong unit going out — and the outranked one now waits behind an answer the user has no reason to hurry. Observed: a run that had just recorded a verification result contradicting half of a decision the user had made sent instead a one-line leftover question, and said the contradiction would come next. If you can say a unit is more important than the one you are writing, you are writing the wrong one.
+
+**A question whose grounds are in the plan file has not been sent.** The record is not a channel — assume they never open it. A unit carries its own evidence into the message or it is not ready to go.
+
 **Reconcile the held units before the first goes out, and again after every answer.** A later result routinely changes an earlier one's premise: it can merge two units, answer one outright, or make it moot. What reaches the user is what is true when it is sent, not what each worker said as it landed.
 
 A question already in front of the user is not overwritten either. Where one is open when the last of the work lands, keep holding: the unanswered question stays the only thing on the screen until they answer it.

@@ -6,27 +6,35 @@ These rules govern the skill's prose: its questions, reactions, reasoning, and s
 - Don't turn an interview turn into a report. Use the smallest structure the turn needs. One reaction and one question is plain prose; reach for bullets only when the user has to compare facts or choices side by side.
 - Don't widen the plan to adjacent work. Cleanup, refactoring, documentation and consistency passes become items only when what the user asked for depends on them. Anything else worth doing goes in as an optional follow-up the user can decline, never as assumed scope.
 - Carry the evidence that changes the answer. A detail from the repository earns a place in a question when it moves the recommendation or tells two options apart. The rest of what you found goes in `PLAN.md`, not into the question as proof that you looked.
-- Give the question its ground. Before the options goes one sentence saying what happens now, in the words the user would use for their own problem — not the words the code uses. The cutting rules above and in Style remove padding; they do not license a bare question stem. A question a stranger cannot answer has been cut past the point where it was still a question.
-- Name what each option gives the user, not only what it does to the code. A description that stops at the mechanism leaves the user to derive the consequence, and the one who researched it is you.
-- Don't coin a term in the question and then ask about it. A phrase you assembled this turn — a "contract", a "boundary", a "mode" the user has never seen — is not shared vocabulary; say the thing itself.
+- Give the question its ground. Before the options goes one sentence saying what happens now, in the words the user would use for their own problem. The cutting rules here and in Style remove padding; they do not license a bare question stem. A question a stranger cannot answer has been cut past the point where it was still a question.
+- Name what each option gives the user, not only what it does to the code. A description that stops at the mechanism leaves the user to work out the consequence, and the one who researched it is you.
 
-The same question, stripped and then grounded.
+The same question, as Codex wrote it and as it should have gone out.
 
 ```
 Which fix should define the regression contract?
 
-a) **Scoped refresh** — refresh through the base, preserving child isolation and wrong-child hydration rejection elsewhere.
-b) **Broad bypass restoration** — make the unscoping helper drop the subtype scope and make hydration bypass-aware.
+a) **Sortable-only base refresh** — refresh this hierarchy-changing Sortable
+   operation through the STI base while preserving child isolation and wrong-child
+   hydration rejection everywhere else.
 ```
 
 ```
-Changing a booking's type moves it to a different subtype, and the reload afterwards
-still looks under the old one, so the row comes back missing. Which fix?
+A booking can be a stay or an experience. Right now, changing one into the other
+and saving it gives back an empty row instead of the changed booking.
 
-a) **Narrow** — only this reorder reloads across subtypes; every other query still
-   refuses to read a sibling type's row.
-b) **Broad** — any explicitly unscoped query may read and write sibling types, undoing
-   a protection shipped in 2.28.3.
+The reload after the save still looks under the old kind, so it no longer finds
+the booking. Two ways to fix it:
+
+a) **Fix the reload only** — the reload learns to look under both kinds. Nothing
+   else changes.
+b) **Let any query cross kinds** — the reload works, and so does every other query
+   that asks to ignore kinds. That turns off a check added in 2.28.3 which stops a
+   stay from reading an experience's row by mistake.
 ```
 
-The first names no symptom, so nothing says which cost is being chosen.
+Three things changed:
+
+- The symptom came first, in what the user sees happen, before anything about the fix.
+- Each option says what else changes for the user. "Preserving child isolation" describes the code; "nothing else changes" answers the question they were asked.
+- The coined term went. Nobody outside the run knows what a regression contract is.

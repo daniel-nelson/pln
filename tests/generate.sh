@@ -911,8 +911,10 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
   has "$f" 'lands on a decision the user already made goes first' \
     "$f does not put a unit landing on a user decision first"
   has "$f" 'is the tell' "$f does not name deferral of the heavier unit"
-  has "$f" 'grounds are in the plan file has not been sent' \
-    "$f lets a question point at the record instead of carrying its evidence"
+  has "$f" 'The question repeats what it is about, in the question' \
+    "$f lets a question point at scrollback instead of restating its subject"
+  has "$f" 'scrolled past the last ten minutes without stopping' \
+    "$f does not test the question against a user who was not watching"
 done
 
 # ─── both hosts have a deterministic turn boundary, not just Codex ───────────

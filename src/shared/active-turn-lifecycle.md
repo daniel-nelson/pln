@@ -30,7 +30,9 @@ When the work quiesces, send the first unit — its finding, its evidence, its q
 
 **"That comes to you next" is the tell.** Written about a unit that outranks the one being sent, it is not sequencing, it is the wrong unit going out — and the outranked one now waits behind an answer the user has no reason to hurry. Observed: a run that had just recorded a verification result contradicting half of a decision the user had made sent instead a one-line leftover question, and said the contradiction would come next. If you can say a unit is more important than the one you are writing, you are writing the wrong one.
 
-**A question whose grounds are in the plan file has not been sent.** The record is not a channel — assume they never open it. A unit carries its own evidence into the message or it is not ready to go.
+**The question repeats what it is about, in the question.** Everything before it is scrollback: a file write whose content scrolled past inside a tool call, a command's output, a finding from ten minutes and forty tool calls ago. None of that was read. A user who has to scroll back to find out what is being asked has been handed the work of assembling the question, and the plan file is the same problem with an extra step — the record is not a channel, so assume they never open it.
+
+So a question message restates its own subject in ordinary words, even when the run just wrote all of it somewhere: what was found, what it changes, and the choice. Two lines pointing at work the user is presumed to have watched is not a question; it is a reference to one. The test is whether it reads as a complete question to someone who scrolled past the last ten minutes without stopping — which is what a user watching a long run actually does.
 
 **Reconcile the held units before the first goes out, and again after every answer.** A later result routinely changes an earlier one's premise: it can merge two units, answer one outright, or make it moot. What reaches the user is what is true when it is sent, not what each worker said as it landed.
 

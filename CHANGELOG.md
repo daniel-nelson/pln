@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.73.0 — 2026-09-10
+
+### Fixed
+
+- **The voice rules now show a whole bad message, because the failure is the message and not its sentences.** Every rule in the Claude voice section fired one sentence at a time on a question that still went out unreadable, and the user said they skimmed it rather than read it: an eight-line lead-in about what had improved since a gate and how a version number now resolved, a paragraph of version arithmetic, three options written as paragraphs with no labels, one of them arguing that it did not reopen a decision the user had not yet made, and nowhere in it a sentence that was the question. The section had a worked rewrite already, but at the scale of a single sentence, so the model had no picture of what its own bad *message* looks like. That pair is replaced by a message-scale one — the real message beside the one the user wanted — with what changed between them: the first line says what is wrong rather than where the message came from, the progress-since-last-time paragraph goes because a fact whose job is to update the user on your own work decides nothing, the derivation goes and leaves the symptoms in the user's vocabulary, and each option becomes one clause naming what happens, since an option that has to defend itself is a paragraph wearing a letter. The check that follows is the one the message failed: before sending, point at the single line that is the question.
+- **Two voice rules that were already written elsewhere are gone, and the rest of the section is shorter.** "State the fact that motivates an option message once" repeated Style's "evidence appears at most once per fact — in the lead-in sentence or in the trailing paragraph, never both, and never repeated inside an option's own description", and "if a sentence could be deleted without changing what someone would pick or do, delete it" repeated Style's Before you send. So the rule against saying a thing twice was itself written twice, twice over. Removing them, and tightening the surviving bullets, is what paid for the longer example: the coordinator prompt is capped at 60000 bytes and was already inside 250 of it, so the section could only grow by first losing what it was saying more than once.
+
 ## 1.72.0 — 2026-09-10
 
 ### Fixed

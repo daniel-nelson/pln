@@ -1,11 +1,12 @@
 # Changelog
 
-## 1.74.0 — 2026-09-10
+## 1.75.0 — 2026-09-10
 
 ### Fixed
 
 - **A correction leads with what is true now, not with what you said before.** Observed: a message opened "I told you something too broad. I said all 608 readings were checked by hand and none was wrong. True of your corpus, not of the parser", and the user said they lost the thread at that third sentence and never recovered it. Every sentence in it is about the model's own previous claim and where its edges were, so the reader has to reconstruct the finding — that a parser misreads four input formats — out of a description of a retraction. The rule against restating the conversation now says a self-correction is not the exception to it: lead with what is true now, and give the reason the earlier claim looked right in one clause after it.
 - **A source your own sentence makes strange has to be named.** The same message said "neither appears in your dumps" and stopped, then "two more like it", and the user asked both times where they had come from. Style's evidence rule is why: it sends citations and provenance to `PLAN.md` on the grounds that they are evidence for the model's confidence rather than inputs to the user's choice, which is right until the message itself tells the user that a fact is *not* where they would look for it. Then the clause saying where it is instead is the only thing that makes the fact believable, and it stays in the message.
+- **The voice section is a pass run on the draft, not a list of principles held while writing it.** Twenty-two bullets had accumulated there, and two sessions running the diagnosis of an unreadable message was that the rule already existed and had not fired. A list read once at the top of a turn does not reach a draft written from habit, so the bullets are replaced by six checks performed on the message after it exists: read the first line alone, point at the single line the user answers, take every sentence out and put back only what changes what they pick or do, read what is left as a stranger, check each option is a label, and scan for the tics that survive the other five because each is attached to a real fact. Nothing was dropped except two carve-outs the checks make redundant — the note that meaning-carrying adverbs are fine, now scoped by "praise adverbs", and the one-em-dash-per-paragraph cap, now the qualitative aside-versus-reveal test. The rewrite is a kilobyte shorter than what it replaces, which is a measure of how much the list was saying twice.
 
 ## 1.73.0 — 2026-09-10
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.70.0 — 2026-09-09
+
+### Fixed
+
+- **An item the user decides against is archived in the same turn, not parked in the live to-do list.** Observed: the user killed a follow-up outright on 2026-09-04 — "The email lane should *not* say anything to a participant when scheduling stops" — in the same run that had filed it. Five days later, at the close, the item was still in the live list wearing `status: dropped`, and the run's last act was to ask whether it could archive it. That is the failure the to-do list exists to prevent: a settled decision stored where the next close reads it back as open work, so the user gets asked again about a thing they already ruled on. Nothing in the guidance said otherwise — `dropped` was defined as one of four status words and never explained, and the only rule downstream of it swept an already-`dropped` item in with items that merely look finished, which genuinely do need the user's ruling because nobody made one. The user's own words about that item now *are* the disposition: `archive --disposition dropped` runs immediately, with those words as the evidence and the record's state left as it was rather than checked off. `dropped` is what a record wears between the decision and the archive, and `pln-todo stale`'s `dropped-not-archived` is a net for the run that died in between rather than a resting place.
+
 ## 1.69.0 — 2026-09-09
 
 ### Fixed

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.74.0 — 2026-09-10
+
+### Fixed
+
+- **A correction leads with what is true now, not with what you said before.** Observed: a message opened "I told you something too broad. I said all 608 readings were checked by hand and none was wrong. True of your corpus, not of the parser", and the user said they lost the thread at that third sentence and never recovered it. Every sentence in it is about the model's own previous claim and where its edges were, so the reader has to reconstruct the finding — that a parser misreads four input formats — out of a description of a retraction. The rule against restating the conversation now says a self-correction is not the exception to it: lead with what is true now, and give the reason the earlier claim looked right in one clause after it.
+- **A source your own sentence makes strange has to be named.** The same message said "neither appears in your dumps" and stopped, then "two more like it", and the user asked both times where they had come from. Style's evidence rule is why: it sends citations and provenance to `PLAN.md` on the grounds that they are evidence for the model's confidence rather than inputs to the user's choice, which is right until the message itself tells the user that a fact is *not* where they would look for it. Then the clause saying where it is instead is the only thing that makes the fact believable, and it stays in the message.
+
 ## 1.73.0 — 2026-09-10
 
 ### Fixed

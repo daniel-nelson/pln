@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.72.0 — 2026-09-10
+
+### Fixed
+
+- **A run consumes nothing while a question is open, because consuming is itself output.** The hold rule already said a result landing mid-flight is written to the durable record silently, and that "the unanswered question stays the only thing on the screen until they answer it." Both were obeyed and the question was buried anyway: saying nothing in prose does not keep the screen clear, since reading an envelope is a command and dispatching a worker is a tool call, and every one of them renders above the prompt. Observed: a question went out with a background agent still running; twenty-four minutes later the agent landed, its envelope was read, and about thirty lines of routing header and production cross-tab printed on top of the open question — followed by a message saying the new numbers "change what item 7 is worth, and I'll put that to you as the next question once you've answered this one", which is the "that comes to you next" tell the same section names, and which had to re-ask the buried question in its own last line to be answerable. So while a question stands unanswered: leave the completion notification unread, leave the result file on disk, dispatch nothing new, and run no command whose output renders. Work already dispatched keeps running into its own artifacts — what is banned is the reading, not the running — and the result keeps, because it is a file. The user's answer is worth more than the pipelining it costs, since a question they have to hunt for is one they answer late, thinly, or not at all.
+
 ## 1.71.0 — 2026-09-10
 
 ### Fixed

@@ -38,6 +38,12 @@ So a question message restates its own subject in ordinary words, even when the 
 
 A question already in front of the user is not overwritten either. Where one is open when the last of the work lands, keep holding: the unanswered question stays the only thing on the screen until they answer it.
 
+**While a question is open, consume nothing — silence is not enough, because consuming prints.** Saying nothing in prose does not keep the screen clear. Reading an envelope is a command, dispatching the next worker is a tool call, and every one of them renders above the prompt, so a run that holds its tongue and keeps working still pushes the question off the screen. Observed: a question went out with a background agent still in flight; twenty-four minutes later the agent landed, its envelope was read, and roughly thirty lines of routing header and production cross-tab printed on top of the open question — followed by a message saying the new numbers "change what item 7 is worth, and I'll put that to you as the next question once you've answered this one", which is the tell above, and which had to re-ask the buried question in its last line to be answerable at all.
+
+So while a question stands unanswered: leave a completion notification unread, leave the result file on disk, dispatch nothing new, and run no command whose output renders. The result keeps — it is a file, and the run's durable record is what recovers it. Consumption resumes the moment the answer arrives, and the answer is worth more than the twenty minutes of pipelining it costs, because a question the user has to hunt for is a question they answer late, thinly, or not at all.
+
+The one thing that still runs is work that was already dispatched before the question went out: it finishes into its own artifacts, unread. What is banned is the *reading*, not the running.
+
 Two things are exempt, because neither is something the user has to have read: the host's own activity surface, and a status line they can ignore without missing anything. Neither may carry a finding or a question.
 
 The one thing that overrides the hold is running work the held result makes moot. Say so and cancel it, rather than letting it finish underneath a question its own answer would change.

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.71.0 — 2026-09-10
+
+### Fixed
+
+- **Delegated mode's short list no longer stops the run it was entered to let run unattended.** The mode is entered when the user leaves — and then the rule that governed it said the short list of reversals, flagged findings and unanswerable questions was "what still stops the run", to be printed and then *walked, one question per turn*. Those two things cannot both be true, and the section said as much in consecutive sentences: "Nothing waives that list", then "Everything else runs without interruption, which is the point of the mode." Observed: a run entered the mode on "I need to go to sleep. I'd like you to implement and then put up a PR when finished... When I wake up in the morning, I'd like to find a green PR for this fix." It interviewed, ran a four-reader R3 plan review, merged 28 findings, advanced the cursor to implementation — then printed the list at 07:54 under a closing line reading "Starting implementation now, at item 9" and ended the turn. No dispatch, no commits, and no notification, where every earlier wait that night had fired one. Eight items were still pending in the morning. The list is now printed and passed in the same turn as the first item's dispatch, nothing about it is a prompt, and it repeats in the Step 7 wrap-up — the message a user who left the run actually comes back to, and where auto mode's deferred blockers already surface. A turn that ends on the list is named as the failure.
+- **The delegated short list is composed under the gate's message filter, which it stands in for.** That filter has said since it was written that repairs are never listed — a finding the review raised and repaired is the plan fixing its own drafting inside a document the user does not read — and that every entry restates its subject in full. But the filter lives in Step 4, and delegated mode's whole point is that Step 4 does not run, so the list was being built outside its reach. The same run's message spent its closing paragraph on three of them: "the extractor had no way to reach the answer text after item 1 was dropped, the repair loop couldn't do what item 4 asked of it, and item 9 couldn't meet its own criterion" — all repaired before the user could see them, none actionable, and each addressed by a bare item number the message never spelled out, so decoding it meant opening `PLAN.md`. The rule now says which filter applies and quotes that sentence as the shape to avoid.
+
 ## 1.70.0 — 2026-09-09
 
 ### Fixed

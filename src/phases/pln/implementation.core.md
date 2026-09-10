@@ -66,7 +66,7 @@ It does NOT bypass:
 - The Step 4 master-plan approval gate: explicit adoption is always required before implementation begins.
 - The four blocker thresholds: a subagent still stops and hands off on any of them. Auto mode only changes whether the orchestrator surfaces the blocker now or defers it.
 
-Delegated mode is the only thing that bypasses the first and third of those, and it does so because the user adopted the plan in advance (see Delegated mode). The two modes compose without cancelling each other: a run in both still stops for delegated mode's pre-implementation short list, and auto mode still defers blocker questions to the end-of-run review rather than surfacing them live.
+Delegated mode is the only thing that bypasses the first and third of those, and it does so because the user adopted the plan in advance (see Delegated mode). The two modes compose without cancelling each other, and they defer to the same place: delegated mode's pre-implementation short list is printed and passed rather than waited on, and auto mode defers blocker questions to the end-of-run review rather than surfacing them live. Both land in that one report, which is the only surface a user who has left the run will actually read.
 
 ### Spinoffs
 

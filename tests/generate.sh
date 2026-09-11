@@ -528,17 +528,45 @@ has "$real_x/phases/pln-pr/review.md" 'nested CLI processes share the login boun
 # on every turn, and hitting it is meant to send content into a phase file or
 # out of the build rather than to move the number.
 #
-# It governs the smaller half of what a phase actually holds: `finish-ship.md`
-# is larger than this ceiling and `outline.md` is close to it, both uncapped,
-# so a phase carries roughly twice this figure. That is a known gap, recorded
-# here rather than left for the next reader to rediscover — and not an argument
-# for raising the ceiling, which is the only thing currently holding the
-# resident half down.
-for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+# The verdict is on the *base* size, not on the bytes this run happened to
+# write. A generated router is `base + sites × L`, where `L` is the length of
+# the absolute output root and `sites` is the number of `{{OUTPUT_ROOT}}`
+# substitutions the build carries, so the same source is a larger file when it
+# is built into a longer directory. Measuring raw bytes would hand the pass/fail
+# decision to whatever `$TMPDIR` this run got: the Codex build binds first, and
+# it spends one byte of ceiling per `{{OUTPUT_ROOT}}` site per character of
+# install root, so a long enough temporary directory name fails the gauntlet
+# with no source change at all. `sites` is counted from the generated
+# file — each substitution leaves one copy of the root in it — rather than
+# hardcoded, so a new `{{OUTPUT_ROOT}}` moves the printed figure with nobody
+# editing this test. The loop prints, per host, the base and the longest install
+# root that still fits, which is the figure to quote; a bare byte count quoted
+# from a build is only true at that build's directory length.
+#
+# What is *not* capped, verified at HEAD and written as base plus site count for
+# the same reason: on the `/pln` side both `outline.md` (base 67022 over 4
+# sites, Claude; 67470, Codex) and `finish-ship.md` (66431 over 4, Claude;
+# 68246, Codex) are already past this ceiling on their own, and the largest
+# generated file anywhere is `/pln-pr`'s `ship-watch.md` (76176 over 6 sites,
+# Claude; 77467, Codex), beside a `pln-pr/SKILL.md` router that is not capped
+# either. So a run holds this capped router plus one uncapped phase file that
+# can be larger than it. That is a known gap, recorded here rather than left for
+# the next reader to rediscover — and not an argument for raising the ceiling,
+# which is the only thing currently holding the resident half down.
+for host_build in "claude:$real_c" "codex:$real_x"; do
+  host="${host_build%%:*}"
+  f="${host_build#*:}/SKILL.md"
+  out_root="$(cd "${host_build#*:}" && pwd -P)"
   bytes="$(LC_ALL=C wc -c < "$f")"
   bytes="${bytes//[[:space:]]/}"
-  [ "$bytes" -le 60000 ] \
-    || fail "$f is $bytes bytes; phase router ceiling is 60000"
+  sites="$(grep -o -F -- "$out_root" "$f" | wc -l)"
+  sites="${sites//[[:space:]]/}"
+  [ "$sites" -ge 1 ] \
+    || fail "the $host router names no absolute output root; the base size cannot be normalized"
+  base=$(( bytes - sites * ${#out_root} ))
+  [ "$base" -le 60000 ] \
+    || fail "the $host router is $base bytes before install-root substitution ($sites sites); phase router ceiling is 60000"
+  echo "router ceiling: $host base $base bytes over $sites {{OUTPUT_ROOT}} sites — fits an install root up to $(( (60000 - base) / sites )) characters (ceiling 60000)"
 done
 
 # The public skills are routers. Every detailed phase is generated one level

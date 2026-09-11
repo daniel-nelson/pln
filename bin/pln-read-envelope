@@ -1,20 +1,36 @@
 #!/usr/bin/env bash
-# pln-read-envelope — print a worker result only after its path and size pass.
+# pln-read-envelope — print a worker result only after its path, size and
+# envelope fields pass.
 #
 # Usage:
-#   pln-read-envelope --root <plan-dir> --max-bytes <count> <result-file>
+#   pln-read-envelope [--no-require-fields] --root <plan-dir> \
+#     --max-bytes <count> <result-file>
 #
 # The coordinator uses this instead of reading a worker result directly.  The
 # result must be a non-empty regular file below the plan directory, must not be
-# a symlink, and must fit within the caller's byte budget.  All validation is
-# performed before any result bytes are written to stdout.
+# a symlink, and must fit within the caller's byte budget.  It must also carry
+# every field of the shared worker envelope contract with a non-empty value, a
+# `STATUS` from that contract's closed vocabulary, and an `EVIDENCE_FILE` that
+# exists inside the same root.  All validation is performed before any result
+# bytes are written to stdout.
+#
+# `--no-require-fields` drops the field and evidence checks, for the one case
+# that re-reads a result an earlier run already validated under the release
+# that wrote it: the fields were checked once, and the evidence file may since
+# have been reaped with its temporary directory.
+#
+# REQUIRED_FIELDS is not a second owner of the envelope shape.  Its one owner
+# is src/workers/context-envelope.md, and tests/worker-contracts.sh refuses any
+# disagreement between that contract and this line.
+REQUIRED_FIELDS='STATUS SCOPE REQUESTED_PROFILE ACTUAL_PROFILE ACTUAL_MODEL ACTUAL_EFFORT ROUTING_FALLBACK ESCALATE SUMMARY COUNTEREVIDENCE UNCERTAINTY REFERENCES DECISION_IMPACT EVIDENCE_FILE'
 set -euo pipefail
 
 ROOT=""
 MAX_BYTES=""
+REQUIRE_FIELDS=1
 
 usage() {
-  echo "Usage: pln-read-envelope --root <plan-dir> --max-bytes <count> <result-file>" >&2
+  echo "Usage: pln-read-envelope [--no-require-fields] --root <plan-dir> --max-bytes <count> <result-file>" >&2
   exit 2
 }
 
@@ -34,6 +50,10 @@ while [ $# -gt 0 ]; do
       [ $# -ge 2 ] || usage
       MAX_BYTES="$2"
       shift 2
+      ;;
+    --no-require-fields)
+      REQUIRE_FIELDS=0
+      shift
       ;;
     --)
       shift
@@ -75,5 +95,98 @@ BYTE_COUNT="${BYTE_COUNT//[[:space:]]/}"
 [ "$BYTE_COUNT" -gt 0 ] || fail "result file is empty: $RESULT_FILE"
 [ "$BYTE_COUNT" -le "$MAX_BYTES" ] \
   || fail "result file is $BYTE_COUNT bytes; limit is $MAX_BYTES: $RESULT_FILE"
+
+if [ "$REQUIRE_FIELDS" -eq 1 ]; then
+  # One pass over the envelope.  A label line opens a field only the first time
+  # that field is seen, so a later repetition inside a block field's body is
+  # body text rather than a second heading.  A field counts as filled by text
+  # after its colon or by any non-blank line before the next field opens — the
+  # inline fields and the block fields of the contract both resolve that way.
+  REPORT="$(
+    LC_ALL=C awk -v fields="$REQUIRED_FIELDS" '
+      BEGIN {
+        count = split(fields, order, " ")
+        for (i = 1; i <= count; i++) want[order[i]] = 1
+        current = ""
+      }
+      {
+        line = $0
+        sub(/\r$/, "", line)
+        if (match(line, /^[A-Z][A-Z_]*:/)) {
+          name = substr(line, 1, RLENGTH - 1)
+          if ((name in want) && !(name in seen)) {
+            seen[name] = 1
+            current = name
+            rest = substr(line, RLENGTH + 1)
+            sub(/^[ \t]+/, "", rest)
+            sub(/[ \t]+$/, "", rest)
+            if (rest != "") { filled[name] = 1; value[name] = rest }
+            next
+          }
+        }
+        if (current != "" && !(current in filled)) {
+          body = line
+          sub(/^[ \t]+/, "", body)
+          sub(/[ \t]+$/, "", body)
+          if (body != "") { filled[current] = 1; value[current] = body }
+        }
+      }
+      END {
+        for (i = 1; i <= count; i++) {
+          field = order[i]
+          if (!(field in seen)) print "MISSING " field
+          else if (!(field in filled)) print "EMPTY " field
+        }
+        print "VALUE STATUS " value["STATUS"]
+        print "VALUE EVIDENCE_FILE " value["EVIDENCE_FILE"]
+      }
+    ' "$RESULT_REAL"
+  )"
+
+  MISSING_FIELDS=""
+  EMPTY_FIELDS=""
+  STATUS_VALUE=""
+  EVIDENCE_VALUE=""
+  while IFS= read -r reported; do
+    case "$reported" in
+      'MISSING '*) MISSING_FIELDS="$MISSING_FIELDS ${reported#MISSING }" ;;
+      'EMPTY '*) EMPTY_FIELDS="$EMPTY_FIELDS ${reported#EMPTY }" ;;
+      'VALUE STATUS '*) STATUS_VALUE="${reported#VALUE STATUS }" ;;
+      'VALUE EVIDENCE_FILE '*) EVIDENCE_VALUE="${reported#VALUE EVIDENCE_FILE }" ;;
+    esac
+  done <<REPORT_EOF
+$REPORT
+REPORT_EOF
+
+  [ -z "$MISSING_FIELDS" ] \
+    || fail "envelope is missing required field(s)${MISSING_FIELDS}: $RESULT_FILE"
+  [ -z "$EMPTY_FIELDS" ] \
+    || fail "envelope field(s) present with no value${EMPTY_FIELDS}: $RESULT_FILE"
+
+  case "$STATUS_VALUE" in
+    complete | blocked) ;;
+    *) fail "envelope STATUS must be complete or blocked, not '$STATUS_VALUE': $RESULT_FILE" ;;
+  esac
+
+  # The declared evidence path resolves against the same --root the result did,
+  # and gets the same confinement: an envelope body is worker-authored, so a
+  # bare existence check would stamp "validated" on a pointer out of the root.
+  case "$EVIDENCE_VALUE" in
+    /*) EVIDENCE_PATH="$EVIDENCE_VALUE" ;;
+    *) EVIDENCE_PATH="$ROOT_REAL/$EVIDENCE_VALUE" ;;
+  esac
+  [ ! -L "$EVIDENCE_PATH" ] \
+    || fail "evidence file must not be a symlink: $EVIDENCE_VALUE"
+  [ -e "$EVIDENCE_PATH" ] \
+    || fail "evidence file does not exist: $EVIDENCE_VALUE"
+  EVIDENCE_DIR="$(dirname "$EVIDENCE_PATH")"
+  EVIDENCE_BASE="$(basename "$EVIDENCE_PATH")"
+  EVIDENCE_DIR_REAL="$(cd "$EVIDENCE_DIR" 2>/dev/null && pwd -P)" \
+    || fail "could not resolve evidence directory: $EVIDENCE_DIR"
+  case "$EVIDENCE_DIR_REAL/$EVIDENCE_BASE" in
+    "$ROOT_REAL"/*) ;;
+    *) fail "evidence file is outside the plan root: $EVIDENCE_VALUE" ;;
+  esac
+fi
 
 cat "$RESULT_REAL"

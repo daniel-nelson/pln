@@ -59,6 +59,21 @@ has "$envelope" 'ESCALATE:' 'result envelopes do not carry evidence-to-frontier 
 has "$envelope" 'Measure and trim before you finalize' \
   'envelope contract lost its measure-and-trim step'
 has "$envelope" 'wc -c' 'envelope contract no longer names how to measure the result'
+# The envelope shape has one owner, and it is the contract above. The reader
+# that refuses a malformed envelope carries the field names as a list, so this
+# pins that list to the contract: a field added, renamed or dropped there and
+# nowhere else is the drift the reader was built to stop, reproduced inside it.
+contract_fields="$(awk '
+  state == 0 && /^```text$/ { state = 1; next }
+  state == 1 && /^```$/ { state = 2; next }
+  state == 1 && /^[A-Z][A-Z_]*:/ { sub(/:.*/, ""); print }
+' "$envelope" | sort)"
+[ -n "$contract_fields" ] || fail "no envelope fields found in $envelope"
+reader_fields="$(awk -F"'" '/^REQUIRED_FIELDS=/ { print $2; exit }' \
+  "$REPO_DIR/bin/pln-read-envelope" | tr ' ' '\n' | grep -v '^$' | sort)"
+[ -n "$reader_fields" ] || fail "bin/pln-read-envelope declares no required fields"
+[ "$contract_fields" = "$reader_fields" ] || fail \
+  "bin/pln-read-envelope's required fields disagree with $envelope"
 has "$implementation" 'When it says `worker`' 'implementation contract lost worker commit ownership'
 has "$implementation" 'When it says `coordinator`' 'implementation contract lost coordinator commit ownership'
 has "$implementation" 'host assignment owns which value applies' \

@@ -6,6 +6,8 @@ SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$SELF_DIR")"
 CORPUS="$ROOT_DIR/evals/corpus/behavior.tsv"
 GOLD="$ROOT_DIR/evals/corpus/gold.tsv"
+MODEL_ROUTING="$ROOT_DIR/evals/corpus/model-routing.json"
+OUTLINE_CHECKPOINT="$ROOT_DIR/evals/corpus/outline-checkpoint.json"
 QUALIFICATION="$ROOT_DIR/evals/economy-qualification.tsv"
 FRONTIER_REGRESSION_CORPUS="$ROOT_DIR/evals/corpus/frontier-regression-v3.tsv"
 FRONTIER_REGRESSION_GOLD="$ROOT_DIR/evals/corpus/frontier-regression-v3-gold.tsv"
@@ -44,8 +46,8 @@ fixture_hash() {
   trap 'rm -f "$tmp"' RETURN
   printf '%s  behavior.tsv\n' "$(sha256_file "$CORPUS")" > "$tmp"
   printf '%s  gold.tsv\n' "$(sha256_file "$GOLD")" >> "$tmp"
-  printf '%s  model-routing.json\n' "$(sha256_file "$ROOT_DIR/evals/corpus/model-routing.json")" >> "$tmp"
-  printf '%s  outline-checkpoint.json\n' "$(sha256_file "$ROOT_DIR/evals/corpus/outline-checkpoint.json")" >> "$tmp"
+  printf '%s  model-routing.json\n' "$(sha256_file "$MODEL_ROUTING")" >> "$tmp"
+  printf '%s  outline-checkpoint.json\n' "$(sha256_file "$OUTLINE_CHECKPOINT")" >> "$tmp"
   sha256_file "$tmp"
   rm -f "$tmp"
   trap - RETURN
@@ -70,7 +72,12 @@ class_count() {
 }
 
 validate() {
-  [ -f "$CORPUS" ] && [ -f "$GOLD" ] && [ -f "$QUALIFICATION" ] || fail 'eval files are missing'
+  local sealed_file
+  # Every file the seal covers is checked by name: sha256_file pipes through
+  # awk, so a missing fixture would otherwise hash to nothing and report ok.
+  for sealed_file in "$CORPUS" "$GOLD" "$MODEL_ROUTING" "$OUTLINE_CHECKPOINT" "$QUALIFICATION"; do
+    [ -f "$sealed_file" ] || fail "eval file is missing: ${sealed_file#"$ROOT_DIR"/}"
+  done
   [ "$(head -n 1 "$CORPUS")" = $'id\tsplit\tclass\tcategory\tbrief' ] || fail 'unknown behavior.tsv header'
   [ "$(head -n 1 "$GOLD")" = $'id\tprofile\tkey\texpected\ttags' ] || fail 'unknown gold.tsv header'
   awk -F '\t' '
@@ -90,12 +97,15 @@ validate() {
     END { exit bad }
   ' "$GOLD" || fail 'gold validation failed'
   [ "$(head -n 1 "$QUALIFICATION")" = $'host\tmodel\tstatus\tfixture_sha256\tskill_version\treason' ] || fail 'unknown economy qualification header'
-  awk -F '\t' -v version="$(cat "$ROOT_DIR/VERSION")" '
+  local fixture version
+  fixture="$(fixture_hash)"
+  version="$(cat "$ROOT_DIR/VERSION")"
+  awk -F '\t' -v version="$version" -v fixture="$fixture" '
     NR == 1 { next }
-    NF != 6 || ($1 != "claude" && $1 != "codex") || ($3 != "enabled" && $3 != "disabled") || $4 !~ /^[0-9a-f]{64}$/ || $5 != version || $6 == "" { bad=1 }
+    NF != 6 || ($1 != "claude" && $1 != "codex") || ($3 != "enabled" && $3 != "disabled") || $4 != fixture || $5 != version || $6 == "" { bad=1 }
     seen[$1]++ { bad=1 }
     END { if (seen["claude"] != 1 || seen["codex"] != 1) bad=1; exit bad }
-  ' "$QUALIFICATION" || fail 'economy qualification validation failed'
+  ' "$QUALIFICATION" || fail "economy qualification validation failed; every row needs fixture_sha256=$fixture and skill_version=$version"
   local split class n total
   total="$(awk 'END { print NR - 1 }' "$CORPUS")"
   [ "$total" -ge 20 ] || fail "corpus has only $total cases"
@@ -121,7 +131,7 @@ validate() {
   ' "$CORPUS" || fail 'profile coverage is incomplete'
   printf 'STATUS=ok\nCASES=%s\nCALIBRATION_ELIGIBLE=%s\nCALIBRATION_BOUNDARY=%s\nHOLDOUT_ELIGIBLE=%s\nHOLDOUT_BOUNDARY=%s\nFIXTURE_SHA256=%s\n' \
     "$total" "$(class_count calibration eligible)" "$(class_count calibration boundary)" \
-    "$(class_count holdout eligible)" "$(class_count holdout boundary)" "$(fixture_hash)"
+    "$(class_count holdout eligible)" "$(class_count holdout boundary)" "$fixture"
 }
 
 validate_frontier_regression() {

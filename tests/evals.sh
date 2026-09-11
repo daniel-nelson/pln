@@ -21,6 +21,57 @@ done
 fixture="$(printf '%s\n' "$validation" | sed -n 's/^FIXTURE_SHA256=//p')"
 [ "${#fixture}" -eq 64 ] || fail 'fixture hash is not SHA-256 sized'
 
+# The corpus seal actually seals. bin/pln-eval resolves its corpus,
+# qualification file and VERSION from its own directory with no environment
+# override, and a test may not write to the working tree, so the whole layout
+# is mirrored into $WORK and mutated there. Every expected value is derived
+# from the mirror, never hardcoded, so a release bump cannot break this.
+SEAL="$WORK/seal-mirror"
+mkdir -p "$SEAL/bin" "$SEAL/evals/corpus"
+cp "$EVAL" "$SEAL/bin/pln-eval"
+cp "$REPO_DIR"/evals/corpus/* "$SEAL/evals/corpus/"
+cp "$REPO_DIR/evals/economy-qualification.tsv" "$SEAL/evals/economy-qualification.tsv"
+cp "$REPO_DIR/VERSION" "$SEAL/VERSION"
+mirror_version="$(cat "$SEAL/VERSION")"
+mirror_fixture="$("$SEAL/bin/pln-eval" validate | sed -n 's/^FIXTURE_SHA256=//p')"
+[ "$mirror_fixture" = "$fixture" ] || fail 'the mirrored corpus did not reproduce the repository fixture hash'
+
+seal_validate() { seal_out="$("$SEAL/bin/pln-eval" validate 2>&1)"; }
+
+# A sealed fixture that is gone is refused by name, not hashed as nothing.
+mv "$SEAL/evals/corpus/model-routing.json" "$SEAL/model-routing.json.aside"
+rc=0
+seal_validate || rc=$?
+[ "$rc" -ne 0 ] || fail 'a missing sealed fixture still validated'
+printf '%s\n' "$seal_out" | grep -q 'eval file is missing: evals/corpus/model-routing.json' \
+  || fail 'a missing sealed fixture was not refused by name'
+mv "$SEAL/model-routing.json.aside" "$SEAL/evals/corpus/model-routing.json"
+
+# A stale skill_version names the version the mirrored VERSION file carries.
+printf '%s\n' "$mirror_version-seal-test" > "$SEAL/VERSION"
+rc=0
+seal_validate || rc=$?
+[ "$rc" -ne 0 ] || fail 'a stale skill_version still validated'
+printf '%s\n' "$seal_out" | grep -q "skill_version=$mirror_version-seal-test" \
+  || fail 'the release failure did not name the version it wanted'
+printf '%s\n' "$mirror_version" > "$SEAL/VERSION"
+
+# A changed sealed fixture fails, and the failure carries a usable replacement
+# hash — validate exits before it ever prints FIXTURE_SHA256=.
+printf '\n' >> "$SEAL/evals/corpus/outline-checkpoint.json"
+rc=0
+seal_validate || rc=$?
+[ "$rc" -ne 0 ] || fail 'a changed sealed fixture still validated'
+reported="$(printf '%s\n' "$seal_out" | sed -n 's/.*fixture_sha256=\([0-9a-f]\{64\}\).*/\1/p' | tail -n 1)"
+[ "${#reported}" -eq 64 ] || fail 'the seal failure did not carry the expected fixture hash'
+[ "$reported" != "$mirror_fixture" ] || fail 'a changed fixture reported the unchanged hash'
+awk -F '\t' -v OFS='\t' -v h="$reported" 'NR>1 { $4=h } { print }' \
+  "$SEAL/evals/economy-qualification.tsv" > "$SEAL/restamped.tsv"
+mv "$SEAL/restamped.tsv" "$SEAL/evals/economy-qualification.tsv"
+seal_validate || fail 're-stamping fixture_sha256 with the reported hash did not restore validation'
+printf '%s\n' "$seal_out" | grep -q "^FIXTURE_SHA256=$reported$" \
+  || fail 'the re-stamped corpus did not report the hash the failure named'
+
 # The replacement frontier suite is distinct from the opened 40-case holdout,
 # binds the exact always-loaded runtime contract, and cannot be rendered before
 # a host-specific immutable seal is written.

@@ -12,7 +12,7 @@ The peer brief is file-first and self-contained. A peer may be prompt-in/text-ou
 
 Run the helper as a tracked foreground or host-native resumable command. If it overlaps an independent same-model roster, retain both native handles and join both before advancing. Never detach `pln-peer` with an untracked shell `&`/`disown`, and never send a final response while the peer subprocess or its paired roster remains active.
 
-The helper reports eight fixed metadata lines: rung, peer, status, result/log paths, and actual judgment profile/model/effort. Rung 1 is the configured `peer_command`; rung 2 is an authenticated supported CLI other than the host; rung 3 sends nothing. Read no result unless exit 0 and `STATUS=ok`.
+The helper reports nine fixed metadata lines: rung, peer, status, `REASON=` for why there is no peer when there is none, result/log paths, and actual judgment profile/model/effort. Rung 1 is the configured `peer_command`; rung 2 is an authenticated supported CLI other than the host; rung 3 sends nothing. Read no result unless exit 0 and `STATUS=ok`.
 
 ## Two separate one-time decisions
 

@@ -31,7 +31,7 @@ REFERENCES:
 DECISION_IMPACT:
 <what the coordinator should decide or ask next; no implementation>
 
-EVIDENCE_FILE: <plan-directory-relative path to the detailed notes>
+EVIDENCE_FILE: <path to the detailed notes, relative to the assigned artifact root>
 ```
 
 Rules:

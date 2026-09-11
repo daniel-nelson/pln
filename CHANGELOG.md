@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.77.1 — 2026-09-11
+
+### Fixed
+
+- **The "who wrote this document" question no longer fires on a link the user's own sentence cites.** Observed on a Codex `/pln` run started with *"We need to fix the bugs appearing in Sentry: `<issues url>`"*. 1.76.0's Step 1 question triggers on any named path or URL, so it fired here, and with no write-up to ask about it came out as "Should I treat the linked Sentry page as live diagnostic data with no pre-decided fixes, or does it reflect solutions you have already settled on?" — a question about a list of crashes, with no answer the user could usefully give. The trigger is now the request being *handed off* to a document rather than a document being mentioned: where the user's own sentence is the request and the link is what it points at, nothing was handed off and nothing is asked. That test reads the prompt's words, not the document, so the question still opens nothing before it is asked. And where it does fire, it is one short line — *"Who wrote that — you, or an agent? And is what it proposes settled, or open?"* — supplied verbatim rather than left to be improvised per source.
+
 ## 1.77.0 — 2026-09-11
 
 ### Fixed

@@ -45,6 +45,21 @@ The rules about how the skill *sounds* — cutting padding, the deletion test, n
 
 This is the one place the host seam is about the *model's* behavior rather than the *host's* mechanics, so it is easy to forget and cross-apply.
 
+## Before you add a rule
+
+A September 2026 sweep classified every rule in `src/` by shape and falsified the thesis it began from. "A rule works only if something refuses" is wrong: roughly 65 bright-line prohibitions have no refuser and no artifact behind them — never use `AskUserQuestion`, one question per turn, never `--amend` (`src/SKILL.core.md:37,38,43`) — and they hold. What was seen failing is narrower:
+
+- **Graded self-assessment** — a rule asking the model to judge how much of some quality its own output has. The same rule written as something it either did or did not do does not fail the same way.
+- **Produce something and instruct someone else to consume it.** The producer complies, no consumer exists, and the field is filled in forever and read never. The 14-field worker envelope sat like that until `bin/pln-read-envelope` was taught to validate it.
+
+What those two lack and the prohibitions have is being **binary and observable to the actor while acting**. Treat that as an observation about the rules in this repository, not a law: the sweep counted shapes, it did not measure how often each fires, and `evals/` cannot supply the measurement either — it scores whether a model recognizes a rule pasted into a short tool-free prompt (`bin/pln-eval:318,429-430`), not whether a model applies one while composing under load. Say what was observed and where; do not promote it to a property that predicts.
+
+**Some things have no enforceable form, and a further rule about them makes it worse.** Prose register (`src/hosts/claude/voice.md:12`, and `:10`, which says of its own list of tics that "a blocklist never catches the variants"); the deletion test (`src/shared/style.md:123`); whether you already have a preference (`src/SKILL.core.md:99`); whether a question has two answers you would honestly implement (`:107`); whether a consequence is the user's and material (`:108`); whether an entry would change the build (`src/phases/pln/review-approval.core.md:101`); whether you are about to concede the premise (`src/phases/pln/review-approval.core.md:146`). Leave them as judgment.
+
+**For a message the user reads, the user is the check.** They caught an unreadable one in a single turn. A fresh agent cannot take that over for a chat message: spawning it and reading its answer both render above the message being protected, so the guard pushes the guarded message off screen.
+
+**No new rule may ask a model to assess its own output.** That is the shape this section is about.
+
 ## Releases
 
 Every PR that changes skill behavior must include both:
@@ -54,6 +69,10 @@ Every PR that changes skill behavior must include both:
 - A re-stamp of the `skill_version` column in `evals/economy-qualification.tsv`
 
 That third one is not optional and not cosmetic: `bin/pln-eval` validates the column against `VERSION`, so **every** bump fails `tests/evals.sh` with `economy qualification validation failed` until the file is re-stamped. Change only that column — the economy route stays `disabled` with reason `release-behavior-changed-requalification-required`, because a behavioral release is exactly what requires requalification, and `fixture_sha256` seals the corpus rather than the release. Re-qualifying the route for real is a separate piece of work from shipping one.
+
+`fixture_sha256` is a live seal, not a shape check: `bin/pln-eval validate` compares it against the hash it computes over `behavior.tsv`, `gold.tsv`, `model-routing.json` and `outline-checkpoint.json` (`bin/pln-eval:41-52`). A PR that changes any of those four re-stamps that column too. The other three files under `evals/corpus/` are sealed into a per-run artifact instead and never reach this column, so changing them re-stamps nothing.
+
+`economy qualification validation failed` therefore has two causes, and the failure message quotes the value it wanted for each: a stale `skill_version` after a version bump, fixed by matching `VERSION`; and a stale `fixture_sha256` after a corpus change, fixed by copying the hash out of the message. Re-stamping whichever one is not stale changes nothing visible.
 
 **Minor bump** (1.0.0 → 1.1.0): new guidance, reworked explanations, new sections, behavioral changes to `/pln`, `/pln-pr`, or `/pln-update`.  
 **Patch bump** (1.0.0 → 1.0.1): typo fixes, factual corrections, wording-only edits that don't change behavior.

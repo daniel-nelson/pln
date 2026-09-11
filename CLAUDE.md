@@ -55,6 +55,10 @@ Every PR that changes skill behavior must include both:
 
 That third one is not optional and not cosmetic: `bin/pln-eval` validates the column against `VERSION`, so **every** bump fails `tests/evals.sh` with `economy qualification validation failed` until the file is re-stamped. Change only that column — the economy route stays `disabled` with reason `release-behavior-changed-requalification-required`, because a behavioral release is exactly what requires requalification, and `fixture_sha256` seals the corpus rather than the release. Re-qualifying the route for real is a separate piece of work from shipping one.
 
+`fixture_sha256` is a live seal, not a shape check: `bin/pln-eval validate` compares it against the hash it computes over `behavior.tsv`, `gold.tsv`, `model-routing.json` and `outline-checkpoint.json` (`bin/pln-eval:41-52`). A PR that changes any of those four re-stamps that column too. The other three files under `evals/corpus/` are sealed into a per-run artifact instead and never reach this column, so changing them re-stamps nothing.
+
+`economy qualification validation failed` therefore has two causes, and the failure message quotes the value it wanted for each: a stale `skill_version` after a version bump, fixed by matching `VERSION`; and a stale `fixture_sha256` after a corpus change, fixed by copying the hash out of the message. Re-stamping whichever one is not stale changes nothing visible.
+
 **Minor bump** (1.0.0 → 1.1.0): new guidance, reworked explanations, new sections, behavioral changes to `/pln`, `/pln-pr`, or `/pln-update`.  
 **Patch bump** (1.0.0 → 1.0.1): typo fixes, factual corrections, wording-only edits that don't change behavior.
 

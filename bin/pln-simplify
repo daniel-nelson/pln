@@ -18,7 +18,9 @@ Usage:
   pln-simplify propagate --repo DIR --body FILE [--head REF]
 
 V1 defaults: due at 100 visible commits or 90 days; overdue at 250 commits
-or 180 days. Repository overrides live in .pln-simplify-policy.
+or 180 days. A repository with no marker is measured from its first commit and
+reports due at most, never overdue. Repository overrides live in
+.pln-simplify-policy.
 EOF
   exit 2
 }
@@ -168,6 +170,23 @@ read_policy() { # repo
   [ "$DUE_DAYS" -le "$OVERDUE_DAYS" ] || fail 'due-days exceeds overdue-days'
 }
 
+# The repository's own beginning, for a repository that has never recorded a
+# marker. The oldest root commit rather than the first one listed: a grafted or
+# merged-in history can put an older root second.
+repo_origin() { # repo head; sets ORIGIN_COMMIT and ORIGIN_EPOCH
+  local repo="$1" head="$2" sha epoch
+  ORIGIN_COMMIT=''; ORIGIN_EPOCH=''
+  while IFS= read -r sha; do
+    [ -n "$sha" ] || continue
+    epoch="$(git -C "$repo" show -s --format=%ct "$sha" 2>/dev/null)" || continue
+    case "$epoch" in ''|*[!0-9]*) continue ;; esac
+    if [ -z "$ORIGIN_EPOCH" ] || [ "$epoch" -lt "$ORIGIN_EPOCH" ]; then
+      ORIGIN_EPOCH="$epoch"; ORIGIN_COMMIT="$sha"
+    fi
+  done < <(git -C "$repo" rev-list --max-parents=0 "$head" 2>/dev/null || true)
+  [ -n "$ORIGIN_EPOCH" ]
+}
+
 select_marker() { # repo head; sets SELECTED_*
   local repo="$1" head="$2" commit body line completed claimed actual epoch best_epoch=-1
   SELECTED_LINE=''; SELECTED_COMMIT=''; SELECTED_COMPLETED=''; SELECTED_SHA=''
@@ -211,6 +230,25 @@ status_cmd() {
   if [ -z "$SELECTED_LINE" ]; then
     shallow="$(git -C "$repo" rev-parse --is-shallow-repository 2>/dev/null || printf unknown)"
     if [ "$shallow" = true ]; then reason=shallow-no-valid-reachable-v1-marker; else reason=no-valid-reachable-v1-marker; fi
+    # A repository that has never recorded a marker is not fresh; it has never
+    # been assessed. Below the due thresholds there is nothing worth saying, and
+    # the answer stays `unknown`. Past them, date the cadence from the repository's
+    # own first commit rather than staying silent forever — otherwise the very
+    # first assessment is the one thing cadence can never ask for. It never
+    # escalates past `due`: `overdue` means a cadence was kept and let lapse,
+    # which cannot be true of a repository that never had one. A shallow clone
+    # stays `unknown`, because a truncated history would fabricate both numbers.
+    if [ "$shallow" != true ] && repo_origin "$repo" "$head"; then
+      commits="$(git -C "$repo" rev-list --count "$head" 2>/dev/null || true)"
+      now="${now:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}"; now_epoch="$(utc_epoch "$now")" || fail "invalid --now timestamp: $now"
+      age_days=$(( (now_epoch - ORIGIN_EPOCH) / 86400 )); [ "$age_days" -ge 0 ] || age_days=0
+      case "$commits" in ''|*[!0-9]*) commits='' ;; esac
+      if [ -n "$commits" ] && { [ "$commits" -ge "$DUE_COMMITS" ] || [ "$age_days" -ge "$DUE_DAYS" ]; }; then
+        printf 'STATUS=due\nREASON=never-simplified\nPOLICY_MODE=%s\nMARKER=none\nMARKER_COMMIT=none\nORIGIN_COMMIT=%s\nVISIBLE_COMMITS=%s\nAGE_DAYS=%s\n' \
+          "$POLICY_MODE" "$ORIGIN_COMMIT" "$commits" "$age_days"
+        return 0
+      fi
+    fi
     printf 'STATUS=unknown\nREASON=%s\nPOLICY_MODE=%s\n' "$reason" "$POLICY_MODE"
     return 0
   fi

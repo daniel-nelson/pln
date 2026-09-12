@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.78.0 — 2026-09-11
+
+### Fixed
+
+- **Simplification cadence can now ask for the first simplification, which it never could.** `bin/pln-simplify status` returned `unknown` for any repository with no reachable V1 marker, and `enforce` maps everything that is not `due` or `overdue` to `ACTION=continue`, so the nudge was silent by construction until a marker existed — and a marker only exists after a `/pln-simplify` run. Every repository on earth was in that state, including this one, and no `/pln-pr` run since the feature shipped has said a word about it. A repository with no marker is now dated from its own first commit: past either due threshold it reports `STATUS=due` with `REASON=never-simplified`, `MARKER=none` and an `ORIGIN_COMMIT`, which is one disclosure and continues. It never escalates to `overdue`, because `overdue` means a cadence was kept and let lapse and that cannot be true here — so this adds no blocking path, not even under an opt-in `required` policy. Below the thresholds, and in a shallow clone where both numbers would be invented from a truncated history, the answer stays exactly the `unknown` it was. The other half of the original silence is fixed too. `/pln-pr`'s scope-baseline step was the only caller of the cadence, so a repository that skips `/pln-pr` — this one does, by its own self-hosting exception — could never hear it however the helper answered. `/pln`'s close now reads cadence in the same sweep that files every other piece of outstanding work, and a `due` or `overdue` reading files one to-do item under the fixed id `simplification-cadence` rather than asking a question or holding the run. The fixed id is the whole mechanism for not repeating: a cadence that is true this run is true next run, and the second `add` refuses against the existing item and overwrites nothing. `/pln` still never invokes `/pln-simplify` itself.
+
 ## 1.77.1 — 2026-09-11
 
 ### Fixed

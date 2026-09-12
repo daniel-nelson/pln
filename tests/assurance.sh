@@ -89,7 +89,7 @@ fi
 # Fingerprints bind verification to the exact candidate tree, command set, and
 # relevant environment. Any one changing invalidates reuse.
 FIXTURE="$(mktemp -d "${TMPDIR:-/tmp}/pln-assurance-test.XXXXXX")"
-trap 'rm -rf "$FIXTURE"' EXIT
+trap 'rm -rf "$FIXTURE" "$FIXTURE-unknown" "$FIXTURE-shallow"' EXIT
 git -C "$FIXTURE" init -q
 git -C "$FIXTURE" config user.email test@example.com
 git -C "$FIXTURE" config user.name Test
@@ -205,6 +205,30 @@ git -C "$UNKNOWN" add x
 git -C "$UNKNOWN" commit -qm 'PLN-SIMPLIFY-V2 completed=2026-08-18T12:34:56Z content-sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 status="$($SIMPLIFY status --repo "$UNKNOWN" --now 2026-08-18T12:34:56Z)"
 has_line "$status" 'STATUS=unknown' 'missing supported metadata fabricated staleness'
+
+# A repository that has never recorded a marker is measured from its own first
+# commit, so the first assessment of all is reachable by cadence instead of being
+# the one thing cadence can never ask for. Past either due threshold it says
+# never-simplified and claims no marker; it never escalates to overdue, so it
+# cannot block a required policy. A shallow clone keeps saying unknown, because
+# a truncated history would invent both numbers.
+status="$($SIMPLIFY status --repo "$UNKNOWN" --now 2026-08-18T12:34:56Z --due-commits 1)"
+has_line "$status" 'STATUS=due' 'an unmarked repository past the commit threshold stayed silent'
+has_line "$status" 'REASON=never-simplified' 'an unmarked repository reported a marker-derived reason'
+has_line "$status" 'MARKER=none' 'an unmarked repository fabricated a marker'
+status="$($SIMPLIFY status --repo "$UNKNOWN" --now 2030-08-18T12:34:56Z)"
+has_line "$status" 'STATUS=due' 'an unmarked repository past the age threshold stayed silent'
+status="$($SIMPLIFY status --repo "$UNKNOWN" --now 2030-08-18T12:34:56Z --due-commits 1 --overdue-commits 1 --due-days 1 --overdue-days 1)"
+has_line "$status" 'STATUS=due' 'an unmarked repository escalated past due'
+printf 'schema=1\nmode=required\nminimum-client=1\nprotocol=1\n' > "$UNKNOWN/.pln-simplify-policy"
+decision="$($SIMPLIFY enforce --repo "$UNKNOWN" --base HEAD --head HEAD --run-id never --now 2030-08-18T12:34:56Z)"
+has_line "$decision" 'ACTION=disclose' 'a never-simplified repository blocked a required policy'
+rm "$UNKNOWN/.pln-simplify-policy"
+SHALLOW="$FIXTURE-shallow"
+git clone -q --depth 1 "file://$UNKNOWN" "$SHALLOW" 2>/dev/null
+status="$($SIMPLIFY status --repo "$SHALLOW" --now 2030-08-18T12:34:56Z --due-commits 1)"
+has_line "$status" 'STATUS=unknown' 'a shallow clone fabricated never-simplified cadence'
+has_line "$status" 'REASON=shallow-no-valid-reachable-v1-marker' 'a shallow clone lost its truncation attribution'
 
 # Repository policy is advisory by default. A supported V1 required policy can
 # stop only overdue, while disabled is silent and unknown remains non-blocking.

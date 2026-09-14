@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.80.0 — 2026-09-14
+
+### Fixed
+
+- **An item the user finished themselves, mid-run, is now archived rather than offered back to them.** Observed at the close of a `/pln` run that had filed `sentry-slack-alert-rules-never-fire`, watched the user repair it themselves in another tool two days later, and then verified the repair against Sentry down to the single audit entry for the day and the whole detector → workflow → action filter → Slack action → channel chain. The closing message still ended *"and `sentry-slack-alert-rules-never-fire` is finished — say the word and I'll archive it"*, asking the user to authorize filing a thing they had done with their own hands. The run was following the rule as written: "work that got finished some other way is the user's call, every time" covers the whole of `stale`, and `stale`'s cases are all inference — a record an earlier run left `[x]`, an abandoned claim, an item that has aged, a commit that names an id. Inference is what that rule protects against, and it keeps it. What it should never have covered is the case where the user said in this run that they did the work and the run went and checked. That now archives in the same turn under `--disposition resolved-elsewhere`, with their words and the verification as the evidence — the completion counterpart of the existing rule for an item the user kills mid-run, which already says their decision is the whole authority the archive needs and asking re-opens something they just settled. Nothing else moves: the record still gains no `[x]` it did not earn, and the archive is still the one write a run makes outside its declared set.
+
 ## 1.79.0 — 2026-09-14
 
 ### Fixed

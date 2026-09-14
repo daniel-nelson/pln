@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.81.0 — 2026-09-14
+
+### Fixed
+
+- **A run now closes out the to-do items it claimed at its own close, instead of waiting to be asked.** Observed on a `/pln` run whose PR went green on all eighteen checks: the closing message handed over the PR and the seven filed follow-ups, and left both ids the run had claimed sitting live in the to-do list. They were archived an hour later, against the merge commit, only because the user asked "is there anything else you need to do, or is it safe to exit" — and the reply, *"One thing was outstanding and I've done it"*, is the whole defect in one sentence. The rule it was following said an item a run claimed is "archived with the evidence that closed it" and never said what closes one, so a run that had just watched its own CI go green could read the merge as the closing event. A merge is the user's action and happens after the session has ended, so nothing in the run's reach ever satisfies that reading; the item stays open until somebody notices. The closing event is now named and it is the run's own: a claimed id is marked from what actually landed, and every one standing at `[x]` is archived `--disposition completed` at the close that hands the work back — the PR and its green required checks as the evidence where a PR was opened, the open PR where the repository runs no checks at all, the commits where the run was implement-only. Under a PR-bearing `Ship` the two halves sit where the evidence does: `/pln`'s close marks, and `/pln-pr`'s close archives on green, because a PR can still go red and there is no inverse of `archive`. A PR that is red, stuck or blocked archives nothing and its items keep the state they earned. None of this asks. What `pln-todo stale` turns up is untouched and still the user's call — that is inference about work the run did not do, and this is a run filing the outcome of its own.
+
 ## 1.80.0 — 2026-09-14
 
 ### Fixed

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.78.0 — 2026-09-13
+
+### Fixed
+
+- **The ship hand-off is no longer announced in the sentence that ends the turn.** Observed on a twelve-item `/pln` run that had just passed its own gauntlet: a phone push reading *"pln: rating screen done — 12/12 items, gauntlet green, opening the PR now"*, then a wrap-up message ending *"Handing off to `/pln-pr` now to review the branch and open the PR"*, then nothing. Seventeen minutes later the user asked *"Are you still working, or did you stop?"*, and the hand-off fired on that turn — `Skill({skill: "pln-pr", args: "review=full"})`, with the review depth carried correctly, against durable state that had not changed since the wrap-up. So none of Step 8's trigger machinery failed. The condition held the whole time; the run simply wrote a sentence about the action instead of taking it, and both statements it put in front of the user were false at the moment they were sent. Step 8 already said the hand-off is the turn's first action and that no message goes out in its place, with the wrap-up as the one thing it waits behind — and that carve-out is exactly where the failure lived, because a wrap-up is composed as an ending and "handing off now" is the natural last line of one. The rule that was missing is the one Step 5 has had all along for the next dispatch: prose about it comes after the call or not at all. It now applies to the hand-off too, covering the notification in the same breath, so the wrap-up says what changed and what is still open and stops there. `/pln-pr` announces itself in its own first lines; nothing needs to promise it first. No new trigger, no new state, no new field — one prohibition, binary and visible while the sentence is being written, which is the shape this repository's rules hold in.
+
 ## 1.77.1 — 2026-09-11
 
 ### Fixed

@@ -290,6 +290,27 @@ has "$pr_merge" 'one complete `Safety disposition` record' \
 has "$pr_merge" 'missing or malformed disposition is `retain`' \
   'PR merge does not default malformed structural proof to retention'
 
+# A reproduction that constructs the offending state itself proves the state is
+# possible, never that anything ships it. One run filed a critical emergency-stop
+# bypass whose only two constructors were two lines in the spec file the finding
+# cited as its own proof, then spent a blocker, a user decision, and a repair
+# workstream on it. The merge worker is where the claim gets checked, so the
+# demotion has to live here and not only in the reviewer brief.
+has "$pr_merge" 'never take the claim' \
+  'PR merge accepts a reader reachability claim without confirming it'
+has "$pr_merge" 'is `informational` whatever the reader marked it' \
+  'PR merge lets an unreachable finding keep a critical severity'
+has "$pr_merge" 'never routed `needs-decision`, and never raises a blocker' \
+  'PR merge can still spend a user decision on a test-only finding'
+
+# Even a reachable finding can carry a cathedral. The same run's proposed repair
+# for two dead fields on a persisted type was to validate every envelope against
+# its durable journal payload, and the question that reached the user offered
+# that design as its only option. 1.76.0 made a /pln interview name the simpler
+# route it passed over; this is the review's copy of that field.
+has "$pr_merge" 'Persist each finding'"'"'s `smaller_fix` verbatim' \
+  'PR merge drops the smaller repair a reader passed over'
+
 "$REPO_DIR/bin/pln-generate" --host claude --out-dir "$WORK/claude" >/dev/null
 "$REPO_DIR/bin/pln-generate" --host codex --out-dir "$WORK/codex" >/dev/null
 for host in claude codex; do
@@ -328,6 +349,18 @@ for host in claude codex; do
     "$host simplification coordinator lost the no-change outcome"
   has "$WORK/$host/phases/pln-simplify/verify-record.md" 'src/workers/final-verification.md' \
     "$host simplification recording does not reuse final verification"
+  has "$WORK/$host/phases/pln-pr/review.md" 'reached_by: string' \
+    "$host review phase no longer requires reachability on every finding"
+  has "$WORK/$host/phases/pln-pr/review.md" 'or the literal `test-only`' \
+    "$host reviewer brief lost the test-only reachability answer"
+  has "$WORK/$host/phases/pln-pr/fix.md" '`reached_by: test-only` is never one of these questions' \
+    "$host fix phase can route an unreachable finding to a user decision"
+  has "$WORK/$host/phases/pln-pr/review.md" 'smaller_fix: string' \
+    "$host review phase no longer asks for the smaller repair passed over"
+  has "$WORK/$host/phases/pln-pr/review.md" 'the literal `none found`' \
+    "$host reviewer brief lost the no-smaller-repair answer"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'carries the finding'"'"'s `smaller_fix` beside its proposed fix' \
+    "$host decision question can present one design as the only option"
   has "$WORK/$host/SKILL.md" 'at most two exact operations' "$host /pln router lost the direct lookup budget"
   has "$WORK/$host/SKILL.md" 'routing.tsv' "$host /pln router lost the local routing ledger"
   has "$WORK/$host/pln-pr/SKILL.md" 'at most two exact operations' "$host /pln-pr router lost the direct lookup budget"

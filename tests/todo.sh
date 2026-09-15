@@ -1109,6 +1109,211 @@ is STALE_COUNT 4 "stale reported the wrong number of candidates"
 after="$(cd "$R/pln" && find . -type f | sort | xargs shasum)"
 [ "$before" = "$after" ] || fail "stale wrote to the to-do list; it reports and never writes"
 
+# ─── a claim has a holder, and a holder can be gone ───────────────────────────
+# A claim is the only assertion in this store with no expiry: it says somebody is
+# writing those paths right now, and until the holder gives it back it keeps
+# refusing everyone. A run that never reaches its own close cannot give it back,
+# so the hold outlives the work — which is the whole failure this section covers.
+# `claimed_in` is the evidence, and the rule is `lock_is_dead`'s: release where
+# the worktree is gone, never on a guess.
+LROOT="$WORK/liveness-root"
+for tree in live-one live-two; do
+  new_repo "$WORK/$tree"
+  printf 'pln-todo: %s\n' "$LROOT" > "$WORK/$tree/CLAUDE.md"
+done
+ok "filing an item for the holder to take" add --project "$WORK/live-one" --id held-by-gone \
+  --claim 'taken by a run that never came back' --source s --touches 'api/shared.ts'
+ok "filing the item that will want the same path" add --project "$WORK/live-one" --id wants-same-path \
+  --claim 'needs the path the vanished run declared' --source s --touches 'api/shared.ts,api/own.ts'
+ok "filing an item held by a tree that stays" add --project "$WORK/live-one" --id held-by-living \
+  --claim 'taken by a run that is still going' --source s --touches 'api/living.ts'
+ok "filing the item that wants the living run's path" add --project "$WORK/live-one" --id wants-living-path \
+  --claim 'needs the path the live run declared' --source s --touches 'api/living.ts'
+ok "the second tree taking both items" claim --project "$WORK/live-two" --id held-by-gone --run 2026-08-27-two
+ok "the second tree taking the other item" claim --project "$WORK/live-two" --id held-by-living --run 2026-08-27-two
+
+# While both holders are live, both refuse. This is the property the liveness
+# test must not cost: a run that is still going keeps its paths.
+refused "claiming across a live holder's declared path" claim --project "$WORK/live-one" \
+  --id wants-same-path --run 2026-08-27-one
+said $'COLLISION\theld-by-gone\tpath\tapi/shared.ts' "a live holder's path overlap was not refused"
+
+rm -rf "$WORK/live-two"
+
+# The worktree is gone, so the run that claimed from it is writing nothing. Its
+# declared set stops constraining anyone — and the line says so rather than the
+# record silently vanishing from the comparison, because "never claimed" and
+# "claimant is gone" are different facts about an item.
+ok "claiming across a holder whose worktree is gone" claim --project "$WORK/live-one" \
+  --id wants-same-path --run 2026-08-27-one
+said $'DEAD_HOLDER\theld-by-gone\t2026-08-27-two\t'"$WORK/live-two" \
+  "a claim whose worktree is gone was not reported as a dead holder"
+said 'CHECK=clear' "a dead holder's declared paths still refused a live run"
+didnt_say $'COLLISION\theld-by-gone' "a dead holder's paths were compared anyway"
+
+# `check` is advisory and may be conservative, never disagree: what it reports is
+# what `claim` would do.
+ok "checking across a holder whose worktree is gone" check --project "$WORK/live-one" \
+  --id wants-living-path --run 2026-08-27-one
+said $'DEAD_HOLDER\theld-by-gone' "check did not see the dead holder claim saw"
+said 'CHECK=clear' "check and claim disagreed about a dead holder"
+
+# Taking the dead-held item itself. No `--steal`, because `--steal` is a decision
+# and an absent worktree is a fact — but the release is reported, never silent.
+ok "claiming an item whose own holder is gone" claim --project "$WORK/live-one" \
+  --id held-by-gone --run 2026-08-27-one
+is RELEASED_DEAD 2026-08-27-two "taking a dead holder's item did not name the holder it released"
+is RELEASED_FROM "$WORK/live-two" "the released claim did not name the worktree that is gone"
+is CLAIM held "an item whose holder's worktree is gone was not claimable"
+didnt_say 'STOLEN_FROM' "a release on evidence was reported as a steal"
+
+# A wrong `--steal` is still refused when the holder is dead. The caller named a
+# holder this store does not have, and proceeding would confirm something false
+# rather than correct it.
+ok "filing another item for the vanished tree" add --project "$WORK/live-one" --id wrong-steal \
+  --claim 'held by the vanished tree' --source s --touches 'api/wrong.ts'
+new_repo "$WORK/live-five"
+printf 'pln-todo: %s\n' "$LROOT" > "$WORK/live-five/CLAUDE.md"
+ok "the fifth tree taking it" claim --project "$WORK/live-five" --id wrong-steal --run 2026-08-27-five
+rm -rf "$WORK/live-five"
+refused "naming the wrong holder while the real one is gone" claim --project "$WORK/live-one" \
+  --id wrong-steal --run 2026-08-27-one --steal nobody
+said 'nothing was released' "a wrong --steal was excused because the holder was gone"
+has "$LROOT/items/wrong-steal.md" 'claimed_by: 2026-08-27-five' \
+  "a refused steal still moved the holder"
+
+# A caller-named `--against` set is the caller's question, not the store's
+# answer, so the liveness skip is not applied to it.
+ok "checking against a named set that includes a dead holder's item" check \
+  --project "$WORK/live-one" --id wants-living-path --against held-by-living
+said 'CHECK=refused' "a named set carrying a dead holder's item did not refuse"
+said $'COLLISION\theld-by-living\tpath\tapi/living.ts' \
+  "a caller-named set was filtered by holder liveness instead of honored verbatim"
+
+# ─── giving an item back ──────────────────────────────────────────────────────
+# Before `release` a claim had exactly two ends: the run's own close, or someone
+# else's `--steal`. Everything else — interrupted, out of context, or simply an
+# item the run decided not to take — leaked the hold, because the only other call
+# shaped like "I am not working this" is `archive`, which removes the record.
+ok "filing an item to take and give back" add --project "$WORK/live-one" --id give-back \
+  --claim 'taken and handed back' --source s --touches 'api/give.ts'
+ok "taking it" claim --project "$WORK/live-one" --id give-back --run 2026-08-27-one
+ok "releasing one's own claim" release --project "$WORK/live-one" --id give-back --run 2026-08-27-one
+is RELEASE released "a run could not release its own claim"
+is RELEASE_REASON own-claim "releasing one's own claim was attributed to something else"
+is WAS_HELD_BY 2026-08-27-one "the release did not name the holder it cleared"
+hasnt "$LROOT/items/give-back.md" 'claimed_by:' \
+  "a released record kept a claimed_by key; it should read like one nobody has taken"
+hasnt "$LROOT/items/give-back.md" 'claimed_in:' "a released record kept a claimed_in key"
+has "$LROOT/items/give-back.md" 'touches: [api/give.ts]' \
+  "releasing a claim disturbed the rest of the record"
+line_is "$LROOT/TO-DO.md" \
+  '- [ ] ready · taken and handed back → `items/give-back.md`' \
+  "the index still shows a holder for a released item"
+ok "re-taking a released item from another run" claim --project "$WORK/live-one" \
+  --id give-back --run 2026-08-27-other
+said 'CLAIM=held' "a released item was not freely claimable again"
+didnt_say 'STOLEN_FROM' "re-taking a released item was reported as a steal"
+
+# Releasing what nobody holds is quiet. A close that releases every id it took
+# should not have to remember which ones it actually got.
+ok "releasing an item nobody holds" release --project "$WORK/live-one" --id wants-living-path \
+  --run 2026-08-27-one
+is RELEASE noop "releasing an unheld item was not a quiet no-op"
+
+# A live holder is not released out from under: that is a decision, and `--steal`
+# is where a decision is made and recorded.
+refused "releasing a live holder's claim" release --project "$WORK/live-one" --id give-back \
+  --run 2026-08-27-one
+is RELEASE refused "a foreign live claim was released"
+said 'claim --steal 2026-08-27-other' "the refusal did not name the way to move a live holder"
+has "$LROOT/items/give-back.md" 'claimed_by: 2026-08-27-other' \
+  "a refused release still cleared the holder"
+
+# A dead holder's claim can be released without taking the item — the case where
+# you are tidying up after a run rather than picking up its work.
+ok "filing an item for the vanished tree to hold" add --project "$WORK/live-one" --id tidy-up \
+  --claim 'held by a tree that is gone' --source s --touches 'api/tidy.ts'
+new_repo "$WORK/live-three"
+printf 'pln-todo: %s\n' "$LROOT" > "$WORK/live-three/CLAUDE.md"
+ok "the third tree taking it" claim --project "$WORK/live-three" --id tidy-up --run 2026-08-27-three
+rm -rf "$WORK/live-three"
+ok "releasing a claim whose worktree is gone" release --project "$WORK/live-one" --id tidy-up \
+  --run 2026-08-27-one
+is RELEASE_REASON holder-gone "releasing a vanished holder's claim was attributed to the releasing run"
+is WAS_HELD_BY 2026-08-27-three "the release did not name the holder whose tree is gone"
+hasnt "$LROOT/items/tidy-up.md" 'claimed_by:' "the vanished holder's claim was not cleared"
+
+# ─── an unknown holder, and an unknown write set ──────────────────────────────
+# A record predating `claimed_in` names no tree, so nothing here can tell whether
+# its run is still going. Absence of evidence is not evidence, and it keeps
+# refusing.
+ok "filing an item held under an older record shape" add --project "$WORK/live-one" --id old-shape \
+  --claim 'claimed before the worktree was recorded' --source s --touches 'api/old.ts'
+ok "taking it" claim --project "$WORK/live-one" --id old-shape --run 2026-08-27-one
+LC_ALL=C sed '/^claimed_in:/d' "$LROOT/items/old-shape.md" > "$LROOT/items/old-shape.md.tmp"
+mv "$LROOT/items/old-shape.md.tmp" "$LROOT/items/old-shape.md"
+new_repo "$WORK/live-four"
+printf 'pln-todo: %s\n' "$LROOT" > "$WORK/live-four/CLAUDE.md"
+refused "claiming a record that names no worktree" claim --project "$WORK/live-four" \
+  --id old-shape --run 2026-08-27-elsewhere
+said 'records no worktree' \
+  "a holder that proves nothing either way was not distinguished from one whose tree is there"
+said '--steal 2026-08-27-one' "the refusal did not name the way to take it anyway"
+has "$LROOT/items/old-shape.md" 'claimed_by: 2026-08-27-one' \
+  "a record naming no worktree was released as though its holder were proven gone"
+ok "taking the older-shape record back with --steal" claim --project "$WORK/live-one" \
+  --id old-shape --run 2026-08-27-fresh --steal 2026-08-27-one
+said 'STOLEN_FROM=2026-08-27-one' "a record naming no worktree was not moved by --steal"
+
+# `UNKNOWN` is pln's word for a write set nobody has established, and
+# `pln-scheduler` reads it as a lease overlapping everything. Read as a literal
+# path it contains nothing and nothing contains it, so it would be reported
+# parallel-safe against the whole store — making the honest placeholder strictly
+# more permissive than declaring nothing at all.
+ok "filing an item whose write set is recorded as unknown" add --project "$WORK/live-one" \
+  --id writes-unknown --claim 'write set not established' --source s --touches 'UNKNOWN'
+ok "checking an item whose write set is UNKNOWN" check --project "$WORK/live-one" \
+  --id writes-unknown --against held-by-living
+said 'CHECK=refused' "an UNKNOWN write set was reported parallel-safe"
+said 'writes-unknown declares an unknown write set' \
+  "an UNKNOWN write set was not reported as unknown"
+ok "checking against an item whose write set is UNKNOWN" check --project "$WORK/live-one" \
+  --id held-by-living --against writes-unknown
+said 'CHECK=refused' "an item with an UNKNOWN write set did not refuse whoever compared against it"
+said 'writes-unknown declares an unknown write set' \
+  "an UNKNOWN write set was treated as a path that collides with nothing"
+refused "claiming an item whose write set is UNKNOWN" claim --project "$WORK/live-one" \
+  --id writes-unknown --run 2026-08-27-one
+said '--touches' "the refusal did not name the way out"
+ok "replacing the unknown write set on the claim" claim --project "$WORK/live-one" \
+  --id writes-unknown --run 2026-08-27-one --touches 'api/known.ts'
+said 'CLAIM=held' "declaring a real write set over UNKNOWN did not take the item"
+
+# ─── staleness reports a gone holder off the days clock ───────────────────────
+# Age is a guess about whether a run is still going; an absent worktree is an
+# answer. A run working several trees at once accumulates these in hours, far
+# inside any cutoff worth setting for the aged case.
+SROOT="$WORK/stale-liveness-root"
+new_repo "$WORK/stale-one"
+printf 'pln-todo: %s\n' "$SROOT" > "$WORK/stale-one/CLAUDE.md"
+new_repo "$WORK/stale-two"
+printf 'pln-todo: %s\n' "$SROOT" > "$WORK/stale-two/CLAUDE.md"
+ok "filing an item claimed today" add --project "$WORK/stale-one" --id claimed-today \
+  --claim 'claimed today from a tree that vanishes' --source s --touches 'api/today.ts'
+ok "claiming it from the tree that vanishes" claim --project "$WORK/stale-two" --id claimed-today \
+  --run 2026-08-27-vanishing
+ok "reporting staleness while the holder is live" stale --project "$WORK/stale-one" --days 30
+is STALE_COUNT 0 "a claim taken today by a live tree was reported stale"
+rm -rf "$WORK/stale-two"
+sbefore="$(cd "$SROOT" && find . -type f | sort | xargs shasum)"
+ok "reporting staleness after the holder's tree is gone" stale --project "$WORK/stale-one" --days 30
+said $'STALE\tclaimed-today\tclaim-holder-gone\t2026-08-27-vanishing\tclaimed today from a tree that vanishes' \
+  "a claim whose worktree is gone was not reported, or not with its holder and claim"
+is STALE_COUNT 1 "stale reported the wrong number of candidates for a gone holder"
+safter="$(cd "$SROOT" && find . -type f | sort | xargs shasum)"
+[ "$sbefore" = "$safter" ] || fail "stale wrote to the to-do list when it found a gone holder"
+
 # ─── the scratch tree is the only thing that was written ──────────────────────
 [ ! -e "$HOME/.pln" ] || fail "the helper wrote to the developer's pln state directory"
 

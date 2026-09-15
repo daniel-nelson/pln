@@ -39,6 +39,7 @@ Usage:
   pln-todo check --id ID [--against CSV] [--run TEXT]
   pln-todo claim --id ID --run TEXT [--touches CSV] [--holds CSV]
                  [--against CSV] [--steal HOLDER]
+  pln-todo release --id ID --run TEXT
   pln-todo mark --id ID [--run TEXT] [--state S] [--status S] [--urgent true|false] [--group TEXT]
                 [--touches CSV] [--holds CSV] [--depends-on CSV] [--source TEXT]
                 [--add-sub-item TEXT] [--sub-item-state "[ ]"|"[-]"|"[x]"]
@@ -50,9 +51,15 @@ Global options: [--project DIR] [--no-create]
 
 There is no delete subcommand: a record is archived, never destroyed.
 
+A claim is held by a run and the worktree it claimed from, together. `release`
+gives one back; a claim whose worktree is gone is released by whoever needs it,
+on that evidence alone, and reported when it happens. A holder that is still on
+disk is moved only by `claim --steal`, never released out from under it.
+
 Exit codes: 0 done, 2 usage or failure, 3 refused (a collision, an occupied path,
-no resolvable to-do list). Every subcommand resolves the to-do list first and reports
-TODO_ROOT, whether it created one, and whether the location question is owed.
+a live holder, no resolvable to-do list). Every subcommand resolves the to-do list
+first and reports TODO_ROOT, whether it created one, and whether the location
+question is owed.
 
 Env overrides (for testing):
   PLN_TODO_DATE — the UTC date the helper writes (YYYY-MM-DD)
@@ -834,6 +841,48 @@ index_line_for() {
   LC_ALL=C grep -F -- "\`$LIVE_DIR/$1.md\`" "$TODO_ROOT/$INDEX_NAME" | head -1
 }
 
+# ------------------------------------------------------------ a holder's liveness
+
+# A claim is an assertion that somebody is writing those paths right now, and it
+# is the only thing in this store with no expiry: the run that took it is the
+# only thing that can give it back. So a run that never reaches its own close —
+# a session closed, a worktree deleted, a machine rebooted — leaves a hold that
+# outlives the work by any amount, and the next run is refused by a writer that
+# stopped writing days ago.
+#
+# `claimed_in` is what answers that, and until now nothing asked it. The rule is
+# `lock_is_dead`'s, for the same reason: release only where the evidence says the
+# holder is gone, never on a guess. An absent worktree is evidence — nothing is
+# being written from a directory that is not there. Everything else is left
+# standing: a record predating `claimed_in` names no tree and so proves nothing,
+# and a tree that is still on disk is treated as live whether or not any session
+# is attached to it, because a run between turns and a run that died look
+# identical from here.
+holder_is_dead() {
+  local wt="$1"
+  [ -n "$wt" ] || return 1
+  [ ! -d "$wt" ] || return 1
+  return 0
+}
+
+# `UNKNOWN` is pln's word for a write set nobody has established — `pln-scheduler`
+# reads it as a lease that overlaps everything, which is what keeps an unresolved
+# target serial. A `touches` list carrying it means the same thing and must refuse
+# for the same reason an absent list does. Without this it is a path like any
+# other: no separator, so it contains nothing and nothing contains it, and the
+# item is reported parallel-safe against the whole store. That makes writing down
+# that you do not know strictly more permissive than writing nothing at all,
+# which inverts the rule the empty case exists to hold.
+# Matched as a whole line without a pipe: `grep -q` exits on its first hit, and
+# under `pipefail` a SIGPIPE on the writing side would come back as the
+# pipeline's status and invert the answer.
+declares_unknown() {
+  case "$1" in
+    UNKNOWN | UNKNOWN$'\n'* | *$'\n'UNKNOWN | *$'\n'UNKNOWN$'\n'*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # ----------------------------------------------------------------- the overlap
 
 overlap_report() {
@@ -847,7 +896,7 @@ overlap_report() {
   # covers `path` only — a shared `holds` resource, and an undeclared `touches`,
   # keep refusing whoever asks.
   local a="$1" b="$2" run="${3:-}" wt="${4:-}" af bf ta tb ha hb x y hit=0
-  local exempt=0 other_rec other_run other_wt
+  local exempt=0 other_rec other_run other_wt why
   af="$(detail_path "$a")"; bf="$(detail_path "$b")"
   if [ -n "$run" ] && [ -n "$wt" ]; then
     other_rec="$(parse_detail "$bf")" || other_rec=''
@@ -862,10 +911,13 @@ overlap_report() {
   ha="$(detail_list "$af" holds)"
   hb="$(detail_list "$bf" holds)"
 
-  if [ -z "$tb" ]; then
-    printf 'COLLISION\t%s\tunknown\t%s\n' "$b" "$b declares no touches"
+  # Undeclared and `UNKNOWN` are the same answer — nobody has established this
+  # item's write set — so they refuse alike and only the wording differs.
+  if [ -z "$tb" ] || declares_unknown "$tb"; then
+    if [ -z "$tb" ]; then why="$b declares no touches"; else why="$b declares an unknown write set"; fi
+    printf 'COLLISION\t%s\tunknown\t%s\n' "$b" "$why"
     hit=1
-  elif [ -n "$ta" ]; then
+  elif [ -n "$ta" ] && ! declares_unknown "$ta"; then
     while IFS= read -r x; do
       [ -n "$x" ] || continue
       x="${x%/}"
@@ -918,13 +970,17 @@ run_check() {
   # $1 = subject id, $2 = CSV of ids to compare against ('' = the claimed set),
   # $3 = the run asking (or ''), $4 = the worktree it is asking from (or '').
   local id="$1" against="$2" run="${3:-}" wt="${4:-}"
-  local others other refused=0 subject_touches
+  local others other refused=0 subject_touches derived=1
+  local other_rec other_run other_wt
   subject_touches="$(detail_list "$(detail_path "$id")" touches)"
 
   if [ -n "$against" ]; then
     others="$(csv_to_lines "$against")"
     # A caller-named set is honored verbatim: the seam the exemption answers is
-    # in the derivation, and the caller named this set themselves.
+    # in the derivation, and the caller named this set themselves. The liveness
+    # skip below is part of that derivation and is dropped here for the same
+    # reason — a named set is the caller's question, not the store's answer.
+    derived=0
     run=''; wt=''
   else
     others="$(claimed_ids)"
@@ -932,8 +988,13 @@ run_check() {
 
   # Absent means unknown, and unknown collides with everything: otherwise the
   # cheapest capture would be the most permissive thing in the to-do list.
-  if [ -z "$subject_touches" ]; then
-    printf 'COLLISION\t-\tunknown\t%s\n' "$id declares no touches"
+  # `UNKNOWN` says the same thing in the scheduler's words and answers the same.
+  if [ -z "$subject_touches" ] || declares_unknown "$subject_touches"; then
+    if [ -z "$subject_touches" ]; then
+      printf 'COLLISION\t-\tunknown\t%s\n' "$id declares no touches"
+    else
+      printf 'COLLISION\t-\tunknown\t%s\n' "$id declares an unknown write set"
+    fi
     refused=1
   fi
 
@@ -941,6 +1002,21 @@ run_check() {
     [ -n "$other" ] || continue
     [ "$other" != "$id" ] || continue
     [ -f "$(detail_path "$other")" ] || fail "no such to-do item: $other"
+    # The compared set is "what somebody is working right now", and a claim whose
+    # worktree is gone is nobody working anything. Constraining a live run with a
+    # dead one's declared writes is how a finished session blocks the next one
+    # indefinitely. The line is printed rather than the record quietly dropped,
+    # because the reader is owed the difference between an item that was never
+    # claimed and one whose claimant is gone.
+    if [ "$derived" = 1 ]; then
+      other_rec="$(parse_detail "$(detail_path "$other")")" || other_rec=''
+      other_run="$(printf '%s' "$other_rec" | LC_ALL=C cut -f7)"
+      other_wt="$(printf '%s' "$other_rec" | LC_ALL=C cut -f10)"
+      if holder_is_dead "$other_wt"; then
+        printf 'DEAD_HOLDER\t%s\t%s\t%s\n' "$other" "${other_run:--}" "$other_wt"
+        continue
+      fi
+    fi
     if ! overlap_report "$id" "$other" "$run" "$wt"; then refused=1; fi
   done <<EOF
 $others
@@ -971,6 +1047,30 @@ set_field() {
       if (i > 0) {
         k = substr($0, 1, i - 1); sub(/^[ \t]+/, "", k); sub(/[ \t]+$/, "", k)
         if (k == key) { print key ": " value; done = 1; next }
+      }
+      print; next
+    }
+    { print }
+  ' "$file" > "$tmp"
+  mv "$tmp" "$file"
+}
+
+# Remove a frontmatter key outright. A released record should read exactly like
+# one nobody has claimed yet — which is a record with no `claimed_by` line at all,
+# since that is the shape `add` writes. Setting the key to an empty value would
+# leave three keys that `parse_detail` reads as unheld and a person reads as a
+# claim.
+clear_field() {
+  local file="$1" key="$2" tmp
+  tmp="$(mktemp "$(dirname "$file")/.pln-todo-detail.XXXXXX")"
+  LC_ALL=C awk -v key="$key" '
+    NR == 1 { print; inhdr = 1; next }
+    inhdr && $0 == "---" { inhdr = 0; print; next }
+    inhdr {
+      i = index($0, ":")
+      if (i > 0) {
+        k = substr($0, 1, i - 1); sub(/^[ \t]+/, "", k); sub(/[ \t]+$/, "", k)
+        if (k == key) next
       }
       print; next
     }
@@ -1241,18 +1341,30 @@ case "$command" in
     # the holder's own when both halves match. An older record carrying no
     # `claimed_in` matches no tree and is released by `--steal` like any other.
     held_elsewhere=0
+    holder_dead=0
     if [ -n "$holder" ] && { [ "$holder" != "$run" ] || [ "$holder_wt" != "$PROJECT_TOP" ]; }; then
       held_elsewhere=1
     fi
+    if [ "$held_elsewhere" = 1 ] && holder_is_dead "$holder_wt"; then holder_dead=1; fi
     if [ "$held_elsewhere" = 1 ]; then
       if [ -n "$holder_wt" ]; then held_desc="$holder in $holder_wt"; else held_desc="$holder"; fi
-      if [ -z "$steal" ]; then
-        printf 'CLAIM=refused\nHELD_BY=%s\nHELD_IN=%s\n' "$holder" "${holder_wt:--}"
-        refuse "$id is held by $held_desc; a stale holder is released only by --steal $holder"
-      fi
-      if [ "$steal" != "$holder" ]; then
+      # A wrong `--steal` is refused whether the holder is live or dead: the
+      # caller named a holder the store does not have, and proceeding would
+      # confirm something false rather than correct it.
+      if [ -n "$steal" ] && [ "$steal" != "$holder" ]; then
         printf 'CLAIM=refused\nHELD_BY=%s\nHELD_IN=%s\n' "$holder" "${holder_wt:--}"
         refuse "--steal names $steal but $id is held by $held_desc; nothing was released"
+      fi
+      # A dead holder needs no `--steal`, because `--steal` is a decision and
+      # this is a fact: there is nothing to weigh against a worktree that is not
+      # there. A live one still does — displacing a run that is mid-flight is
+      # exactly the call that should not be made for the caller.
+      if [ -z "$steal" ] && [ "$holder_dead" = 0 ]; then
+        printf 'CLAIM=refused\nHELD_BY=%s\nHELD_IN=%s\n' "$holder" "${holder_wt:--}"
+        if [ -z "$holder_wt" ]; then
+          refuse "$id is held by $holder, which records no worktree, so nothing here can tell whether that run is still going; take it with --steal $holder"
+        fi
+        refuse "$id is held by $held_desc, and that worktree is still on disk; take it with --steal $holder"
       fi
     fi
     # Taking an item is the moment somebody has actually looked at it, so it is
@@ -1272,8 +1384,12 @@ case "$command" in
     printf '%s\n' "$check_out"
     if [ "$check_rc" != 0 ]; then
       printf 'CLAIM=refused\n'
-      if [ -z "$(detail_list "$detail" touches)" ]; then
+      claim_set="$(detail_list "$detail" touches)"
+      if [ -z "$claim_set" ]; then
         refuse "$id declares no touches, so nothing can be said about running it beside anything else; declare its write set on the claim: --touches <paths>"
+      fi
+      if declares_unknown "$claim_set"; then
+        refuse "$id declares an unknown write set, which says the same thing as declaring none; replace it on the claim: --touches <paths>"
       fi
       refuse "$id collides with the declared set; it is not parallel-safe yet"
     fi
@@ -1285,11 +1401,84 @@ case "$command" in
     set_field "$detail" 'claimed_in' "$PROJECT_TOP"
     write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
     release_lock
-    if [ "$held_elsewhere" = 1 ]; then printf 'STOLEN_FROM=%s\n' "$holder"; fi
+    if [ "$holder_dead" = 1 ]; then
+      printf 'RELEASED_DEAD=%s\nRELEASED_FROM=%s\n' "$holder" "$holder_wt"
+    elif [ "$held_elsewhere" = 1 ]; then
+      printf 'STOLEN_FROM=%s\n' "$holder"
+    fi
     printf 'CLAIM=held\nHELD_BY=%s\n' "$run"
     # Read the write set back off the record rather than echoing the argument:
     # what the next claim is checked against is what the file now says.
     printf 'TOUCHES=%s\n' "$(detail_list "$detail" touches | paste -sd, - )"
+    ;;
+
+  # Giving an item back. Until this existed a claim had exactly two ends — the
+  # run's own close, or somebody else's `--steal` — so a run that stopped for any
+  # other reason leaked its hold by construction: interrupted, out of context,
+  # told to do something else, or simply finished with an item it decided not to
+  # take. There was no call that meant "I am not working this", and the only
+  # thing shaped like one, `archive`, removes the record instead. Releasing keeps
+  # the item exactly as it is and clears the three holder fields, so it goes back
+  # to being work anyone can pick up rather than work one dead run owns.
+  release)
+    id=''; run=''
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --project) project="${2:-}"; shift 2 ;;
+        --id) id="${2:-}"; shift 2 ;;
+        --run) run="${2:-}"; shift 2 ;;
+        --no-create) create_flag=0; shift ;;
+        *) usage ;;
+      esac
+    done
+    [ -n "$id" ] && [ -n "$run" ] || usage
+    single_line 'run' "$run"
+    project_context "$project"
+    resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
+    load_header
+    report_resolution
+    detail="$(detail_path "$id")"
+    [ -f "$detail" ] || fail "no such to-do item: $id"
+
+    # Under the same lock as `claim`, and for the same reason: the holder is read
+    # and rewritten as one step or two runs can both read it as theirs.
+    take_lock
+    holder="$(parse_detail "$detail")" || holder=''
+    holder_wt="$(printf '%s' "$holder" | LC_ALL=C cut -f10)"
+    holder="$(printf '%s' "$holder" | LC_ALL=C cut -f7)"
+    if [ -z "$holder" ]; then
+      release_lock
+      # Nothing held, nothing to give back. This is not a failure: a close that
+      # releases every id it took should not have to remember which ones it
+      # actually got, and a release that has already happened stays quiet.
+      printf 'RELEASE=noop\nHELD_BY=-\n'
+      exit 0
+    fi
+    own=0
+    if [ "$holder" = "$run" ] && [ "$holder_wt" = "$PROJECT_TOP" ]; then own=1; fi
+    holder_dead=0
+    if holder_is_dead "$holder_wt"; then holder_dead=1; fi
+    # Your own claim, or one whose worktree is gone. A live holder that is not you
+    # is refused here exactly as it is on `claim`: taking an item away from a run
+    # that is still going is a decision, and `--steal` is where that decision is
+    # made and recorded.
+    if [ "$own" = 0 ] && [ "$holder_dead" = 0 ]; then
+      release_lock
+      if [ -n "$holder_wt" ]; then held_desc="$holder in $holder_wt"; else held_desc="$holder"; fi
+      printf 'RELEASE=refused\nHELD_BY=%s\nHELD_IN=%s\n' "$holder" "${holder_wt:--}"
+      refuse "$id is held by $held_desc, not by $run; a holder that is still there is moved with claim --steal $holder, never released out from under it"
+    fi
+    clear_field "$detail" 'claimed_by'
+    clear_field "$detail" 'claimed_at'
+    clear_field "$detail" 'claimed_in'
+    write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
+    release_lock
+    if [ "$own" = 1 ]; then reason='own-claim'; else reason='holder-gone'; fi
+    printf 'RELEASE=released\nRELEASED=%s\nRELEASE_REASON=%s\nWAS_HELD_BY=%s\nWAS_HELD_IN=%s\n' \
+      "$id" "$reason" "$holder" "${holder_wt:--}"
+    line="$(index_line_for "$id")"
+    [ -n "$line" ] || fail "the index was rebuilt without $id"
+    printf 'INDEX_LINE=%s\n' "$line"
     ;;
 
   mark)
@@ -1452,15 +1641,34 @@ case "$command" in
     now="$(today)"
     cutoff="$(cutoff_date "$now" "$days")"
     records="$(live_records)" || fail "cannot read the to-do list's detail files"
+    # Which held records name a worktree that is no longer there. This is a
+    # filesystem question and awk cannot ask it, so it is answered here and
+    # handed in as a set. It is deliberately not on the `--days` clock: age is a
+    # guess about whether a run is still going, and an absent worktree is an
+    # answer. A run working several trees in parallel accumulates these in hours,
+    # which is far inside any cutoff worth setting for the aged case.
+    dead_ids="$(printf '%s' "$records" \
+      | LC_ALL=C awk -F '\t' '$7 != "" && $10 != "" { print $1 "\t" $10 }' \
+      | while IFS="$(printf '\t')" read -r rid rwt; do
+          [ -n "$rid" ] || continue
+          if holder_is_dead "$rwt"; then printf '%s\n' "$rid"; fi
+        done | LC_ALL=C paste -sd, -)"
     # Report only. Nothing here writes, marks or archives: a record leaves the
     # live to-do list on the user's confirmation, never on this helper's judgment.
-    stale_out="$(printf '%s' "$records" | LC_ALL=C awk -F '\t' -v cutoff="$cutoff" '
+    # That holds for a dead holder too — `release` and `claim` act on that
+    # evidence, because they are a run saying what it is doing; `stale` only says
+    # what it found.
+    stale_out="$(printf '%s' "$records" | LC_ALL=C awk -F '\t' -v cutoff="$cutoff" -v dead=",$dead_ids," '
       NF >= 9 {
         id = $1; state = $2; status = $4; opened = $5; by = $7; at = $8; claim = $9
         reasons = ""
         if (state == "[x]") reasons = "completed-not-archived"
         if (status == "dropped") reasons = reasons == "" ? "dropped-not-archived" : reasons ",dropped-not-archived"
-        if (by != "" && at != "" && at <= cutoff)
+        # The stronger reason replaces the weaker: an abandoned claim is a guess
+        # from a date, and a holder whose tree is gone is not a guess at all.
+        if (by != "" && index(dead, "," id ",") > 0)
+          reasons = reasons == "" ? "claim-holder-gone" : reasons ",claim-holder-gone"
+        else if (by != "" && at != "" && at <= cutoff)
           reasons = reasons == "" ? "claim-abandoned" : reasons ",claim-abandoned"
         if (reasons == "" && opened != "" && opened <= cutoff) reasons = "aged"
         if (reasons == "") next

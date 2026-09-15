@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.84.0 — 2026-09-15
+
+### Fixed
+
+- **A refused claim no longer rewrites the item's write set on its way out.** `claim --touches` lands the declaration before the collision check, because the check is what it is for — and on a refusal it stayed. Observed in a live store: a claim refused against three holders left a twenty-one entry `touches` list on the item it failed to take, written on behalf of a run that was then refused and walked away. The check and the record are taken under one lock precisely so that a claim has two outcomes; a refusal that permanently rewrote the record is a third, and the next run compares against a declaration nobody stands behind. Where that declaration is narrower than what the item really writes — the easy mistake, since it is typed before the work — every later parallel-safety answer under-declares on its authority. `touches` and `holds` are now restored on every refusing path. A claim that succeeds keeps its declaration, unchanged.
+
+- **The holder is written in one rewrite, so a record can never be read carrying part of one.** `claimed_by`, `claimed_at` and `claimed_in` were three separate rewrite-and-rename passes with two windows between them, and `mark` was up to eight. A process that dies in a window — a kill, an OOM, a turn denied and abandoned mid-flight — leaves a record with some of a holder and not the rest, and the `EXIT` trap releases the to-do list's lock on the way out, so the next reader gets no signal at all. A record in that state was found in a live store: a `claimed_at` with no `claimed_by` and no `claimed_in`, which reads as unheld to every tool here and as claimed to a person opening the file, and names a date for a run that does not hold it. The three fields are now written together and cleared together; `mark` is one rewrite too. `claimed_by` is the holder, so a record carrying either of the others without it is a remnant: `stale` reports it as `holder-record-inconsistent` whatever its dates say — this is not a judgment about age — and `release` clears it, which is the only honest thing that can be done with it and is what that subcommand is for.
+
 ## 1.83.0 — 2026-09-15
 
 ### Fixed

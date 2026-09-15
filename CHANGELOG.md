@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.85.0 — 2026-09-15
+
+### Fixed
+
+- **A run can no longer decide by itself that the user's own source may not go to the peer, and can no longer report the peer as blocked without having asked it.** Observed on a Codex run whose `~/.pln/config.yaml` carried `peer_consent: true` and `peer_egress: consent`, and whose plan review had already completed three peer reads at `STATUS=ok`: at `/pln-pr`'s R3 adversarial slot it stopped calling `pln-peer` entirely, substituted a same-model reader, and closed by telling the user the cross-model review "could not run because policy prohibited sending private source code externally." No such policy existed. What it had found was the user's own global instruction granting standing approval for something narrower — sending synthetic eval fixtures to a model API — and it read that grant as the ceiling on every external send, so material the grant did not mention became material the grant forbade. The recorded consent that actually governs this traffic, and that the user had answered twice at install, never entered the reasoning. The wording invited it: `--material` asked the model to decide whether "repository/session instructions and inspected content permit cross-provider egress", which is a search for permission in instruction files for a question `peer_consent` and `peer_egress` had already closed. `--material` is now scoped to this material alone, `unknown` is named as the ordinary answer rather than a hedge, and a suppression state requires an instruction that names *this* material sensitive, confidential, private, or local-only — quoted where the suppression is reported, and absent a quotable one, not a suppression. A private or proprietary repository is not by itself sensitive: the user's own source is what the peer is for. An authorization covering other traffic is not a prohibition on this traffic. And no run may call the peer blocked, prohibited, or unavailable without a `STATUS=` line from the helper saying so — where the material really does look suppressed, it is classified, the helper is run, and its answer is reported, so the decision is attributable and the user can change it with `pln-config` rather than argue with a reading of an instruction file they cannot see.
+
 ## 1.84.0 — 2026-09-15
 
 ### Fixed

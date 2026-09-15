@@ -1314,6 +1314,68 @@ is STALE_COUNT 1 "stale reported the wrong number of candidates for a gone holde
 safter="$(cd "$SROOT" && find . -type f | sort | xargs shasum)"
 [ "$sbefore" = "$safter" ] || fail "stale wrote to the to-do list when it found a gone holder"
 
+# ─── a refused claim leaves the record exactly as it found it ─────────────────
+# The check and the record are taken under one lock so that a claim either
+# happens or does not. The write set has to be declared before the check, because
+# the check is what it is for — but a refusal that kept the declaration is
+# neither of those two outcomes, and the run that wrote it walked away. The next
+# run then compares against a write set nobody stands behind, and a narrower one
+# than the item really writes under-declares for everyone after it.
+RROOT="$WORK/rollback-root"
+for tree in roll-one roll-two; do
+  new_repo "$WORK/$tree"
+  printf 'pln-todo: %s\n' "$RROOT" > "$WORK/$tree/CLAUDE.md"
+done
+ok "filing the item that will block" add --project "$WORK/roll-one" --id roll-blocker \
+  --claim 'holds the contested path' --source s --touches 'api/contested.ts'
+ok "filing the item that will be refused" add --project "$WORK/roll-one" --id roll-subject \
+  --claim 'declares on the claim and is refused' --source s --touches 'api/own.ts' --holds 'own-lock'
+ok "the other tree taking the blocker" claim --project "$WORK/roll-two" --id roll-blocker --run 2026-08-27-live
+refused "declaring a colliding write set on a claim" claim --project "$WORK/roll-one" \
+  --id roll-subject --run 2026-08-27-mine --touches 'api/contested.ts,api/extra.ts' --holds 'prod-deploy'
+has "$RROOT/items/roll-subject.md" 'touches: [api/own.ts]' \
+  "a refused claim kept the write set it declared on the way in"
+has "$RROOT/items/roll-subject.md" 'holds: [own-lock]' \
+  "a refused claim kept the holds it declared on the way in"
+hasnt "$RROOT/items/roll-subject.md" 'claimed_by:' "a refused claim recorded a holder"
+# The declaration is not lost when the claim succeeds — that is what it is for.
+ok "declaring a clear write set on a claim" claim --project "$WORK/roll-one" --id roll-subject \
+  --run 2026-08-27-mine --touches 'api/own.ts,api/second.ts'
+has "$RROOT/items/roll-subject.md" 'touches: [api/own.ts, api/second.ts]' \
+  "a successful claim did not keep the write set it declared"
+
+# ─── a holder is three fields and is never readable as part of one ────────────
+# `claimed_by`, `claimed_at` and `claimed_in` are written and cleared in one
+# rewrite. Written one at a time there are windows in which a killed process
+# leaves a record carrying part of a holder: unheld to every tool here, claimed
+# to a person opening the file, and naming a date or a worktree for a run that
+# does not hold it. Such a record has been seen in a live store. This covers what
+# is observable — that the remnant is named rather than passed over, and that the
+# helper can clear it.
+ok "filing an item to leave a remnant on" add --project "$WORK/roll-one" --id remnant \
+  --claim 'carries part of a holder' --source s --touches 'api/remnant.ts'
+ok "claiming it properly first" claim --project "$WORK/roll-one" --id remnant --run 2026-08-27-mine
+has "$RROOT/items/remnant.md" 'claimed_by: 2026-08-27-mine' "the claim did not record a holder"
+LC_ALL=C sed '/^claimed_by:/d' "$RROOT/items/remnant.md" > "$RROOT/items/remnant.md.tmp"
+mv "$RROOT/items/remnant.md.tmp" "$RROOT/items/remnant.md"
+has "$RROOT/items/remnant.md" 'claimed_at:' "the fixture did not leave a remnant behind"
+ok "reporting a record carrying part of a holder" stale --project "$WORK/roll-one" --days 30
+said $'STALE\tremnant\tholder-record-inconsistent\t-\tcarries part of a holder' \
+  "a record carrying part of a holder was not reported"
+ok "clearing a record that carries part of a holder" release --project "$WORK/roll-one" \
+  --id remnant --run 2026-08-27-mine
+is RELEASE cleared "a holder remnant was treated as nothing to do"
+is RELEASE_REASON holder-record-inconsistent "clearing a remnant was attributed to something else"
+hasnt "$RROOT/items/remnant.md" 'claimed_at:' "the remnant was reported and not cleared"
+hasnt "$RROOT/items/remnant.md" 'claimed_in:' "the remnant's worktree line survived"
+ok "the cleared record is freely claimable" claim --project "$WORK/roll-one" --id remnant \
+  --run 2026-08-27-after
+said 'CLAIM=held' "a record whose remnant was cleared could not be claimed"
+# And a claim over a remnant writes a whole holder rather than inheriting half of
+# one: the three fields go in together, so what was left cannot survive alongside.
+ok "reporting staleness once the remnant is gone" stale --project "$WORK/roll-one" --days 30
+didnt_say 'holder-record-inconsistent' "a fully claimed record was still reported inconsistent"
+
 # ─── the scratch tree is the only thing that was written ──────────────────────
 [ ! -e "$HOME/.pln" ] || fail "the helper wrote to the developer's pln state directory"
 

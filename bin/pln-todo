@@ -1032,27 +1032,66 @@ EOF
 
 # ------------------------------------------------------------------ frontmatter
 
-set_field() {
-  # $1 = detail file, $2 = key, $3 = value (already YAML-safe)
-  local file="$1" key="$2" value="$3" tmp
+# Write several frontmatter keys in ONE rewrite. The record's holder is three
+# fields — `claimed_by`, `claimed_at`, `claimed_in` — and writing them one at a
+# time is three separate rewrite-and-rename passes with two windows between them.
+# A process that dies in a window (a kill, an OOM, a denied-and-abandoned turn)
+# leaves a record carrying some of a holder and not the rest, and the `EXIT` trap
+# releases the to-do list's lock on the way out, so the next reader sees a
+# half-written claim with nothing to tell it so. The claim is already taken under
+# one lock; the record it produces is now written under one rename too.
+#
+# Ops arrive on stdin, one per line, as `set<TAB>key<TAB>value` or `del<TAB>key`.
+# Keys absent from the record are appended before its closing `---`, in the order
+# given; `del` removes the line outright.
+set_fields() {
+  local file="$1" ops tmp
+  ops="$(mktemp "$(dirname "$file")/.pln-todo-ops.XXXXXX")"
+  cat > "$ops"
+  # A tab or newline inside a value would split into a key nobody asked for, so
+  # the encoding is checked rather than trusted — these values include a
+  # worktree path, which this helper never composed.
+  if LC_ALL=C awk -F '\t' '($1 == "set" && NF == 3) || ($1 == "del" && NF == 2) { next } { exit 1 }' "$ops"; then :; else
+    rm -f "$ops"; fail "internal: malformed frontmatter write for $file"
+  fi
   tmp="$(mktemp "$(dirname "$file")/.pln-todo-detail.XXXXXX")"
-  LC_ALL=C awk -v key="$key" -v value="$value" '
+  LC_ALL=C awk -v opsfile="$ops" '
+    BEGIN {
+      FS = "\t"
+      while ((getline line < opsfile) > 0) {
+        n++
+        split(line, f, "\t")
+        op[n] = f[1]; key[n] = f[2]; val[n] = f[3]
+        idx[f[2]] = n
+      }
+      close(opsfile)
+    }
     NR == 1 { print; inhdr = 1; next }
     inhdr && $0 == "---" {
-      if (!done) { print key ": " value; done = 1 }
+      for (i = 1; i <= n; i++) if (op[i] == "set" && !done[i]) { print key[i] ": " val[i]; done[i] = 1 }
       inhdr = 0; print; next
     }
     inhdr {
       i = index($0, ":")
       if (i > 0) {
         k = substr($0, 1, i - 1); sub(/^[ \t]+/, "", k); sub(/[ \t]+$/, "", k)
-        if (k == key) { print key ": " value; done = 1; next }
+        if (k in idx) {
+          j = idx[k]
+          if (op[j] == "del") { done[j] = 1; next }
+          print key[j] ": " val[j]; done[j] = 1; next
+        }
       }
       print; next
     }
     { print }
   ' "$file" > "$tmp"
+  rm -f "$ops"
   mv "$tmp" "$file"
+}
+
+set_field() {
+  # $1 = detail file, $2 = key, $3 = value (already YAML-safe)
+  printf 'set\t%s\t%s\n' "$2" "$3" | set_fields "$1"
 }
 
 # Remove a frontmatter key outright. A released record should read exactly like
@@ -1061,22 +1100,7 @@ set_field() {
 # leave three keys that `parse_detail` reads as unheld and a person reads as a
 # claim.
 clear_field() {
-  local file="$1" key="$2" tmp
-  tmp="$(mktemp "$(dirname "$file")/.pln-todo-detail.XXXXXX")"
-  LC_ALL=C awk -v key="$key" '
-    NR == 1 { print; inhdr = 1; next }
-    inhdr && $0 == "---" { inhdr = 0; print; next }
-    inhdr {
-      i = index($0, ":")
-      if (i > 0) {
-        k = substr($0, 1, i - 1); sub(/^[ \t]+/, "", k); sub(/[ \t]+$/, "", k)
-        if (k == key) next
-      }
-      print; next
-    }
-    { print }
-  ' "$file" > "$tmp"
-  mv "$tmp" "$file"
+  printf 'del\t%s\n' "$2" | set_fields "$1"
 }
 
 append_sub_item() {
@@ -1373,10 +1397,27 @@ case "$command" in
     # run that just read the item, under the same lock the check runs in, so the
     # check below sees what was declared rather than the empty field it was
     # filed with.
-    [ "$have_claim_touches" = 0 ] || set_field "$detail" 'touches' \
-      "$(csv_to_lines "$claim_touches" | lines_to_yaml_list)"
-    [ "$have_claim_holds" = 0 ] || set_field "$detail" 'holds' \
-      "$(csv_to_lines "$claim_holds" | lines_to_yaml_list)"
+    #
+    # The declaration has to land before the check, because the check is what it
+    # is for. But a refused claim must not leave it behind: the whole point of
+    # taking the check and the record under one lock is that a claim either
+    # happens or does not, and a refusal that permanently rewrote the item's write
+    # set is neither. Worse, the run that wrote it walked away — so the next run
+    # compares against a declaration nobody stands behind, and a narrower one than
+    # the item really writes silently under-declares for everyone after. The prior
+    # values are held here and put back on every refusing path below.
+    prior_touches="$(detail_list "$detail" touches | lines_to_yaml_list)"
+    prior_holds="$(detail_list "$detail" holds | lines_to_yaml_list)"
+    declared=0
+    if [ "$have_claim_touches" = 1 ] || [ "$have_claim_holds" = 1 ]; then
+      declared=1
+      {
+        [ "$have_claim_touches" = 0 ] || printf 'set\ttouches\t%s\n' \
+          "$(csv_to_lines "$claim_touches" | lines_to_yaml_list)"
+        [ "$have_claim_holds" = 0 ] || printf 'set\tholds\t%s\n' \
+          "$(csv_to_lines "$claim_holds" | lines_to_yaml_list)"
+      } | set_fields "$detail"
+    fi
     set +e
     check_out="$(run_check "$id" "$against" "$run" "$PROJECT_TOP")"
     check_rc=$?
@@ -1385,6 +1426,10 @@ case "$command" in
     if [ "$check_rc" != 0 ]; then
       printf 'CLAIM=refused\n'
       claim_set="$(detail_list "$detail" touches)"
+      if [ "$declared" = 1 ]; then
+        printf 'set\ttouches\t%s\nset\tholds\t%s\n' "$prior_touches" "$prior_holds" \
+          | set_fields "$detail"
+      fi
       if [ -z "$claim_set" ]; then
         refuse "$id declares no touches, so nothing can be said about running it beside anything else; declare its write set on the claim: --touches <paths>"
       fi
@@ -1393,12 +1438,16 @@ case "$command" in
       fi
       refuse "$id collides with the declared set; it is not parallel-safe yet"
     fi
-    set_field "$detail" 'claimed_by' "$run"
-    set_field "$detail" 'claimed_at' "$(today)"
+    # The holder is three fields and is written as one rewrite. Written one at a
+    # time it has two windows in which a killed process leaves a record carrying
+    # part of a holder — which reads as unheld to every tool and as claimed to a
+    # person, and says a date or a worktree for a run that does not hold it.
+    #
     # The worktree travels with the run because a run string is not unique on its
     # own: two repositories whose instructions declare one to-do-list root can carry
     # the same `<date>-<slug>` on one day, with no scheduler edge between them.
-    set_field "$detail" 'claimed_in' "$PROJECT_TOP"
+    printf 'set\tclaimed_by\t%s\nset\tclaimed_at\t%s\nset\tclaimed_in\t%s\n' \
+      "$run" "$(today)" "$PROJECT_TOP" | set_fields "$detail"
     write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
     release_lock
     if [ "$holder_dead" = 1 ]; then
@@ -1443,10 +1492,26 @@ case "$command" in
     # Under the same lock as `claim`, and for the same reason: the holder is read
     # and rewritten as one step or two runs can both read it as theirs.
     take_lock
-    holder="$(parse_detail "$detail")" || holder=''
-    holder_wt="$(printf '%s' "$holder" | LC_ALL=C cut -f10)"
-    holder="$(printf '%s' "$holder" | LC_ALL=C cut -f7)"
+    holder_rec="$(parse_detail "$detail")" || holder_rec=''
+    holder_wt="$(printf '%s' "$holder_rec" | LC_ALL=C cut -f10)"
+    holder_at="$(printf '%s' "$holder_rec" | LC_ALL=C cut -f8)"
+    holder="$(printf '%s' "$holder_rec" | LC_ALL=C cut -f7)"
     if [ -z "$holder" ]; then
+      # `claimed_by` is the holder; `claimed_at` and `claimed_in` mean nothing
+      # without it. A record carrying one of those and no holder is a claim that
+      # was written or removed in pieces — it reads as unheld to every tool here
+      # and as claimed to a person opening the file, and it names a date or a
+      # worktree for a run that does not hold it. Clearing the remnant is the
+      # only thing `release` can honestly do with it, and it is what this
+      # subcommand is for.
+      if [ -n "$holder_at" ] || [ -n "$holder_wt" ]; then
+        printf 'del\tclaimed_at\ndel\tclaimed_in\n' | set_fields "$detail"
+        write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
+        release_lock
+        printf 'RELEASE=cleared\nRELEASED=%s\nRELEASE_REASON=holder-record-inconsistent\nWAS_HELD_BY=-\nWAS_HELD_IN=%s\n' \
+          "$id" "${holder_wt:--}"
+        exit 0
+      fi
       release_lock
       # Nothing held, nothing to give back. This is not a failure: a close that
       # releases every id it took should not have to remember which ones it
@@ -1468,9 +1533,9 @@ case "$command" in
       printf 'RELEASE=refused\nHELD_BY=%s\nHELD_IN=%s\n' "$holder" "${holder_wt:--}"
       refuse "$id is held by $held_desc, not by $run; a holder that is still there is moved with claim --steal $holder, never released out from under it"
     fi
-    clear_field "$detail" 'claimed_by'
-    clear_field "$detail" 'claimed_at'
-    clear_field "$detail" 'claimed_in'
+    # One rewrite, for the reason `claim` writes them in one: a record must never
+    # be readable carrying part of a holder.
+    printf 'del\tclaimed_by\ndel\tclaimed_at\ndel\tclaimed_in\n' | set_fields "$detail"
     write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
     release_lock
     if [ "$own" = 1 ]; then reason='own-claim'; else reason='holder-gone'; fi
@@ -1538,15 +1603,19 @@ case "$command" in
       refuse "$id is held by $mark_desc; take it back with claim --steal $mark_holder before marking it"
     fi
     # The helper owns the frontmatter and the sub-item checklist it appends to,
-    # and nothing else in the body.
-    [ -z "$set_state" ] || set_field "$detail" 'state' "\"$set_state\""
-    [ -z "$set_status" ] || set_field "$detail" 'status' "$set_status"
-    [ -z "$set_urgent" ] || set_field "$detail" 'urgent' "$set_urgent"
-    [ "$have_group" = 0 ] || set_field "$detail" 'group' "$set_group"
-    [ -z "$set_source" ] || set_field "$detail" 'source' "$set_source"
-    [ "$have_touches" = 0 ] || set_field "$detail" 'touches' "$(csv_to_lines "$set_touches" | lines_to_yaml_list)"
-    [ "$have_holds" = 0 ] || set_field "$detail" 'holds' "$(csv_to_lines "$set_holds" | lines_to_yaml_list)"
-    [ "$have_depends" = 0 ] || set_field "$detail" 'depends_on' "$(csv_to_lines "$set_depends" | lines_to_yaml_list)"
+    # and nothing else in the body. One `mark` is one rewrite: a call setting a
+    # state and a write set together is one edit to the reader, and writing it as
+    # eight leaves seven moments where the record says half of what was asked.
+    {
+      [ -z "$set_state" ] || printf 'set\tstate\t"%s"\n' "$set_state"
+      [ -z "$set_status" ] || printf 'set\tstatus\t%s\n' "$set_status"
+      [ -z "$set_urgent" ] || printf 'set\turgent\t%s\n' "$set_urgent"
+      [ "$have_group" = 0 ] || printf 'set\tgroup\t%s\n' "$set_group"
+      [ -z "$set_source" ] || printf 'set\tsource\t%s\n' "$set_source"
+      [ "$have_touches" = 0 ] || printf 'set\ttouches\t%s\n' "$(csv_to_lines "$set_touches" | lines_to_yaml_list)"
+      [ "$have_holds" = 0 ] || printf 'set\tholds\t%s\n' "$(csv_to_lines "$set_holds" | lines_to_yaml_list)"
+      [ "$have_depends" = 0 ] || printf 'set\tdepends_on\t%s\n' "$(csv_to_lines "$set_depends" | lines_to_yaml_list)"
+    } | set_fields "$detail"
     [ -z "$sub" ] || append_sub_item "$detail" "$sub" "$sub_state"
     write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
     release_lock
@@ -1666,6 +1735,10 @@ case "$command" in
         if (status == "dropped") reasons = reasons == "" ? "dropped-not-archived" : reasons ",dropped-not-archived"
         # The stronger reason replaces the weaker: an abandoned claim is a guess
         # from a date, and a holder whose tree is gone is not a guess at all.
+        # A holder written or removed in pieces. Reported whatever its dates
+        # say, because this is not a judgment about age at all.
+        if (by == "" && ($8 != "" || $10 != ""))
+          reasons = reasons == "" ? "holder-record-inconsistent" : reasons ",holder-record-inconsistent"
         if (by != "" && index(dead, "," id ",") > 0)
           reasons = reasons == "" ? "claim-holder-gone" : reasons ",claim-holder-gone"
         else if (by != "" && at != "" && at <= cutoff)

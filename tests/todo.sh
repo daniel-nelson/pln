@@ -1376,6 +1376,64 @@ said 'CLAIM=held' "a record whose remnant was cleared could not be claimed"
 ok "reporting staleness once the remnant is gone" stale --project "$WORK/roll-one" --days 30
 didnt_say 'holder-record-inconsistent' "a fully claimed record was still reported inconsistent"
 
+# ─── decide and proposed are different words for different situations ─────────
+# `decide` is a run that cannot go on until the user answers. `proposed` is a
+# run that found something the user has never seen. Both used to be `decide`,
+# which is how a proposal came to read as a debt.
+R="$WORK/decide-vs-proposed"
+new_repo "$R"
+ok "an empty list reports nothing waiting on the user" list --project "$R"
+is DECIDE_OPEN 0 "an empty list did not report its open-decision count"
+
+ok "filing a proposal" add --project "$R" --id swept-up --status proposed \
+  --claim 'a sweep found a ledger nothing reads' --source 'rule-surface sweep'
+ok "filing a real blocker" add --project "$R" --id really-stuck --status decide \
+  --claim 'the run cannot pick which charge the refund clears' --source 'item 3'
+ok "filing ordinary work" add --project "$R" --id plain-work \
+  --claim 'a test passes vacuously' --source s
+
+ok "the list separates the two" list --project "$R"
+is ITEM_COUNT 3 "three items were not filed"
+is DECIDE_OPEN 1 "a proposal was counted as something waiting on the user"
+said 'proposed · a sweep found a ledger nothing reads' \
+  "a proposal did not render under its own status word"
+said 'decide · the run cannot pick which charge the refund clears' \
+  "a blocker did not render as a decision"
+
+# No ceiling and no refusal: a count is a symptom, and bounding it would bound
+# proposals, which are the thing there is no reason to lose.
+for n in 1 2 3 4 5 6 7 8; do
+  ok "filing proposal $n" add --project "$R" --id "p$n" --claim "proposal $n" \
+    --source sweep --status proposed
+done
+ok "many proposals are not an error" list --project "$R"
+is ITEM_COUNT 11 "filing many proposals was refused or lost"
+is DECIDE_OPEN 1 "proposals moved the count of things waiting on the user"
+
+# "Not now" is an answer: the item leaves decide for the status its shape now
+# has, and stops being rendered as a question.
+ok "answering a blocker with not-now" mark --project "$R" --id really-stuck --status ready
+ok "the answered item no longer waits on the user" list --project "$R"
+is DECIDE_OPEN 0 "an answered decision was still counted as waiting"
+said 'ready · the run cannot pick which charge the refund clears' \
+  "the answered item did not take the status its shape now has"
+
+# A completed decision is not an open one either.
+ok "filing a second blocker" add --project "$R" --id stuck-again --status decide \
+  --claim 'still needs an answer' --source s
+ok "two items, one waiting" list --project "$R"
+is DECIDE_OPEN 1 "a newly filed blocker was not counted"
+ok "marking it done" mark --project "$R" --id stuck-again --state '[x]'
+ok "a completed decision stops waiting" list --project "$R"
+is DECIDE_OPEN 0 "a completed decision was still counted as waiting"
+
+# The closed set is still closed.
+refused "filing an invented status" add --project "$R" --id invented --status someday \
+  --claim 'not a member of the set' --source s
+said 'ready, blocked, decide, proposed or dropped' \
+  "the status error did not name the whole closed set"
+refused "marking an item to an invented status" mark --project "$R" --id plain-work --status someday
+
 # ─── the scratch tree is the only thing that was written ──────────────────────
 [ ! -e "$HOME/.pln" ] || fail "the helper wrote to the developer's pln state directory"
 

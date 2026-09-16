@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.86.0 — 2026-09-16
+
+### Changed
+
+- **One word in the to-do list meant three different things, so every close handed the user settled matters and idle ideas back as debts.** `decide` was the status for a run that could not go on without an answer, for a proposal the user had never seen, and for a decision the user had already made. Read on the store this was written against: nine items filed `decide` and **not one of them a run that was stuck**. Six were a run's own discoveries — two rule-surface sweeps, a `pln-simplify` map, a plan-review flag, an interview's research step — which nothing waits on and the user owes nothing about. Three were decisions the user had already given, to do the thing later or in its own session; one of those carried their own words in its `source` field, *asked for it as a dedicated session*, and was still rendered to them as an unanswered decision at every close for eight days. Nothing was broken and no run did anything wrong. There was one word for three situations.
+
+  The status set gains `proposed` and `decide` narrows to its real meaning. `decide` is now a run saying it is stuck: the work cannot proceed until the user answers, and the answer is not one the run may pick. It is rare by construction, because pln's interview is where a decision belongs — one question at a time, while the plan is still cheap to change — so an item that outlives its run at `decide` is evidence a question escaped the interview. `proposed` is a run saying it found something the user has never seen: the shape is not agreed, so nobody implements it, and nothing is blocked, so nobody owes an answer. `pln-todo list` now prints `DECIDE_OPEN=` on every read. It is reported and deliberately not capped — a ceiling would bound proposals, which are the one thing here there is no reason to lose, and the count is a symptom rather than the disease.
+
+- **"Not now" is an answer, and an answered item no longer stays `decide`.** The twin of the existing rule that a decision *against* an item is a disposition rather than a status to park it in. When the user says the thing is worth doing and not here — its own session, after the release, once the other work lands — that is a decision, and the item leaves `decide` in the same turn it is given, for `ready` when the shape is now agreed or `blocked` when it waits on something the item names, with the user's own words as the record's evidence. Left at `decide` it is filed exactly as an open question, and the next close asks them again about a thing they settled.
+
+- **The two places pln itself filed a `decide` now file a `proposed`.** `/pln`'s simplification-cadence notice at the close, whose own text already said it reaches the user "as one line of the follow-up list rather than as a question" — `decide` contradicted that in the record — and `/pln-simplify`'s unadopted map candidates, which are the canonical case of a run finding something the user has not seen.
+
 ## 1.85.0 — 2026-09-15
 
 ### Fixed

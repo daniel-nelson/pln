@@ -32,7 +32,7 @@ usage() {
   cat >&2 <<'EOF'
 Usage:
   pln-todo init [--project DIR] [--root PATH] [--answered] [--migration-offered]
-  pln-todo add --id ID --claim TEXT --source TEXT [--status ready|blocked|decide|dropped]
+  pln-todo add --id ID --claim TEXT --source TEXT [--status ready|blocked|decide|proposed|dropped]
                [--state "[ ]"|"[-]"|"[x]"] [--urgent] [--group TEXT] [--opened YYYY-MM-DD]
                [--depends-on CSV] [--touches CSV] [--holds CSV] [--body FILE|-]
   pln-todo list [--project DIR]
@@ -128,8 +128,14 @@ valid_state() {
   case "$1" in '[ ]' | '[-]' | '[x]') return 0 ;; *) return 1 ;; esac
 }
 
+# Five words, and the seam that matters runs between two of them. `decide` is a
+# run saying it is stuck: the work in front of it cannot go on until the user
+# answers. `proposed` is a run saying it found something the user has never seen
+# and owes nothing about. Both used to be `decide`, which made a proposal look
+# like a debt every time a close rendered the list — and, read the other way,
+# made a real blocker indistinguishable from a someday idea.
 valid_status() {
-  case "$1" in ready | blocked | decide | dropped) return 0 ;; *) return 1 ;; esac
+  case "$1" in ready | blocked | decide | proposed | dropped) return 0 ;; *) return 1 ;; esac
 }
 
 csv_to_lines() {
@@ -770,6 +776,17 @@ live_records() {
   return 0
 }
 
+# How many items are waiting on the user rather than on a worker. `list` prints
+# it on every read, and it is reported rather than bounded: there is no ceiling
+# and no refusal, because the number is a symptom and not the disease. A run
+# that cannot proceed asks; the interview is where a question belongs. So a
+# `decide` item that outlives the run that filed it is evidence that a question
+# escaped the interview, and the count is how that becomes visible instead of
+# sitting in a file as one word among four.
+open_decide_ids() {
+  live_records | LC_ALL=C awk -F '\t' 'NF >= 9 && $4 == "decide" && $2 != "[x]" { print $1 }'
+}
+
 # --------------------------------------------------------------- the index file
 
 render_index() {
@@ -1193,7 +1210,7 @@ case "$command" in
     [ -n "$id" ] && [ -n "$claim" ] && [ -n "$source" ] || usage
     valid_id "$id" || fail "id must be lowercase letters, digits and hyphens: $id"
     valid_state "$state" || fail "state must be '[ ]', '[-]' or '[x]': $state"
-    valid_status "$status" || fail "status must be ready, blocked, decide or dropped: $status"
+    valid_status "$status" || fail "status must be ready, blocked, decide, proposed or dropped: $status"
     single_line 'claim' "$claim"
     single_line 'source' "$source"
     single_line 'group' "$group"
@@ -1286,6 +1303,9 @@ case "$command" in
     count="$(live_records | LC_ALL=C grep -c '' || true)"
     [ -n "$count" ] || count=0
     printf 'ITEM_COUNT=%s\n' "$count"
+    decide_open="$(open_decide_ids | LC_ALL=C grep -c '' || true)"
+    [ -n "$decide_open" ] || decide_open=0
+    printf 'DECIDE_OPEN=%s\n' "$decide_open"
     if [ "$count" = "0" ]; then printf 'STATUS=empty\n'; else printf 'STATUS=items\n'; fi
     # The output is never empty, so a caller can tell an empty to-do list — a real
     # read — from a failed call, which must fail the close rather than render
@@ -1572,7 +1592,7 @@ case "$command" in
     done
     [ -n "$id" ] || usage
     [ -z "$set_state" ] || valid_state "$set_state" || fail "state must be '[ ]', '[-]' or '[x]': $set_state"
-    [ -z "$set_status" ] || valid_status "$set_status" || fail "status must be ready, blocked, decide or dropped: $set_status"
+    [ -z "$set_status" ] || valid_status "$set_status" || fail "status must be ready, blocked, decide, proposed or dropped: $set_status"
     if [ -n "$set_urgent" ]; then
       case "$set_urgent" in true | false) ;; *) fail "urgent must be true or false: $set_urgent" ;; esac
     fi

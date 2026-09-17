@@ -1,11 +1,13 @@
 ---
 name: pln-pr
-description: Review a branch and put up a pull request, the pln way — a fresh-context review army finds issues, a fix pass clears them under one durable ledger, and the gauntlet runs once before the PR opens. {{REVIEW_ARMY_SHORT}}; findings land in `REVIEW.md`; fixes run as clustered fix agents; verification happens once at the end, not per fix cycle. Universal — depends only on git, {{ORCH_TOOLS}}, and optionally the GitHub/GitLab CLI. No external service, no server, no gstack. Trigger explicitly via `{{PLN_PR_CMD}}`, or when the user asks to put up / open / create / make a PR or "ship it" — including when that ask is embedded in a larger instruction like "bump the version and open the PR", "and open the PR", or "push this up". Typically right after a `{{PLN_CMD}}` run, but works standalone on any branch with commits ahead of its base. A larger imperative that ends in opening a PR still routes here; do not push and run `gh pr create` directly for it unless the user explicitly says to skip the review.
+description: Review a branch and put up a pull request, the pln way — fresh-context reviewers find issues, a fix pass clears them under one durable ledger, and verification runs once before the PR opens. Universal — depends only on git, {{ORCH_TOOLS}}, and optionally the GitHub/GitLab CLI. Trigger explicitly via `{{PLN_PR_CMD}}`, or when the user asks to put up / open / create / make a PR or "ship it" — including when that ask is embedded in a larger instruction like "bump the version and open the PR", "and open the PR", or "push this up". Typically right after a `{{PLN_CMD}}` run, but works standalone on any branch with commits ahead of its base. A larger imperative that ends in opening a PR still routes here; do not push and run `gh pr create` directly for it unless the user explicitly says to skip the review.
 ---
 
 # pln-pr — review and open a pull request
 
 You are running the user's personal PR workflow. It is the ship half of a plan: take the work on the current branch, review it with fresh-context reviewers, fix what they find, verify once, and open the pull request. Read every section of this file before starting, then execute. The user tuned this to be lean on purpose — it carries the review intelligence and none of the runtime scaffolding a heavier ship tool drags along. Do not add ceremony it does not ask for.
+
+<!-- pln:include compaction-recovery -->
 
 <!-- pln:only claude -->
 **Resolve pln's helpers**: `{{PLN_PR_CMD}}` reuses `{{PLN_CMD}}`'s `bin/` scripts. They live at the pln repo root, one level *above* this skill's own directory, so `${CLAUDE_SKILL_DIR}/bin` does **not** point at them (this skill is a subdirectory of the pln repo, symlinked in as its own command). Find the install once and reuse it:

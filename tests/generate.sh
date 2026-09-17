@@ -569,6 +569,107 @@ for host_build in "claude:$real_c" "codex:$real_x"; do
   echo "router ceiling: $host base $base bytes over $sites {{OUTPUT_ROOT}} sites — fits an install root up to $(( (60000 - base) / sites )) characters (ceiling 60000)"
 done
 
+# ─── The compaction-truncation recovery line ─────────────────────────────────
+# Claude Code re-injects the body of each invoked skill after compaction and
+# keeps only "the first 5,000 tokens of each" (`code.claude.com/docs/en/skills`
+# and `/context-window`), truncating from the end. Both routers are well past
+# that: `/pln` is ~13,100 tokens and `/pln-pr` ~10,300, so an automatic compact
+# silently deletes everything from roughly the halfway mark down — for `/pln`
+# that is the whole phase router, including the very sentence telling the
+# coordinator to reread the router after compaction.
+#
+# The recovery line is the cheap fix: a truncated copy is one the model can
+# detect, because the section the line names is the file's last, and re-reading
+# the file restores it in full (a Read is not subject to the cap). That only
+# works while two things hold, so both are asserted here: the line sits near the
+# very top, inside any plausible truncation window, and the section it names as
+# the sentinel still exists under that exact heading. Rename the heading without
+# touching the line and the check inverts — every run decides it was truncated.
+for host_build in "claude:$real_c" "codex:$real_x"; do
+  host="${host_build%%:*}"
+  out="${host_build#*:}"
+  for skill in "/pln:$out/SKILL.md" "/pln-pr:$out/pln-pr/SKILL.md"; do
+    label="${skill%%:*}"
+    f="${skill#*:}"
+    has "$f" 'If `## Phase router` is missing below' \
+      "the $host $label router has no compaction-truncation recovery line"
+    # -x, not a substring match: '## Phase routing' contains '## Phase router',
+    # so a renamed heading would slip past grep -F and the sentinel would be
+    # pointing at a heading that no longer exists.
+    grep -qxF '## Phase router' "$f" \
+      || fail "the $host $label router names '## Phase router' as its truncation sentinel but has no heading exactly that"
+    head -c 4000 "$f" | grep -qF 'If `## Phase router` is missing below' \
+      || fail "the $host $label recovery line is past the first 4000 bytes; truncation would take it too"
+    # The sentinel detects truncation only by being LAST. A section added below
+    # it would be cut away while the sentinel still reads as present, and the
+    # recovery line would report an intact file that is missing its tail.
+    [ "$(grep '^## ' "$f" | tail -1)" = '## Phase router' ] \
+      || fail "the $host $label router ends with $(grep '^## ' "$f" | tail -1), not '## Phase router'; the truncation sentinel must be the last section"
+  done
+done
+
+# ─── Agent Skills specification conformance ──────────────────────────────────
+# Every SKILL.md this repo ships is an Agent Skill in the sense of the open
+# specification at https://agentskills.io/specification, and two of its
+# frontmatter rules are hard limits rather than advice: `name` is 1-64
+# characters of lowercase alphanumerics and single hyphens matching the parent
+# directory, and `description` is at most 1024 characters. A skill that breaks
+# either is rejected by a conforming validator (`skills-ref validate`), so it
+# does not fail loudly here at generation time — it fails silently on somebody
+# else's machine.
+#
+# `/pln-pr` shipped a 1108-character description for several releases. Nothing
+# in the gauntlet looked at the frontmatter, because the router ceiling above
+# measures the whole file and a description is a rounding error inside 60000
+# bytes. This checks the frontmatter itself, on every generated router and on
+# the tracked static one, so the next overlong description is caught by
+# `tests/generate.sh` rather than by a user's validator.
+#
+# The description length is printed, not just asserted: it is the field that
+# grows by accretion, and seeing the number is what stops the growth.
+#
+# The spec's other `name` rules — 64 characters, no leading, trailing or
+# doubled hyphen, nothing outside a-z0-9 — are not checked. `name` is asserted
+# equal to a literal directory name one line below, so a check on its shape
+# could never fail without that assertion failing first.
+spec_name_of() { # spec_name_of <skill.md>
+  awk 'NR==1 && $0 != "---" { exit } NR>1 && $0 == "---" { exit }
+       /^name:/ { sub(/^name:[[:space:]]*/, ""); print; exit }' "$1"
+}
+spec_description_of() { # spec_description_of <skill.md> — joins folded lines
+  awk 'NR==1 && $0 != "---" { exit }
+       NR>1 && $0 == "---" { exit }
+       /^description:/ { sub(/^description:[[:space:]]*/, ""); d=$0; grabbing=1; next }
+       grabbing && /^[a-zA-Z-]+:/ { grabbing=0 }
+       grabbing { sub(/^[[:space:]]+/, ""); d = d " " $0 }
+       END { print d }' "$1"
+}
+spec_check() { # spec_check <skill.md> <expected name> <label>
+  local f="$1" want="$2" label="$3" name desc
+  [ -f "$f" ] || fail "$label has no SKILL.md at $f"
+  [ "$(head -n 1 "$f")" = "---" ] || fail "$label does not open with YAML frontmatter"
+
+  name="$(spec_name_of "$f")"
+  [ -n "$name" ] || fail "$label has no name field"
+  [ "$name" = "$want" ] \
+    || fail "$label declares name '$name' but installs as directory '$want'; the spec requires them to match"
+  desc="$(spec_description_of "$f")"
+  [ -n "$desc" ] || fail "$label has an empty description; the spec requires a non-empty one"
+  [ "${#desc}" -le 1024 ] \
+    || fail "$label description is ${#desc} characters; the spec limit is 1024"
+  echo "spec: $label name=$name description=${#desc}/1024 characters"
+}
+
+for host_build in "claude:$real_c" "codex:$real_x"; do
+  host="${host_build%%:*}"
+  out="${host_build#*:}"
+  spec_check "$out/SKILL.md" pln "the $host /pln router"
+  spec_check "$out/pln-pr/SKILL.md" pln-pr "the $host /pln-pr router"
+  spec_check "$out/pln-simplify/SKILL.md" pln-simplify "the $host /pln-simplify router"
+done
+# /pln-update is tracked rather than generated, and ships to users all the same.
+spec_check "$REPO_DIR/pln-update/SKILL.md" pln-update "the tracked /pln-update skill"
+
 # The public skills are routers. Every detailed phase is generated one level
 # below phases/, carries only its host's mechanics, and is addressed by the
 # absolute output root baked into the router at generation time.

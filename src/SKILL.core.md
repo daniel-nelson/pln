@@ -1,17 +1,19 @@
 ---
 name: pln
-description: Human-paced planning — one question at a time — with a peer that pushes back. Two distinct phases — first an interview that resolves every per-item question into a complete master plan, then (only after the master plan is approved as a whole) dependency-aware implementation with durable item checkpoints. A thin orchestrator schedules fresh workers, short direct-dependency cohorts, and isolated disjoint waves while PLAN.md plus a local run manifest preserve recovery. No interleaving: implementation never begins while questions are still open. Plans live under `./plans/` in git worktrees and in an external temporary run directory otherwise. Trigger explicitly via `{{PLN_CMD}} <task>`, or auto-engage when the user says things like "make a plan", "let's tackle this in steps", "work through these", or pastes a numbered list of items to address. Universal — works in any repo. NEVER use the AskUserQuestion tool.
+description: Human-paced planning — one question at a time — with a peer that pushes back. Two distinct phases — first an interview that resolves every per-item question into a complete master plan, then (only after the master plan is approved as a whole) dependency-aware implementation with durable item checkpoints. No interleaving: implementation never begins while questions are still open. Plans live under `./plans/` in git worktrees and in an external temporary run directory otherwise. Trigger explicitly via `{{PLN_CMD}} <task>`, or auto-engage when the user says things like "make a plan", "let's tackle this in steps", "work through these", or pastes a numbered list of items to address. Universal — works in any repo. NEVER use the AskUserQuestion tool.
 ---
 
 # pln — personal planning workflow
 
 You are running the user's personal planning skill. Read every section of this file before starting, then execute. The user has tuned this workflow over many sessions; treat the rules as deliberate.
 
+<!-- pln:include compaction-recovery -->
+
 <!-- pln:include update-check -->
 
 <!-- pln:include notify-setup -->
 
-See Notifications (in Cross-cutting concerns) for the call sites and message format.
+See Notifications, at the end of this file, for the call sites and message format.
 
 <!-- pln:include readiness -->
 

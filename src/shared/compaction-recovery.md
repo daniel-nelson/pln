@@ -1,0 +1,1 @@
+**Holding a cut-off copy?** If this file does not end with `## End of router`, it was truncated when the conversation compacted — re-read this skill's own `SKILL.md` in full before acting on anything in it.

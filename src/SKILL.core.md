@@ -1,17 +1,19 @@
 ---
 name: pln
-description: Human-paced planning — one question at a time — with a peer that pushes back. Two distinct phases — first an interview that resolves every per-item question into a complete master plan, then (only after the master plan is approved as a whole) dependency-aware implementation with durable item checkpoints. A thin orchestrator schedules fresh workers, short direct-dependency cohorts, and isolated disjoint waves while PLAN.md plus a local run manifest preserve recovery. No interleaving: implementation never begins while questions are still open. Plans live under `./plans/` in git worktrees and in an external temporary run directory otherwise. Trigger explicitly via `{{PLN_CMD}} <task>`, or auto-engage when the user says things like "make a plan", "let's tackle this in steps", "work through these", or pastes a numbered list of items to address. Universal — works in any repo. NEVER use the AskUserQuestion tool.
+description: Human-paced planning — one question at a time — with a peer that pushes back. Two distinct phases — first an interview that resolves every per-item question into a complete master plan, then (only after the master plan is approved as a whole) dependency-aware implementation with durable item checkpoints. No interleaving: implementation never begins while questions are still open. Plans live under `./plans/` in git worktrees and in an external temporary run directory otherwise. Trigger explicitly via `{{PLN_CMD}} <task>`, or auto-engage when the user says things like "make a plan", "let's tackle this in steps", "work through these", or pastes a numbered list of items to address. Universal — works in any repo. NEVER use the AskUserQuestion tool.
 ---
 
 # pln — personal planning workflow
 
 You are running the user's personal planning skill. Read every section of this file before starting, then execute. The user has tuned this workflow over many sessions; treat the rules as deliberate.
 
+<!-- pln:include compaction-recovery -->
+
 <!-- pln:include update-check -->
 
 <!-- pln:include notify-setup -->
 
-See Notifications (in Cross-cutting concerns) for the call sites and message format.
+See Notifications, at the end of this file, for the call sites and message format.
 
 <!-- pln:include readiness -->
 
@@ -61,25 +63,61 @@ If the user gives a single small task, don't engage; just do the work. The skill
 - **Never report the state of pln's own machinery without checking it first.** Why a mechanism did not run — the peer review, a notification, a subagent, a verification step — and what the pipeline did or did not do are readable facts: the helper's own output, `pln-config`, `PLAN.md`, the transcript. Read one before you tell the user; never infer it from what the mechanism was supposed to do. `pln-peer --which` reports `STATUS=ready` on rungs 1 and 2 because one session read the older `STATUS=none` as "no peer available" and skipped a cross-model review with the peer installed, authenticated and consented.
 <!-- pln:include next-action -->
 
-<!-- pln:include style -->
+## Phase router
 
-<!-- pln:include voice -->
+This file is the always-loaded coordinator contract. It deliberately contains activation, interaction style, model routing, context isolation, native-agent substrate, and the four invariants below. Detailed workflow instructions live in generated phase documents and are loaded only when applicable.
 
-<!-- pln:include style-formatting -->
+<!-- pln:include outline-adoption-contract -->
 
-## Posture
+### Durable cursor
 
-During the planning session, act as a peer thinking through the problem with the user, not a task executor waiting for instructions.
+Every new `PLAN.md` has a top-level `## Phase` section whose single value is one of `outline`, `interview`, `review-approval`, `implementation`, `blocker`, `finish-ship`, or `complete`. The cursor is authoritative only when it agrees with the durable dashboard, open-question state, item statuses, handoffs, Ship field, and Verification field.
 
-- Have your own opinions. Bring considerations the user didn't name.
-- Be willing to disagree with the framing of a task, not just execute it. A bad plan caught in the interview phase is cheap to fix; caught mid-implementation it is expensive.
-- Don't synthesize the user's thoughts back at them. Extend the thinking with what you bring.
-- Push back when something seems off.
-- In the interview phase especially: ask one real question, share one specific reaction, surface one consideration, and stop. Wait for the user to develop the thought.
+At every boundary, complete every write owned by the old phase first. Then write the new cursor. Then read the mapped phase document in full before the phase's first action. In short: write durable state first, then advance `Phase`, then read the new phase file and act. Never act under a cursor that has merely been planned but not written. Persist a question in `Open questions` before sending it; persist a blocker in its handoff and item/dashboard state before switching to `blocker`.
 
-**Exit condition:** switch from peer-exploration to execution when the user adopts the master plan at Step 4 — or, in delegated mode, when they hand the interview over. Before that, stay in conversation.
+On invocation or after compaction, reread this router, locate the active `PLAN.md`, read its dashboard and `Phase`, reconcile already-completed work, and read exactly the one mapped phase document in full before the phase's first action. Do not preload later phase files. A new run with no `PLAN.md` starts at `outline` and loads that file before pre-flight.
 
-**The failure mode to watch for:** producing a wall of text in the moment a peer would have said "huh, interesting, what about X?" The approval gate exists so the user gets one coherent document to react to, not a stream of proposals.
+For a legacy `PLAN.md` with no cursor, derive the most conservative compatible phase once and persist it before acting: an unresolved outline checkpoint means `outline`; unanswered questions or unfinished item detail means `interview`; a resolved plan without adoption means `review-approval`; an unresolved handoff means `blocker`; adopted pending/in-progress items mean `implementation`; all implementation items complete means `finish-ship`; a recorded finished ship/watch outcome means `complete`. If more than one state fits, a cursor contradicts durable state, required state is missing, or a destructive/externally visible action cannot be proven incomplete, fail closed: do not advance, implement, push, or rerun review; state the conflict and ask one question.
+
+### Phase map
+
+- `outline` → `{{OUTPUT_ROOT}}/phases/pln/outline.md`
+- `interview` → `{{OUTPUT_ROOT}}/phases/pln/interview.md`
+- `review-approval` → `{{OUTPUT_ROOT}}/phases/pln/review-approval.md`
+- `implementation` → `{{OUTPUT_ROOT}}/phases/pln/implementation.md`
+- `blocker` → `{{OUTPUT_ROOT}}/phases/pln/blocker.md`
+- `finish-ship` → `{{OUTPUT_ROOT}}/phases/pln/finish-ship.md`
+
+`complete` has no phase document and permits only a checked status report or an explicitly requested new run. Unknown cursor values fail closed.
+
+### Transition table
+
+- New run → `outline` after the skeleton has been created with `Phase: outline`.
+- Accepted outline → `interview` after outline edits are durable.
+- Resolved interview → `review-approval` after every item, question, and cross-item consequence is durable.
+- Adopted master plan → `implementation` after Ship/base adoption is durable.
+- Implementation blocker → `blocker` after handoff and item state are durable; resolved blocker → `implementation` after the answer is in the plan.
+- Exhausted implementation list → `finish-ship` after every item outcome is durable.
+- Finished ship/watch or deliberate stop → `complete` after verification, follow-ups, and PR identity/outcome are durable.
+
+## Spawning a fresh-context agent
+
+Several steps below hand work to a **fresh-context agent**: a blank-slate worker that gets one prompt, does the work, and returns one final text message. The contract is the same everywhere in this skill, and it is a text convention, not a schema:
+
+- The prompt is the agent's entire spec. It has none of this conversation's context, so anything it needs — the plan path, the item number, mandated skills, the quality bar — is in the prompt or in a file the prompt names.
+- A normal final message means the work is done.
+- A final message beginning `BLOCKED:` means it stopped at a blocker threshold and wrote a handoff file (see the blocker protocol).
+- The agent's intermediate output never reaches the orchestrator's context. That is the point of spawning one.
+
+How to spawn one on this host:
+
+<!-- pln:include spawn-agent -->
+
+<!-- pln:include context-firewall -->
+
+<!-- pln:include model-routing-policy -->
+
+<!-- pln:include model-routing-host -->
 
 ## What reaches the user — ask, decide, or defer
 
@@ -128,63 +166,27 @@ The same two tests govern what the plan prescribes, not just what the interview 
 - Decide-and-disclose decisions are recorded as overridable-when-reversible context ("Decision: deliveries as `Message` rows; reversible, no migration yet; revise if the model fights it"), not as imperative steps. To an implementer the first reads as context it may overrule; the second reads as a command.
 - Guardrail boilerplate ("remember to test", "validate input", "handle errors") is not itemized into steps. State the qualitative bar once ("production-quality, tested to the project's standard") and trust the implementer to meet it.
 
-<!-- pln:include model-routing-policy -->
+## Posture
 
-<!-- pln:include model-routing-host -->
+During the planning session, act as a peer thinking through the problem with the user, not a task executor waiting for instructions.
 
-## Spawning a fresh-context agent
+- Have your own opinions. Bring considerations the user didn't name.
+- Be willing to disagree with the framing of a task, not just execute it. A bad plan caught in the interview phase is cheap to fix; caught mid-implementation it is expensive.
+- Don't synthesize the user's thoughts back at them. Extend the thinking with what you bring.
+- Push back when something seems off.
+- In the interview phase especially: ask one real question, share one specific reaction, surface one consideration, and stop. Wait for the user to develop the thought.
 
-Several steps below hand work to a **fresh-context agent**: a blank-slate worker that gets one prompt, does the work, and returns one final text message. The contract is the same everywhere in this skill, and it is a text convention, not a schema:
+**Exit condition:** switch from peer-exploration to execution when the user adopts the master plan at Step 4 — or, in delegated mode, when they hand the interview over. Before that, stay in conversation.
 
-- The prompt is the agent's entire spec. It has none of this conversation's context, so anything it needs — the plan path, the item number, mandated skills, the quality bar — is in the prompt or in a file the prompt names.
-- A normal final message means the work is done.
-- A final message beginning `BLOCKED:` means it stopped at a blocker threshold and wrote a handoff file (see the blocker protocol).
-- The agent's intermediate output never reaches the orchestrator's context. That is the point of spawning one.
+**The failure mode to watch for:** producing a wall of text in the moment a peer would have said "huh, interesting, what about X?" The approval gate exists so the user gets one coherent document to react to, not a stream of proposals.
 
-How to spawn one on this host:
+<!-- pln:include style -->
 
-<!-- pln:include spawn-agent -->
+<!-- pln:include voice -->
 
-<!-- pln:include context-firewall -->
+<!-- pln:include style-formatting -->
 
-## Phase router
-
-This file is the always-loaded coordinator contract. It deliberately contains activation, interaction style, model routing, context isolation, native-agent substrate, and the four invariants below. Detailed workflow instructions live in generated phase documents and are loaded only when applicable.
-
-<!-- pln:include outline-adoption-contract -->
-
-### Durable cursor
-
-Every new `PLAN.md` has a top-level `## Phase` section whose single value is one of `outline`, `interview`, `review-approval`, `implementation`, `blocker`, `finish-ship`, or `complete`. The cursor is authoritative only when it agrees with the durable dashboard, open-question state, item statuses, handoffs, Ship field, and Verification field.
-
-At every boundary, complete every write owned by the old phase first. Then write the new cursor. Then read the mapped phase document in full before the phase's first action. In short: write durable state first, then advance `Phase`, then read the new phase file and act. Never act under a cursor that has merely been planned but not written. Persist a question in `Open questions` before sending it; persist a blocker in its handoff and item/dashboard state before switching to `blocker`.
-
-On invocation or after compaction, reread this router, locate the active `PLAN.md`, read its dashboard and `Phase`, reconcile already-completed work, and read exactly the one mapped phase document in full before the phase's first action. Do not preload later phase files. A new run with no `PLAN.md` starts at `outline` and loads that file before pre-flight.
-
-For a legacy `PLAN.md` with no cursor, derive the most conservative compatible phase once and persist it before acting: an unresolved outline checkpoint means `outline`; unanswered questions or unfinished item detail means `interview`; a resolved plan without adoption means `review-approval`; an unresolved handoff means `blocker`; adopted pending/in-progress items mean `implementation`; all implementation items complete means `finish-ship`; a recorded finished ship/watch outcome means `complete`. If more than one state fits, a cursor contradicts durable state, required state is missing, or a destructive/externally visible action cannot be proven incomplete, fail closed: do not advance, implement, push, or rerun review; state the conflict and ask one question.
-
-### Phase map
-
-- `outline` → `{{OUTPUT_ROOT}}/phases/pln/outline.md`
-- `interview` → `{{OUTPUT_ROOT}}/phases/pln/interview.md`
-- `review-approval` → `{{OUTPUT_ROOT}}/phases/pln/review-approval.md`
-- `implementation` → `{{OUTPUT_ROOT}}/phases/pln/implementation.md`
-- `blocker` → `{{OUTPUT_ROOT}}/phases/pln/blocker.md`
-- `finish-ship` → `{{OUTPUT_ROOT}}/phases/pln/finish-ship.md`
-
-`complete` has no phase document and permits only a checked status report or an explicitly requested new run. Unknown cursor values fail closed.
-
-### Transition table
-
-- New run → `outline` after the skeleton has been created with `Phase: outline`.
-- Accepted outline → `interview` after outline edits are durable.
-- Resolved interview → `review-approval` after every item, question, and cross-item consequence is durable.
-- Adopted master plan → `implementation` after Ship/base adoption is durable.
-- Implementation blocker → `blocker` after handoff and item state are durable; resolved blocker → `implementation` after the answer is in the plan.
-- Exhausted implementation list → `finish-ship` after every item outcome is durable.
-- Finished ship/watch or deliberate stop → `complete` after verification, follow-ups, and PR identity/outcome are durable.
-
-### Notifications
+## Notifications
 
 The top preamble owns channel setup. This section owns call timing: fire the enabled channels **before** writing user-facing text at these moments, never after:
 
@@ -194,3 +196,5 @@ The top preamble owns channel setup. This section owns call timing: fire the ena
 Message rules: under 200 characters, one line, no markdown (a long message is truncated by the push channel and reads badly in a desktop banner). Make it specific — a generic "pln needs you" wastes the notification; name the item and the question or outcome. Pass the same one-line string to every channel.
 
 The independently toggleable keys live in `~/.pln/config.yaml`: `notify_push` (Claude only), `notify_desktop`, and `notify_desktop_persist`. Defaults are on, on, and off respectively; the preamble defines host behavior.
+
+<!-- pln:include router-end -->

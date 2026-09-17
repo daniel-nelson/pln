@@ -528,6 +528,83 @@ for host in claude codex; do
     hasnt "$brief" "$brief_term" \
       "$host Step 7 brief names a host, CLI or sandbox product: $brief_term"
   done
+  # The same refusal rule is coordinator text in three skills now, and
+  # bin/pln-generate resolves pln:include only in src/**/*.core.md, so none of
+  # the three can share one fragment with the worker contract or with each
+  # other. The first pass at this fix reached /pln-pr alone; /pln and
+  # /pln-simplify went on treating a refusal as a plain verification failure,
+  # and /pln-simplify additionally deleted the unpublished candidate ref on
+  # one — destroying the run's own work over a permissions problem that said
+  # nothing about the tree. Each condition is asserted separately, the way the
+  # /pln-pr copy above is, because one presence check per file would prove only
+  # that each holds a single literal this script names.
+  finish_ship="$WORK/$host/phases/pln/finish-ship.md"
+  finish_step7="$WORK/$host-finish-step7.md"
+  awk '/^### Step 7\./ { s = 1 } /^### Step 8\./ { s = 0 } s' "$finish_ship" > "$finish_step7"
+  [ -s "$finish_step7" ] || fail "$host finish-ship phase has no Step 7 section"
+  # Both sections are extracted rather than read whole, and for the same
+  # reason: each file also includes the shared assurance policy, which states
+  # the qualified-pass outcome in its own words. A whole-file check would be
+  # answered by that include no matter what the step itself said.
+  verify_record="$WORK/$host/phases/pln-simplify/verify-record.md"
+  verify_steps="$WORK/$host-verify-steps.md"
+  awk '/^After ordinary checkpoints:/ { s = 1 } /^Set `Phase: complete`/ { s = 0 } s' \
+    "$verify_record" > "$verify_steps"
+  [ -s "$verify_steps" ] || fail "$host /pln-simplify recording has no candidate-verification steps"
+  for coordinator in "$finish_step7" "$verify_steps"; do
+    has "$coordinator" 'A refused command leaves the gauntlet incomplete — not failed, and not destroyed.' \
+      "$coordinator lost the incomplete-not-failed-not-destroyed outcome the shipped copy states"
+    has "$coordinator" 'is not a verification result' \
+      "$coordinator no longer says an environment refusal is not a verification result"
+    has "$coordinator" 'so the rerun is yours: run exactly that one command' \
+      "$coordinator no longer gives the rerun to the coordinator that holds the access"
+    has "$coordinator" 'which command was refused, the exact refusal, and what access the rerun was granted' \
+      "$coordinator rerun no longer records all three facts"
+    has "$coordinator" 'never read back into coordinator context' \
+      "$coordinator rerun reads the raw gauntlet log into coordinator context"
+    has "$coordinator" 'A command that never executed makes the gauntlet incomplete, and an incomplete gauntlet is not a pass' \
+      "$coordinator lost the completeness precondition on combining a rerun with the recorded run"
+    has "$coordinator" 'the refusal *is* a verification result and the rerun does not repair it' \
+      "$coordinator lets a rerun repair a refusal the change under test caused"
+    has "$coordinator" 'What still forces a whole repeat is the tree changing or the command set changing; a refusal does neither' \
+      "$coordinator no longer says what still forces the whole gauntlet to repeat"
+    has "$coordinator" 'What that produces is a qualified pass, not a green' \
+      "$coordinator reports a rerun refused command as an unqualified green"
+    has "$coordinator" 'green except the named command, which ran at elevated access' \
+      "$coordinator no longer discloses which command ran at elevated access"
+    has "$coordinator" 'carrying both environment hashes' \
+      "$coordinator qualified pass no longer carries both environment hashes"
+    has "$coordinator" 'A command can pass *because* of the privilege it was rerun under' \
+      "$coordinator qualifies the pass without saying what the qualification is for"
+    has "$coordinator" 'the qualification is disclosed rather than absorbed into a green nobody can audit' \
+      "$coordinator absorbs a rerun at elevated access into a green nobody can audit"
+    # The rule is written in terms of what to do when a command is refused,
+    # never of which host refuses: one host's parent/child privilege boundary
+    # is the only instance recorded anywhere, and neither of these two skills
+    # asserts a host fact by carrying this.
+    rule="$WORK/$host-refusal-rule.md"
+    awk '/A refused command leaves the gauntlet incomplete/, /qualification is disclosed rather than absorbed/' \
+      "$coordinator" > "$rule"
+    [ -s "$rule" ] || fail "$coordinator lost the refusal rule block"
+    for rule_term in Claude Codex claude codex sandbox 'gh pr' glab npm 'Agent tool' \
+      'spawn_agent' 'wait_agent' 'Workflow('; do
+      hasnt "$rule" "$rule_term" \
+        "$coordinator refusal rule names a host, CLI or sandbox product: $rule_term"
+    done
+  done
+  # A refusal is not the failure either file already handled, and both of those
+  # failure clauses stay exactly as consequential as they were for a real one.
+  has "$finish_step7" 'A command the environment refused reported nothing about the tree and is not a new item' \
+    "$host /pln Step 7 turns a refusal into a new item the way it does a real failure"
+  has "$verify_steps" 'delete only the named unpublished candidate ref' \
+    "$host /pln-simplify no longer isolates a candidate that genuinely failed"
+  has "$verify_steps" 'A refusal is not that failure and this step does not run on one' \
+    "$host /pln-simplify deletes the candidate ref over an environment refusal"
+  has "$verify_steps" 'Keep the candidate ref.' \
+    "$host /pln-simplify no longer keeps the candidate ref through a refusal"
+  has "$verify_steps" 'the candidate ref stays where it is, unpublished and unmerged' \
+    "$host /pln-simplify does not say what becomes of a refusal that is never cleared"
+
   for file in "$WORK/$host/SKILL.md" "$WORK/$host/phases/pln/"*.md; do
     hasnt "$file" 'WORKER_ONLY_SENTINEL_' "$file contains worker-only contract prose"
     hasnt "$file" 'Do not inventory strengths or praise the plan' "$file embeds reviewer-only detail"

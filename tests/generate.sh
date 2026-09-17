@@ -521,38 +521,40 @@ has "$real_x/phases/pln-pr/review.md" 'before entering the shared `wait_agent` m
 has "$real_x/phases/pln-pr/review.md" 'nested CLI processes share the login boundary' \
   "the codex build lost fallback-only serialization"
 
-# A regression ceiling on the always-resident coordinator prompt, not a target.
-# The router is the one file a run holds for its whole length; phase files
-# rotate in and out beside it, and the worker-owned contracts below are
-# deliberately outside it. So this caps accretion where accretion is paid for
-# on every turn, and hitting it is meant to send content into a phase file or
-# out of the build rather than to move the number.
+# A discipline ceiling on the always-resident coordinator prompt, not a target
+# and not an external limit. The router is the one file a run holds for its
+# whole length; phase files rotate in and out beside it. So this caps accretion
+# where accretion is paid on every turn, and hitting it is meant to send content
+# into a phase file or out of the build rather than to move the number.
+#
+# What it is NOT is the constraint that decides correctness. That one is the
+# 5,000-token compaction window and the machinery-prefix budget asserted below,
+# and it was invisible here for seventy-odd releases: this ceiling was set at
+# roughly the file's incidental weight when it was introduced, which happens to
+# be about 13,200 tokens, or 2.6x the window. A router passing this check could
+# still lose 62% of itself to an ordinary automatic compaction, and did.
+#
+# The number moved once, from 60000 to 61000, to admit the recovery line and the
+# end marker that fixed exactly that. It is recorded here rather than quietly
+# re-fitted: the point of a discipline cap is that moving it costs an argument.
 #
 # The verdict is on the *base* size, not on the bytes this run happened to
-# write. A generated router is `base + sites × L`, where `L` is the length of
+# write. A generated router is `base + sites x L`, where `L` is the length of
 # the absolute output root and `sites` is the number of `{{OUTPUT_ROOT}}`
 # substitutions the build carries, so the same source is a larger file when it
 # is built into a longer directory. Measuring raw bytes would hand the pass/fail
 # decision to whatever `$TMPDIR` this run got: the Codex build binds first, and
 # it spends one byte of ceiling per `{{OUTPUT_ROOT}}` site per character of
 # install root, so a long enough temporary directory name fails the gauntlet
-# with no source change at all. `sites` is counted from the generated
-# file — each substitution leaves one copy of the root in it — rather than
-# hardcoded, so a new `{{OUTPUT_ROOT}}` moves the printed figure with nobody
-# editing this test. The loop prints, per host, the base and the longest install
-# root that still fits, which is the figure to quote; a bare byte count quoted
-# from a build is only true at that build's directory length.
+# with no source change at all. `sites` is counted from the generated file
+# rather than hardcoded, so a new `{{OUTPUT_ROOT}}` moves the printed figure
+# with nobody editing this test. The loop prints, per host, the base and the
+# longest install root that still fits, which is the figure to quote.
 #
-# What is *not* capped, verified at HEAD and written as base plus site count for
-# the same reason: on the `/pln` side both `outline.md` (base 67022 over 4
-# sites, Claude; 67470, Codex) and `finish-ship.md` (66431 over 4, Claude;
-# 68246, Codex) are already past this ceiling on their own, and the largest
-# generated file anywhere is `/pln-pr`'s `ship-watch.md` (76176 over 6 sites,
-# Claude; 77467, Codex), beside a `pln-pr/SKILL.md` router that is not capped
-# either. So a run holds this capped router plus one uncapped phase file that
-# can be larger than it. That is a known gap, recorded here rather than left for
-# the next reader to rediscover — and not an argument for raising the ceiling,
-# which is the only thing currently holding the resident half down.
+# What is *not* capped: the phase files, several of which are larger than this
+# router on their own. They are read on demand and are not re-injected after a
+# compaction at all, so the truncation window does not reach them; what they
+# cost is a fresh read each time a phase begins.
 for host_build in "claude:$real_c" "codex:$real_x"; do
   host="${host_build%%:*}"
   f="${host_build#*:}/SKILL.md"
@@ -564,47 +566,79 @@ for host_build in "claude:$real_c" "codex:$real_x"; do
   [ "$sites" -ge 1 ] \
     || fail "the $host router names no absolute output root; the base size cannot be normalized"
   base=$(( bytes - sites * ${#out_root} ))
-  [ "$base" -le 60000 ] \
-    || fail "the $host router is $base bytes before install-root substitution ($sites sites); phase router ceiling is 60000"
-  echo "router ceiling: $host base $base bytes over $sites {{OUTPUT_ROOT}} sites — fits an install root up to $(( (60000 - base) / sites )) characters (ceiling 60000)"
+  [ "$base" -le 61000 ] \
+    || fail "the $host router is $base bytes before install-root substitution ($sites sites); phase router ceiling is 61000"
+  echo "router ceiling: $host base $base bytes over $sites {{OUTPUT_ROOT}} sites — fits an install root up to $(( (61000 - base) / sites )) characters (ceiling 61000)"
 done
 
-# ─── The compaction-truncation recovery line ─────────────────────────────────
-# Claude Code re-injects the body of each invoked skill after compaction and
-# keeps only "the first 5,000 tokens of each" (`code.claude.com/docs/en/skills`
-# and `/context-window`), truncating from the end. Both routers are well past
-# that: `/pln` is ~13,100 tokens and `/pln-pr` ~10,300, so an automatic compact
-# silently deletes everything from roughly the halfway mark down — for `/pln`
-# that is the whole phase router, including the very sentence telling the
-# coordinator to reread the router after compaction.
+# ─── Compaction truncation: the recovery line and the machinery prefix ───────
+# Claude Code re-injects the body of each invoked skill after the conversation
+# compacts and keeps only "the first 5,000 tokens of each"
+# (`code.claude.com/docs/en/skills`, and `/context-window`: "Truncation keeps
+# the start of the file, so put the most important instructions near the top of
+# `SKILL.md`"). Compaction is automatic, and a `/pln` run is long by
+# construction, so this is ordinary behaviour rather than an edge case.
 #
-# The recovery line is the cheap fix: a truncated copy is one the model can
-# detect, because the section the line names is the file's last, and re-reading
-# the file restores it in full (a Read is not subject to the cap). That only
-# works while two things hold, so both are asserted here: the line sits near the
-# very top, inside any plausible truncation window, and the section it names as
-# the sentinel still exists under that exact heading. Rename the heading without
-# touching the line and the check inverts — every run decides it was truncated.
+# Both routers are far past 5,000 tokens and cannot get under it: the Style
+# section alone is ~5,200, and moving it into the phase documents would cost a
+# six-phase run ~31,000 fresh tokens against ~13,300 paid once in the cached
+# resident prefix. So the router stays whole and two other things hold instead.
+#
+#   1. The sentinel. The last line of the file is a section the top of the file
+#      names, so a truncated copy is one the model can detect and re-read (a
+#      Read is not subject to the cap). An explicit end marker is used rather
+#      than whatever section happens to sort last, because naming a real section
+#      breaks silently the moment content moves — and naming the *start* of the
+#      last section is worse than useless, since a cut inside it still leaves
+#      the heading visible and the file reads as intact.
+#
+#   2. The machinery prefix. Recovery depends on the model acting on an
+#      instruction, so the un-recovered state must still be safe to resume from.
+#      Everything a resumed run needs to find its place — the readiness sweep,
+#      the hard constraints, and above all the phase router with its cursor,
+#      phase map and transition table — is asserted to fit inside the window
+#      with margin. Prose about how to word a message is deliberately below it:
+#      losing that degrades the writing, where losing the phase router loses the
+#      run.
+#
+# The budget is 18000 bytes against a window of roughly 22600 (5,000 tokens at
+# this corpus's measured ~4.5 bytes per token). The margin absorbs tokenizer
+# variance and keeps the check from turning into a tripwire that gets relaxed.
+# Measured on the base, with install-root substitutions removed, for the same
+# reason the whole-file ceiling above is: the phase map names absolute paths, so
+# a longer install directory would otherwise fail the gauntlet with no source
+# change at all.
 for host_build in "claude:$real_c" "codex:$real_x"; do
   host="${host_build%%:*}"
   out="${host_build#*:}"
+  out="$(cd "$out" && pwd -P)"
   for skill in "/pln:$out/SKILL.md" "/pln-pr:$out/pln-pr/SKILL.md"; do
     label="${skill%%:*}"
     f="${skill#*:}"
-    has "$f" 'If `## Phase router` is missing below' \
+
+    has "$f" 'If this file does not end with `## End of router`' \
       "the $host $label router has no compaction-truncation recovery line"
-    # -x, not a substring match: '## Phase routing' contains '## Phase router',
-    # so a renamed heading would slip past grep -F and the sentinel would be
-    # pointing at a heading that no longer exists.
-    grep -qxF '## Phase router' "$f" \
-      || fail "the $host $label router names '## Phase router' as its truncation sentinel but has no heading exactly that"
-    head -c 4000 "$f" | grep -qF 'If `## Phase router` is missing below' \
+    head -c 4000 "$f" | grep -qF 'If this file does not end with `## End of router`' \
       || fail "the $host $label recovery line is past the first 4000 bytes; truncation would take it too"
-    # The sentinel detects truncation only by being LAST. A section added below
-    # it would be cut away while the sentinel still reads as present, and the
-    # recovery line would report an intact file that is missing its tail.
-    [ "$(grep '^## ' "$f" | tail -1)" = '## Phase router' ] \
-      || fail "the $host $label router ends with $(grep '^## ' "$f" | tail -1), not '## Phase router'; the truncation sentinel must be the last section"
+    # The sentinel detects truncation only by being last. A section added below
+    # it would be cut away while the sentinel still read as present.
+    [ "$(grep '^#\{1,6\} ' "$f" | tail -1)" = '## End of router' ] \
+      || fail "the $host $label router ends with $(grep '^#\{1,6\} ' "$f" | tail -1), not '## End of router'; the truncation sentinel must be the last heading"
+
+    # The phase router — the section a resumed run cannot reconstruct — must end
+    # inside the truncation window even if the recovery line is never acted on.
+    # Bytes from the start of the file to the end of the phase router section.
+    # One pass: count every line until the heading that follows it.
+    total="$(awk '/^## Phase router$/ { seen = 1 }
+                  seen && /^## / && $0 != "## Phase router" { exit }
+                  { n += length($0) + 1 }
+                  END { print n }' "$f")"
+    sites="$(head -c "$total" "$f" | grep -o -F -- "$out" | wc -l)"
+    sites="${sites//[[:space:]]/}"
+    base=$(( total - sites * ${#out} ))
+    [ "$base" -le 18000 ] \
+      || fail "the $host $label machinery prefix ends at $base bytes; it must close inside 18000 so the phase router survives a compaction"
+    echo "machinery prefix: $host $label ends at $base bytes (budget 18000, truncation window ~22600)"
   done
 done
 

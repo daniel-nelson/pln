@@ -43,16 +43,6 @@ Engage when the user types `{{PLN_PR_CMD}}`, or asks to put up / open / create /
 
 If the branch has no commits ahead of base, say so and stop — there is nothing to put up.
 
-## Interaction discipline
-
-This skill follows pln's discipline. Never call the `AskUserQuestion` tool. Surface at most one decision at a time, as plain prose. When you record a user's answer, echo it back in one short line before moving on. The Style section below is the same text `{{PLN_CMD}}` carries, generated from one shared source, and it governs every message this skill produces.
-
-<!-- pln:include style -->
-
-<!-- pln:include voice -->
-
-<!-- pln:include style-formatting -->
-
 ## Hard constraints (no exceptions)
 
 <!-- pln:only claude -->
@@ -66,20 +56,6 @@ This skill follows pln's discipline. Never call the `AskUserQuestion` tool. Surf
 - **Findings are durable, best-effort.** Merged findings live in `REVIEW.md` before any fix runs, and Step 1 resumes an existing ledger rather than re-reviewing from scratch. Resume is best-effort, not transactional: a fix commit lands before its status is written back, so a crash in that narrow window can leave a fixed finding still marked `open` — on resume, re-checking it is cheap and safe, so prefer re-running a possibly-done fix over skipping a possibly-open one.
 - **Commit discipline:** commit only complete, verified work with the co-author trailer; never `--amend`, never `--no-verify`, never `git add -A` (stage fixed files by name).
 <!-- pln:include next-action -->
-
-<!-- pln:include model-routing-policy -->
-
-<!-- pln:include model-routing-host -->
-
-<!-- pln:include context-firewall -->
-
-## Spawning a fresh-context agent
-
-Every reviewer, fix pass, and verification run below is a **fresh-context agent**: a blank-slate worker that gets one prompt, does the work, and returns one final message. It has none of this conversation's context, so its brief carries everything it needs — the diff command, the ledger path, the findings it owns.
-
-How to spawn one on this host:
-
-<!-- pln:include spawn-agent -->
 
 ## Phase router
 
@@ -111,3 +87,29 @@ For a legacy ledger without `Phase`, derive and persist the most conservative co
 - Fix decision or worker blocker → `blocker` after its question/handoff is recorded; resolved blocker → `fix` after its answer is durable.
 - Findings resolved and post-fix checks recorded → `ship-watch`.
 - Final gauntlet plus PR/CI outcome or deliberate stop recorded → `complete`.
+
+<!-- pln:include model-routing-policy -->
+
+<!-- pln:include model-routing-host -->
+
+<!-- pln:include context-firewall -->
+
+## Spawning a fresh-context agent
+
+Every reviewer, fix pass, and verification run below is a **fresh-context agent**: a blank-slate worker that gets one prompt, does the work, and returns one final message. It has none of this conversation's context, so its brief carries everything it needs — the diff command, the ledger path, the findings it owns.
+
+How to spawn one on this host:
+
+<!-- pln:include spawn-agent -->
+
+## Interaction discipline
+
+This skill follows pln's discipline. Never call the `AskUserQuestion` tool. Surface at most one decision at a time, as plain prose. When you record a user's answer, echo it back in one short line before moving on. The Style section below is the same text `{{PLN_CMD}}` carries, generated from one shared source, and it governs every message this skill produces.
+
+<!-- pln:include style -->
+
+<!-- pln:include voice -->
+
+<!-- pln:include style-formatting -->
+
+<!-- pln:include router-end -->

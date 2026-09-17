@@ -28,7 +28,7 @@ When you do bump: raise the version per the repo's scheme (read recent changelog
 
 ### Step 7. Final gauntlet — once
 
-Write the ordered commands and normalized non-secret environment to artifacts, compute the exact candidate fingerprint, then spawn one fresh-context agent to run the gauntlet on that candidate—including version/changelog changes. Recompute afterward; any mismatch fails. Record pass/fail per command plus tree/command/environment/candidate hashes in `REVIEW.md`, and which tier each command belongs to. Confirm untrusted commands first.
+Write the ordered commands to `<plan-dir>/evidence/final-gauntlet.commands` and a normalized non-secret environment description to `<plan-dir>/evidence/final-gauntlet.environment`, compute the exact candidate fingerprint with `bin/pln-assurance fingerprint`, and persist all four hashes before anything runs. Confirm untrusted commands first. Then spawn one fresh-context agent to run that recorded gauntlet on that candidate—including version/changelog changes. Recompute afterward; any mismatch fails. Record pass/fail per command plus tree/command/environment/candidate hashes in `REVIEW.md`, and which tier each command belongs to.
 
 **The static checks always run here. The behavior suite runs only under an exception below.** The two are not the same purchase. Static checks cost seconds, catch what an agent's edit actually breaks, and a lint or build error that reaches CI burns a whole CI run — every job, every container — to report something a local command reports instantly. The behavior suite costs minutes, and CI runs it across parallel jobs that no single machine matches; running it locally first buys a slower copy of an answer CI is about to produce anyway, and then CI produces it again regardless.
 
@@ -42,8 +42,25 @@ Everything else that seems to argue for the suite argues for **targeted tests in
 If the project names no static checks at all, there is simply nothing to run here — that is a thin local gate, not a reason to fall back to the suite. Record in `REVIEW.md` what ran and, where the suite ran, which of the two justifications applied.
 
 Outside those, a green static pass plus any targeted tests is what this step certifies, and the suite is CI's job. This is a change in *what is verified locally*, not in how strictly: a red static check still means the branch does not ship, and the candidate fingerprint still covers the commands that actually ran.
+
+**Step 7 spawns exactly one agent, and there is no adjudication worker.** The coordinator records the result from that agent's envelope and from the exit status of anything it reruns below. Evidence the coordinator already holds is never handed to a second agent to be judged.
+
+**This step carries its worker brief inline, below — there is no separate contract file for the final gauntlet.** The installed `src/workers` directory holds contracts for other phases; the one there whose subject most resembles this step's is addressed to a different skill, opens by requiring a `PLAN.md` that a standalone `{{PLN_PR_CMD}}` run does not have, and rules a refused command out of existence on that skill's terms rather than on these. A real run searched that directory, found it, and followed the wrong rule. Brief the agent from what follows and from nothing there.
+
+Give it the two artifact files, the persisted fingerprint, the project root, `<plan-dir>/evidence/final-gauntlet.md`, `<plan-dir>/results/final-gauntlet.txt`, routing attribution, and a 2048-byte budget:
+
+"Run every command in the recorded command file, in the order written, once each. Do not add a command, drop one, or repeat the set. Write each command's exact invocation, exit status and full output to the assigned evidence file, and keep that output there rather than in your reply. Recompute the candidate fingerprint after the last command and fail if candidate identity moved. Never turn an absent, skipped, timed-out, or empty command result into a pass. Where the execution environment refuses a command outright — a denied write, a blocked network call, a capability you were not given — that is not a verification result: record which command it was and the refusal verbatim, mark it refused rather than failed, and run the remaining commands. Return only the envelope: per-command pass, fail or refused, the refusal text where there is one, the recomputed hashes, and the evidence path."
+
+**A refused command leaves the gauntlet incomplete — not failed, and not destroyed.** The coordinator holds access the agent it spawned does not, so the rerun is the coordinator's own: run exactly that one command, with the access it needs, its output redirected to `<plan-dir>/evidence/final-gauntlet.md` and never read back into coordinator context. What reaches this context is the command's exit status plus three recorded facts — **which command was refused, the exact refusal, and what access the rerun was granted**. An exit status is bounded metadata, not a log. What still forces a whole repeat is the tree changing or the command set changing; a refusal does neither.
+
+Two conditions on combining that rerun with the recorded run, both answerable before you act:
+
+- **Completeness.** Every command in the recorded set carries a result, from the recorded run or from a named rerun. A command that never executed makes the gauntlet incomplete, and an incomplete gauntlet is not a pass.
+- **The refusal must not be a claim about the code.** Where the branch's own diff touches the refused command, or changed what that command requires, the refusal *is* a verification result and the rerun does not repair it. Answer that from `git diff "$DIFF_BASE"` and the command set. Without it, a branch that adds an unvendored dependency ships green: the build reaches the network, the agent is denied, and the rerun is granted the network the branch itself now needs.
+
+**What that produces is a qualified pass, not a green.** Record it in `REVIEW.md` and in the PR body as green except the named command, which ran at elevated access, carrying both environment hashes — the one the refused pass ran under and the one the rerun ran under. A command can pass *because* of the privilege it was rerun under, and nothing here tells that apart from a command that merely needed the privilege in order to run, so the qualification is disclosed rather than absorbed into a green nobody can audit. The two hashes differ, and that difference is the record; nothing is being reused under a matching seal.
 <!-- pln:only codex -->
-Same spawn shape and the same sandbox caveat as Step 2.
+Same spawn shape as Step 2: the agent runs with `--sandbox workspace-write` and no network. The refusal rule above is Step 7's own — Step 2's caveat does not govern here.
 <!-- pln:endonly -->
 
 If it fails: the branch does not ship. Surface the failure and stop (or spawn one fix agent if the fix is obvious and in-scope, then this single gauntlet re-runs — not the whole flow).

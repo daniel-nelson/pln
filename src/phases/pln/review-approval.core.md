@@ -10,7 +10,7 @@ Read this file in full before the first review or approval action. `Phase: revie
 
 A review round remains in this phase until its merge result and all plan repairs/findings are durable. Persist any reopened question before sending it. After explicit adoption, write the Ship choice and PR base, write the to-do items this run takes, reconcile all open questions/findings, then set `Phase: implementation` and read the implementation phase in full before dispatch. Delegated mode's advance adoption uses the same durable writes before advancing.
 
-**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-todo add` — not by leaving it in prose for the close to remember.
+<!-- pln:include followup-filing -->
 
 <!-- pln:include assurance-policy -->
 
@@ -51,7 +51,7 @@ The coordinator owns whether review runs, risk/roster validation, reader dispatc
 Every reviewer sees the plan but never the interview transcript or rejected options. The merge worker alone reads raw findings, checks citations/evidence state, updates `PLAN.md`, and returns a bounded envelope. A finding on a user-made decision is protected from repair. Empty or failed readers contribute nothing and are named accurately at the gate. The coordinator reads only the validated 4096-byte envelope; malformed merge output gets one fresh judgment retry, then fails closed.
 ### Step 3.5. Plan review
 
-Every item's detail section is now written, and nobody has read the plan who wasn't in the conversation that produced it. This reading happens before adoption. The universal enabled floor is one fresh broad judgment reviewer inheriting the hosting model; semantic risk may add specialists and the R3 adversarial slot.
+Every item's detail section is now written, and nobody has read the plan who wasn't in the conversation that produced it. This reading happens before adoption, at the depth the assurance policy above sets.
 
 1. Use the existing `evidence/` and `results/` folders. Dispatch `assurance-classification.md`, validate its output with `pln-assurance classify`, then create the pre-fix roster with `pln-assurance roster`. If plan review is off, run no readers; record the opt-out and warn only for R3.
 2. Assemble the broad review brief without opening the contract or plan in coordinator context:
@@ -64,7 +64,7 @@ Every item's detail section is now written, and nobody has read the plan who was
    ```
 
 3. Spawn the fresh same-model broad reviewer on that brief. For R2/R3, assemble distinct briefs naming each rostered specialist area and spawn at most those two readers. Each writes a distinct raw artifact and returns only its pointer. Missing, empty, malformed, errored, timed-out, or wrong-tree output is failed coverage.
-4. For R3, fill the roster's adversarial slot through Consulting a peer model when consent, egress policy, and repository/session classification permit. Otherwise spawn one fresh same-model adversarial reviewer in that same slot and attribute why model-family independence was absent. In R1/R2, consult a peer only for an explicit request or recorded assurance-first posture; it is additive and its absence does not invent a substitute slot.
+4. For R3, fill the roster's adversarial slot through Consulting a peer model when consent, egress policy, and repository/session classification permit; substitution into that same slot, and its attribution, are that section's. In R1/R2, consult a peer only for an explicit request or recorded assurance-first posture; it is additive and its absence does not invent a substitute slot.
 5. Spawn one fresh merge worker with `{{SKILL_DIR}}/src/workers/plan-review-merge.md`, the plan path, all raw artifact paths, actual-reader/role attribution, exact source fingerprint, whether applying is enabled, item scope, `evidence/plan-review-merge.md`, `results/plan-review-merge.txt`, and a 4096-byte budget. On a bounded round, these findings replace the in-scope items' earlier findings. The merge worker alone reads findings and edits `PLAN.md`.
 6. Validate the merge envelope through `bin/pln-read-envelope --root <plan-dir> --max-bytes 4096`. At least the broad reader must succeed; for R3, a failed role is a visible coverage failure rather than a clean plan. Never open raw findings in this context.
 

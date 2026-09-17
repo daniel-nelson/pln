@@ -1,6 +1,6 @@
 ## The project to-do list
 
-Work that is found and not done now reaches the to-do list — wherever in a session it was found, and whichever of `{{PLN_CMD}}`, `{{PLN_PR_CMD}}` and `{{PLN_SIMPLIFY_CMD}}` found it. A PR body, a review ledger and a commit message are copies; the to-do list is the record.
+Work that is found and not done now reaches the to-do list — wherever in a session it was found, and whichever of `{{PLN_CMD}}`, `{{PLN_PR_CMD}}` and `{{PLN_SIMPLIFY_CMD}}` found it. A PR body, a PR comment, a review ledger and a commit message are copies: each is a place a follow-up gets *mentioned* on the way past, none is where someone goes to find out what is still outstanding, and putting one there and treating it as filed reads as done because the text is visibly written somewhere. The to-do list is the record; everything else quotes it.
 
 **There is no to-do-list command.** pln grows no fourth skill and no slash command for this. Anything computed — whether an item can be picked up, whether two items collide, which ones look finished — comes from `{{OUTPUT_ROOT}}/bin/pln-todo`, called during a run. Anything read is read by opening the file.
 
@@ -154,7 +154,7 @@ Work enters through four doors, and every one of them ends in the same call: `{{
 
 **Adding never asks.** Filing is the run writing down what it found, not a decision the user has to be present for. No door pauses for permission, and none of them holds an item back for a better moment.
 
-**A door files a complete item**: an `--id`, a `--status`, a `--source` and a claim. `source` names the run, the review or the person the item came from, because the failure this to-do list answers is a follow-up whose origin died with the run that found it. Everything else is optional — an item filed with no `touches` is filed with none, and unknown then collides with everything, so it is never reported parallel-safe until someone fills the field in.
+**A door files a complete item**: an `--id`, a `--status`, a `--source` and a claim. Everything else is optional.
 
 **1. The run spinoff — the sweep at either close.** At `{{PLN_CMD}}`'s Step 7 wrap-up and at whichever `{{PLN_PR_CMD}}` close hands the PR to the user, the outstanding sweep already assembles the candidates and the follow-up bar already decides which of them are filed. Each one that clears the bar is filed **before the closing message is drafted**, not after it, so that the message can be written from the to-do list rather than the to-do list from the message.
 

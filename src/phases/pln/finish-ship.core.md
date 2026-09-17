@@ -78,6 +78,7 @@ Applies at Step 7's wrap-up, and at the equivalent point in `{{PLN_PR_CMD}}`. Th
 **Full detail lives in `PLAN.md`,** not the closing message — the bullet list there names each follow-up, `PLAN.md` (or, in a standalone `{{PLN_PR_CMD}}` run with no `PLAN.md`, `REVIEW.md`) carries the rest.
 
 <!-- pln:include todo-location -->
+<!-- pln:include todo-destination -->
 <!-- pln:include todo-format -->
 
 ## Failure modes to watch for

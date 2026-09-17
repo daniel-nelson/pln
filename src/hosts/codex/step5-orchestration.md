@@ -2,7 +2,7 @@ Once the schedule is validated, the main session is a thin coordinator: it owns 
 
 **Native agents are the mechanism, not one option among two.** Where `spawn_agent` is available — it normally is, and this run has already used it for research and review — dispatch item work through it. `pln-codex-agent` is for a host that genuinely lacks native collaboration or has it switched off, and taking it is a decision to disclose with its reason, not a branch to drift into. A run that has spawned native agents successfully in an earlier phase has its answer. Observed otherwise: a coordinator that used `spawn_agent` fourteen times without a failure read this phase, ran `pln-codex-agent --help`, and then put every item, verification and repair through nested subprocesses that share one authentication state and therefore cannot overlap — serializing work it had already been told was ordered anyway, and paying a fresh process, a fresh context and a full re-read of the plan and root instructions for each one.
 
-Item work happens in the working tree the run was launched in. Do not create a git worktree: a fresh worktree is a bare checkout with no installed dependencies, environment file, database or port block, and every worker handed one rebuilds that for itself — none of which git tracks, so no lease describes it and no dirty snapshot protects it.
+Item work happens in the working tree the run was launched in. Do not create a git worktree — the bare-checkout reason is stated above.
 
 For each item `pln-scheduler ready` names:
 

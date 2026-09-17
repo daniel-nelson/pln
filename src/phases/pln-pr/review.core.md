@@ -10,7 +10,7 @@ Read this file in full before the first reviewer or peer action. Keep `Phase: re
 
 After the merged ledger is durable, set `Review status` and then set `Phase: fix` when acted-on findings remain or `Phase: ship-watch` when none remain. Read the mapped phase before its first action.
 
-**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-todo add` — not by leaving it in prose for the close to remember.
+<!-- pln:include followup-filing -->
 
 <!-- pln:include assurance-policy -->
 
@@ -24,7 +24,7 @@ Every reviewer this skill spawns is the same model as the orchestrator spawning 
 
 ### Step 3. Risk-calibrated review roster
 
-Use the R1/R2/R3 classification persisted in scope-baseline and validate the roster with `bin/pln-assurance roster`. Every tier has one fresh broad judgment reviewer inheriting the hosting model. R2 adds at most two applicable specialist lenses. R3 runs at most four pre-fix readers: broad, up to two highest-risk specialists, and one adversarial slot. `DIFF_LINES` may raise routine work to R2 at the provisional threshold but never reduces the roster; the fewer-than-30-lines shortcut is removed.
+Use the R1/R2/R3 classification persisted in scope-baseline and validate the roster with `bin/pln-assurance roster`; the tiers and the readers each one calls for are the assurance policy's, above. `DIFF_LINES` may raise routine work to R2 at the provisional threshold but never reduces the roster; the fewer-than-30-lines shortcut is removed.
 
 **`REVIEW.md`'s `Review depth` decides how much of that roster runs.** Only a human sets it — at `{{PLN_CMD}}`'s adoption gate, as a `review=` argument, as an instruction in the invoking message, or in answer to scope-baseline's one ask. `full` runs the validated roster above. `broad` runs the mandatory broad reviewer alone and drops every specialist and adversarial slot, whatever the tier. `none` skips review entirely, under the skip rules in the skill body. A depth is not a reclassification: persist the real tier unchanged, and say which roster actually ran and that a narrower one was chosen — giving the depth as the concrete trigger that set it rather than as a tier name — so nothing downstream reads a `broad` run on critical work as the full critical roster having found nothing. Fix, verification, and post-fix assurance are unaffected — those follow the tier, not the depth.
 
@@ -72,7 +72,7 @@ The **adversarial slot** is a generalist with no checklist: "Try to break this e
 
 <!-- pln:include pr-review-invoke -->
 
-**The cross-model adversarial slot.** For R3, send the standalone adversarial brief through `pln-peer` only when consent, `peer_egress`, and repository/session classification allow it. A no-peer, declined, suppressed, or failed peer is replaced by one fresh same-model adversarial reviewer in that same slot; attribute the reason and the loss of model-family independence. For R1/R2, a peer runs only under an explicit request or recorded assurance-first posture and is additive. Raw peer output remains file-first for the merge worker.
+**The cross-model adversarial slot.** For R3, send the standalone adversarial brief through `pln-peer` only when consent, `peer_egress`, and repository/session classification allow it; what replaces a no-peer, declined, suppressed or failed peer, and how it is attributed, are Consulting a peer model's. For R1/R2, a peer runs only under an explicit request or recorded assurance-first posture and is additive. Raw peer output remains file-first for the merge worker.
 
 ### Step 3.1. Merge, gate, and write the ledger
 

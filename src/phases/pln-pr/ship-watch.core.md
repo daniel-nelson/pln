@@ -118,7 +118,7 @@ This step only runs right after Step 8 created a **brand-new** draft PR (`IS_NEW
 
 After a CI code fix, recompute risk and candidate fingerprints, invalidate the earlier review/gauntlet, run the applicable fresh review/post-fix assurance on the changed candidate, and run **the static checks** before pushing. Push only the reverified candidate and re-enter the watch loop.
 
-The behavior suite does not re-run here, and this is the step where that mattered most: the push at the end of this round starts a fresh CI run that will execute the whole suite in parallel, so running it locally first is paying twice for one answer and delaying the run that produces it. Where the fix touched a specific test or an uncovered path, run that test and only that test. The two whole-suite justifications above still stand and nothing else does. Measured on a real run before this rule existed: one CI round going red made a three-file branch re-run its project's full suite four more times, `pnpm lint` ten times, over eighteen minutes of a forty-two-minute "CI watch" that was barely watching CI.
+The behavior suite does not re-run here; the two whole-suite justifications above still stand and nothing else does. Where the fix touched a specific test or an uncovered path, run that test and only that test. Measured on a real run before this rule existed: one CI round going red made a three-file branch re-run its project's full suite four more times, `pnpm lint` ten times, over eighteen minutes of a forty-two-minute "CI watch" that was barely watching CI.
 
 The old bar here was "not exactly subsumed by the required CI checks", where exact subsumption meant the same command, inputs and relevant environment. That never fired: CI runs in a container on a clean checkout, so a local command is never *exactly* the same environment, so everything always re-ran. A guard that cannot be satisfied is not a guard.
 
@@ -133,12 +133,12 @@ All of this runs at whichever close hands the PR to the user — Step 8's or Ste
 <!-- pln:include outstanding-sweep -->
 
 <!-- pln:include todo-location -->
+<!-- pln:include todo-destination -->
 <!-- pln:include todo-format -->
 
 ## Failure modes to watch for
 
 - **Re-running the gauntlet after each fix cluster.** This is the exact thrash pln-pr exists to prevent. Fixes accumulate; the mandatory run happens once at Step 7 (plus the optional Step 2 baseline).
-- **Running the behavior suite locally when CI is about to run it anyway.** The push at the end of a CI-fix round starts a run that executes the whole suite in parallel. Running it first buys a slower copy of an answer CI is going to produce regardless, and delays the run that produces it. Static checks are the local purchase; the suite is CI's.
 - **Treating a failed review as a clean one.** If no reviewer succeeds, that is zero coverage, not zero findings. Fail closed and stop — never write an empty ledger and open the PR.
 - **The orchestrator fixing findings itself.** It dispatches fix agents; it does not read code or edit files. If you catch yourself editing in the orchestrator, stop and spawn the cluster.
 - **Acting on unverified findings.** A finding with no `motivating_code` is a suspicion, not a bug. It stays in the appendix and is not fixed.

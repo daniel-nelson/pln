@@ -4,7 +4,7 @@ Once the schedule is validated, the main session is a thin coordinator: it owns 
 
 Before the first item, tell the user once where to watch: each item runs as a named background Agent, and its live activity — the actual tool calls, as they happen — is visible in `/tasks` and the session's agent UI under that name. That view costs the coordinator's context nothing, so it is the way to watch without derailing the run. Name each worker after its item (`item-3-metrics`, not an opaque handle), so those rows read as the plan's items. On the `pln-claude-agent` fallback, say instead that item work will not appear there, and why.
 
-Item work happens in the working tree the run was launched in. Do not create a git worktree, and do not pass `isolation: "worktree"`: a fresh worktree is a bare checkout with no installed dependencies, environment file, database or port block, and every worker handed one rebuilds that for itself — none of which git tracks, so no lease describes it and no dirty snapshot protects it.
+Item work happens in the working tree the run was launched in. Do not create a git worktree, and do not pass `isolation: "worktree"` — the bare-checkout reason is stated above.
 
 For each item `pln-scheduler ready` names:
 

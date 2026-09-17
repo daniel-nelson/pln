@@ -113,7 +113,7 @@ The routing above says who owns a choice. This says whether the user ever hears 
 
 Everything else is the work. Make the least-scope repair that restores what the plan already says it wants, record it, and move on.
 
-**What "record it" is not: a channel to the user.** Assume they never open `PLAN.md`. The record exists for the implementer who builds from it, the reviewer who argues with it, and for auditing this filter the next time it is wrong. That is exactly why the fork test has to be right rather than generous — nothing that clears it may be left to the record instead.
+**What "record it" is not: a channel to the user** — see Style's "The user does not have the plan open, and never will". The record is also where this filter is audited the next time it is wrong, which is exactly why the fork test has to be right rather than generous: nothing that clears it may be left to the record instead.
 
 **Two tells, in both directions.** Too generous: **the user ratifies** — a question or finding answered with "yes, add it", a bare selector, or "sure" had one answer, and the round trip bought nothing. Too tight: the user meets something at implementation and asks why it was decided that way.
 

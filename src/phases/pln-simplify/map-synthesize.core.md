@@ -8,7 +8,7 @@ name: pln-simplify-phase-map-synthesize
 
 Read this file before repository mapping, then load `{{OUTPUT_ROOT}}/phases/pln/outline.md` for root-instruction discovery, plan-directory placement, `.git/info/exclude`, pre-flight evidence routing, and its mandatory initial outline checkpoint. The specialization below changes only the evidence that shapes that outline; it does not create another planning or approval lifecycle.
 
-**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-todo add` — not by leaving it in prose for the close to remember.
+<!-- pln:include followup-filing -->
 
 Dispatch fresh `judgment` workers on `{{OUTPUT_ROOT}}/src/workers/simplification-map.md` across the smallest independent set of responsibility areas that covers the requested scope. Use one worker when the scope has one owner; use disjoint workers concurrently only when their reads are independent. Each gets one bounded area, the source commit and root mandates, distinct evidence/result paths, routing attribution, and a 4096-byte envelope. Validate every result with `pln-read-envelope`; failed coverage stays uncertainty.
 

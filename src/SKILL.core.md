@@ -98,6 +98,8 @@ The tell that the filter is miscalibrated: the user answers an interview questio
 
 **The tell that fires before the question goes out: you have a preference.** If you can say which option you would take, you have already applied one of the two tests above and got an answer — an authority you can name, or a consequence you can bound — and the choice is in the decide-and-disclose lane by this section's own rules. Ask only where you genuinely cannot say. See Style's "A recommendation is a statement, not a question" for the shape it takes instead; this is where the routing decision is made.
 
+**Except where the approach you prefer adds durable surface** — a new owner, data concept, service, workflow, public interface, compatibility path, or a further release (the interview's system-fit gate carries the list). A preference does not route that out of Ask: being cite-backed decides how the options are framed, never whether they are shown. Read it off the approach, not off how large it feels. A localized correction inside an established owner is untouched, and *Theirs* below still rules out this run's own apparatus.
+
 ### The fork test — what spends the user's attention
 
 The routing above says who owns a choice. This says whether the user ever hears about it, and it is the one test in the skill for that. The interview runs it on a choice; the plan-review merge contract runs it on a finding; the gate's numbered list is what comes out of it.

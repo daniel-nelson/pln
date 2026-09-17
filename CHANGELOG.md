@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.88.0 — 2026-09-16
+
+### Changed
+
+- **Having a preference no longer decides a design the user will have to live with.** Since 1.29.0 the interview has routed a choice out of the ask lane the moment the agent could say which option it would take — a rule written against a measured waste, where across three audited sessions twenty-one bare selectors all picked the option already marked recommended and no losing branch was ever read. It is right about mechanics and wrong about architecture: an agent that can cite an authority for building a topology registry has, by that rule, earned the right not to mention it. Two runs since show the cost. On psychic-workers PR #82 a two-line sweep of an existing collection became an encoded locator format, a version prefix, an error class, a topology registry, generation tokens and roughly 1,400 lines of specs — and *the user found the design at the pull request*. On a task to set one integer column on about a thousand rows, the plan reached a KMS-backed S3 manifest, an application-encrypted correction receipt, cross-repository IAM work and three releases. Both cleared the system-fit gate, both disclosed the simpler route that lost, and neither was ever a question. A preference now stops routing where the approach adds durable surface — a new owner, data concept, service, workflow, public interface, compatibility path, or a further release, the list the system-fit gate already enumerates. Being cite-backed there decides how the options are framed, never whether they are shown, and 1.87.0's floor is one of them. What 1.29.0 was written to stop is untouched: a localized correction inside an established owner, and every reversible mechanic, still belongs to the implementer; where no honest floor can be written there is still no fork, and the call is still made and disclosed rather than asked. The test reads off the approach — it adds one of those things or it does not — rather than off a judgment about how large the design feels, which is the rule shape this repository has already recorded as failing.
+
 ## 1.87.0 — 2026-09-16
 
 ### Fixed

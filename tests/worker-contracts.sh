@@ -363,10 +363,12 @@ has "$pr_merge" 'Persist each finding'"'"'s `smaller_fix` verbatim' \
 # and opened a repair cluster, two of them carrying behavior-preservation proof.
 has "$pr_merge" 'breaks_if_shipped' \
   'PR merge no longer checks what a finding costs if it ships'
-has "$pr_merge" 'Disposition: preference' \
-  'PR merge lost the disposition that files a finding instead of building it'
-has "$pr_merge" 'never enters an automatic fix cluster' \
-  'PR merge can still route a preference into repair work'
+has "$pr_merge" 'a preference is **dropped**' \
+  'PR merge keeps a finding nobody will act on instead of dropping it'
+has "$pr_merge" 'There is no third destination' \
+  'PR merge regained a place to defer the call to'
+has "$pr_merge" 'A note nobody will read is not a lighter version of acting' \
+  'PR merge can resolve a doubtful finding by writing it down for no reader'
 
 "$REPO_DIR/bin/pln-generate" --host claude --out-dir "$WORK/claude" >/dev/null
 "$REPO_DIR/bin/pln-generate" --host codex --out-dir "$WORK/codex" >/dev/null
@@ -422,18 +424,16 @@ for host in claude codex; do
     "$host review phase no longer requires a shipped consequence on every finding"
   has "$WORK/$host/phases/pln-pr/review.md" 'Write the literal `nothing`' \
     "$host reviewer brief lost the no-consequence answer"
-  has "$WORK/$host/phases/pln-pr/fix.md" '`Disposition: preference` is not work at all' \
+  has "$WORK/$host/phases/pln-pr/fix.md" 'Nothing reaches this phase that is not work' \
     "$host fix phase can still build a finding with no shipped consequence"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'repair-action --disposition preference' \
-    "$host fix phase files preferences by judgment rather than through the helper"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'means the ledger, not the to-do list' \
-    "$host fix phase turns every declined finding into a chore for the user"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'a cheap repair is not a reason to build something' \
+    "$host fix phase can readmit a dropped finding because the repair looks small"
   has "$WORK/$host/phases/pln-pr/fix.md" 'Settled candidate' \
     "$host fix phase lost the scope that keeps later rounds on the repairs"
   has "$WORK/$host/phases/pln-pr/fix.md" 'This is a scope rule, not a round cap' \
     "$host settled-candidate rule no longer distinguishes itself from the removed round cap"
-  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'the branch ships without them' \
-    "$host closing message no longer reports what the run declined to build"
+  hasnt "$WORK/$host/phases/pln-pr/ship-watch.md" 'the branch ships without them' \
+    "$host closing message regained a tally of work nobody is doing"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Settled candidate' \
     "$host ledger no longer carries the settled candidate across a compaction"
   has "$WORK/$host/SKILL.md" 'at most two exact operations' "$host /pln router lost the direct lookup budget"

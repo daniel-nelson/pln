@@ -1,0 +1,412 @@
+#!/usr/bin/env bash
+# pln-skill-standard — the vendored Agent Skills standard: prove it intact,
+# say where to read it, and go and find out what upstream changed.
+#
+# The corpus is reference/agent-skills/: the pages themselves plus SOURCES.tsv,
+# a four-column manifest (url, path, fetched, sha256) with one header row.
+# `check` and `paths` are offline and need only bash and a sha256 command.
+# `refresh` is the one network path and is never run for you.
+#
+# Host-neutral. No agent CLI, no credentials, no state directory.
+set -euo pipefail
+
+SELF_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+STANDARD_DIR="${PLN_STANDARD_DIR:-$SELF_DIR/reference/agent-skills}"
+
+MANIFEST='SOURCES.tsv'
+HEADER="$(printf 'url\tpath\tfetched\tsha256')"
+TAB="$(printf '\t')"
+
+# refresh fetches nothing off this host. A rewritten SOURCES.tsv URL is
+# otherwise a redirect to anywhere, which is the hole bin/pln-update-check:271-282
+# closes for its own fetch and tests/update-check.sh pins.
+ANCHOR='https://agentskills.io/'
+
+# A 200 that is not the page — captive portal, proxy interstitial, edge error —
+# would be written over the markdown and re-hashed as authentic, after which
+# `check` passes forever. The smallest real page in the corpus is ~1.3 KB.
+MIN_BODY_BYTES=200
+
+# No timeout means refresh hangs behind a black-holing firewall, which is the
+# absent-network case the degradation requirement exists for. The precedent
+# uses 5 for a VERSION file (bin/pln-update-check:307) and 10 for a payload
+# (bin/pln-update-apply:126); these are 8-17 KB pages.
+FETCH_MAX_TIME=20
+
+usage() {
+  cat <<'EOF'
+Usage:
+  pln-skill-standard check     verify the vendored corpus against SOURCES.tsv
+  pln-skill-standard paths     print each vendored file's absolute path and date
+  pln-skill-standard refresh   re-fetch every source, compare, rewrite (network)
+  pln-skill-standard --help
+
+Every subcommand prints KEY=VALUE lines on stdout: DIR first, STATUS and DETAIL
+last. STATUS is one of ok, drift, missing, extra, invalid, unavailable,
+unreachable, and each maps to one exit code below.
+
+check (offline)
+  Two passes. Every SOURCES.tsv row's file must be present and match its
+  recorded sha256; then every non-dot entry in the directory must be claimed by
+  some row. On failure DETAIL names the first offending path and what differed.
+  Dotfiles are ignored by the second pass: .gitignore already carries
+  .DS_Store because Finder writes one into any directory a user opens, and a
+  gauntlet that goes red on a Finder artifact teaches people to loosen it.
+  STATUS=missing usually means an install that never ran ./setup — run it, or
+  re-install — rather than a corrupted corpus.
+
+paths (offline)
+  One line per source, for an agent about to read them:
+    FETCHED=<YYYY-MM-DD> FILE=<absolute path>
+  The path comes last so a consumer can take the rest of the line.
+
+refresh (network, opt-in)
+  Re-fetches every row's URL, prints one line per source
+    SOURCE=<path> STATE=UNCHANGED|CHANGED BYTES=<delta> LINES=<delta>
+  and then rewrites the files and SOURCES.tsv. All or nothing: everything is
+  fetched and validated in a temporary directory first, and a single failure
+  leaves every file and every SOURCES.tsv byte untouched.
+  A URL not on agentskills.io is refused, not fetched. No -L, so no redirect is
+  followed. Every fetch carries --max-time. A body that is empty, opens with
+  '<' or '<!DOCTYPE', or falls under a floor length is rejected before anything
+  is written.
+
+What the seal proves, and what it does not
+  The sha256 proves the local copy has not been edited since the last refresh.
+  It does NOT prove the upstream bytes are authentic: refresh rewrites the
+  files and their hashes from the same fetch, so a substituted page is sealed
+  as readily as a real one. There is no trust root here and this helper does
+  not invent one.
+  Nor does "it is a tracked file" stand in for one outside a development
+  clone. In a contributor's clone a refresh arrives as a reviewable diff in a
+  pull request, and that is a real control. On an installed copy it is not:
+  pln-update-apply stashes and hard-resets a git install, and rm -rf's and
+  re-copies a vendored one, so a refresh there is a silent, unreviewed rewrite
+  that re-seals itself and is discarded at the next /pln-update. Keeping up to
+  date happens where someone can commit; every other install sits at whatever
+  the last release vendored. refresh says so when it runs outside such a clone.
+
+Exit codes
+  0  success
+  2  usage error
+  3  corpus fault — a file missing, a hash mismatch, or an unclaimed extra file
+     (STATUS=missing, drift, extra)
+  4  refused — a SOURCES.tsv row that is malformed, whose path is not a plain
+     filename inside the corpus directory or is a symlink, or whose URL names a
+     host other than agentskills.io (STATUS=invalid)
+  5  a required tool is unavailable — no sha256 command, or no curl for refresh
+     (STATUS=unavailable)
+  6  refresh could not complete — a source unreachable, a non-200, a short read,
+     or a body that is not the page. Nothing was written. (STATUS=unreachable)
+
+Env overrides (for testing)
+  PLN_STANDARD_DIR        corpus directory (default <install>/reference/agent-skills)
+  PLN_STANDARD_URL_BASE   relocate refresh's fetches: a row's URL keeps its
+                          recorded agentskills.io form and is still anchored,
+                          but the bytes are read from <base>/<rest of path>.
+                          Follows the precedent's shape — an override is taken,
+                          not refused (bin/pln-update-check:271-274).
+  PLN_STANDARD_DATE       the UTC date refresh records (YYYY-MM-DD)
+EOF
+}
+
+# Usage errors are stderr-only, like the other bin/ helpers: there is no corpus
+# verdict to report when the invocation itself was wrong.
+fail() { echo "pln-skill-standard: $*" >&2; exit 2; }
+
+# The reporting exits. Each prints the verdict on stdout, where a caller reads
+# it, and the human sentence on stderr.
+report_exit() { # report_exit <status> <code> <detail>
+  echo "STATUS=$1"
+  echo "DETAIL=$3"
+  echo "pln-skill-standard: $3" >&2
+  exit "$2"
+}
+faulted()      { report_exit "$1" 3 "$2"; }  # faulted <missing|drift|extra> <detail>
+refuse()       { report_exit invalid 4 "$1"; }
+missing_tool() { report_exit unavailable 5 "$1"; }
+unreached()    { report_exit unreachable 6 "$1"; }
+
+# ─── sha256, with no guarantee either command exists ─────────────────────────
+SHA_CMD=""
+detect_sha() {
+  [ -z "$SHA_CMD" ] || return 0
+  if command -v shasum >/dev/null 2>&1; then
+    SHA_CMD="shasum -a 256"
+  elif command -v sha256sum >/dev/null 2>&1; then
+    SHA_CMD="sha256sum"
+  else
+    missing_tool "no sha256 command found (tried shasum, sha256sum) — this machine cannot verify the corpus; paths still works"
+  fi
+}
+
+sha_of() { # sha_of <file> — detect_sha has already run
+  $SHA_CMD "$1" | LC_ALL=C awk '{print $1}'
+}
+
+today() {
+  local d="${PLN_STANDARD_DATE:-}"
+  [ -n "$d" ] || d="$(date -u '+%Y-%m-%d')"
+  case "$d" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+    *) fail "date must be YYYY-MM-DD: $d" ;;
+  esac
+  printf '%s\n' "$d"
+}
+
+# ─── the manifest ────────────────────────────────────────────────────────────
+# Parallel indexed arrays, because bash 3.2 has no associative ones. CLAIMED is
+# a |-delimited membership string for the same reason.
+ROW_URL=()
+ROW_PATH=()
+ROW_FETCHED=()
+ROW_SHA=()
+CLAIMED='|'
+ROW_COUNT=0
+
+load_manifest() {
+  echo "DIR=$STANDARD_DIR"
+
+  local file="$STANDARD_DIR/$MANIFEST"
+  [ -d "$STANDARD_DIR" ] \
+    || faulted missing "corpus directory not found: $STANDARD_DIR — run ./setup, or re-install"
+  [ ! -L "$file" ] || refuse "$MANIFEST must not be a symlink: $file"
+  [ -f "$file" ] \
+    || faulted missing "$MANIFEST not found in $STANDARD_DIR — run ./setup, or re-install"
+
+  local first=""
+  IFS= read -r first < "$file" || true
+  [ "$first" = "$HEADER" ] \
+    || refuse "$MANIFEST header must be exactly 'url<TAB>path<TAB>fetched<TAB>sha256'"
+
+  local lineno=1 u="" p="" f="" s="" extra=""
+  while IFS="$TAB" read -r u p f s extra || [ -n "$u$p$f$s" ]; do
+    lineno=$((lineno + 1))
+    if [ -z "$u$p$f$s" ]; then u=""; p=""; f=""; s=""; extra=""; continue; fi
+    [ -z "$extra" ] || refuse "$MANIFEST line $lineno has more than four fields"
+    [ -n "$s" ] || refuse "$MANIFEST line $lineno has fewer than four fields"
+
+    case "$u" in
+      "$ANCHOR"*) ;;
+      *) refuse "$MANIFEST line $lineno: url is not on ${ANCHOR%/} — refusing to trust it: $u" ;;
+    esac
+
+    # The path column is anchored for the same reason the url column is: it is
+    # what refresh writes through and check reads through, and a row reading
+    # ../../bin/pln-generate would have refresh overwrite an executable with
+    # fetched text. Same class bin/pln-read-envelope:77,90,179 refuses.
+    case "$p" in
+      '') refuse "$MANIFEST line $lineno: path is empty" ;;
+      */*) refuse "$MANIFEST line $lineno: path must be a plain filename inside $STANDARD_DIR, not a path: $p" ;;
+      .*) refuse "$MANIFEST line $lineno: path must not begin with a dot: $p" ;;
+    esac
+    case "$CLAIMED" in
+      *"|$p|"*) refuse "$MANIFEST line $lineno: path claimed twice: $p" ;;
+    esac
+    [ ! -L "$STANDARD_DIR/$p" ] \
+      || refuse "$MANIFEST line $lineno: path is a symlink: $STANDARD_DIR/$p"
+
+    case "$f" in
+      [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+      *) refuse "$MANIFEST line $lineno: fetched must be YYYY-MM-DD: $f" ;;
+    esac
+    case "$s" in
+      '' | *[!0-9a-f]*) refuse "$MANIFEST line $lineno: sha256 is not lowercase hex: $s" ;;
+    esac
+    [ "${#s}" -eq 64 ] || refuse "$MANIFEST line $lineno: sha256 is not 64 characters: $s"
+
+    ROW_URL[$ROW_COUNT]="$u"
+    ROW_PATH[$ROW_COUNT]="$p"
+    ROW_FETCHED[$ROW_COUNT]="$f"
+    ROW_SHA[$ROW_COUNT]="$s"
+    ROW_COUNT=$((ROW_COUNT + 1))
+    CLAIMED="$CLAIMED$p|"
+    u=""; p=""; f=""; s=""; extra=""
+  done < <(LC_ALL=C tail -n +2 "$file")
+
+  [ "$ROW_COUNT" -gt 0 ] || refuse "$MANIFEST has a header row and no sources"
+  echo "ROWS=$ROW_COUNT"
+}
+
+# ─── check ───────────────────────────────────────────────────────────────────
+cmd_check() {
+  load_manifest
+  detect_sha
+
+  local i=0 p want got
+  while [ "$i" -lt "$ROW_COUNT" ]; do
+    p="${ROW_PATH[$i]}"
+    want="${ROW_SHA[$i]}"
+    [ -e "$STANDARD_DIR/$p" ] \
+      || faulted missing "$p is absent from $STANDARD_DIR — run ./setup, or re-install"
+    [ -f "$STANDARD_DIR/$p" ] \
+      || refuse "$p is not a regular file: $STANDARD_DIR/$p"
+    got="$(sha_of "$STANDARD_DIR/$p")"
+    [ "$got" = "$want" ] \
+      || faulted drift "$p has drifted: $MANIFEST records $want, the file hashes to $got"
+    i=$((i + 1))
+  done
+
+  # Second pass: anything in the directory no row claims. The glob skips
+  # dotfiles, which is the intent rather than an accident.
+  local entry base
+  for entry in "$STANDARD_DIR"/*; do
+    [ -e "$entry" ] || [ -L "$entry" ] || continue
+    base="$(basename "$entry")"
+    [ "$base" != "$MANIFEST" ] || continue
+    case "$CLAIMED" in
+      *"|$base|"*) continue ;;
+    esac
+    faulted extra "$base is present in $STANDARD_DIR and no $MANIFEST row claims it"
+  done
+
+  echo "STATUS=ok"
+  echo "DETAIL=none"
+}
+
+# ─── paths ───────────────────────────────────────────────────────────────────
+cmd_paths() {
+  load_manifest
+
+  local i=0 absent=""
+  while [ "$i" -lt "$ROW_COUNT" ]; do
+    printf 'FETCHED=%s FILE=%s\n' "${ROW_FETCHED[$i]}" "$STANDARD_DIR/${ROW_PATH[$i]}"
+    if [ ! -f "$STANDARD_DIR/${ROW_PATH[$i]}" ] && [ -z "$absent" ]; then
+      absent="${ROW_PATH[$i]}"
+    fi
+    i=$((i + 1))
+  done
+
+  [ -z "$absent" ] \
+    || faulted missing "$absent is absent from $STANDARD_DIR — run ./setup, or re-install"
+  echo "STATUS=ok"
+  echo "DETAIL=none"
+}
+
+# ─── refresh ─────────────────────────────────────────────────────────────────
+TMPDIR_REFRESH=""
+cleanup_refresh() { [ -z "$TMPDIR_REFRESH" ] || rm -rf "$TMPDIR_REFRESH"; }
+
+# A signed delta, so a reviewer sees the size of what changed rather than a
+# bare word.
+delta() { # delta <old> <new>
+  local d=$(( $2 - $1 ))
+  if [ "$d" -ge 0 ]; then printf '+%s' "$d"; else printf '%s' "$d"; fi
+}
+
+fetch_url() { # fetch_url <recorded-url> — prints the URL bytes are read from
+  local u="$1"
+  if [ -n "${PLN_STANDARD_URL_BASE:-}" ]; then
+    printf '%s/%s' "${PLN_STANDARD_URL_BASE%/}" "${u#"$ANCHOR"}"
+  else
+    printf '%s' "$u"
+  fi
+}
+
+cmd_refresh() {
+  load_manifest
+  command -v curl >/dev/null 2>&1 \
+    || missing_tool "curl is not installed — refresh cannot reach the sources; check and paths still work offline"
+  detect_sha
+  [ -w "$STANDARD_DIR" ] || fail "corpus directory is not writable: $STANDARD_DIR"
+
+  # Outside a development clone the rewrite produces no reviewable diff, and
+  # the user is told before the lines that look like progress.
+  if ! { command -v git >/dev/null 2>&1 \
+         && git -C "$STANDARD_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+         && [ -n "$(git -C "$STANDARD_DIR" remote 2>/dev/null)" ]; }; then
+    echo "NOTICE=not-a-clone: this rewrite produces no reviewable diff and /pln-update will discard it; refresh where someone can commit"
+  fi
+
+  TMPDIR_REFRESH="$(mktemp -d "${TMPDIR:-/tmp}/pln-skill-standard.XXXXXX")"
+  trap cleanup_refresh EXIT
+
+  # Pass one: fetch and validate everything. Nothing in STANDARD_DIR is touched
+  # until every source is in hand, so one failure changes no byte.
+  local i=0 p url furl tmp bytes rc lead
+  while [ "$i" -lt "$ROW_COUNT" ]; do
+    p="${ROW_PATH[$i]}"
+    url="${ROW_URL[$i]}"
+    furl="$(fetch_url "$url")"
+    tmp="$TMPDIR_REFRESH/$p"
+
+    # No -L: not following redirects is what makes the host anchor mean
+    # anything (bin/pln-update-check:307 omits it for the same reason).
+    set +e
+    curl -sf --max-time "$FETCH_MAX_TIME" -o "$tmp" "$furl" 2>/dev/null
+    rc=$?
+    set -e
+    [ "$rc" -eq 0 ] \
+      || unreached "could not reach the source for $p at $furl (curl exit $rc) — nothing was written"
+    [ -f "$tmp" ] \
+      || unreached "no body returned for $p at $furl — nothing was written"
+
+    bytes="$(LC_ALL=C wc -c < "$tmp")"
+    bytes="${bytes//[[:space:]]/}"
+    [ "$bytes" -ge "$MIN_BODY_BYTES" ] \
+      || unreached "$p at $furl returned $bytes bytes, under the ${MIN_BODY_BYTES}-byte floor — that is not the page; nothing was written"
+    lead="$(LC_ALL=C head -c 64 "$tmp" | LC_ALL=C tr -d '[:space:]' | LC_ALL=C cut -c1)"
+    [ "$lead" != '<' ] \
+      || unreached "$p at $furl returned markup, not the page — nothing was written"
+
+    i=$((i + 1))
+  done
+
+  # Pass two: report, and build the replacement manifest, still in the temp dir.
+  local stamp newsha ob ol nb nl state
+  stamp="$(today)"
+  local manifest_tmp="$TMPDIR_REFRESH/$MANIFEST.new"
+  printf '%s\n' "$HEADER" > "$manifest_tmp"
+
+  i=0
+  while [ "$i" -lt "$ROW_COUNT" ]; do
+    p="${ROW_PATH[$i]}"
+    tmp="$TMPDIR_REFRESH/$p"
+    newsha="$(sha_of "$tmp")"
+
+    ob=0; ol=0
+    if [ -f "$STANDARD_DIR/$p" ]; then
+      ob="$(LC_ALL=C wc -c < "$STANDARD_DIR/$p")"
+      ol="$(LC_ALL=C wc -l < "$STANDARD_DIR/$p")"
+    fi
+    nb="$(LC_ALL=C wc -c < "$tmp")"
+    nl="$(LC_ALL=C wc -l < "$tmp")"
+    ob="${ob//[[:space:]]/}"; ol="${ol//[[:space:]]/}"
+    nb="${nb//[[:space:]]/}"; nl="${nl//[[:space:]]/}"
+
+    if [ "$newsha" = "${ROW_SHA[$i]}" ]; then state=UNCHANGED; else state=CHANGED; fi
+    printf 'SOURCE=%s STATE=%s BYTES=%s LINES=%s\n' \
+      "$p" "$state" "$(delta "$ob" "$nb")" "$(delta "$ol" "$nl")"
+
+    printf '%s\t%s\t%s\t%s\n' "${ROW_URL[$i]}" "$p" "$stamp" "$newsha" >> "$manifest_tmp"
+    i=$((i + 1))
+  done
+
+  # Pass three: move into place. The temp dir may be on another filesystem, so
+  # copy beside the target and rename, which is atomic per file.
+  i=0
+  while [ "$i" -lt "$ROW_COUNT" ]; do
+    p="${ROW_PATH[$i]}"
+    cp "$TMPDIR_REFRESH/$p" "$STANDARD_DIR/.$p.pln-new"
+    chmod 644 "$STANDARD_DIR/.$p.pln-new"
+    mv -f "$STANDARD_DIR/.$p.pln-new" "$STANDARD_DIR/$p"
+    i=$((i + 1))
+  done
+  cp "$manifest_tmp" "$STANDARD_DIR/.$MANIFEST.pln-new"
+  chmod 644 "$STANDARD_DIR/.$MANIFEST.pln-new"
+  mv -f "$STANDARD_DIR/.$MANIFEST.pln-new" "$STANDARD_DIR/$MANIFEST"
+
+  echo "FETCHED=$stamp"
+  echo "STATUS=ok"
+  echo "DETAIL=none"
+}
+
+# ─── dispatch ────────────────────────────────────────────────────────────────
+[ $# -ge 1 ] || { usage >&2; exit 2; }
+case "$1" in
+  check)   shift; [ $# -eq 0 ] || fail "check takes no arguments"; cmd_check ;;
+  paths)   shift; [ $# -eq 0 ] || fail "paths takes no arguments"; cmd_paths ;;
+  refresh) shift; [ $# -eq 0 ] || fail "refresh takes no arguments"; cmd_refresh ;;
+  -h | --help | help) usage; exit 0 ;;
+  *) usage >&2; exit 2 ;;
+esac

@@ -128,23 +128,66 @@ has "$merge_contract" 'A single enclosing Markdown code fence is transport, not 
 has "$merge_contract" 'reject what is still unparseable' \
   'stripping a fence was allowed to soften the rest of validation'
 
-# The final gauntlet is exact-once, so a command that cannot run here destroys
-# the attempt rather than failing it. One run spent four attempts learning its
-# commands' requirements from inside the fingerprinted run: a worker has no
-# terminal, and network, filesystem and browser access are settled at a first
-# invocation or not at all.
+# A refused command is not a verification result, and for several releases this
+# contract said so and denied it in the same breath: a command that could not
+# run here was said to destroy the attempt. It does not. A refusal says nothing
+# about the tree, so the recorded set simply holds a command with no result —
+# incomplete, not failed and not destroyed. The surviving half was pinned below
+# all along; the clause that caused the defect was pinned by nothing, so it is
+# now banned by name.
+hasnt "$verification" 'destroys the attempt' \
+  'final-verification contract again spends the attempt on an environment refusal'
+has "$verification" 'A refused command leaves the gauntlet incomplete — not failed, and not destroyed.' \
+  'final-verification contract lost the incomplete-not-failed-not-destroyed outcome'
+has "$verification" 'An environment refusal is not a verification result' \
+  'final-verification contract reports environment denials as failed verification'
+# The worker records and stops, and is granted no rerun on purpose: the
+# privilege boundary runs between coordinator and child, so a rerun permission
+# written here is one its holder could never exercise. Where an incomplete
+# gauntlet gets resolved is stated, not left implied.
+has "$verification" 'Mark the aggregate environment-blocked, name every refused command beside the exact refusal, and stop there' \
+  'final-verification worker no longer records every refusal and stops'
+has "$verification" 'clearing a refusal is not work you can do' \
+  'final-verification worker was handed a rerun it has no access to perform'
+has "$verification" 'decided where that access lives' \
+  'final-verification contract no longer defers an incomplete gauntlet to the access holder'
+has "$verification" 'the aggregate result — environment-blocked where anything was refused' \
+  'final-verification results no longer report a refusal in the aggregate'
+# One run spent four attempts learning its commands' requirements from inside
+# the fingerprinted run: a worker has no terminal, and network, filesystem and
+# browser access are settled at a first invocation or not at all. Both pins
+# below still sit on that pre-flight guard, which was rewritten around them
+# rather than moved — "you have no terminal" survived verbatim. The guard now
+# also says where it stops: whether the coordinator holds access the worker was
+# not given is a fact about who runs a command, discoverable from no
+# documentation, and the guard hands that case to the rule above instead of
+# blaming the worker for missing it.
 has "$verification" 'Establish that the gauntlet can run before you run it' \
   'final-verification contract learns its requirements from a burned attempt'
 has "$verification" 'you have no terminal' \
   'final-verification contract does not say the run is non-interactive'
-has "$verification" 'An environment refusal is not a verification result' \
-  'final-verification contract reports environment denials as failed verification'
+has "$verification" 'It cannot settle access' \
+  'pre-flight guard again claims a privilege boundary it cannot see'
+has "$verification" 'not a pre-flight obligation and a refusal of that kind was not yours to foresee' \
+  'pre-flight guard again blames the worker for a refusal it could not have foreseen'
+has "$verification" 'the refused-command rule below is where it is handled' \
+  'pre-flight guard no longer names the rule that owns a refusal'
 # No toolchain is named: a project states the unattended form of its own
 # commands, and pln does not learn one package manager or one browser.
 for banned in 'CI=true' pnpm Puppeteer Firefox npm yarn; do
   hasnt "$verification" "$banned" \
     "final-verification contract hardcodes $banned instead of reading the project's instructions"
 done
+
+# The qualified pass belongs to the shared assurance policy, not to /pln-pr
+# alone. Three skills include that fragment, and a local exception in one of
+# them to a rule the fragment states is exactly the drift being guarded here:
+# the reuse rule and the rerun outcome have to be written by the same owner.
+policy="$REPO_DIR/src/shared/assurance-policy.md"
+has "$policy" 'the outcome is recorded as a **qualified pass**' \
+  'assurance policy lost the qualified-pass outcome for a rerun refused command'
+has "$policy" 'not the reuse of a green this rule governs' \
+  'assurance policy no longer separates a qualified pass from reusing a green under a matching seal'
 
 
 assurance="$REPO_DIR/src/workers/assurance-classification.md"
@@ -405,12 +448,189 @@ for host in claude codex; do
     "$host PR repair does not require complete admission proof"
   has "$WORK/$host/phases/pln-pr/fix.md" 'rerun the structural reference check and consumer map' \
     "$host post-fix assurance lost structural closure"
+  # Step 7 carries its own copy of the refusal rule and has to: bin/pln-generate
+  # resolves pln:include only in src/**/*.core.md, so a phase file and
+  # src/workers/final-verification.md cannot share one fragment. Two copies of
+  # one rule drift, and a single presence check per file would prove only that
+  # each contains one literal this script names. So the substance is asserted
+  # condition by condition, here and on the worker copy above.
+  ship_watch="$WORK/$host/phases/pln-pr/ship-watch.md"
+  step7="$WORK/$host-step7.md"
+  awk '/^### Step 7\./ { s = 1 } /^### Step 8\./ { s = 0 } s' "$ship_watch" > "$step7"
+  [ -s "$step7" ] || fail "$host ship-watch phase has no Step 7 section"
+  has "$step7" 'A refused command leaves the gauntlet incomplete — not failed, and not destroyed.' \
+    "$host Step 7 lost the incomplete-not-failed-not-destroyed outcome the worker contract also states"
+  has "$step7" 'not a verification result' \
+    "$host Step 7 no longer says an environment refusal is not a verification result"
+  has "$step7" 'mark it refused rather than failed, and run the remaining commands' \
+    "$host Step 7 brief turns a refusal into a failure or stops the run on one"
+  hasnt "$ship_watch" 'destroys the attempt' \
+    "$host Step 7 again spends the attempt on an environment refusal"
+  # The rerun is the coordinator's, and each condition on it is separately
+  # load-bearing. Drop the completeness precondition and a never-executed
+  # command passes; drop the branch-caused exclusion and a branch that adds an
+  # unvendored dependency ships green, because the rerun is granted the network
+  # the branch itself now needs.
+  has "$step7" 'never read back into coordinator context' \
+    "$host Step 7 rerun reads the raw gauntlet log into coordinator context"
+  has "$step7" 'which command was refused, the exact refusal, and what access the rerun was granted' \
+    "$host Step 7 rerun no longer records all three facts"
+  has "$step7" 'A command that never executed makes the gauntlet incomplete, and an incomplete gauntlet is not a pass' \
+    "$host Step 7 lost the completeness precondition on combining a rerun with the recorded run"
+  has "$step7" "Where the branch's own diff touches the refused command" \
+    "$host Step 7 lets a rerun repair a refusal the branch itself caused"
+  has "$step7" 'the refusal *is* a verification result and the rerun does not repair it' \
+    "$host Step 7 states the branch-caused exclusion without its consequence"
+  has "$step7" 'What still forces a whole repeat is the tree changing or the command set changing; a refusal does neither' \
+    "$host Step 7 no longer says what still forces the whole gauntlet to repeat"
+  # The one-agent rule and the fact that makes it safe sit eight lines apart, and
+  # the clause joining them is the whole of the edit that closed that gap. Three
+  # pins, because the fact and the rule can each survive while the connective
+  # between them is deleted — which is exactly the state the rule was written
+  # out of, a bare prohibition whose reason sits seven paragraphs away.
+  has "$step7" 'Step 7 spawns exactly one agent, and there is no adjudication worker' \
+    "$host Step 7 no longer says it spawns one agent and adjudicates nothing"
+  has "$step7" 'Evidence the coordinator already holds is never handed to a second agent to be judged' \
+    "$host Step 7 can hand evidence it already holds to a second agent"
+  has "$step7" 'An exit status is bounded metadata, not a log' \
+    "$host Step 7 lost the fact that lets one agent hold the context firewall"
+  has "$step7" 'so the context firewall holds without a second agent between you and the result' \
+    "$host Step 7 states the bounded-metadata fact without saying it is why one agent suffices"
+  # A rerun at elevated access can pass because of the privilege, and nothing
+  # tells that apart from a command that merely needed it. So the result is
+  # disclosed rather than absorbed into a green nobody can audit.
+  has "$step7" 'What that produces is a qualified pass, not a green' \
+    "$host Step 7 reports a rerun refused command as an unqualified green"
+  has "$step7" 'green except the named command, which ran at elevated access' \
+    "$host Step 7 no longer discloses which command ran at elevated access"
+  has "$step7" 'carrying both environment hashes' \
+    "$host Step 7 qualified pass no longer carries both environment hashes"
+  has "$step7" 'A command can pass *because* of the privilege it was rerun under' \
+    "$host Step 7 qualifies the pass without saying what the qualification is for"
+  # The brief is inline because a real run searched src/workers, found the
+  # contract addressed to another skill, and followed the wrong rule.
+  has "$step7" 'This step carries its worker brief inline, below — there is no separate contract file for the final gauntlet.' \
+    "$host Step 7 no longer declares its worker brief self-contained"
+  hasnt "$ship_watch" 'final-verification' \
+    "$host ship-watch phase sends the final-gauntlet worker to the contract it must not read"
+  hasnt "$step7" 'src/workers/' \
+    "$host Step 7 points its worker at a contract file instead of the inline brief"
+  # Scoped to the brief itself, not the file: ship-watch legitimately names a
+  # host in its pln:only blocks, while the brief is the part a worker reads, and
+  # this step is authorized to word it for its own register. The quoted block is
+  # the brief, so the extraction anchors on the quoting rather than on any phrase
+  # inside it.
+  brief="$WORK/$host-step7-brief.md"
+  awk '/^"/ { print; n = 1 } END { exit !n }' "$step7" > "$brief" \
+    || fail "$host Step 7 lost its inline gauntlet brief"
+  for brief_term in Claude Codex claude codex sandbox 'gh pr' glab npm 'Agent tool' \
+    'spawn_agent' 'wait_agent' 'Workflow('; do
+    hasnt "$brief" "$brief_term" \
+      "$host Step 7 brief names a host, CLI or sandbox product: $brief_term"
+  done
+  # The same refusal rule is coordinator text in three skills now, and
+  # bin/pln-generate resolves pln:include only in src/**/*.core.md, so none of
+  # the three can share one fragment with the worker contract or with each
+  # other. The first pass at this fix reached /pln-pr alone; /pln and
+  # /pln-simplify went on treating a refusal as a plain verification failure,
+  # and /pln-simplify additionally deleted the unpublished candidate ref on
+  # one — destroying the run's own work over a permissions problem that said
+  # nothing about the tree. Each condition is asserted separately, the way the
+  # /pln-pr copy above is, because one presence check per file would prove only
+  # that each holds a single literal this script names.
+  finish_ship="$WORK/$host/phases/pln/finish-ship.md"
+  finish_step7="$WORK/$host-finish-step7.md"
+  awk '/^### Step 7\./ { s = 1 } /^### Step 8\./ { s = 0 } s' "$finish_ship" > "$finish_step7"
+  [ -s "$finish_step7" ] || fail "$host finish-ship phase has no Step 7 section"
+  # Both sections are extracted rather than read whole, and for the same
+  # reason: each file also includes the shared assurance policy, which states
+  # the qualified-pass outcome in its own words. A whole-file check would be
+  # answered by that include no matter what the step itself said.
+  verify_record="$WORK/$host/phases/pln-simplify/verify-record.md"
+  verify_steps="$WORK/$host-verify-steps.md"
+  awk '/^After ordinary checkpoints:/ { s = 1 } /^Set `Phase: complete`/ { s = 0 } s' \
+    "$verify_record" > "$verify_steps"
+  [ -s "$verify_steps" ] || fail "$host /pln-simplify recording has no candidate-verification steps"
+  for coordinator in "$finish_step7" "$verify_steps"; do
+    has "$coordinator" 'A refused command leaves the gauntlet incomplete — not failed, and not destroyed.' \
+      "$coordinator lost the incomplete-not-failed-not-destroyed outcome the shipped copy states"
+    has "$coordinator" 'is not a verification result' \
+      "$coordinator no longer says an environment refusal is not a verification result"
+    has "$coordinator" 'so the rerun is yours: run exactly that one command' \
+      "$coordinator no longer gives the rerun to the coordinator that holds the access"
+    has "$coordinator" 'which command was refused, the exact refusal, and what access the rerun was granted' \
+      "$coordinator rerun no longer records all three facts"
+    has "$coordinator" 'never read back into coordinator context' \
+      "$coordinator rerun reads the raw gauntlet log into coordinator context"
+    has "$coordinator" 'A command that never executed makes the gauntlet incomplete, and an incomplete gauntlet is not a pass' \
+      "$coordinator lost the completeness precondition on combining a rerun with the recorded run"
+    has "$coordinator" 'the refusal *is* a verification result and the rerun does not repair it' \
+      "$coordinator lets a rerun repair a refusal the change under test caused"
+    has "$coordinator" 'What still forces a whole repeat is the tree changing or the command set changing; a refusal does neither' \
+      "$coordinator no longer says what still forces the whole gauntlet to repeat"
+    has "$coordinator" 'What that produces is a qualified pass, not a green' \
+      "$coordinator reports a rerun refused command as an unqualified green"
+    has "$coordinator" 'green except the named command, which ran at elevated access' \
+      "$coordinator no longer discloses which command ran at elevated access"
+    has "$coordinator" 'carrying both environment hashes' \
+      "$coordinator qualified pass no longer carries both environment hashes"
+    has "$coordinator" 'A command can pass *because* of the privilege it was rerun under' \
+      "$coordinator qualifies the pass without saying what the qualification is for"
+    has "$coordinator" 'the qualification is disclosed rather than absorbed into a green nobody can audit' \
+      "$coordinator absorbs a rerun at elevated access into a green nobody can audit"
+    # The rule is written in terms of what to do when a command is refused,
+    # never of which host refuses: one host's parent/child privilege boundary
+    # is the only instance recorded anywhere, and neither of these two skills
+    # asserts a host fact by carrying this.
+    rule="$WORK/$host-refusal-rule.md"
+    awk '/A refused command leaves the gauntlet incomplete/, /qualification is disclosed rather than absorbed/' \
+      "$coordinator" > "$rule"
+    [ -s "$rule" ] || fail "$coordinator lost the refusal rule block"
+    for rule_term in Claude Codex claude codex sandbox 'gh pr' glab npm 'Agent tool' \
+      'spawn_agent' 'wait_agent' 'Workflow('; do
+      hasnt "$rule" "$rule_term" \
+        "$coordinator refusal rule names a host, CLI or sandbox product: $rule_term"
+    done
+  done
+  # A refusal is not the failure either file already handled, and both of those
+  # failure clauses stay exactly as consequential as they were for a real one.
+  has "$finish_step7" 'A command the environment refused reported nothing about the tree and is not a new item' \
+    "$host /pln Step 7 turns a refusal into a new item the way it does a real failure"
+  has "$verify_steps" 'delete only the named unpublished candidate ref' \
+    "$host /pln-simplify no longer isolates a candidate that genuinely failed"
+  has "$verify_steps" 'A refusal is not that failure and this step does not run on one' \
+    "$host /pln-simplify deletes the candidate ref over an environment refusal"
+  has "$verify_steps" 'Keep the candidate ref.' \
+    "$host /pln-simplify no longer keeps the candidate ref through a refusal"
+  has "$verify_steps" 'the candidate ref stays where it is, unpublished and unmerged' \
+    "$host /pln-simplify does not say what becomes of a refusal that is never cleared"
+
   for file in "$WORK/$host/SKILL.md" "$WORK/$host/phases/pln/"*.md; do
     hasnt "$file" 'WORKER_ONLY_SENTINEL_' "$file contains worker-only contract prose"
     hasnt "$file" 'Do not inventory strengths or praise the plan' "$file embeds reviewer-only detail"
     hasnt "$file" 'Run the new test before the fix' "$file embeds implementation-worker detail"
   done
 done
+
+# Step 2 and Step 7 state their separation from opposite sides, and both
+# statements sit in pln:only codex blocks — no Claude instance of that
+# privilege boundary is recorded anywhere, so neither was promoted host-neutral.
+# A Claude build is therefore the wrong place to look for either. Each half is
+# asserted where it exists and asserted absent where it must not appear, so
+# moving one side without the other fails here rather than inside a run.
+codex_scope="$WORK/codex/phases/pln-pr/scope-baseline.md"
+has "$codex_scope" 'never read the raw log into coordinator context or report a sandbox denial as a red baseline' \
+  'Step 2 lost its sandbox-denial precedent'
+has "$codex_scope" "That is Step 2's handling of a denial, and Step 2's alone" \
+  'the Step 2 denial clause again reads as governing every step'
+has "$codex_scope" "Step 7's final gauntlet carries its own refusal rule inline" \
+  'Step 2 no longer says where Step 7 gets its refusal rule'
+has "$WORK/codex/phases/pln-pr/ship-watch.md" "Step 2's caveat does not govern here" \
+  'Step 7 no longer disclaims the Step 2 caveat it used to import'
+hasnt "$WORK/claude/phases/pln-pr/scope-baseline.md" "Step 2's alone" \
+  'the Codex-only denial clause leaked into the Claude build'
+hasnt "$WORK/claude/phases/pln-pr/ship-watch.md" "Step 2's caveat does not govern here" \
+  'the Codex-only Step 7 disclaimer leaked into the Claude build'
 
 brief_dir="$WORK/brief"
 mkdir -p "$brief_dir"

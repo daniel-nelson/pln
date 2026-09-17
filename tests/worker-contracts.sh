@@ -426,6 +426,8 @@ for host in claude codex; do
     "$host fix phase can still build a finding with no shipped consequence"
   has "$WORK/$host/phases/pln-pr/fix.md" 'repair-action --disposition preference' \
     "$host fix phase files preferences by judgment rather than through the helper"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'means the ledger, not the to-do list' \
+    "$host fix phase turns every declined finding into a chore for the user"
   has "$WORK/$host/phases/pln-pr/fix.md" 'Settled candidate' \
     "$host fix phase lost the scope that keeps later rounds on the repairs"
   has "$WORK/$host/phases/pln-pr/fix.md" 'This is a scope rule, not a round cap' \

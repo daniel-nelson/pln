@@ -6,7 +6,7 @@ name: pln-pr-phase-scope-baseline
 
 <!-- pln:include active-turn-lifecycle -->
 
-Read this file in full before the first repository or remote action. Create `REVIEW.md` before durable scope work with a `## State` section containing `Phase: scope-baseline`, a new durable Run identity, Base, Base source, Trust/command confirmation, Diff base, Review depth, Tree/command/environment/candidate fingerprints, Simplification freshness/policy/bypass, Risk tier/signals, Review status, PR identity, Draft disposition, and CI round/status. Update those fields as facts become known.
+Read this file in full before the first repository or remote action. Create `REVIEW.md` before durable scope work with a `## State` section containing `Phase: scope-baseline`, a new durable Run identity, Base, Base source, Trust/command confirmation, Diff base, Review depth, Tree/command/environment/candidate fingerprints, Simplification freshness/policy/bypass, Risk tier/signals, Review status, Settled candidate, PR identity, Draft disposition, and CI round/status. `Settled candidate` is empty until the fix phase records one; it is enumerated here because a coordinator rebuilding state after a compaction reads this list, and a scope rule that silently loses its anchor re-opens the whole candidate to every later reader. Update those fields as facts become known.
 
 Finish base validation, trust decisions, exact-tree fingerprinting, and any baseline result before advancing. Then set `Phase: review` and read the review phase in full. If an existing ledger shows later durable work, reconcile it and follow the router rather than overwriting or re-reviewing it.
 

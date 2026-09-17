@@ -8,7 +8,7 @@ Usage:
   pln-assurance classify --signals CSV --substantive-files N --non-generated-lines N
   pln-assurance roster --risk R1|R2|R3 --areas CSV --adversary peer|local
   pln-assurance repair-key --kind behavioral|structural --boundary TEXT --check TEXT [--owner TEXT]
-  pln-assurance repair-action --disposition new|persisted|needs-decision|out-of-scope|destructive|worker-blocked --failed-attempts N
+  pln-assurance repair-action --disposition new|persisted|preference|needs-decision|out-of-scope|destructive|worker-blocked --failed-attempts N
   pln-assurance fingerprint --root DIR --commands FILE --environment FILE
 USAGE
   exit 2
@@ -171,6 +171,16 @@ case "$command" in
         [ "$failed_attempts" -eq 0 ] || usage
         action="repair"
         reason="new-verified-finding"
+        ;;
+      preference)
+        # A finding with no consequence the shipped system produces is real,
+        # recorded, and not work. Filing it is the terminal action: it never
+        # becomes a cluster, a user decision, or another repair round. A
+        # preference was never repaired, so a nonzero attempt count is a
+        # mis-keyed call rather than history.
+        [ "$failed_attempts" -eq 0 ] || usage
+        action="file"
+        reason="no-shipped-consequence"
         ;;
       persisted)
         if [ "$failed_attempts" -lt 3 ]; then

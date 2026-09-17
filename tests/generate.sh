@@ -1517,6 +1517,8 @@ for root in "$real_c" "$real_x"; do
   has "$review" 'direct callers or consumers' "$review lost changed-responsibility consumer traversal"
   hasnt "$review" 'DIFF_LINES < 30' "$review retained the line-count shortcut"
   hasnt "$review" 'confidence: 1-10' "$review retained reviewer self-scoring"
+  has "$review" 'routes nothing' "$review still lets a reader's own severity authorize work"
+  has "$review" 'Answer it before you write `fix`' "$review lost the ordering that stops a fix inventing its consequence"
   has "$fix" 'R1 narrowly verifies' "$fix lost tiered post-fix assurance"
   has "$fix" 'separate from the four-reader pre-fix cap' "$fix counts red team in the pre-fix roster"
   has "$fix" 'already-authorized repair work' "$fix asks permission for another repair round"

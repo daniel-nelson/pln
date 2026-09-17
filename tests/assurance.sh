@@ -69,6 +69,20 @@ if "$ASSURANCE" repair-action --disposition persisted --failed-attempts nope >/d
   fail 'repair action accepted a non-numeric attempt count'
 fi
 
+# A finding with no consequence the shipped system produces is filed, not built.
+# This is the only terminal action that is neither a repair nor a blocker: the
+# review army can always name another defensible improvement, so a run that
+# repairs every real finding never converges.
+out="$($ASSURANCE repair-action --disposition preference --failed-attempts 0)"
+has_line "$out" 'ACTION=file' 'a preference was routed to repair or to the user instead of being filed'
+has_line "$out" 'REASON=no-shipped-consequence' 'a filed preference lost its reason'
+case "$out" in *ACTION=repair*) fail 'a preference authorized repair work' ;; esac
+case "$out" in *ACTION=block*) fail 'a preference spent a user decision' ;; esac
+
+if "$ASSURANCE" repair-action --disposition preference --failed-attempts 1 >/dev/null 2>&1; then
+  fail 'a preference accepted a failed-attempt history it can never have had'
+fi
+
 # Repair identity follows the semantic proof rather than a title, round, or
 # citation. Structural keys additionally bind the established owner.
 structural_one="$($ASSURANCE repair-key --kind structural --boundary 'configuration loading' --owner 'src/config.ts' --check 'bash tests/config.sh')"

@@ -93,6 +93,8 @@ This baseline run is optional. Reuse any green gauntlet result already on record
 
 <!-- pln:only codex -->
 That agent needs `--sandbox workspace-write` — test runs write caches, temp files and coverage output — and it still has no network. A gauntlet command that installs dependencies or talks to a remote will be denied inside the sandbox, which is not the same thing as a failing test. When that happens, re-run that one command from the orchestrator's own shell with its output redirected (`... > "$RUN/gauntlet.log" 2>&1`) and give the log to a judgment verifier for a bounded pass/fail envelope; never read the raw log into coordinator context or report a sandbox denial as a red baseline.
+
+**That is Step 2's handling of a denial, and Step 2's alone.** Step 7's final gauntlet carries its own refusal rule inline, and it is a different one: there the rerun's output goes to the evidence file unread, the coordinator takes the exit status and the recorded facts, and no verifier stands in between.
 <!-- pln:endonly -->
 
 If anything fails, the branch is not shippable as-is. Surface the failures in one message and stop, unless the user has already said to fix-and-continue — in which case the failures become the first fix cluster in Step 4 and you skip straight there after review. Do not open a PR on a red baseline.

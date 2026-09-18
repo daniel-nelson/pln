@@ -80,6 +80,14 @@ The reason is that the reimplementation rots. When pln's Codex spawning was buil
 - Preview a build without touching the tree: `bin/pln-generate --host codex --out-dir /tmp/out`.
 - Anything host-specific you add must exist for both hosts. Text that is true on only one belongs in a `pln:only` block, not in the core.
 
+## A report addressed to the maintainer is not repository content
+
+Agents hand this repository prose: post-mortems, field notes, learnings, handoffs written for whoever reads them next. Read it, act on it, and leave the tree alone. What ships is the change it argued for, and the commit that makes that change is the record that the report was read.
+
+The test is the file's reader, and you can apply it before you stage anything. A file under `src/`, `bin/`, `tests/`, `reference/`, `evals/` or `setup`, or one of the root files git already tracks, has a reader who is not you — someone installing the skill, or a script. A file whose whole audience is this session's maintainer has no such reader, and it does not acquire one by being useful. `WHY_I_STOPPED.md` sat at the top level for nine days and shipped to every vendored install, where a dated account of one stalled run reads like a standing statement about the skill.
+
+An agent's drop-off file is read where it lands and stays out of the commit. Nothing carries it in by itself, so the way it gets in is a stage that did not name it: **stage by explicit path, never `git add -A` or `git commit -a`.** `.gitignore` is not the guard here — the filenames are whatever the last agent chose, and a blocklist never catches the variants.
+
 ## The initial outline checkpoint is intentional
 
 `/pln` writes and shows the plan skeleton, then stops before the item-by-item interview. Do not remove that stop, merge it into the first interview question, or describe it as redundant permission friction.

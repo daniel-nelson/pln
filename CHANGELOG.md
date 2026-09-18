@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.92.1 — 2026-09-18
+
+### Changed
+
+- **A post-mortem written for the maintainer was sitting in the repository root, installed alongside the skill.** `WHY_I_STOPPED.md` was one session's account of one stalled `/pln` run, committed in `c3dcbb6` next to the fix it asked for — so it was already spent the moment it landed. Nothing references it; it is not a skill file, a source fragment, a test fixture, or documentation an installer reads. An install root is a clone of the whole repository, so it went out with every copy, where a dated note about one night reads like a standing statement about the skill. It is removed, and the text survives in the history beside the commit that answers it. This is a patch release rather than no release at all because an install only drops the file when `pln-update-check` sees a higher remote `VERSION`; without the bump the removal reaches nobody.
+
+- **The removal alone would leave the gap that put it there.** An agent handed a report has nowhere written down to put it, and the tree is the nearest surface. `CLAUDE.md` now states the test as something answerable before anything is staged — does this file have a reader who is not you? — and names the mechanism that actually carries these in, which is a stage that did not name the path. Staging is by explicit path, never `git add -A`. `.gitignore` is called out as not being the guard: the filenames are whatever the last agent chose, and this repository's own text elsewhere says a blocklist never catches the variants.
+
 ## 1.92.0 — 2026-09-17
 
 ### Fixed

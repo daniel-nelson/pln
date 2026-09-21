@@ -3,6 +3,24 @@
 set -euo pipefail
 
 fail() { echo "pln-scheduler: $*" >&2; exit 2; }
+
+# Which copy of pln is running, for the manifest's run stamp. A run record that
+# cannot say which release wrote it cannot attribute a change in behaviour to a
+# release, and pln ships several a week. This is telemetry, so it never fails
+# the build: an unreadable VERSION or an undetectable host stamps `unknown`
+# rather than stopping a run.
+skill_stamp_version() {
+  local dir="$1" v=""
+  # Test readability first: a redirect from a missing file is reported by the
+  # shell before any `2>/dev/null` on the command can take effect.
+  [ -r "$dir/VERSION" ] && v="$(tr -d '[:space:]' < "$dir/VERSION" 2>/dev/null || true)"
+  case "$v" in "" | *[!0-9.]*) printf 'unknown\n' ;; *) printf '%s\n' "$v" ;; esac
+}
+skill_stamp_host() {
+  local dir="$1" h=""
+  h="$("$dir/bin/pln-host" "$dir" 2>/dev/null || true)"
+  case "$h" in claude | codex) printf '%s\n' "$h" ;; *) printf 'unknown\n' ;; esac
+}
 usage() {
   cat >&2 <<'EOF'
 Usage:
@@ -304,7 +322,11 @@ case "$command" in
     [ -f "$nodes" ] && [ ! -L "$nodes" ] || fail "nodes file is missing or a symlink: $nodes"
     [ -f "$dirty_snapshot" ] && [ ! -L "$dirty_snapshot" ] || fail "dirty snapshot is missing or a symlink: $dirty_snapshot"
     tmp="$(mktemp "$(dirname "$manifest")/.pln-manifest.XXXXXX")"
-    if ! awk -F '\t' -v OFS='\t' -v mode="$repo_mode" -v source_root="$source_root_real" '
+    skill_dir="$(cd "$(dirname "$0")/.." && pwd -P)"
+    skill_version="$(skill_stamp_version "$skill_dir")"
+    host="$(skill_stamp_host "$skill_dir")"
+    if ! awk -F '\t' -v OFS='\t' -v mode="$repo_mode" -v source_root="$source_root_real" \
+      -v skill_version="$skill_version" -v host="$host" '
       function die(msg) { print "pln-scheduler: " msg > "/dev/stderr"; exit 2 }
       function hasdep(s, d,    a,n,k) {
         if (s == "-") return 0
@@ -397,6 +419,8 @@ case "$command" in
         print "META", "SOURCE_HEAD", "PENDING"
         print "META", "DIRTY_SNAPSHOT", "PENDING"
         print "META", "REPO_MODE", mode
+        print "META", "SKILL_VERSION", skill_version
+        print "META", "HOST", host
         print "ITEM", "DEPS", "LEASES", "COHORT", "CONTEXT", "DIRTY_STATE", "WAVE", "EXECUTION", "WORKTREE", "REQUESTED_PROFILE", "ACTUAL_PROFILE", "ACTUAL_MODEL", "ACTUAL_EFFORT", "HANDLE", "STATUS", "HANDOFF", "RESULT", "COMMIT", "INTEGRATION_ORDER"
         for (i=1;i<=n;i++) {
           wt=source_root

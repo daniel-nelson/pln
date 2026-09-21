@@ -62,6 +62,43 @@ build_out="$WORK/build.out"
 has "$build_out" 'NODE_COUNT=5' 'build did not report every node'
 has "$WORK/plan/run-manifest.tsv" $'META\tSOURCE_HEAD\t' 'manifest omitted source HEAD'
 has "$WORK/plan/run-manifest.tsv" $'META\tDIRTY_SNAPSHOT\t' 'manifest omitted dirty snapshot'
+
+# The run stamp. Without it a plan directory cannot say which release wrote it,
+# so no observation across runs can be attributed to a release — which is the
+# whole point of keeping these records. Telemetry, so it never fails a build:
+# an unreadable VERSION or an undetectable host stamps `unknown` instead.
+has "$WORK/plan/run-manifest.tsv" $'META\tSKILL_VERSION\t'"$(tr -d '[:space:]' < "$REPO_DIR/VERSION")" \
+  'manifest omitted the pln version that wrote it'
+PLN_HOST=codex "$SCHEDULER" build \
+  --root "$WORK/plan" \
+  --nodes "$WORK/plan/nodes.tsv" \
+  --manifest "$WORK/plan/host-stamp.tsv" \
+  --source-root "$WORK/repo" \
+  --source-head "$(git -C "$WORK/repo" rev-parse HEAD)" \
+  --dirty-snapshot "$WORK/plan/dirty.tsv" \
+  --repo-mode git > /dev/null
+has "$WORK/plan/host-stamp.tsv" $'META\tHOST\tcodex' 'manifest did not record the host it ran under'
+
+# A copy with no VERSION stamps `unknown` and still builds. A run that cannot
+# name its release is worth more than a run that refused to start.
+mkdir -p "$WORK/nover/bin"
+cp "$REPO_DIR/bin/pln-scheduler" "$REPO_DIR/bin/pln-host" "$WORK/nover/bin/"
+"$WORK/nover/bin/pln-scheduler" build \
+  --root "$WORK/plan" \
+  --nodes "$WORK/plan/nodes.tsv" \
+  --manifest "$WORK/plan/nover.tsv" \
+  --source-root "$WORK/repo" \
+  --source-head "$(git -C "$WORK/repo" rev-parse HEAD)" \
+  --dirty-snapshot "$WORK/plan/dirty.tsv" \
+  --repo-mode git > /dev/null
+has "$WORK/plan/nover.tsv" $'META\tSKILL_VERSION\tunknown' 'a missing VERSION did not stamp unknown'
+
+# A manifest written before the stamp existed still verifies. Runs span days and
+# pln ships several releases a week, so an upgrade mid-run must not strand a
+# recovery on a field the older build never wrote.
+grep -v $'^META\t\(SKILL_VERSION\|HOST\)\t' "$WORK/plan/run-manifest.tsv" > "$WORK/plan/legacy.tsv"
+"$SCHEDULER" verify --manifest "$WORK/plan/legacy.tsv" > /dev/null \
+  || fail 'a manifest predating the run stamp no longer verifies'
 # Execution is linear: every node runs alone, in the tree the coordinator was
 # given. Two disjoint nodes with non-overlapping leases used to share an
 # isolated wave, and the worktree that bought each one was a bare checkout the

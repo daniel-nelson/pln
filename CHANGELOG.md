@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.93.0 — 2026-09-21
+
+### Added
+
+- **A run's manifest now records which pln wrote it.** `run-manifest.tsv` carried `SOURCE_ROOT`, `SOURCE_HEAD`, `REPO_MODE` and `DIRTY_SNAPSHOT`, and nothing about pln itself. Twenty-four run records on one machine, twenty-six releases in the ten days before this one, and no way to say which release produced any of them — so a change in how runs go cannot be attributed to the change that caused it, and the only evidence available about a release is whatever someone happened to notice during it. `pln-scheduler build` now stamps `META SKILL_VERSION` from the installed `VERSION` and `META HOST` from `pln-host`.
+
+  It is telemetry, so it never fails a build: an unreadable `VERSION` or an undetectable host stamps `unknown` rather than stopping a run. And `verify` does not require either field, because runs span days while releases ship several a week — a manifest written before this release still verifies, so an upgrade mid-run cannot strand a recovery on a field the older build never wrote.
+
 ## 1.92.1 — 2026-09-18
 
 ### Changed

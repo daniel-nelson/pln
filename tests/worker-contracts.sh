@@ -393,6 +393,20 @@ has "$pr_merge" 'is `informational` whatever the reader marked it' \
 has "$pr_merge" 'never routed `needs-decision`, and never raises a blocker' \
   'PR merge can still spend a user decision on a test-only finding'
 
+# A defect the base branch already had is not this branch's to repair. One run
+# auto-repaired a take-back prune that behaved identically on its diff base, and
+# that 230-line repair produced a later finding of its own. Provenance is keyed
+# to the reproduction's input and consequence, not to where the code sits, and
+# the merge worker confirms it rather than taking the reader's word.
+has "$pr_merge" '`on_base`' 'PR merge no longer confirms base provenance'
+has "$pr_merge" "builds the reproduction's own input" \
+  'PR merge can call a finding pre-existing on a base failure reached by a different input'
+has "$pr_merge" 'in scope even though the base fails the same way' \
+  'PR merge lets a fix branch exclude the defect it set out to fix'
+has "$pr_merge" 'gets no repair key' 'PR merge can queue a pre-existing defect for repair'
+has "$pr_merge" "the envelope's \`pre_existing\` field" \
+  'PR merge envelope no longer names pre-existing findings for filing'
+
 # Even a reachable finding can carry a cathedral. The same run's proposed repair
 # for two dead fields on a persisted type was to validate every envelope against
 # its durable journal payload, and the question that reached the user offered
@@ -461,6 +475,18 @@ for host in claude codex; do
     "$host reviewer brief lost the test-only reachability answer"
   has "$WORK/$host/phases/pln-pr/fix.md" '`reached_by: test-only` is never one of these questions' \
     "$host fix phase can route an unreachable finding to a user decision"
+  has "$WORK/$host/phases/pln-pr/review.md" 'on_base: string' \
+    "$host review phase no longer asks whether the base already fails"
+  has "$WORK/$host/phases/pln-pr/review.md" 'with the same input your reproduction uses' \
+    "$host reviewer brief keys base provenance to code location instead of the reproduction"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'Give each finding an `on_base`' \
+    "$host post-fix red team no longer states base provenance"
+  for phase in review fix; do
+    has "$WORK/$host/phases/pln-pr/$phase.md" "merge envelope's \`pre_existing\` field once with" \
+      "$host $phase phase no longer files the pre-existing findings its merge named"
+  done
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'Every `pre-existing` finding' \
+    "$host PR body and closing message can omit filed pre-existing defects"
   has "$WORK/$host/phases/pln-pr/review.md" 'smaller_fix: string' \
     "$host review phase no longer asks for the smaller repair passed over"
   has "$WORK/$host/phases/pln-pr/review.md" 'the literal `none found`' \

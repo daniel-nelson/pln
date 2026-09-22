@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 # pln-update-check — periodic version check, run from the SKILL.md preamble.
 #
-# Output (one line, or nothing):
+# Ordinary output (one line, or nothing):
 #   JUST_UPGRADED <old> <new>       — marker found from a recent upgrade
 #   UPGRADE_AVAILABLE <old> <new>   — some installed copy is behind remote
 #   (nothing)                       — up to date, snoozed, disabled, or check skipped
+#
+# Recovery receipt mode:
+#   --start <run-id>                 — mint a fresh generation, run the check,
+#                                      and write UPDATE_RECEIPT_READY
+#   --consume <run-id> <challenge>   — atomically validate and spend it once
+#
+# Receipt-mode verdicts are closed and machine-readable: VERIFIED_CURRENT,
+# CACHED_CURRENT, UPGRADE_AVAILABLE, JUST_UPGRADED, DISABLED, or UNAVAILABLE.
+# DISABLED and UNAVAILABLE are explicit non-blocking degradation and carry no
+# freshness claim. Ordinary current-version checks remain silent to the user.
 #
 # On the slow path an UPGRADE_AVAILABLE line may be followed by an indented
 # per-copy detail line (which dir is behind), for the human to see. The first
@@ -29,6 +39,148 @@ CACHE_FILE="$STATE_DIR/last-update-check"
 MARKER_FILE="$STATE_DIR/just-upgraded-from"
 SNOOZE_FILE="$STATE_DIR/update-snoozed"
 REMOTE_URL="${PLN_REMOTE_URL:-https://raw.githubusercontent.com/daniel-nelson/pln/main/VERSION}"
+RECEIPT_DIR="$STATE_DIR/update-receipts"
+RECEIPT_MODE=false
+RECEIPT_RUN=""
+RECEIPT_KEY=""
+RECEIPT_CHALLENGE=""
+RECEIPT_LOCK_KEY=""
+
+receipt_key() {
+  printf '%s' "$1" | cksum | awk '{ print $1 "-" $2 }'
+}
+
+valid_run_id() {
+  [ -n "$1" ] || return 1
+  case "$1" in *$'\n'*|*$'\r'*|*$'\t'*) return 1 ;; esac
+  return 0
+}
+
+receipt_lock() {
+  local key="$1" tries=0
+  mkdir -p "$RECEIPT_DIR" 2>/dev/null || return 1
+  while ! mkdir "$RECEIPT_DIR/$key.lock" 2>/dev/null; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 4 ] || return 1
+    sleep 1
+  done
+  RECEIPT_LOCK_KEY="$key"
+}
+
+receipt_unlock() {
+  rmdir "$RECEIPT_DIR/$1.lock" 2>/dev/null || true
+  [ "$RECEIPT_LOCK_KEY" = "$1" ] && RECEIPT_LOCK_KEY=""
+}
+
+receipt_cleanup() {
+  [ -n "$RECEIPT_LOCK_KEY" ] && rmdir "$RECEIPT_DIR/$RECEIPT_LOCK_KEY.lock" 2>/dev/null || true
+}
+trap receipt_cleanup EXIT
+
+receipt_begin() {
+  local run="$1" key state old_run="" old_gen=0 generation tmp
+  valid_run_id "$run" || { echo "pln-update-check: run id must be one non-empty line" >&2; exit 2; }
+  key="$(receipt_key "$run")"
+  state="$RECEIPT_DIR/$key.state"
+  receipt_lock "$key" || { echo "pln-update-check: receipt state is unavailable" >&2; exit 4; }
+  if [ -f "$state" ]; then
+    IFS= read -r old_run < "$state" || true
+    old_gen="$(sed -n '2p' "$state" 2>/dev/null || true)"
+    case "$old_gen" in ''|*[!0-9]*) old_gen=0 ;; esac
+    [ "$old_run" = "$run" ] || old_gen=0
+  fi
+  generation=$((old_gen + 1))
+  # A new invocation/recovery invalidates any unconsumed predecessor before it
+  # asks the remote. The generation file is the durable challenge owner.
+  [ "$old_gen" -gt 0 ] && rm -f "$RECEIPT_DIR/$key.g$old_gen.receipt" 2>/dev/null || true
+  tmp="$(mktemp "$RECEIPT_DIR/.state.XXXXXX")" || { receipt_unlock "$key"; exit 4; }
+  printf '%s\n%s\n' "$run" "$generation" > "$tmp"
+  mv "$tmp" "$state"
+  receipt_unlock "$key"
+  RECEIPT_MODE=true
+  RECEIPT_RUN="$run"
+  RECEIPT_KEY="$key"
+  RECEIPT_CHALLENGE="g$generation"
+}
+
+receipt_write() {
+  local verdict="$1" freshness="$2" state receipt tmp state_run generation
+  $RECEIPT_MODE || return 0
+  state="$RECEIPT_DIR/$RECEIPT_KEY.state"
+  receipt="$RECEIPT_DIR/$RECEIPT_KEY.$RECEIPT_CHALLENGE.receipt"
+  receipt_lock "$RECEIPT_KEY" || { echo "pln-update-check: receipt state is unavailable" >&2; exit 4; }
+  IFS= read -r state_run < "$state" 2>/dev/null || state_run=""
+  generation="$(sed -n '2p' "$state" 2>/dev/null || true)"
+  if [ "$state_run" != "$RECEIPT_RUN" ] || [ "g$generation" != "$RECEIPT_CHALLENGE" ]; then
+    receipt_unlock "$RECEIPT_KEY"
+    echo "pln-update-check: receipt challenge was replaced before completion" >&2
+    exit 4
+  fi
+  tmp="$(mktemp "$RECEIPT_DIR/.receipt.XXXXXX")" || { receipt_unlock "$RECEIPT_KEY"; exit 4; }
+  printf '%s\n%s\n%s\n%s\n' "$RECEIPT_RUN" "$RECEIPT_CHALLENGE" "$verdict" "$freshness" > "$tmp"
+  mv "$tmp" "$receipt"
+  receipt_unlock "$RECEIPT_KEY"
+  printf 'UPDATE_RECEIPT_READY %s %s %s\n' "$RECEIPT_CHALLENGE" "$verdict" "$freshness"
+}
+
+receipt_consume() {
+  local run="$1" challenge="$2" key state receipt claimed state_run generation
+  local saved_run saved_challenge verdict freshness
+  valid_run_id "$run" || { echo "pln-update-check: run id must be one non-empty line" >&2; return 2; }
+  case "$challenge" in g[1-9]|g[1-9][0-9]*) ;; *) echo "pln-update-check: invalid receipt challenge" >&2; return 3 ;; esac
+  key="$(receipt_key "$run")"
+  state="$RECEIPT_DIR/$key.state"
+  receipt="$RECEIPT_DIR/$key.$challenge.receipt"
+  receipt_lock "$key" || { echo "pln-update-check: receipt state is unavailable" >&2; return 4; }
+  IFS= read -r state_run < "$state" 2>/dev/null || state_run=""
+  generation="$(sed -n '2p' "$state" 2>/dev/null || true)"
+  if [ "$state_run" != "$run" ] || [ "g$generation" != "$challenge" ] || [ ! -f "$receipt" ]; then
+    receipt_unlock "$key"
+    echo "pln-update-check: missing, stale, wrong-run, or spent update receipt" >&2
+    return 3
+  fi
+  claimed="$RECEIPT_DIR/.consuming.$key.$challenge.$$"
+  if ! mv "$receipt" "$claimed" 2>/dev/null; then
+    receipt_unlock "$key"
+    echo "pln-update-check: update receipt was already spent" >&2
+    return 3
+  fi
+  receipt_unlock "$key"
+
+  IFS= read -r saved_run < "$claimed" || saved_run=""
+  saved_challenge="$(sed -n '2p' "$claimed" 2>/dev/null || true)"
+  verdict="$(sed -n '3p' "$claimed" 2>/dev/null || true)"
+  freshness="$(sed -n '4p' "$claimed" 2>/dev/null || true)"
+  rm -f "$claimed" 2>/dev/null || true
+  [ "$saved_run" = "$run" ] && [ "$saved_challenge" = "$challenge" ] || {
+    echo "pln-update-check: malformed update receipt" >&2
+    return 3
+  }
+  case "$verdict:$freshness" in
+    VERIFIED_CURRENT:verified|CACHED_CURRENT:cached|UPGRADE_AVAILABLE:verified|\
+    UPGRADE_AVAILABLE:cached|JUST_UPGRADED:upgrade-event|DISABLED:none|UNAVAILABLE:none) ;;
+    *) echo "pln-update-check: unknown update receipt outcome" >&2; return 3 ;;
+  esac
+  printf 'UPDATE_RECEIPT_CONSUMED %s %s\n' "$verdict" "$freshness"
+}
+
+case "${1:-}" in
+  --help)
+    echo "Usage: pln-update-check [--force|--start <run-id>|--consume <run-id> <challenge>]"
+    exit 0
+    ;;
+  --start)
+    [ "$#" -eq 2 ] || { echo "Usage: pln-update-check --start <run-id>" >&2; exit 2; }
+    receipt_begin "$2"
+    ;;
+  --consume)
+    [ "$#" -eq 3 ] || { echo "Usage: pln-update-check --consume <run-id> <challenge>" >&2; exit 2; }
+    receipt_consume "$2" "$3"
+    exit $?
+    ;;
+  --force|'') ;;
+  *) echo "Usage: pln-update-check [--force|--start <run-id>|--consume <run-id> <challenge>]" >&2; exit 2 ;;
+esac
 
 # ─── Force flag (busts cache + snooze for standalone /pln-update) ────────────
 FORCE_CHECK=false
@@ -41,6 +193,7 @@ fi
 # ─── Step 0: Check if updates are disabled ────────────────────
 _UC=$("$SELF_DIR/bin/pln-config" get update_check 2>/dev/null || true)
 if [ "$_UC" = "false" ]; then
+  receipt_write DISABLED none
   exit 0
 fi
 
@@ -108,6 +261,7 @@ while IFS= read -r dir; do
 done < <(list_install_dirs)
 
 if [ -z "$LOCAL" ]; then
+  receipt_write UNAVAILABLE none
   exit 0  # No install copy found → skip check
 fi
 
@@ -144,10 +298,12 @@ if [ -f "$MARKER_FILE" ]; then
   rm -f "$SNOOZE_FILE" 2>/dev/null || true
   mkdir -p "$STATE_DIR" 2>/dev/null || true
   if [ "$FORCE_CHECK" != "true" ]; then
-    echo "UP_TO_DATE $LOCAL" > "$CACHE_FILE" 2>/dev/null || true
     if [ -n "$OLD" ]; then
       echo "JUST_UPGRADED $OLD $LOCAL"
       [ -n "$BY" ] && printf '  upgraded by %s\n' "$BY"
+      receipt_write JUST_UPGRADED upgrade-event
+    else
+      receipt_write UNAVAILABLE none
     fi
     exit 0
   fi
@@ -224,7 +380,9 @@ if [ "$FORCE_CHECK" != "true" ] && [ -f "$CACHE_FILE" ]; then
     case "$CACHED" in
       UP_TO_DATE*)
         CACHED_VER="$(echo "$CACHED" | awk '{print $2}')"
-        if [ "$CACHED_VER" = "$LOCAL" ]; then
+        CACHED_PROOF="$(echo "$CACHED" | awk '{print $3}')"
+        if [ "$CACHED_VER" = "$LOCAL" ] && [ "$CACHED_PROOF" = "VERIFIED" ]; then
+          receipt_write CACHED_CURRENT cached
           exit 0
         fi
         ;;
@@ -232,12 +390,16 @@ if [ "$FORCE_CHECK" != "true" ] && [ -f "$CACHE_FILE" ]; then
         CACHED_OLD="$(echo "$CACHED" | awk '{print $2}')"
         if [ "$CACHED_OLD" = "$LOCAL" ]; then
           CACHED_NEW="$(echo "$CACHED" | awk '{print $3}')"
-          if check_snooze "$CACHED_NEW"; then
-            exit 0  # snoozed — stay quiet
+          if echo "$CACHED_NEW" | grep -qE '^[0-9]+\.[0-9.]+$'; then
+            if check_snooze "$CACHED_NEW"; then
+              receipt_write UPGRADE_AVAILABLE cached
+              exit 0  # snoozed — stay quiet
+            fi
+            echo "$CACHED"
+            build_detail "$CACHED_NEW"
+            receipt_write UPGRADE_AVAILABLE cached
+            exit 0
           fi
-          echo "$CACHED"
-          build_detail "$CACHED_NEW"
-          exit 0
         fi
         ;;
     esac
@@ -323,16 +485,18 @@ report_marker() {
 
 # Validate: must look like a version number (reject HTML error pages)
 if ! echo "$REMOTE" | grep -qE '^[0-9]+\.[0-9.]+$'; then
-  # Invalid or empty response — assume up to date
-  echo "UP_TO_DATE $LOCAL" > "$CACHE_FILE" 2>/dev/null || true
+  # Invalid or empty data establishes no version truth. Keep the ordinary
+  # interface quiet, but never cache or receipt it as current.
   report_marker
+  receipt_write UNAVAILABLE none
   exit 0
 fi
 
 # Any installed copy behind remote? (LOCAL is the lowest across all copies.)
 if ! ver_lt "$LOCAL" "$REMOTE"; then
-  echo "UP_TO_DATE $LOCAL" > "$CACHE_FILE" 2>/dev/null || true
+  echo "UP_TO_DATE $LOCAL VERIFIED" > "$CACHE_FILE" 2>/dev/null || true
   report_marker
+  receipt_write VERIFIED_CURRENT verified
   exit 0
 fi
 
@@ -340,9 +504,11 @@ fi
 echo "UPGRADE_AVAILABLE $LOCAL $REMOTE" > "$CACHE_FILE" 2>/dev/null || true
 if check_snooze "$REMOTE"; then
   report_marker
+  receipt_write UPGRADE_AVAILABLE verified
   exit 0  # snoozed — stay quiet
 fi
 
 report_marker
 echo "UPGRADE_AVAILABLE $LOCAL $REMOTE"
 build_detail "$REMOTE"
+receipt_write UPGRADE_AVAILABLE verified

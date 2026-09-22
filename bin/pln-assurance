@@ -17,6 +17,7 @@ Usage:
   pln-assurance roster --risk R1|R2|R3 --areas CSV --adversary peer|local
   pln-assurance repair-key --kind behavioral|structural --boundary TEXT --check TEXT [--owner TEXT]
   pln-assurance repair-action --disposition new|persisted|needs-decision|out-of-scope|destructive|worker-blocked --failed-attempts N
+  pln-assurance diff-fingerprint --root DIR --base REF
   pln-assurance fingerprint --root DIR --commands FILE --environment FILE
 USAGE
   exit 2
@@ -194,6 +195,30 @@ case "$command" in
       *) usage ;;
     esac
     printf 'ACTION=%s\nREASON=%s\nFAILED_ATTEMPTS=%s\n' "$action" "$reason" "$failed_attempts"
+    ;;
+
+  diff-fingerprint)
+    root=""
+    base=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --root) root="${2:-}"; shift 2 ;;
+        --base) base="${2:-}"; shift 2 ;;
+        *) usage ;;
+      esac
+    done
+    [ -d "$root" ] && [ -n "$base" ] || usage
+    git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+      echo "pln-assurance: diff root is not a git worktree: $root" >&2
+      exit 2
+    }
+    git -C "$root" rev-parse --verify "$base^{commit}" >/dev/null 2>&1 || {
+      echo "pln-assurance: diff base is not a commit: $base" >&2
+      exit 2
+    }
+    diff_base="$(git -C "$root" merge-base "$base" HEAD)"
+    review_hash="$(git -C "$root" diff --binary --full-index "$diff_base" -- | sha256_stream)"
+    printf 'DIFF_BASE=%s\nREVIEW_DIFF_SHA256=%s\n' "$diff_base" "$review_hash"
     ;;
 
   fingerprint)

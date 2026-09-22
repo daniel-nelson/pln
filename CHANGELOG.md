@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.95.0 — 2026-09-22
+
+### Changed
+
+- **Continuation update checks now leave one-time proof that recovery consumes.** `/pln` and `/pln-pr` create a fresh run- and recovery-bound challenge before checking for an update, and `bin/pln-update-check` records a closed machine-readable outcome against it. Recovery spends that receipt exactly once, so an earlier check, replay, wrong-run receipt, crash residue, or skipped installed checker cannot pass as fresh. Verified current, cached current, upgrade available, just upgraded, configured disabled, unavailable, and absent-helper degradation remain distinct; disabled or unavailable checks stay non-blocking without claiming freshness, and invalid or empty remote data can no longer mint or cache an up-to-date verdict.
+
+- **PR merge readers receive bounded prepared context while retaining independent verification.** The existing review-brief builder now has a contract-first PR-merge inventory with mechanically encoded repository, candidate, ledger, artifact, and instruction/skill-manifest metadata. Dispatch validates manifest coverage, and the merge reader rechecks the candidate fingerprint, confines artifact paths, matches sizes and digests immediately before parsing, reopens cited source, reproduces the finding, and traces production reachability. Stable control-plane discovery is no longer repeated by every reader, but the inventory remains provenance rather than truth.
+
+- **Every canonical `REVIEW.md` update is a guarded atomic replacement.** Review, fix, blocker, gauntlet, PR, and CI paths stage a complete candidate and publish it through the narrow review-ledger helper. The helper serializes writers and checks run identity, generation, and the expected prior digest before a sibling-temp rename; stale, unsafe, interrupted, or failed publishers leave the previous complete ledger byte-for-byte intact.
+
+- **Finalization settles cheap identity and release checks before expensive verification, then reuses evidence only for identical behavior.** Base refresh recomputes the merge base and ledger-bound reviewed-diff fingerprints before gauntlet dispatch: byte-identical review subjects keep their review, while a changed diff returns to review. Executor requirements and the exact command graph are part of candidate identity, known coordinator-only commands run there first, and final-gauntlet workers validate their own bounded envelope before returning. A late release-only correction reruns version/package validation without rerunning the functional gauntlet; any other changed byte invalidates that evidence.
+
+- **A plain request to put up, open, or create a PR now means a ready PR after valid local verification.** The default draft policy no longer converts that request, or an explicit review skip, into an unrequested draft-and-CI-watch hold. Explicit draft requests still create and watch drafts, existing PRs retain their current draft/ready state, and CI watching is offered rather than started automatically for a normal ready handoff.
+
+- **Declared gauntlet groups can run safely in parallel without guessing from command names.** Projects and plans may record explicit dependencies, parallel groups, exclusive resources, and tree-mutating commands in the command artifact. Legacy command lists remain serial; ready commands in one declared group run concurrently with separate raw output and status, join in deterministic declaration order, and advance only after every dependency succeeds. The command graph is fingerprinted, and command-caused tree mutation still fails verification.
+
 ## 1.94.0 — 2026-09-21
 
 ### Fixed

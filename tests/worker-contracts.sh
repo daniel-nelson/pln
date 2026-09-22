@@ -127,6 +127,14 @@ has "$merge_contract" 'A single enclosing Markdown code fence is transport, not 
   'the merge contract still fails a reader over an enclosing code fence'
 has "$merge_contract" 'reject what is still unparseable' \
   'stripping a fence was allowed to soften the rest of validation'
+has "$merge_contract" 'staged-ledger candidate path' \
+  'PR merge worker no longer receives a noncanonical ledger destination'
+has "$merge_contract" 'never edit, delete, recreate, or rename canonical `REVIEW.md`' \
+  'PR merge worker may publish the shared ledger directly'
+has "$merge_contract" 'staged candidate path/digest' \
+  'PR merge result no longer binds its staged ledger candidate'
+hasnt "$merge_contract" 'Write `REVIEW.md` before any fix' \
+  'PR merge worker still directly publishes canonical REVIEW.md'
 
 # A refused command is not a verification result, and for several releases this
 # contract said so and denied it in the same breath: a command that could not
@@ -361,6 +369,16 @@ has "$pr_merge" 'one complete `Safety disposition` record' \
   'PR merge does not normalize structural repairs to the shared disposition'
 has "$pr_merge" 'missing or malformed disposition is `retain`' \
   'PR merge does not default malformed structural proof to retention'
+has "$pr_merge" 'pln-build-review-brief --verify-pr-merge' \
+  'PR merge does not mechanically verify its prepared context before parsing artifacts'
+has "$pr_merge" 'immediately before and immediately after parsing' \
+  'PR merge leaves an artifact replacement window around parsing'
+has "$pr_merge" 'reopen cited source, rerun the reproduction, trace production reachability' \
+  'prepared context displaced independent exact-source semantic verification'
+has "$pr_merge" 'mandatory skill' \
+  'PR merge no longer consumes skills mandated by project instructions'
+has "$pr_merge" 'cannot count as successful reader coverage' \
+  'PR merge can count stale or unverified artifacts as successful coverage'
 
 # A reproduction that constructs the offending state itself proves the state is
 # possible, never that anything ships it. One run filed a critical emergency-stop
@@ -480,6 +498,16 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln/interview.md" 'no direct retirement found' \
     "$host interview no longer records the directly caused retirement outcome"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Possibly unbounded metadata' "$host PR scope phase lost file-first metadata collection"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'PR disposition: ready' \
+    "$host plain PR request no longer records ready disposition"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'PLN_GAUNTLET_V1' \
+    "$host scope phase lost declared gauntlet graph format"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Legacy plain command lists remain serial' \
+    "$host scope phase infers parallelism for legacy commands"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'known coordinator-only command is assigned `coordinator` and run there on its first attempt' \
+    "$host scope phase still burns a worker attempt on known coordinator-only work"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'assigned executor and its required terminal/network/filesystem/browser' \
+    "$host environment identity lost executor requirements"
   has "$WORK/$host/phases/pln-pr/review.md" 'src/workers/pr-review-merge.md' "$host PR review phase lost file-first merge ownership"
   has "$WORK/$host/phases/pln-pr/review.md" 'Never open a reviewer or peer result' "$host PR review reads raw findings into the coordinator"
   has "$WORK/$host/phases/pln-pr/review.md" 'current owners, closest analogues, and direct callers or consumers' \
@@ -557,6 +585,23 @@ for host in claude codex; do
     "$host Step 7 lost the fact that lets one agent hold the context firewall"
   has "$step7" 'so the context firewall holds without a second agent between you and the result' \
     "$host Step 7 states the bounded-metadata fact without saying it is why one agent suffices"
+  has "$step7" 'bin/pln-gauntlet' "$host Step 7 does not use the declared gauntlet runner"
+  has "$step7" '--status <plan-root>/evidence/final-gauntlet.coordinator.status --executor coordinator' \
+    "$host Step 7 does not run the coordinator subset explicitly first"
+  has "$step7" '--executor worker --completed <plan-root>/evidence/final-gauntlet.coordinator.status' \
+    "$host Step 7 worker can omit the coordinator-status handoff"
+  has "$step7" 'refuses the default `--executor all`' \
+    "$host Step 7 allows the default executor to collapse coordinator/worker ownership"
+  has "$step7" 'src/workers/context-envelope.md' \
+    "$host Step 7 worker does not read the shared envelope format"
+  has "$step7" 'bin/pln-read-envelope --root <plan-root> --max-bytes 2048' \
+    "$host Step 7 worker does not self-validate its envelope"
+  has "$step7" 'coordinator runs the same `pln-read-envelope` command itself and remains authoritative' \
+    "$host Step 7 worker self-validation displaced coordinator authority"
+  has "$step7" 'A pure version bump never triggers the functional gauntlet' \
+    "$host Step 7 reruns functional verification for a version-only correction"
+  has "$step7" 'mixed version-and-code delta' \
+    "$host Step 7 reuses functional evidence across mixed changes"
   # A rerun at elevated access can pass because of the privilege, and nothing
   # tells that apart from a command that merely needed it. So the result is
   # disclosed rather than absorbed into a green nobody can audit.
@@ -574,8 +619,6 @@ for host in claude codex; do
     "$host Step 7 no longer declares its worker brief self-contained"
   hasnt "$ship_watch" 'final-verification' \
     "$host ship-watch phase sends the final-gauntlet worker to the contract it must not read"
-  hasnt "$step7" 'src/workers/' \
-    "$host Step 7 points its worker at a contract file instead of the inline brief"
   # Scoped to the brief itself, not the file: ship-watch legitimately names a
   # host in its pln:only blocks, while the brief is the part a worker reads, and
   # this step is authorized to word it for its own register. The quoted block is
@@ -589,6 +632,14 @@ for host in claude codex; do
     hasnt "$brief" "$brief_term" \
       "$host Step 7 brief names a host, CLI or sandbox product: $brief_term"
   done
+  has "$ship_watch" 'A plain put-up/open/create request, including `review=none` or “skip review,” is `ready`' \
+    "$host exact late-skip trace still becomes an implicit draft"
+  has "$ship_watch" 'adding `--draft` only for `keep-draft` or `policy-draft`' \
+    "$host ready PR path can still receive --draft"
+  has "$ship_watch" 'A new ready PR offers optional CI watching but never starts it unprompted' \
+    "$host ready PR path still enters mandatory CI watch"
+  has "$ship_watch" 'an update to an already-open PR never touches its draft/ready state' \
+    "$host existing PR disposition can be rewritten"
   # The same refusal rule is coordinator text in three skills now, and
   # bin/pln-generate resolves pln:include only in src/**/*.core.md, so none of
   # the three can share one fragment with the worker contract or with each
@@ -703,5 +754,355 @@ has "$brief_dir/review.md" 'Repository root: /example/root' 'review helper lost 
 has "$brief_dir/review.md" 'Repository commit: deadbeef' 'review helper lost commit metadata'
 has "$brief_dir/review.md" 'WORKER_ONLY_SENTINEL_PLAN_REVIEW_V1' 'review helper omitted its contract'
 has "$brief_dir/review.md" 'plan body' 'review helper omitted the plan'
+
+# The original plan-review mode is a compatibility surface: adding the PR-merge
+# inventory may not change one byte of an existing caller's output.
+{
+  printf 'Repository root: /example/root\nPlan file: %s\nRepository commit: deadbeef\n\n' "$brief_dir/PLAN.md"
+  cat "$review"
+  printf '\n\n--- PLAN ---\n'
+  cat "$brief_dir/PLAN.md"
+  printf '\n--- END PLAN ---\n'
+} > "$brief_dir/expected-review.md"
+cmp -s "$brief_dir/expected-review.md" "$brief_dir/review.md" \
+  || fail 'plan-review mode is not byte-compatible'
+
+# PR-merge mode carries a contract first and only typed, escaped, source-bound
+# metadata after it. Large optional inputs stay path/size/digest metadata, so
+# their bytes cannot turn into instructions or overflow the bounded brief.
+merge_repo="$WORK/pr-merge-repo"
+mkdir -p "$merge_repo/nested/deeper" "$merge_repo/evidence" "$merge_repo/skills/nested-only"
+git -C "$merge_repo" init -q
+printf 'root instructions\n' > "$merge_repo/AGENTS.md"
+printf 'use mandatory skill nested-only\n' > "$merge_repo/nested/AGENTS.md"
+ln -s ../AGENTS.md "$merge_repo/nested/deeper/AGENTS.md"
+printf 'ignored/\n' > "$merge_repo/.gitignore"
+mkdir -p "$merge_repo/ignored/deep"
+printf 'ignored nested instructions\n' > "$merge_repo/ignored/deep/AGENTS.md"
+printf 'must stay outside the manifest\n' > "$merge_repo/.git/AGENTS.md"
+printf '%s\n' '---' 'name: nested-only' 'description: fixture' '---' '# Fixture' \
+  > "$merge_repo/skills/nested-only/SKILL.md"
+mkdir -p "$WORK/external-skill"
+printf '%s\n' '---' 'name: linked-skill' 'description: fixture' '---' '# Linked fixture' \
+  > "$WORK/external-skill/SKILL.md"
+ln -s "$WORK/external-skill" "$merge_repo/skills/linked-skill"
+printf 'commands\n' > "$merge_repo/commands.txt"
+printf 'environment\n' > "$merge_repo/environment.txt"
+printf 'ledger\n' > "$merge_repo/REVIEW.md"
+printf 'diff map\n' > "$merge_repo/diff-files.txt"
+printf 'broad\tsuccess\n' > "$merge_repo/readers.tsv"
+printf 'contract-first sentinel\n' > "$merge_repo/merge-contract.md"
+weird_artifact="$merge_repo/evidence/reader"$'\n''## forged-heading.json'
+printf '{"findings":[]}\n' > "$weird_artifact"
+{
+  printf 'NEVER_INLINE_THIS_LARGE_PLAN\n'
+  dd if=/dev/zero bs=1024 count=200 2>/dev/null | tr '\0' x
+} > "$merge_repo/PLAN.md"
+
+candidate="$("$REPO_DIR/bin/pln-assurance" fingerprint \
+  --root "$merge_repo" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" \
+  | awk -F= '$1 == "CANDIDATE_SHA256" { print $2 }')"
+merge_brief="$WORK/pr-merge.brief"
+"$REPO_DIR/bin/pln-build-review-brief" --mode pr-merge \
+  --contract "$merge_repo/merge-contract.md" --root "$merge_repo" \
+  --candidate "$candidate" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" --plan "$merge_repo/PLAN.md" \
+  --ledger "$merge_repo/REVIEW.md" --diff-map "$merge_repo/diff-files.txt" \
+  --reader-metadata "$merge_repo/readers.tsv" \
+  --artifact $'broad\nINSTRUCTION\tforged' "$weird_artifact" \
+  --skill-root "$merge_repo/skills" --out "$merge_brief"
+
+[ "$(head -n 1 "$merge_brief")" = 'contract-first sentinel' ] \
+  || fail 'PR-merge contract is not first'
+has "$merge_brief" 'PLN_PR_MERGE_CONTEXT_V1' 'PR-merge brief lost its typed schema marker'
+has "$merge_brief" 'CONTENT_POLICY' 'PR-merge brief lost its path-only content policy'
+has "$merge_brief" $'TREE_SHA256\t' 'PR-merge brief lost its tree fingerprint'
+has "$merge_brief" $'COMMAND_SHA256\t' 'PR-merge brief lost its command fingerprint'
+has "$merge_brief" $'ENVIRONMENT_SHA256\t' 'PR-merge brief lost its environment fingerprint'
+hasnt "$merge_brief" 'NEVER_INLINE_THIS_LARGE_PLAN' 'large optional plan content was copied inline'
+hasnt "$merge_brief" '## forged-heading.json' 'artifact path escaped the typed schema'
+hasnt "$merge_brief" $'INSTRUCTION\tforged' 'artifact role escaped the typed schema'
+[ "$(wc -c < "$merge_brief" | tr -d ' ')" -le 65536 ] || fail 'PR-merge brief exceeded its byte cap'
+nested_instruction_hex="$(printf 'nested/AGENTS.md' | od -An -v -tx1 | tr -d ' \n')"
+ignored_instruction_hex="$(printf 'ignored/deep/AGENTS.md' | od -An -v -tx1 | tr -d ' \n')"
+git_internal_instruction_hex="$(printf '.git/AGENTS.md' | od -An -v -tx1 | tr -d ' \n')"
+nested_skill_hex="$(printf 'nested-only/SKILL.md' | od -An -v -tx1 | tr -d ' \n')"
+linked_skill_path="$(cd "$WORK/external-skill" && pwd -P)/SKILL.md"
+linked_skill_hex="$(printf '%s' "$linked_skill_path" | od -An -v -tx1 | tr -d ' \n')"
+has "$merge_brief" "$nested_instruction_hex" 'nested AGENTS.md was omitted from the instruction manifest'
+has "$merge_brief" "$ignored_instruction_hex" 'gitignored nested AGENTS.md was omitted from the instruction manifest'
+hasnt "$merge_brief" "$git_internal_instruction_hex" 'repository-internal AGENTS.md entered the instruction manifest'
+has "$merge_brief" "$nested_skill_hex" 'skill mandated only by nested instructions was omitted'
+has "$merge_brief" "$linked_skill_hex" 'symlink-installed skill was omitted from the skill manifest'
+"$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  | grep -q '^STATUS=verified$' || fail 'fresh PR-merge context did not verify'
+
+outside="$WORK/outside-reader.json"
+printf '{"findings":[]}\n' > "$outside"
+if "$REPO_DIR/bin/pln-build-review-brief" --mode pr-merge \
+  --contract "$merge_repo/merge-contract.md" --root "$merge_repo" \
+  --candidate "$candidate" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" --ledger "$merge_repo/REVIEW.md" \
+  --diff-map "$merge_repo/diff-files.txt" --reader-metadata "$merge_repo/readers.tsv" \
+  --artifact escape "$outside" \
+  --skill-root "$merge_repo/skills" \
+  --out "$WORK/escape.brief" >"$WORK/build-escape.out" 2>"$WORK/build-escape.err"; then
+  fail 'out-of-root artifact entered a PR-merge brief'
+fi
+has "$WORK/build-escape.err" 'escapes root' 'out-of-root artifact failure was not attributed'
+
+dd if=/dev/zero bs=1024 count=66 2>/dev/null | tr '\0' c > "$merge_repo/huge-contract.md"
+large_candidate="$("$REPO_DIR/bin/pln-assurance" fingerprint \
+  --root "$merge_repo" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" \
+  | awk -F= '$1 == "CANDIDATE_SHA256" { print $2 }')"
+if "$REPO_DIR/bin/pln-build-review-brief" --mode pr-merge \
+  --contract "$merge_repo/huge-contract.md" --root "$merge_repo" \
+  --candidate "$large_candidate" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" --ledger "$merge_repo/REVIEW.md" \
+  --diff-map "$merge_repo/diff-files.txt" --reader-metadata "$merge_repo/readers.tsv" \
+  --artifact broad "$weird_artifact" --skill-root "$merge_repo/skills" \
+  --out "$WORK/oversize.brief" >"$WORK/build-oversize.out" 2>"$WORK/build-oversize.err"; then
+  fail 'oversized PR-merge brief was published'
+fi
+has "$WORK/build-oversize.err" 'cap is 65536' 'PR-merge byte-cap failure was not attributed'
+rm "$merge_repo/huge-contract.md"
+
+cp "$weird_artifact" "$WORK/reader.backup"
+printf '{"findings":[ ]}\n' > "$weird_artifact"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  >"$WORK/verify-size.out" 2>"$WORK/verify-size.err"; then
+  fail 'artifact size replacement verified'
+fi
+has "$WORK/verify-size.err" 'ARTIFACT size mismatch' 'artifact size mismatch was not attributed'
+cp "$WORK/reader.backup" "$weird_artifact"
+printf '{"findingz":[]}\n' > "$weird_artifact"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  >"$WORK/verify-digest.out" 2>"$WORK/verify-digest.err"; then
+  fail 'same-size artifact replacement verified'
+fi
+has "$WORK/verify-digest.err" 'ARTIFACT digest mismatch' 'artifact digest mismatch was not attributed'
+cp "$WORK/reader.backup" "$weird_artifact"
+
+rm "$weird_artifact"
+ln -s "$outside" "$weird_artifact"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  >"$WORK/verify-link.out" 2>"$WORK/verify-link.err"; then
+  fail 'symlink artifact replacement verified'
+fi
+has "$WORK/verify-link.err" 'symlink file is not allowed' 'symlink replacement was not rejected'
+rm "$weird_artifact"
+cp "$WORK/reader.backup" "$weird_artifact"
+
+mkdir -p "$merge_repo/ignored/deep/later"
+printf 'late ignored instructions\n' > "$merge_repo/ignored/deep/later/CLAUDE.md"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  >"$WORK/verify-manifest.out" 2>"$WORK/verify-manifest.err"; then
+  fail 'incomplete instruction manifest verified'
+fi
+has "$WORK/verify-manifest.err" 'instruction manifest is stale or incomplete' \
+  'instruction-manifest drift was not attributed'
+rm "$merge_repo/ignored/deep/later/CLAUDE.md"
+rmdir "$merge_repo/ignored/deep/later"
+
+mkdir -p "$merge_repo/skills/late-skill"
+printf '%s\n' '---' 'name: late-skill' 'description: fixture' '---' \
+  > "$merge_repo/skills/late-skill/SKILL.md"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  >"$WORK/verify-skills.out" 2>"$WORK/verify-skills.err"; then
+  fail 'incomplete skill manifest verified'
+fi
+has "$WORK/verify-skills.err" 'skill manifest is stale or incomplete' \
+  'skill-manifest drift was not attributed'
+rm "$merge_repo/skills/late-skill/SKILL.md"
+rmdir "$merge_repo/skills/late-skill"
+
+printf 'candidate drift\n' > "$merge_repo/ordinary-source.txt"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  >"$WORK/verify-candidate.out" 2>"$WORK/verify-candidate.err"; then
+  fail 'stale candidate fingerprint verified'
+fi
+has "$WORK/verify-candidate.err" 'candidate fingerprint mismatch' \
+  'candidate drift was not attributed'
+
+# REVIEW.md publication is a narrow compare-and-publish boundary. A complete
+# candidate becomes visible by one sibling rename only after its run identity,
+# prior digest, and generation still match under the ledger lock.
+publisher="$REPO_DIR/bin/pln-publish-review"
+[ -x "$publisher" ] || fail 'missing executable REVIEW.md publisher'
+
+# A pre-publisher resumable ledger has no generation. Its exact digest and
+# durable run identity authorize one generation-zero migration without
+# discarding any of its state or starting a new run.
+legacy_root="$WORK/review-publish-legacy"
+mkdir -p "$legacy_root/evidence"
+printf '%s\n' '# Review' '## State' 'Run identity: legacy-run' \
+  'Phase: fix' 'Finding: still open' > "$legacy_root/REVIEW.md"
+legacy_digest="$(if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$legacy_root/REVIEW.md"; else sha256sum "$legacy_root/REVIEW.md"; fi | awk '{ print $1 }')"
+printf '%s\n' '# Review' '## State' 'Run identity: legacy-run' \
+  'Ledger generation: 1' 'Phase: fix' 'Finding: still open' \
+  > "$legacy_root/evidence/migrated.md"
+"$publisher" --root "$legacy_root" --ledger "$legacy_root/REVIEW.md" \
+  --candidate "$legacy_root/evidence/migrated.md" --run-id legacy-run \
+  --expected-digest "$legacy_digest" --expected-generation 0 \
+  > "$WORK/publish-legacy.out"
+cmp -s "$legacy_root/evidence/migrated.md" "$legacy_root/REVIEW.md" \
+  || fail 'legacy REVIEW.md did not migrate without losing resumable state'
+
+publish_root="$WORK/review-publish"
+mkdir -p "$publish_root/evidence"
+ledger="$publish_root/REVIEW.md"
+run_id='run-fixture-1'
+write_review_candidate() {
+  local file="$1" generation="$2" body="$3"
+  printf '%s\n' '# Review' '## State' "Run identity: $run_id" \
+    "Ledger generation: $generation" "Body: $body" > "$file"
+}
+file_sha256() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{ print $1 }'
+  else
+    sha256sum "$1" | awk '{ print $1 }'
+  fi
+}
+
+candidate_1="$publish_root/evidence/review-1.md"
+write_review_candidate "$candidate_1" 1 'one'
+"$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$candidate_1" --run-id "$run_id" \
+  --expected-digest absent --expected-generation 0 > "$WORK/publish-create.out"
+cmp -s "$candidate_1" "$ledger" || fail 'initial REVIEW.md candidate was not published exactly'
+has "$WORK/publish-create.out" 'LEDGER_GENERATION=1' 'publisher omitted the new generation'
+digest_1="$(file_sha256 "$ledger")"
+
+candidate_2="$publish_root/evidence/review-2.md"
+write_review_candidate "$candidate_2" 2 'two'
+"$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$candidate_2" --run-id "$run_id" \
+  --expected-digest "$digest_1" --expected-generation 1 > "$WORK/publish-replace.out"
+cmp -s "$candidate_2" "$ledger" || fail 'replacement REVIEW.md candidate was not published exactly'
+digest_2="$(file_sha256 "$ledger")"
+
+# A delayed writer prepared from generation 1 cannot overwrite generation 2.
+stale_candidate="$publish_root/evidence/review-stale.md"
+write_review_candidate "$stale_candidate" 2 'stale'
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$stale_candidate" --run-id "$run_id" \
+  --expected-digest "$digest_1" --expected-generation 1 \
+  >"$WORK/publish-stale.out" 2>"$WORK/publish-stale.err"; then
+  fail 'stale REVIEW.md publisher replaced a newer generation'
+fi
+has "$WORK/publish-stale.err" 'stale publication' 'stale writer failure was not attributed'
+[ "$(file_sha256 "$ledger")" = "$digest_2" ] || fail 'stale writer changed REVIEW.md bytes'
+
+# Generation, digest, and durable run identity are independent compare-and-set
+# guards; holding one correct cannot compensate for another being stale.
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$stale_candidate" --run-id "$run_id" \
+  --expected-digest "$digest_2" --expected-generation 1 \
+  >"$WORK/publish-generation.out" 2>"$WORK/publish-generation.err"; then
+  fail 'stale REVIEW.md generation was accepted with a current digest'
+fi
+has "$WORK/publish-generation.err" 'current ledger generation differs' \
+  'generation mismatch was not attributed'
+
+candidate_3="$publish_root/evidence/review-3.md"
+write_review_candidate "$candidate_3" 3 'three'
+wrong_digest="$(printf '0%.0s' {1..64})"
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$candidate_3" --run-id "$run_id" \
+  --expected-digest "$wrong_digest" --expected-generation 2 \
+  >"$WORK/publish-digest.out" 2>"$WORK/publish-digest.err"; then
+  fail 'stale REVIEW.md digest was accepted with a current generation'
+fi
+has "$WORK/publish-digest.err" 'current ledger digest differs' \
+  'digest mismatch was not attributed'
+
+other_run_candidate="$publish_root/evidence/review-other-run.md"
+printf '%s\n' '# Review' '## State' 'Run identity: other-run' \
+  'Ledger generation: 3' 'Body: other' > "$other_run_candidate"
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$other_run_candidate" --run-id 'other-run' \
+  --expected-digest "$digest_2" --expected-generation 2 \
+  >"$WORK/publish-run.out" 2>"$WORK/publish-run.err"; then
+  fail 'different durable run identity replaced REVIEW.md'
+fi
+has "$WORK/publish-run.err" 'current run identity differs' \
+  'run-identity mismatch was not attributed'
+[ "$(file_sha256 "$ledger")" = "$digest_2" ] || fail 'failed compare-and-set guard changed REVIEW.md bytes'
+
+# Copy/pre-rename failures retain the prior complete bytes and clean every
+# sibling temp and lock. These are process-visible replacement guarantees, not
+# a claim that directory data survives power loss.
+for fault in partial-copy before-rename; do
+  if PLN_PUBLISH_REVIEW_FAULT="$fault" "$publisher" \
+    --root "$publish_root" --ledger "$ledger" --candidate "$candidate_3" \
+    --run-id "$run_id" --expected-digest "$digest_2" --expected-generation 2 \
+    >"$WORK/publish-$fault.out" 2>"$WORK/publish-$fault.err"; then
+    fail "$fault REVIEW.md publication unexpectedly succeeded"
+  fi
+  [ "$(file_sha256 "$ledger")" = "$digest_2" ] || fail "$fault changed REVIEW.md bytes"
+  if find "$publish_root" -maxdepth 1 \( -name '.REVIEW.md.publish.*' -o -name '.REVIEW.md.publish.lock' \) \
+    | grep -q .; then
+    fail "$fault left REVIEW.md publication debris"
+  fi
+done
+
+# Guard the complete candidate boundary before taking the lock.
+printf '' > "$publish_root/evidence/empty.md"
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$publish_root/evidence/empty.md" --run-id "$run_id" \
+  --expected-digest "$digest_2" --expected-generation 2 >/dev/null 2>&1; then
+  fail 'empty REVIEW.md candidate was accepted'
+fi
+ln -s "$candidate_3" "$publish_root/evidence/linked.md"
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$publish_root/evidence/linked.md" --run-id "$run_id" \
+  --expected-digest "$digest_2" --expected-generation 2 >/dev/null 2>&1; then
+  fail 'symlink REVIEW.md candidate was accepted'
+fi
+ln -s "$publish_root/evidence" "$publish_root/linked-evidence"
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$publish_root/linked-evidence/review-3.md" --run-id "$run_id" \
+  --expected-digest "$digest_2" --expected-generation 2 >/dev/null 2>&1; then
+  fail 'REVIEW.md candidate beneath a symlink parent was accepted'
+fi
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$outside" --run-id "$run_id" \
+  --expected-digest "$digest_2" --expected-generation 2 >/dev/null 2>&1; then
+  fail 'out-of-root REVIEW.md candidate was accepted'
+fi
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$ledger" --run-id "$run_id" \
+  --expected-digest "$digest_2" --expected-generation 2 >/dev/null 2>&1; then
+  fail 'canonical REVIEW.md was accepted as its own candidate'
+fi
+
+# Two publishers derived from the same state serialize: exactly one transition
+# wins and the other is rejected without erasing the winner.
+concurrent_a="$publish_root/evidence/review-3a.md"
+concurrent_b="$publish_root/evidence/review-3b.md"
+write_review_candidate "$concurrent_a" 3 'three-a'
+write_review_candidate "$concurrent_b" 3 'three-b'
+set +e
+"$publisher" --root "$publish_root" --ledger "$ledger" --candidate "$concurrent_a" \
+  --run-id "$run_id" --expected-digest "$digest_2" --expected-generation 2 \
+  >"$WORK/publish-a.out" 2>"$WORK/publish-a.err" & publish_a_pid=$!
+"$publisher" --root "$publish_root" --ledger "$ledger" --candidate "$concurrent_b" \
+  --run-id "$run_id" --expected-digest "$digest_2" --expected-generation 2 \
+  >"$WORK/publish-b.out" 2>"$WORK/publish-b.err" & publish_b_pid=$!
+wait "$publish_a_pid"; publish_a_status=$?
+wait "$publish_b_pid"; publish_b_status=$?
+set -e
+[ "$((publish_a_status + publish_b_status))" -eq 2 ] \
+  || fail 'concurrent REVIEW.md publishers did not produce one success and one stale rejection'
+if [ "$publish_a_status" -eq 0 ]; then
+  cmp -s "$concurrent_a" "$ledger" || fail 'concurrent winner was not retained byte-for-byte'
+  has "$WORK/publish-b.err" 'stale publication' 'concurrent loser was not rejected as stale'
+else
+  cmp -s "$concurrent_b" "$ledger" || fail 'concurrent winner was not retained byte-for-byte'
+  has "$WORK/publish-a.err" 'stale publication' 'concurrent loser was not rejected as stale'
+fi
 
 echo "OK"

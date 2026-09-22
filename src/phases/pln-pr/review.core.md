@@ -8,6 +8,10 @@ name: pln-pr-phase-review
 
 Read this file in full before the first reviewer or peer action. Keep `Phase: review` until successful-reader attribution, raw artifacts, merge outcome, and the complete ledger are durable. Missing, empty, or malformed reviewers are failures, never clean results.
 
+Every state change in this phase is a complete next-generation candidate published through `{{OUTPUT_ROOT}}/bin/pln-publish-review` with the current ledger digest/generation. The merge worker writes its complete candidate only to the assigned evidence path; it never writes canonical `REVIEW.md`. Validate its bounded envelope, then publish that candidate. On stale rejection, discard it, reread canonical state, and reconcile rather than overwriting newer work.
+
+Every reader and merge is bound to the ledger's exact diff base and reviewed-diff SHA-256. If a later base refresh produces the same byte-identical diff, this review remains usable; if either the merge base or diff bytes move in a way that changes that subject, invalidate the review and return here before deciding whether any gauntlet evidence can be reused. Version-only verification reuse never authorizes review reuse for a changed diff.
+
 After the merged ledger is durable, set `Review status` and then set `Phase: fix` when acted-on findings remain or `Phase: ship-watch` when none remain. Read the mapped phase before its first action.
 
 <!-- pln:include followup-filing -->
@@ -88,7 +92,25 @@ a lens or adversarial agent that completed, a `codex review` pass that came back
 <!-- pln:endonly -->
 If none succeeded, you have no coverage, not a clean bill of health. Do not write an empty `REVIEW.md` and do not proceed to the PR. Stop, say plainly that the review could not run, and let the user retry or review manually. An empty *merged findings* set is only "clean" when it comes from reviewers that ran and found nothing.
 
-Never open a reviewer or peer result in coordinator context. Collect only fixed success/failure metadata and raw artifact paths, then spawn one fresh `judgment`-profile merge worker under `{{SKILL_DIR}}/src/workers/pr-review-merge.md`. Its assignment carries `REVIEW.md`, the exact diff base/tree fingerprint, successful-reader metadata, every raw artifact path, `<plan-dir>/evidence/pr-review-merge.md`, `<plan-dir>/results/pr-review-merge.txt`, routing attribution, and a 4096-byte budget. It alone reads, validates, translates, and merges raw findings.
+Never open a reviewer or peer result in coordinator context. Write fixed success/failure metadata and raw artifact paths to `<plan-dir>/evidence/pr-review-readers.tsv`, then use `pln-build-review-brief --mode pr-merge` to assemble `<plan-dir>/evidence/pr-review-merge.brief`. Pass the merge-worker contract first; repository root; the exact candidate hash plus `review.commands` and `review.environment`; `PLAN.md` when present; `REVIEW.md`; the diff map; reader metadata; one role/path pair per raw artifact; and each active host skill-catalog root. The helper inventories every repository `AGENTS.md`/`CLAUDE.md` regardless of Git ignore state while excluding `.git`, plus every `SKILL.md` below the recorded roots; hex-encodes branch-controlled strings; records path/size/digest metadata without copying optional prose; and refuses a brief over 65536 bytes. Its ordinary plan-review mode remains a separate byte-compatible interface.
+
+```bash
+"$PLN_BIN/pln-build-review-brief" --mode pr-merge \
+  --contract "{{SKILL_DIR}}/src/workers/pr-review-merge.md" \
+  --root "<repository-root>" --candidate "<candidate-sha256>" \
+  --commands "<plan-dir>/evidence/review.commands" \
+  --environment "<plan-dir>/evidence/review.environment" \
+  --plan "<plan-dir>/PLAN.md" --ledger "<plan-dir>/REVIEW.md" \
+  --diff-map "<plan-dir>/evidence/diff-files.txt" \
+  --reader-metadata "<plan-dir>/evidence/pr-review-readers.tsv" \
+  --artifact "<reader-role>" "<raw-artifact>" \
+  --skill-root "$(dirname "{{SKILL_DIR}}")" \
+  --out "<plan-dir>/evidence/pr-review-merge.brief"
+```
+
+Repeat `--artifact` for every reader and `--skill-root` for any additional active host catalog. Omit `--plan` only for a standalone run with no plan; every other named file is required. If an instruction or skill manifest exceeds the helper's deterministic count bound, stop for a narrower mechanically complete catalog or explicit bounded rediscovery; never silently truncate it.
+
+Spawn one fresh `judgment`-profile merge worker under `{{SKILL_DIR}}/src/workers/pr-review-merge.md` on that prepared brief, plus `<plan-dir>/evidence/pr-review-merge.md`, `<plan-dir>/evidence/REVIEW.g<next-generation>.next.md`, `<plan-dir>/results/pr-review-merge.txt`, routing attribution, and a 4096-byte budget. Tell it the current Run identity and next Ledger generation. The brief is the primary context inventory instead of an ad hoc list of pointers. The worker must verify it with `pln-build-review-brief --verify-pr-merge` before and after parsing artifacts; failed candidate, path, symlink, size, digest, instruction-manifest, or skill-manifest verification is failed coverage, never a clean reader. The worker still reads applicable instructions and mandatory skills, reopens cited source, reruns reproductions, traces production reachability, and confirms shipped consequences independently.
 
 The merge worker applies these ledger rules:
 
@@ -96,7 +118,7 @@ The merge worker applies these ledger rules:
 - **Merge structural proof** by responsibility and invariant, preserving the role-tagged owner/analogue/consumer references, repeatable reference check when practical, and before/after owners, paths, and knobs. Existing findings without structural evidence remain valid.
 - **Persist the Safety disposition** from the single shared behavior-preservation owner for every proposed removal, replacement, or consolidation. A missing or incomplete record retains the surface; only every-conjunct `pass` can enter the existing auto-fix versus needs-a-decision classification, and public/compatibility/stateful/consequential/destructive work remains decision-gated.
 - **Classify evidence:** independently check the exact candidate and record `verified`, `unverified`, or `disproved`. Only verified findings become open automatic-fix work; unverified/disproved findings stay in the appendix with counterevidence.
-- **Write `REVIEW.md`** before any fix. Its header names risk tier, role coverage, and verified/unverified/disproved counts. Each actionable finding carries evidence state, severity, citation, reproduction, confirmed `reached_by`, proposed fix, `smaller_fix`, open/fixed/skipped status, a stable repair key, failed repair attempts, last repair candidate, and last repair outcome.
-- **Return only a bounded envelope** to the coordinator: successful/failed reader attribution, header counts, acted-on cluster names, critical finding titles, and the exact tree fingerprint. Raw findings stay in evidence artifacts and the complete merged state stays in `REVIEW.md`.
+- **Write the complete staged ledger candidate** before any fix. Its header names risk tier, role coverage, and verified/unverified/disproved counts. Each actionable finding carries evidence state, severity, citation, reproduction, confirmed `reached_by`, proposed fix, `smaller_fix`, open/fixed/skipped status, a stable repair key, failed repair attempts, last repair candidate, and last repair outcome.
+- **Return only a bounded envelope** to the coordinator: successful/failed reader attribution, header counts, acted-on cluster names, critical finding titles, the exact tree fingerprint, and the staged candidate path/digest. Raw findings stay in evidence artifacts; canonical state changes only when the coordinator validates and publishes the candidate.
 
 Validate the merge result through `bin/pln-read-envelope --root <plan-dir> --max-bytes 4096`; record its route in `routing.tsv`. A malformed merge gets one fresh judgment retry, then fails closed. If there are zero acted-on findings from at least one successful reviewer, note it and skip the fix pass: go to Step 6 (version/changelog) and then the Step 7 gauntlet.

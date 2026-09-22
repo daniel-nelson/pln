@@ -5,31 +5,11 @@ description: Review a branch and put up a pull request, the pln way — fresh-co
 
 # pln-pr — review and open a pull request
 
-You are running the user's personal PR workflow. It is the ship half of a plan: take the work on the current branch, review it with fresh-context reviewers, fix what they find, verify once, and open the pull request. Read every section of this file before starting, then execute. The user tuned this to be lean on purpose — it carries the review intelligence and none of the runtime scaffolding a heavier ship tool drags along. Do not add ceremony it does not ask for.
+Take the work on the current branch, review it with fresh-context reviewers, fix what they find, verify once, and open the pull request. Read every section of this file before starting, then execute. Keep the workflow lean; do not add ceremony it does not ask for.
 
 <!-- pln:include compaction-recovery -->
 
-<!-- pln:only claude -->
-**Resolve pln's helpers**: `{{PLN_PR_CMD}}` reuses `{{PLN_CMD}}`'s `bin/` scripts. They live at the pln repo root, one level *above* this skill's own directory, so `${CLAUDE_SKILL_DIR}/bin` does **not** point at them (this skill is a subdirectory of the pln repo, symlinked in as its own command). Find the install once and reuse it:
-<!-- pln:endonly -->
-<!-- pln:only codex -->
-**Resolve pln's helpers**: `{{PLN_PR_CMD}}` reuses `{{PLN_CMD}}`'s `bin/` scripts, which live at the pln repo root, one level *above* this skill's own directory. Find the install once and reuse it:
-<!-- pln:endonly -->
-
-```bash
-_PLN_DIR=""
-for d in "$HOME/.claude/skills/pln" "$HOME/.agents/skills/pln" ".claude/skills/pln" ".agents/skills/pln"; do
-  [ -x "$d/bin/pln-config" ] && _PLN_DIR="$d" && break
-done
-echo "PLN_DIR: ${_PLN_DIR:-none}"
-```
-
-<!-- pln:only claude -->
-If `PLN_DIR` is `none`, the helpers aren't found: skip the config-gated notification setup below and treat notifications as off. The skill still works end to end; you just won't get pushes. Every `pln-config` / `pln-notify-desktop` call below is `"$_PLN_DIR/bin/..."` and only runs when `_PLN_DIR` is set.
-<!-- pln:endonly -->
-<!-- pln:only codex -->
-If `PLN_DIR` is `none`, the helpers aren't found: skip the config-gated notification setup below and treat notifications as off. The skill still works end to end; you just won't get desktop notifications. Every `pln-config` / `pln-notify-desktop` call below is `"$_PLN_DIR/bin/..."` and only runs when `_PLN_DIR` is set — substitute the real path, since each shell call starts fresh and the variable does not persist.
-<!-- pln:endonly -->
+<!-- pln:include update-check -->
 
 <!-- pln:include pr-notify-setup -->
 
@@ -61,9 +41,13 @@ If the branch has no commits ahead of base, say so and stop — there is nothing
 
 This file is the always-loaded PR coordinator contract. Detailed scope, review, fix, blocker, and ship/watch instructions live in generated phase documents. Read this router in full on every invocation and after compaction.
 
-Every `REVIEW.md` has a top-level `## State` section containing one `Phase` value: `scope-baseline`, `review`, `fix`, `blocker`, `ship-watch`, or `complete`. The same state section persists a durable run identity, the validated base/source, trust/command confirmation, diff base, review depth, tree/command/environment/candidate fingerprints, simplification freshness status/policy/bypass binding, semantic risk and roster, review status, PR identity, and CI round/status. Those fields, not conversational memory, decide safe resume behavior.
+Every `REVIEW.md` has a top-level `## State` section containing one `Phase` value: `scope-baseline`, `review`, `fix`, `blocker`, `ship-watch`, or `complete`. The same state section persists a durable run identity, the canonical plan root, validated base/source, trust/command confirmation, diff base and reviewed-diff fingerprint, review depth, command graph, tree/command/environment/candidate fingerprints, simplification freshness status/policy/bypass binding, semantic risk and roster, review status, PR identity/disposition, and CI round/status. Resolve the plan root once from the ledger's canonical parent and derive every evidence/result path from it; never keep re-transcribing paths from a prompt. Those fields, not conversational memory, decide safe resume behavior.
 
 At every boundary, finish the old phase's ledger/state writes first. Then write the new cursor. Then read the mapped document in full before the phase's first action. In short: write durable state first, then advance `Phase`, then read the new phase file and act. Persist a user decision or blocker question before sending it, and persist external identities/results before advancing past the action that created them.
+
+Every canonical ledger mutation uses `{{OUTPUT_ROOT}}/bin/pln-publish-review`: write a complete nonempty candidate beneath the plan root with the same `Run identity` and `Ledger generation` incremented by one, then publish it with the current generation and SHA-256 (or `absent`/`0` for creation). Never edit, append, delete, recreate, or rename onto `REVIEW.md` directly. A stale rejection means reread and reconcile; it never authorizes retrying the old candidate. This gives process-visible old-or-new replacement, not power-loss durability.
+
+For an existing pre-publisher ledger with a Run identity but no `Ledger generation`, preserve every byte of its state in a candidate that adds `Ledger generation: 1`, and publish it once with the legacy ledger's exact digest and expected generation `0`. This is a resume migration, not a new run or permission to overwrite the ledger.
 
 On invocation or after compaction, reread this router, locate `REVIEW.md`, read its `State` section, reconcile completed commits/review/PR/CI work, and read exactly one mapped phase file in full before the phase's first action. Do not preload later phases. With no ledger, start `scope-baseline` and load that file before probing remotes or running commands.
 

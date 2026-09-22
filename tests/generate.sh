@@ -854,6 +854,26 @@ for host_out in "$real_c" "$real_x"; do
     "$ship_file dropped the project's instructions as the whole-suite escape hatch"
   has "$ship_file" 'There is no CI that will run it' \
     "$ship_file lost the no-CI justification, where the local run is the only run"
+  has "$scope_file" 'PR disposition: ready' \
+    "$scope_file no longer treats a plain PR request as ready"
+  has "$scope_file" 'PLN_GAUNTLET_V1' \
+    "$scope_file lost project-declared gauntlet parallelism"
+  has "$ship_file" 'Run the cheap declared gates now, before fingerprinting or dispatching the functional gauntlet' \
+    "$ship_file spends the gauntlet before cheap base/version/package gates"
+  has "$ship_file" 'Compare its `DIFF_BASE` and `REVIEW_DIFF_SHA256` with the ledger-bound reviewed subject' \
+    "$ship_file refreshes base without reconciling the reviewed diff"
+  has "$ship_file" 'A pure version bump never triggers the functional gauntlet' \
+    "$ship_file runs the functional gauntlet for a version-only correction"
+  has "$ship_file" '--status <plan-root>/evidence/final-gauntlet.coordinator.status --executor coordinator' \
+    "$ship_file does not route known coordinator commands there first"
+  has "$ship_file" '--executor worker --completed <plan-root>/evidence/final-gauntlet.coordinator.status' \
+    "$ship_file worker pass lacks the exact coordinator-status prerequisite"
+  has "$ship_file" 'A plain put-up/open/create request, including `review=none` or “skip review,” is `ready`' \
+    "$ship_file exact review-none ready-PR trace still enters draft watch"
+  has "$ship_file" 'adding `--draft` only for `keep-draft` or `policy-draft`' \
+    "$ship_file can add --draft to a plain ready request"
+  has "$ship_file" 'A new ready PR offers optional CI watching but never starts it unprompted' \
+    "$ship_file starts CI watch for a ready handoff"
   # An empty check list means "no CI here" only for a PR that could merge. A
   # conflicting one may report the same empty list because the forge cannot build
   # the merge commit its checks run against, so the mergeability question has to
@@ -1435,6 +1455,13 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   hasnt "$f" 'ask whether to inherit for this run' "$f retains the late model-inheritance gate"
   hasnt "$f" 'frontier-capability floor' "$f still claims model names are a capability test"
   has "$f" 'Start-of-invocation readiness sweep' "$f lost the early configuration sweep"
+  has "$f" 'pln-update-check" --start' "$f does not mint a fresh update receipt before recovery"
+  has "$f" 'pln-update-check" --consume' "$f does not mechanically consume the update receipt"
+  has "$f" 'HELPER_ABSENT' "$f has no explicit helper-absent degraded outcome"
+  appears_before "$f" 'pln-update-check" --start' 'On invocation or after compaction' \
+    "$f can recover durable phase state before invoking the update checker"
+  appears_before "$f" 'pln-update-check" --consume' 'On invocation or after compaction' \
+    "$f can recover durable phase state before consuming the update receipt"
   has "$f" 'before any repository research, phase action, or long-running dispatch' \
     "$f can defer predictable configuration until work is underway"
   has "$f" 'Never raise either configuration question later in the run' \
@@ -1533,13 +1560,56 @@ for root in "$real_c" "$real_x"; do
   review="$root/phases/pln-pr/review.md"
   scope="$root/phases/pln-pr/scope-baseline.md"
   fix="$root/phases/pln-pr/fix.md"
+  blocker="$root/phases/pln-pr/blocker.md"
   ship="$root/phases/pln-pr/ship-watch.md"
   finish="$root/phases/pln/finish-ship.md"
+  has "$root/pln-pr/SKILL.md" 'Every canonical ledger mutation uses' \
+    "$root /pln-pr router lost the single REVIEW.md publication boundary"
+  has "$root/pln-pr/SKILL.md" 'process-visible old-or-new replacement, not power-loss durability' \
+    "$root /pln-pr router overstates REVIEW.md durability"
+  has "$root/pln-pr/SKILL.md" 'existing pre-publisher ledger' \
+    "$root /pln-pr router cannot resume a ledger without a generation"
+  for phase_file in "$scope" "$review" "$fix" "$blocker" "$ship"; do
+    has "$phase_file" 'pln-publish-review' \
+      "$phase_file can publish canonical REVIEW.md outside the helper"
+  done
+  has "$scope" '--expected-digest absent --expected-generation 0' \
+    "$scope lost guarded REVIEW.md creation"
+  has "$review" 'never writes canonical `REVIEW.md`' \
+    "$review lets merge workers write canonical REVIEW.md"
+  has "$fix" 'stale publication means reread and reconcile' \
+    "$fix may overwrite a newer fix checkpoint"
+  has "$ship" 'before the next external action' \
+    "$ship may repeat a PR/CI action before its identity is published"
+  hasnt "$review" '**Write `REVIEW.md`**' \
+    "$review still directs the merge worker to publish canonical REVIEW.md"
+  hasnt "$fix" 'which updates `REVIEW.md`' \
+    "$fix still directs post-fix merge to publish canonical REVIEW.md"
+  hasnt "$fix" 'update `REVIEW.md` alone' \
+    "$fix host mechanics still publish checkpoints directly"
+  hasnt "$ship" 'write it into `REVIEW.md`' \
+    "$ship host mechanics still publish CI findings directly"
   has "$review" '### Step 3. Risk-calibrated review roster' "$review lost semantic assurance tiers"
   has "$review" 'at most four pre-fix readers' "$review lost the R3 pre-fix cap"
   has "$review" '"verified"|"unverified"' "$review lost evidence-state findings"
   has "$review" 'structural_evidence?' "$review lost backward-compatible structural evidence"
   has "$review" 'direct callers or consumers' "$review lost changed-responsibility consumer traversal"
+  has "$review" 'pln-build-review-brief --mode pr-merge' \
+    "$review no longer dispatches PR merge through the prepared-context owner"
+  has "$review" 'contract first' "$review lost contract-first prepared context"
+  has "$review" 'hex-encodes branch-controlled strings' \
+    "$review no longer keeps branch-controlled metadata in the typed schema"
+  has "$review" 'regardless of Git ignore state while excluding `.git`' \
+    "$review lets Git ignore rules omit instructions or repository internals enter the manifest"
+  has "$review" 'refuses a brief over 65536 bytes' "$review lost the prepared-context byte cap"
+  has "$review" 'pln-build-review-brief --verify-pr-merge' \
+    "$review no longer verifies candidate, manifests, and artifacts"
+  has "$review" 'reopens cited source, reruns reproductions, traces production reachability' \
+    "$review lets prepared metadata replace independent semantic checks"
+  has "$scope" 'evidence/review.commands' "$scope lost the review command-fingerprint input"
+  has "$scope" 'evidence/review.environment' "$scope lost the review environment-fingerprint input"
+  has "$scope" 'instruction manifest, skill manifest, or review artifact' \
+    "$scope no longer invalidates prepared context when a manifest or artifact changes"
   hasnt "$review" 'DIFF_LINES < 30' "$review retained the line-count shortcut"
   hasnt "$review" 'confidence: 1-10' "$review retained reviewer self-scoring"
   has "$review" 'routes nothing' "$review still lets a reader's own severity authorize work"

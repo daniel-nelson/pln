@@ -137,7 +137,7 @@ Change your mind later, in either direction:
 
 ## Upgrading
 
-pln checks for a new release each time it runs (throttled, no background process). When one is available it offers to upgrade and remembers your choice — upgrade once, always auto-upgrade silently, snooze, or turn checks off. You can also update explicitly anytime:
+pln checks for a new release each time it runs (throttled, no background process). Continuing runs use a one-time local receipt bound to that run and that invocation, so recovery can distinguish a completed check from one that was skipped; current results remain silent. Disabled checks, an unavailable remote, or a missing helper degrade explicitly without claiming freshness and do not prevent the planning workflow from running. When an update is available pln offers to upgrade and remembers your choice — upgrade once, always auto-upgrade silently, snooze, or turn checks off. You can also update explicitly anytime:
 
 ```
 /pln-update

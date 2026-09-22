@@ -1540,8 +1540,35 @@ for root in "$real_c" "$real_x"; do
   review="$root/phases/pln-pr/review.md"
   scope="$root/phases/pln-pr/scope-baseline.md"
   fix="$root/phases/pln-pr/fix.md"
+  blocker="$root/phases/pln-pr/blocker.md"
   ship="$root/phases/pln-pr/ship-watch.md"
   finish="$root/phases/pln/finish-ship.md"
+  has "$root/pln-pr/SKILL.md" 'Every canonical ledger mutation uses' \
+    "$root /pln-pr router lost the single REVIEW.md publication boundary"
+  has "$root/pln-pr/SKILL.md" 'process-visible old-or-new replacement, not power-loss durability' \
+    "$root /pln-pr router overstates REVIEW.md durability"
+  has "$root/pln-pr/SKILL.md" 'existing pre-publisher ledger' \
+    "$root /pln-pr router cannot resume a ledger without a generation"
+  for phase_file in "$scope" "$review" "$fix" "$blocker" "$ship"; do
+    has "$phase_file" 'pln-publish-review' \
+      "$phase_file can publish canonical REVIEW.md outside the helper"
+  done
+  has "$scope" '--expected-digest absent --expected-generation 0' \
+    "$scope lost guarded REVIEW.md creation"
+  has "$review" 'never writes canonical `REVIEW.md`' \
+    "$review lets merge workers write canonical REVIEW.md"
+  has "$fix" 'stale publication means reread and reconcile' \
+    "$fix may overwrite a newer fix checkpoint"
+  has "$ship" 'before the next external action' \
+    "$ship may repeat a PR/CI action before its identity is published"
+  hasnt "$review" '**Write `REVIEW.md`**' \
+    "$review still directs the merge worker to publish canonical REVIEW.md"
+  hasnt "$fix" 'which updates `REVIEW.md`' \
+    "$fix still directs post-fix merge to publish canonical REVIEW.md"
+  hasnt "$fix" 'update `REVIEW.md` alone' \
+    "$fix host mechanics still publish checkpoints directly"
+  hasnt "$ship" 'write it into `REVIEW.md`' \
+    "$ship host mechanics still publish CI findings directly"
   has "$review" '### Step 3. Risk-calibrated review roster' "$review lost semantic assurance tiers"
   has "$review" 'at most four pre-fix readers' "$review lost the R3 pre-fix cap"
   has "$review" '"verified"|"unverified"' "$review lost evidence-state findings"

@@ -5,7 +5,7 @@ description: Review a branch and put up a pull request, the pln way — fresh-co
 
 # pln-pr — review and open a pull request
 
-You are running the user's personal PR workflow. It is the ship half of a plan: take the work on the current branch, review it with fresh-context reviewers, fix what they find, verify once, and open the pull request. Read every section of this file before starting, then execute. The user tuned this to be lean on purpose — it carries the review intelligence and none of the runtime scaffolding a heavier ship tool drags along. Do not add ceremony it does not ask for.
+Take the work on the current branch, review it with fresh-context reviewers, fix what they find, verify once, and open the pull request. Read every section of this file before starting, then execute. Keep the workflow lean; do not add ceremony it does not ask for.
 
 <!-- pln:include compaction-recovery -->
 
@@ -44,6 +44,10 @@ This file is the always-loaded PR coordinator contract. Detailed scope, review, 
 Every `REVIEW.md` has a top-level `## State` section containing one `Phase` value: `scope-baseline`, `review`, `fix`, `blocker`, `ship-watch`, or `complete`. The same state section persists a durable run identity, the validated base/source, trust/command confirmation, diff base, review depth, tree/command/environment/candidate fingerprints, simplification freshness status/policy/bypass binding, semantic risk and roster, review status, PR identity, and CI round/status. Those fields, not conversational memory, decide safe resume behavior.
 
 At every boundary, finish the old phase's ledger/state writes first. Then write the new cursor. Then read the mapped document in full before the phase's first action. In short: write durable state first, then advance `Phase`, then read the new phase file and act. Persist a user decision or blocker question before sending it, and persist external identities/results before advancing past the action that created them.
+
+Every canonical ledger mutation uses `{{OUTPUT_ROOT}}/bin/pln-publish-review`: write a complete nonempty candidate beneath the plan root with the same `Run identity` and `Ledger generation` incremented by one, then publish it with the current generation and SHA-256 (or `absent`/`0` for creation). Never edit, append, delete, recreate, or rename onto `REVIEW.md` directly. A stale rejection means reread and reconcile; it never authorizes retrying the old candidate. This gives process-visible old-or-new replacement, not power-loss durability.
+
+For an existing pre-publisher ledger with a Run identity but no `Ledger generation`, preserve every byte of its state in a candidate that adds `Ledger generation: 1`, and publish it once with the legacy ledger's exact digest and expected generation `0`. This is a resume migration, not a new run or permission to overwrite the ledger.
 
 On invocation or after compaction, reread this router, locate `REVIEW.md`, read its `State` section, reconcile completed commits/review/PR/CI work, and read exactly one mapped phase file in full before the phase's first action. Do not preload later phases. With no ledger, start `scope-baseline` and load that file before probing remotes or running commands.
 

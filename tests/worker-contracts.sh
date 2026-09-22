@@ -127,6 +127,14 @@ has "$merge_contract" 'A single enclosing Markdown code fence is transport, not 
   'the merge contract still fails a reader over an enclosing code fence'
 has "$merge_contract" 'reject what is still unparseable' \
   'stripping a fence was allowed to soften the rest of validation'
+has "$merge_contract" 'staged-ledger candidate path' \
+  'PR merge worker no longer receives a noncanonical ledger destination'
+has "$merge_contract" 'never edit, delete, recreate, or rename canonical `REVIEW.md`' \
+  'PR merge worker may publish the shared ledger directly'
+has "$merge_contract" 'staged candidate path/digest' \
+  'PR merge result no longer binds its staged ledger candidate'
+hasnt "$merge_contract" 'Write `REVIEW.md` before any fix' \
+  'PR merge worker still directly publishes canonical REVIEW.md'
 
 # A refused command is not a verification result, and for several releases this
 # contract said so and denied it in the same breath: a command that could not
@@ -884,5 +892,184 @@ if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
 fi
 has "$WORK/verify-candidate.err" 'candidate fingerprint mismatch' \
   'candidate drift was not attributed'
+
+# REVIEW.md publication is a narrow compare-and-publish boundary. A complete
+# candidate becomes visible by one sibling rename only after its run identity,
+# prior digest, and generation still match under the ledger lock.
+publisher="$REPO_DIR/bin/pln-publish-review"
+[ -x "$publisher" ] || fail 'missing executable REVIEW.md publisher'
+
+# A pre-publisher resumable ledger has no generation. Its exact digest and
+# durable run identity authorize one generation-zero migration without
+# discarding any of its state or starting a new run.
+legacy_root="$WORK/review-publish-legacy"
+mkdir -p "$legacy_root/evidence"
+printf '%s\n' '# Review' '## State' 'Run identity: legacy-run' \
+  'Phase: fix' 'Finding: still open' > "$legacy_root/REVIEW.md"
+legacy_digest="$(if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$legacy_root/REVIEW.md"; else sha256sum "$legacy_root/REVIEW.md"; fi | awk '{ print $1 }')"
+printf '%s\n' '# Review' '## State' 'Run identity: legacy-run' \
+  'Ledger generation: 1' 'Phase: fix' 'Finding: still open' \
+  > "$legacy_root/evidence/migrated.md"
+"$publisher" --root "$legacy_root" --ledger "$legacy_root/REVIEW.md" \
+  --candidate "$legacy_root/evidence/migrated.md" --run-id legacy-run \
+  --expected-digest "$legacy_digest" --expected-generation 0 \
+  > "$WORK/publish-legacy.out"
+cmp -s "$legacy_root/evidence/migrated.md" "$legacy_root/REVIEW.md" \
+  || fail 'legacy REVIEW.md did not migrate without losing resumable state'
+
+publish_root="$WORK/review-publish"
+mkdir -p "$publish_root/evidence"
+ledger="$publish_root/REVIEW.md"
+run_id='run-fixture-1'
+write_review_candidate() {
+  local file="$1" generation="$2" body="$3"
+  printf '%s\n' '# Review' '## State' "Run identity: $run_id" \
+    "Ledger generation: $generation" "Body: $body" > "$file"
+}
+file_sha256() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{ print $1 }'
+  else
+    sha256sum "$1" | awk '{ print $1 }'
+  fi
+}
+
+candidate_1="$publish_root/evidence/review-1.md"
+write_review_candidate "$candidate_1" 1 'one'
+"$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$candidate_1" --run-id "$run_id" \
+  --expected-digest absent --expected-generation 0 > "$WORK/publish-create.out"
+cmp -s "$candidate_1" "$ledger" || fail 'initial REVIEW.md candidate was not published exactly'
+has "$WORK/publish-create.out" 'LEDGER_GENERATION=1' 'publisher omitted the new generation'
+digest_1="$(file_sha256 "$ledger")"
+
+candidate_2="$publish_root/evidence/review-2.md"
+write_review_candidate "$candidate_2" 2 'two'
+"$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$candidate_2" --run-id "$run_id" \
+  --expected-digest "$digest_1" --expected-generation 1 > "$WORK/publish-replace.out"
+cmp -s "$candidate_2" "$ledger" || fail 'replacement REVIEW.md candidate was not published exactly'
+digest_2="$(file_sha256 "$ledger")"
+
+# A delayed writer prepared from generation 1 cannot overwrite generation 2.
+stale_candidate="$publish_root/evidence/review-stale.md"
+write_review_candidate "$stale_candidate" 2 'stale'
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$stale_candidate" --run-id "$run_id" \
+  --expected-digest "$digest_1" --expected-generation 1 \
+  >"$WORK/publish-stale.out" 2>"$WORK/publish-stale.err"; then
+  fail 'stale REVIEW.md publisher replaced a newer generation'
+fi
+has "$WORK/publish-stale.err" 'stale publication' 'stale writer failure was not attributed'
+[ "$(file_sha256 "$ledger")" = "$digest_2" ] || fail 'stale writer changed REVIEW.md bytes'
+
+# Generation, digest, and durable run identity are independent compare-and-set
+# guards; holding one correct cannot compensate for another being stale.
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$stale_candidate" --run-id "$run_id" \
+  --expected-digest "$digest_2" --expected-generation 1 \
+  >"$WORK/publish-generation.out" 2>"$WORK/publish-generation.err"; then
+  fail 'stale REVIEW.md generation was accepted with a current digest'
+fi
+has "$WORK/publish-generation.err" 'current ledger generation differs' \
+  'generation mismatch was not attributed'
+
+candidate_3="$publish_root/evidence/review-3.md"
+write_review_candidate "$candidate_3" 3 'three'
+wrong_digest="$(printf '0%.0s' {1..64})"
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$candidate_3" --run-id "$run_id" \
+  --expected-digest "$wrong_digest" --expected-generation 2 \
+  >"$WORK/publish-digest.out" 2>"$WORK/publish-digest.err"; then
+  fail 'stale REVIEW.md digest was accepted with a current generation'
+fi
+has "$WORK/publish-digest.err" 'current ledger digest differs' \
+  'digest mismatch was not attributed'
+
+other_run_candidate="$publish_root/evidence/review-other-run.md"
+printf '%s\n' '# Review' '## State' 'Run identity: other-run' \
+  'Ledger generation: 3' 'Body: other' > "$other_run_candidate"
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$other_run_candidate" --run-id 'other-run' \
+  --expected-digest "$digest_2" --expected-generation 2 \
+  >"$WORK/publish-run.out" 2>"$WORK/publish-run.err"; then
+  fail 'different durable run identity replaced REVIEW.md'
+fi
+has "$WORK/publish-run.err" 'current run identity differs' \
+  'run-identity mismatch was not attributed'
+[ "$(file_sha256 "$ledger")" = "$digest_2" ] || fail 'failed compare-and-set guard changed REVIEW.md bytes'
+
+# Copy/pre-rename failures retain the prior complete bytes and clean every
+# sibling temp and lock. These are process-visible replacement guarantees, not
+# a claim that directory data survives power loss.
+for fault in partial-copy before-rename; do
+  if PLN_PUBLISH_REVIEW_FAULT="$fault" "$publisher" \
+    --root "$publish_root" --ledger "$ledger" --candidate "$candidate_3" \
+    --run-id "$run_id" --expected-digest "$digest_2" --expected-generation 2 \
+    >"$WORK/publish-$fault.out" 2>"$WORK/publish-$fault.err"; then
+    fail "$fault REVIEW.md publication unexpectedly succeeded"
+  fi
+  [ "$(file_sha256 "$ledger")" = "$digest_2" ] || fail "$fault changed REVIEW.md bytes"
+  if find "$publish_root" -maxdepth 1 \( -name '.REVIEW.md.publish.*' -o -name '.REVIEW.md.publish.lock' \) \
+    | grep -q .; then
+    fail "$fault left REVIEW.md publication debris"
+  fi
+done
+
+# Guard the complete candidate boundary before taking the lock.
+printf '' > "$publish_root/evidence/empty.md"
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$publish_root/evidence/empty.md" --run-id "$run_id" \
+  --expected-digest "$digest_2" --expected-generation 2 >/dev/null 2>&1; then
+  fail 'empty REVIEW.md candidate was accepted'
+fi
+ln -s "$candidate_3" "$publish_root/evidence/linked.md"
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$publish_root/evidence/linked.md" --run-id "$run_id" \
+  --expected-digest "$digest_2" --expected-generation 2 >/dev/null 2>&1; then
+  fail 'symlink REVIEW.md candidate was accepted'
+fi
+ln -s "$publish_root/evidence" "$publish_root/linked-evidence"
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$publish_root/linked-evidence/review-3.md" --run-id "$run_id" \
+  --expected-digest "$digest_2" --expected-generation 2 >/dev/null 2>&1; then
+  fail 'REVIEW.md candidate beneath a symlink parent was accepted'
+fi
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$outside" --run-id "$run_id" \
+  --expected-digest "$digest_2" --expected-generation 2 >/dev/null 2>&1; then
+  fail 'out-of-root REVIEW.md candidate was accepted'
+fi
+if "$publisher" --root "$publish_root" --ledger "$ledger" \
+  --candidate "$ledger" --run-id "$run_id" \
+  --expected-digest "$digest_2" --expected-generation 2 >/dev/null 2>&1; then
+  fail 'canonical REVIEW.md was accepted as its own candidate'
+fi
+
+# Two publishers derived from the same state serialize: exactly one transition
+# wins and the other is rejected without erasing the winner.
+concurrent_a="$publish_root/evidence/review-3a.md"
+concurrent_b="$publish_root/evidence/review-3b.md"
+write_review_candidate "$concurrent_a" 3 'three-a'
+write_review_candidate "$concurrent_b" 3 'three-b'
+set +e
+"$publisher" --root "$publish_root" --ledger "$ledger" --candidate "$concurrent_a" \
+  --run-id "$run_id" --expected-digest "$digest_2" --expected-generation 2 \
+  >"$WORK/publish-a.out" 2>"$WORK/publish-a.err" & publish_a_pid=$!
+"$publisher" --root "$publish_root" --ledger "$ledger" --candidate "$concurrent_b" \
+  --run-id "$run_id" --expected-digest "$digest_2" --expected-generation 2 \
+  >"$WORK/publish-b.out" 2>"$WORK/publish-b.err" & publish_b_pid=$!
+wait "$publish_a_pid"; publish_a_status=$?
+wait "$publish_b_pid"; publish_b_status=$?
+set -e
+[ "$((publish_a_status + publish_b_status))" -eq 2 ] \
+  || fail 'concurrent REVIEW.md publishers did not produce one success and one stale rejection'
+if [ "$publish_a_status" -eq 0 ]; then
+  cmp -s "$concurrent_a" "$ledger" || fail 'concurrent winner was not retained byte-for-byte'
+  has "$WORK/publish-b.err" 'stale publication' 'concurrent loser was not rejected as stale'
+else
+  cmp -s "$concurrent_b" "$ledger" || fail 'concurrent winner was not retained byte-for-byte'
+  has "$WORK/publish-a.err" 'stale publication' 'concurrent loser was not rejected as stale'
+fi
 
 echo "OK"

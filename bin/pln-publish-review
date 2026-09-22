@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+# pln-publish-review — compare-and-publish one complete REVIEW.md candidate.
+set -euo pipefail
+
+ROOT=""
+LEDGER=""
+CANDIDATE=""
+RUN_ID=""
+EXPECTED_DIGEST=""
+EXPECTED_GENERATION=""
+LOCK_HELD=""
+TMP=""
+
+usage() {
+  echo "Usage: pln-publish-review --root PLAN_DIR --ledger PLAN_DIR/REVIEW.md --candidate FILE --run-id ID --expected-digest absent|SHA256 --expected-generation NUMBER" >&2
+  exit 2
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --root) ROOT="${2:-}"; shift 2 ;;
+    --ledger) LEDGER="${2:-}"; shift 2 ;;
+    --candidate) CANDIDATE="${2:-}"; shift 2 ;;
+    --run-id) RUN_ID="${2:-}"; shift 2 ;;
+    --expected-digest) EXPECTED_DIGEST="${2:-}"; shift 2 ;;
+    --expected-generation) EXPECTED_GENERATION="${2:-}"; shift 2 ;;
+    -h | --help) usage ;;
+    *) echo "pln-publish-review: unknown argument '$1'" >&2; usage ;;
+  esac
+done
+
+fail() { echo "pln-publish-review: $*" >&2; exit 2; }
+
+sha256_file() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk 'NR == 1 { print $1; exit }'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk 'NR == 1 { print $1; exit }'
+  else
+    fail 'no SHA-256 implementation (shasum or sha256sum)'
+  fi
+}
+
+field_value() {
+  local file="$1" label="$2"
+  awk -v label="$label" '
+    { line = $0; sub(/^- /, "", line) }
+    index(line, label ": ") == 1 { count++; value = substr(line, length(label) + 3) }
+    END { if (count != 1 || value == "") exit 1; print value }
+  ' "$file"
+}
+
+cleanup() {
+  [ -z "$TMP" ] || rm -f "$TMP" 2>/dev/null || true
+  if [ -n "$LOCK_HELD" ]; then
+    rm -f "$LOCK_HELD/owner" 2>/dev/null || true
+    rmdir "$LOCK_HELD" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT HUP INT TERM
+
+for pair in "root:$ROOT" "ledger:$LEDGER" "candidate:$CANDIDATE" \
+  "run-id:$RUN_ID" "expected-digest:$EXPECTED_DIGEST" \
+  "expected-generation:$EXPECTED_GENERATION"; do
+  [ -n "${pair#*:}" ] || fail "--${pair%%:*} must not be empty"
+done
+case "$RUN_ID" in *$'\t'* | *$'\n'* | *$'\r'*) fail '--run-id must be one line' ;; esac
+case "$EXPECTED_GENERATION" in '' | *[!0-9]*) fail '--expected-generation must be a non-negative integer' ;; esac
+case "$EXPECTED_GENERATION" in 0 | [1-9]*) ;; *) fail '--expected-generation must use canonical decimal form' ;; esac
+case "$EXPECTED_DIGEST" in
+  absent) [ "$EXPECTED_GENERATION" = 0 ] || fail 'absent requires expected generation 0' ;;
+  *[!0-9a-f]* | '') fail '--expected-digest must be absent or a lowercase SHA-256 digest' ;;
+  *) [ "${#EXPECTED_DIGEST}" -eq 64 ] || fail '--expected-digest must be absent or a lowercase SHA-256 digest' ;;
+esac
+
+[ -d "$ROOT" ] || fail "root is not a directory: $ROOT"
+ROOT_LOGICAL="$(cd -L "$ROOT" && pwd -L)"
+ROOT_REAL="$(cd -P "$ROOT" && pwd -P)"
+
+LEDGER_DIR="$(dirname "$LEDGER")"
+[ -d "$LEDGER_DIR" ] || fail "ledger directory does not exist: $LEDGER_DIR"
+[ ! -L "$LEDGER" ] || fail "ledger must not be a symlink: $LEDGER"
+LEDGER_DIR_LOGICAL="$(cd -L "$LEDGER_DIR" && pwd -L)"
+LEDGER_DIR_REAL="$(cd -P "$LEDGER_DIR" && pwd -P)"
+LEDGER_REAL="$LEDGER_DIR_REAL/$(basename "$LEDGER")"
+[ "$LEDGER_REAL" = "$ROOT_REAL/REVIEW.md" ] || fail 'ledger must be REVIEW.md directly beneath the plan root'
+
+[ -f "$CANDIDATE" ] || fail "candidate is not a regular file: $CANDIDATE"
+[ ! -L "$CANDIDATE" ] || fail "candidate must not be a symlink: $CANDIDATE"
+[ -s "$CANDIDATE" ] || fail "candidate is empty: $CANDIDATE"
+CANDIDATE_DIR="$(dirname "$CANDIDATE")"
+CANDIDATE_DIR_LOGICAL="$(cd -L "$CANDIDATE_DIR" && pwd -L)"
+CANDIDATE_DIR_REAL="$(cd -P "$CANDIDATE_DIR" && pwd -P)"
+case "$CANDIDATE_DIR_LOGICAL" in
+  "$ROOT_LOGICAL") EXPECTED_CANDIDATE_DIR="$ROOT_REAL" ;;
+  "$ROOT_LOGICAL"/*) EXPECTED_CANDIDATE_DIR="$ROOT_REAL/${CANDIDATE_DIR_LOGICAL#"$ROOT_LOGICAL"/}" ;;
+  *) EXPECTED_CANDIDATE_DIR="$CANDIDATE_DIR_REAL" ;;
+esac
+[ "$EXPECTED_CANDIDATE_DIR" = "$CANDIDATE_DIR_REAL" ] \
+  || fail "candidate has a symlink parent: $CANDIDATE"
+CANDIDATE_REAL="$CANDIDATE_DIR_REAL/$(basename "$CANDIDATE")"
+case "$CANDIDATE_REAL" in "$ROOT_REAL"/*) ;; *) fail "candidate escapes the plan root: $CANDIDATE" ;; esac
+[ "$CANDIDATE_REAL" != "$LEDGER_REAL" ] || fail 'candidate and ledger must be different files'
+
+CANDIDATE_RUN="$(field_value "$CANDIDATE_REAL" 'Run identity')" \
+  || fail 'candidate must contain exactly one non-empty Run identity field'
+CANDIDATE_GENERATION="$(field_value "$CANDIDATE_REAL" 'Ledger generation')" \
+  || fail 'candidate must contain exactly one non-empty Ledger generation field'
+[ "$CANDIDATE_RUN" = "$RUN_ID" ] || fail 'candidate run identity does not match --run-id'
+case "$CANDIDATE_GENERATION" in '' | *[!0-9]*) fail 'candidate Ledger generation must be a positive integer' ;; esac
+case "$CANDIDATE_GENERATION" in [1-9]*) ;; *) fail 'candidate Ledger generation must use canonical decimal form' ;; esac
+[ "$CANDIDATE_GENERATION" -gt 0 ] || fail 'candidate Ledger generation must be a positive integer'
+[ "$CANDIDATE_GENERATION" -eq "$((EXPECTED_GENERATION + 1))" ] \
+  || fail 'candidate Ledger generation is not the expected next generation'
+CANDIDATE_DIGEST="$(sha256_file "$CANDIDATE_REAL")"
+
+LOCK="$ROOT_REAL/.REVIEW.md.publish.lock"
+tries=0
+while ! mkdir "$LOCK" 2>/dev/null; do
+  if [ -f "$LOCK/owner" ]; then
+    owner_pid="$(awk -F '\t' 'NR == 1 { print $1 }' "$LOCK/owner" 2>/dev/null || true)"
+    owner_host="$(awk -F '\t' 'NR == 1 { print $2 }' "$LOCK/owner" 2>/dev/null || true)"
+    if [ -n "$owner_pid" ] && [ "$owner_host" = "$(hostname)" ] && ! kill -0 "$owner_pid" 2>/dev/null; then
+      rm -f "$LOCK/owner" 2>/dev/null || true
+      rmdir "$LOCK" 2>/dev/null || true
+      continue
+    fi
+  fi
+  tries=$((tries + 1))
+  [ "$tries" -lt 100 ] || fail "ledger publication lock is held: $LOCK"
+  sleep 0.05
+done
+LOCK_HELD="$LOCK"
+printf '%s\t%s\n' "$$" "$(hostname)" > "$LOCK/owner"
+
+[ -f "$CANDIDATE_REAL" ] && [ -s "$CANDIDATE_REAL" ] \
+  || fail 'candidate disappeared or became empty before publication'
+[ ! -L "$CANDIDATE_REAL" ] || fail 'candidate became a symlink before publication'
+
+if [ -e "$LEDGER_REAL" ]; then
+  [ -f "$LEDGER_REAL" ] || fail "ledger is not a regular file: $LEDGER_REAL"
+  [ ! -L "$LEDGER_REAL" ] || fail "ledger must not be a symlink: $LEDGER_REAL"
+  CURRENT_RUN="$(field_value "$LEDGER_REAL" 'Run identity')" \
+    || fail 'current ledger must contain exactly one non-empty Run identity field'
+  if CURRENT_GENERATION="$(field_value "$LEDGER_REAL" 'Ledger generation')"; then
+    :
+  elif grep -qE '^-? ?Ledger generation:' "$LEDGER_REAL"; then
+    fail 'current ledger must contain exactly one non-empty Ledger generation field'
+  else
+    # Ledgers created before guarded publication had no generation. Their exact
+    # digest plus durable run identity is generation zero for one migration.
+    CURRENT_GENERATION=0
+  fi
+  case "$CURRENT_GENERATION" in '' | *[!0-9]*) fail 'current Ledger generation must be a non-negative integer' ;; esac
+  case "$CURRENT_GENERATION" in 0 | [1-9]*) ;; *) fail 'current Ledger generation must use canonical decimal form' ;; esac
+  CURRENT_DIGEST="$(sha256_file "$LEDGER_REAL")"
+  [ "$EXPECTED_DIGEST" != absent ] || fail 'stale publication: expected no prior ledger but one exists'
+  [ "$CURRENT_RUN" = "$RUN_ID" ] || fail 'stale publication: current run identity differs'
+  [ "$CURRENT_GENERATION" = "$EXPECTED_GENERATION" ] \
+    || fail 'stale publication: current ledger generation differs'
+  [ "$CURRENT_DIGEST" = "$EXPECTED_DIGEST" ] \
+    || fail 'stale publication: current ledger digest differs'
+else
+  [ "$EXPECTED_DIGEST" = absent ] || fail 'stale publication: expected prior ledger is absent'
+  [ "$EXPECTED_GENERATION" = 0 ] || fail 'stale publication: absent ledger is not generation 0'
+fi
+
+TMP="$(mktemp "$ROOT_REAL/.REVIEW.md.publish.XXXXXX")"
+if [ "${PLN_PUBLISH_REVIEW_FAULT:-}" = partial-copy ]; then
+  dd if="$CANDIDATE_REAL" of="$TMP" bs=1 count=7 2>/dev/null || true
+  fail 'injected partial-copy failure'
+fi
+cp "$CANDIDATE_REAL" "$TMP"
+[ "$(sha256_file "$TMP")" = "$CANDIDATE_DIGEST" ] || fail 'candidate changed while it was staged'
+[ "$(sha256_file "$CANDIDATE_REAL")" = "$CANDIDATE_DIGEST" ] || fail 'candidate changed during publication'
+[ "${PLN_PUBLISH_REVIEW_FAULT:-}" != before-rename ] || fail 'injected pre-rename failure'
+mv "$TMP" "$LEDGER_REAL"
+TMP=""
+
+printf 'LEDGER_FILE=%s\nLEDGER_GENERATION=%s\nLEDGER_SHA256=%s\n' \
+  "$LEDGER_REAL" "$CANDIDATE_GENERATION" "$CANDIDATE_DIGEST"

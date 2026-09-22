@@ -23,8 +23,9 @@
 #   - a peer that is absent, unauthenticated, empty, failed, timed out, or
 #     answering with malformed output is a fallback or a failed run, never a
 #     review.
-#   - the nine-line stdout contract, including truthful routing attribution
-#     and which of the two kinds of "no peer" a rung-3 answer is.
+#   - the nine-line stdout contract, including truthful routing attribution,
+#     which of the two kinds of "no peer" a rung-3 answer is, and why a peer
+#     that ran failed (usage limit, timeout, empty, or an unrecognized error).
 #
 # Prints OK and exits 0 on success; any failed assertion aborts with a message.
 #
@@ -74,6 +75,11 @@ case "${PLN_TEST_CLAUDE_RUN:-ok}" in
   ok) printf 'claude reviewed the plan\n' ;;
   empty) ;;
   error) printf 'Error: unknown model\n'; exit 1 ;;
+  # What `claude -p` actually printed when a real run's peer was out of quota:
+  # to stdout, exit 1, with nothing in the log.
+  limit) printf "You've hit your session limit \xc2\xb7 resets 1:40pm (America/Chicago)\n"; exit 1 ;;
+  # A real answer that merely talks about limits is a review, not a failure.
+  quotes) printf 'the plan never says what happens at the session limit\n' ;;
   timeout) exit 124 ;;
 esac
 FAKE_CLAUDE
@@ -97,6 +103,13 @@ case "${PLN_TEST_CODEX_RUN:-ok}" in
     ;;
   empty) echo '{"type":"thread.started","thread_id":"tid-peer-1"}' ;;
   error) echo 'boom'; exit 7 ;;
+  # Synthetic: Codex's limit wording is taken from its binary's strings, not
+  # from an observed run.
+  limit)
+    echo '{"type":"thread.started","thread_id":"tid-peer-1"}'
+    echo '{"type":"error","message":"You'"'"'ve hit your usage limit.","code":"usage_limit_exceeded"}'
+    exit 1
+    ;;
   timeout) exit 124 ;;
 esac
 FAKE_CODEX
@@ -110,6 +123,7 @@ case "${PLN_TEST_PEER_RUN:-ok}" in
   ok) printf 'the configured peer reviewed the plan\n' ;;
   empty) ;;
   error) printf 'no\n' >&2; exit 7 ;;
+  limit) printf 'Error: usage limit reached for this key\n' >&2; exit 1 ;;
   timeout) exit 124 ;;
 esac
 FAKE_PEER
@@ -414,16 +428,24 @@ grep -qE 'sh -c .?fakepeer.?( |\\ )--flag' "$WORK/stderr" \
 [ -e "$WORK/peer.args" ] && fail "the dry run actually ran the peer"
 
 # --- a rung-1 peer that fails is a failed run, never a review ----------------
-rung1_fails() { # rung1_fails <scenario> <status> <description>
+# And it says why, as a fixed token named for the peer: a caller shown only
+# STATUS=error could neither tell the user that the peer was out of quota nor
+# know that calling it again in the same review would fail the same way.
+expect_reason() { # expect_reason <reason> <description>
+  [ "$(field REASON)" = "$1" ] || fail "$2 — REASON=$(field REASON) (expected $1)"
+}
+rung1_fails() { # rung1_fails <scenario> <status> <reason> <description>
   fresh
   RC=0
   OUT="$(env PATH="$BOTH:$BASE_PATH" PLN_TEST_PEER_RUN="$1" \
     "$BIN" --host codex --brief "$BRIEF" --out "$WORK/run.out" 2>"$WORK/stderr")" || RC=$?
-  expect 1 fakepeer "$2" 4 "$3"
+  expect 1 fakepeer "$2" 4 "$4"
+  expect_reason "$3" "$4"
 }
-rung1_fails empty empty "a configured peer that exited 0 and wrote nothing"
-rung1_fails error error "a configured peer that exited non-zero"
-rung1_fails timeout timeout "a configured peer that was killed on the ceiling"
+rung1_fails empty empty fakepeer-empty "a configured peer that exited 0 and wrote nothing"
+rung1_fails error error fakepeer-error "a configured peer that exited non-zero"
+rung1_fails timeout timeout fakepeer-timeout "a configured peer that was killed on the ceiling"
+rung1_fails limit error fakepeer-usage-limit "a configured peer that said, in its log, it was out of quota"
 
 cfg peer_command -
 
@@ -454,19 +476,33 @@ grep -q -- '-s read-only' "$WORK/codex.args" || fail "a codex peer was not run r
 grep -q -- "--add-dir $WORK" "$WORK/codex.args" || fail "--add-dir did not reach the codex peer"
 
 # The helper's own status travels out, and the run is a failure.
-rung2_fails() { # rung2_fails <var=value> <host> <peer> <status> <description>
+rung2_fails() { # rung2_fails <var=value> <host> <peer> <status> <reason> <description>
   fresh
   RC=0
   OUT="$(env PATH="$BOTH:$BASE_PATH" "$1" \
     "$BIN" --host "$2" --brief "$BRIEF" --out "$WORK/run.out" 2>"$WORK/stderr")" || RC=$?
-  expect 2 "$3" "$4" 4 "$5"
+  expect 2 "$3" "$4" 4 "$6"
+  expect_reason "$5" "$6"
 }
-rung2_fails PLN_TEST_CLAUDE_RUN=empty codex claude empty "a claude peer that wrote nothing"
-rung2_fails PLN_TEST_CLAUDE_RUN=error codex claude error "a claude peer that exited non-zero"
-rung2_fails PLN_TEST_CLAUDE_RUN=timeout codex claude timeout "a claude peer that was killed"
-rung2_fails PLN_TEST_CODEX_RUN=empty claude codex empty "a codex peer that wrote nothing"
-rung2_fails PLN_TEST_CODEX_RUN=error claude codex error "a codex peer that exited non-zero"
-rung2_fails PLN_TEST_CODEX_RUN=timeout claude codex timeout "a codex peer that was killed"
+rung2_fails PLN_TEST_CLAUDE_RUN=empty codex claude empty claude-empty "a claude peer that wrote nothing"
+rung2_fails PLN_TEST_CLAUDE_RUN=error codex claude error claude-error "a claude peer that exited non-zero"
+rung2_fails PLN_TEST_CLAUDE_RUN=timeout codex claude timeout claude-timeout "a claude peer that was killed"
+rung2_fails PLN_TEST_CLAUDE_RUN=limit codex claude error claude-usage-limit \
+  "a claude peer that printed its session limit to stdout and exited 1"
+rung2_fails PLN_TEST_CODEX_RUN=empty claude codex empty codex-empty "a codex peer that wrote nothing"
+rung2_fails PLN_TEST_CODEX_RUN=error claude codex error codex-error "a codex peer that exited non-zero"
+rung2_fails PLN_TEST_CODEX_RUN=timeout claude codex timeout codex-timeout "a codex peer that was killed"
+rung2_fails PLN_TEST_CODEX_RUN=limit claude codex error codex-usage-limit \
+  "a codex peer whose event stream carried a usage-limit error"
+
+# Classification runs on a failure only. A review that quotes the phrase is a
+# review, and a peer that answered reports no reason at all.
+fresh
+RC=0
+OUT="$(env PATH="$BOTH:$BASE_PATH" PLN_TEST_CLAUDE_RUN=quotes \
+  "$BIN" --host codex --brief "$BRIEF" --out "$WORK/run.out" 2>"$WORK/stderr")" || RC=$?
+expect 2 claude ok 0 "a claude peer whose review mentions a session limit"
+expect_reason none "a successful review was classified as a usage limit"
 
 # --- a helper that is missing or answers with malformed output ---------------
 # pln-peer reads its own copy of the helpers, so this runs a copy of the script
@@ -496,6 +532,7 @@ OUT="$(env PATH="$BOTH:$BASE_PATH" "$COPY/pln-peer" --host codex \
   --brief "$BRIEF" --out "$WORK/run.out" 2>"$WORK/stderr")" || RC=$?
 [ "$(field RUNG)" = "2" ] || fail "a malformed helper answer changed the rung"
 [ "$(field STATUS)" = "ok" ] && fail "malformed helper output was reported as a review"
+[ "$(field REASON)" = "claude-error" ] || fail "a malformed helper answer was given REASON=$(field REASON), not claude-error"
 [ "$(wc -l <<<"$OUT")" -eq 9 ] || fail "a malformed helper answer broke the nine-line contract"
 grep -q 'chatter' <<<"$OUT" && fail "the helper's own output leaked into pln-peer's stdout"
 

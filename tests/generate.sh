@@ -1237,6 +1237,49 @@ has "$real_x/phases/pln/review-approval.md" 'Verified on a real Codex run' \
 hasnt "$real_c/phases/pln/review-approval.md" 'Verified on a real Codex run' \
   "the claude build carries Codex's run evidence"
 
+# ─── the adversarial substitute starts when the host has a slot for it ───────
+# The shared rule once said "a substitute's spawn among the other spawns" on
+# both hosts. On Codex's default four slots (coordinator included) three readers
+# fill the session, so that was unfollowable, and every observed Codex round
+# spawned the substitute only when the first reader finished — while the peer's
+# usage-limit notice reached the user as a bare STATUS=error. So the shared text
+# is host-neutral and each host's roster instructions carry its own timing: on
+# Claude, among the other spawns; on Codex, at once, else the first freed slot,
+# and a peer already out of quota is skipped for the rest of that review.
+for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-approval.md" \
+         "$real_c/phases/pln-pr/review.md" "$real_x/phases/pln-pr/review.md"; do
+  has "$f" 'Start it as soon as the host has a slot for it' \
+    "$f lost the host-neutral substitute timing rule"
+  hasnt "$f" "a substitute's spawn among the other spawns" \
+    "$f still carries the unconditional shared timing Codex's slot cap forbids"
+  has "$f" '`<peer>-usage-limit` means the peer ran and its provider refused it for quota' \
+    "$f does not relay why a peer that ran failed"
+done
+for f in "$real_c/phases/pln/review-approval.md" "$real_c/phases/pln-pr/review.md"; do
+  has "$f" "substitute's spawn goes among the other spawns" \
+    "$f lost Claude's substitute timing"
+  hasnt "$f" 'first slot a finished reader frees' "$f carries Codex's slot-cap timing"
+  hasnt "$f" 'max_concurrent_threads_per_session' "$f names a Codex setting"
+done
+for f in "$real_x/phases/pln/review-approval.md" "$real_x/phases/pln-pr/review.md"; do
+  hasnt "$f" 'among the other spawns' "$f tells Codex to spawn a fourth reader its slots cannot hold"
+  has "$f" "the moment the peer's no-send or failure is known" \
+    "$f waits for a reader before spawning the substitute"
+  has "$f" 'Only if that spawn is refused for capacity' "$f lost the capacity fallback"
+  has "$f" 'first slot a finished reader frees' "$f does not say where a refused substitute goes"
+  has "$f" 'close a finished reader to free it; never a running one' \
+    "$f frees a slot by closing a running reader"
+  # Named only because a manual check showed it changes the stated slot count
+  # (2026-09-22, gpt-5.6-sol: 4 by default, 6 with the key at 6), and only as
+  # the user's own setting.
+  has "$f" 'features.multi_agent_v2.max_concurrent_threads_per_session' \
+    "$f does not name the user's setting that raises the slot count"
+  has "$f" 'pln never writes it' "$f lets the run change the user's Codex config"
+  has "$f" 'A peer already out of quota is not called again in the same review' \
+    "$f calls a peer it already knows is out of quota"
+  has "$f" 'since the limit resets' "$f skips the peer beyond the review that saw the limit"
+done
+
 # ─── a plan directory outside the repository gets a writable artifact root ───
 # A native subagent inherits the coordinator's write boundary, and neither host
 # extends it for a child. So a project whose instructions put plans in

@@ -1435,6 +1435,13 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   hasnt "$f" 'ask whether to inherit for this run' "$f retains the late model-inheritance gate"
   hasnt "$f" 'frontier-capability floor' "$f still claims model names are a capability test"
   has "$f" 'Start-of-invocation readiness sweep' "$f lost the early configuration sweep"
+  has "$f" 'pln-update-check" --start' "$f does not mint a fresh update receipt before recovery"
+  has "$f" 'pln-update-check" --consume' "$f does not mechanically consume the update receipt"
+  has "$f" 'HELPER_ABSENT' "$f has no explicit helper-absent degraded outcome"
+  appears_before "$f" 'pln-update-check" --start' 'On invocation or after compaction' \
+    "$f can recover durable phase state before invoking the update checker"
+  appears_before "$f" 'pln-update-check" --consume' 'On invocation or after compaction' \
+    "$f can recover durable phase state before consuming the update receipt"
   has "$f" 'before any repository research, phase action, or long-running dispatch' \
     "$f can defer predictable configuration until work is underway"
   has "$f" 'Never raise either configuration question later in the run' \

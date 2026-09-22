@@ -26,6 +26,7 @@ STATE="$WORK/state"
 INSTALL="$WORK/install"
 mkdir -p "$STATE" "$INSTALL/bin"
 cp "$ROOT/bin/pln-update-check" "$INSTALL/bin/"
+cp "$ROOT/bin/pln-config" "$INSTALL/bin/"
 REMOTE_FILE="$WORK/remote-version"
 
 check() { # check [--force]
@@ -36,7 +37,23 @@ check() { # check [--force]
 set_local()  { printf '%s\n' "$1" > "$INSTALL/VERSION"; }
 set_remote() { printf '%s\n' "$1" > "$REMOTE_FILE"; }
 set_marker() { printf '%s\n' "$1" > "$STATE/just-upgraded-from"; }
-clear_state() { rm -f "$STATE/just-upgraded-from" "$STATE/last-update-check" "$STATE/update-snoozed"; }
+clear_state() {
+  rm -f "$STATE/just-upgraded-from" "$STATE/last-update-check" "$STATE/update-snoozed" "$STATE/config.yaml"
+  rm -rf "$STATE/update-receipts"
+}
+
+receipt_start() { # receipt_start <run-id>
+  OUT="$(PLN_SKILL_DIR="$INSTALL" PLN_STATE_DIR="$STATE" \
+         PLN_REMOTE_URL="file://$REMOTE_FILE" \
+         "$INSTALL/bin/pln-update-check" --start "$1" 2>&1)"
+  CHALLENGE="$(printf '%s\n' "$OUT" | awk '/^UPDATE_RECEIPT_READY / { print $2; exit }')"
+}
+
+receipt_consume() { # receipt_consume <run-id> <challenge>
+  OUT="$(PLN_SKILL_DIR="$INSTALL" PLN_STATE_DIR="$STATE" \
+         "$INSTALL/bin/pln-update-check" --consume "$1" "$2" 2>&1)"
+  CONSUME_STATUS=$?
+}
 
 # ─── a passive check is still answered by the marker alone ───────────────────
 # This half is unchanged and deliberate: the preamble runs on every invocation
@@ -91,6 +108,110 @@ clear_state; set_local 1.54.0; set_remote 1.54.0
 check --force
 didnt_say 'UPGRADE_AVAILABLE' "an up-to-date check reported an upgrade"
 didnt_say 'JUST_UPGRADED' "an up-to-date check reported a marker"
+
+# ─── receipt mode has a closed, truthful verdict set ─────────────────────────
+# Machine output is always explicit. The router keeps CURRENT results silent to
+# the user and relays only the existing upgrade news lines.
+clear_state; set_local 1.54.0; set_remote 1.54.0
+receipt_start '/repo/plans/run-a/PLAN.md'
+said ' VERIFIED_CURRENT verified' "a remote-verified current check has no truthful receipt verdict"
+[ -n "$CHALLENGE" ] || fail "a verified current check returned no receipt challenge"
+receipt_consume '/repo/plans/run-a/PLAN.md' "$CHALLENGE"
+[ "$CONSUME_STATUS" -eq 0 ] || fail "a verified current receipt was refused"
+said 'UPDATE_RECEIPT_CONSUMED VERIFIED_CURRENT verified' "the verified current receipt lost its freshness source"
+
+# The second check is answered by the still-valid current cache, but mints a
+# fresh generation rather than replaying the first receipt.
+receipt_start '/repo/plans/run-a/PLAN.md'
+said ' CACHED_CURRENT cached' "a cached current check was not distinguished from a remote verification"
+receipt_consume '/repo/plans/run-a/PLAN.md' "$CHALLENGE"
+[ "$CONSUME_STATUS" -eq 0 ] || fail "a cached-current receipt was refused"
+
+clear_state; set_local 1.53.0; set_remote 1.54.0
+receipt_start '/repo/plans/run-a/PLAN.md'
+said ' UPGRADE_AVAILABLE verified' "an available upgrade has no closed receipt verdict"
+said 'UPGRADE_AVAILABLE 1.53.0 1.54.0' "receipt mode dropped the existing upgrade news"
+receipt_consume '/repo/plans/run-a/PLAN.md' "$CHALLENGE"
+[ "$CONSUME_STATUS" -eq 0 ] || fail "the explicit upgrade-available outcome blocked recovery"
+
+clear_state; set_local 1.54.0; set_remote 1.54.0; set_marker '1.53.0'
+receipt_start '/repo/plans/run-a/PLAN.md'
+said ' JUST_UPGRADED upgrade-event' "a just-upgraded marker has no distinct receipt verdict"
+said 'JUST_UPGRADED 1.53.0 1.54.0' "receipt mode dropped the existing just-upgraded news"
+receipt_consume '/repo/plans/run-a/PLAN.md' "$CHALLENGE"
+[ "$CONSUME_STATUS" -eq 0 ] || fail "the explicit just-upgraded outcome blocked recovery"
+
+clear_state; set_local 1.54.0; set_remote 1.54.0
+printf 'update_check: false\n' > "$STATE/config.yaml"
+receipt_start '/repo/plans/run-a/PLAN.md'
+said ' DISABLED none' "configured-disabled was not an explicit degraded outcome"
+receipt_consume '/repo/plans/run-a/PLAN.md' "$CHALLENGE"
+[ "$CONSUME_STATUS" -eq 0 ] || fail "the explicit configured-disabled outcome blocked recovery"
+said 'UPDATE_RECEIPT_CONSUMED DISABLED none' "configured-disabled falsely claimed freshness"
+
+# Empty and invalid remote bytes are indeterminate, never current. Neither may
+# mint an UP_TO_DATE cache entry, but the explicit degraded receipt remains
+# consumable so a network outage does not block the universal workflow.
+for invalid in empty html; do
+  clear_state; set_local 1.54.0
+  case "$invalid" in
+    empty) : > "$REMOTE_FILE" ;;
+    html) printf '<html>no version</html>\n' > "$REMOTE_FILE" ;;
+  esac
+  receipt_start '/repo/plans/run-a/PLAN.md'
+  said ' UNAVAILABLE none' "$invalid remote data was not an explicit indeterminate outcome"
+  case "$(cat "$STATE/last-update-check" 2>/dev/null)" in
+    UP_TO_DATE*) fail "$invalid remote data minted a current cache verdict" ;;
+  esac
+  receipt_consume '/repo/plans/run-a/PLAN.md' "$CHALLENGE"
+  [ "$CONSUME_STATUS" -eq 0 ] || fail "$invalid remote's explicit degraded receipt blocked recovery"
+  said 'UPDATE_RECEIPT_CONSUMED UNAVAILABLE none' "$invalid remote falsely claimed freshness"
+done
+
+# A cache written by an older checker carries no proof marker. It must be
+# revalidated, not promoted into a CACHED_CURRENT receipt.
+clear_state; set_local 1.54.0; : > "$REMOTE_FILE"
+printf 'UP_TO_DATE 1.54.0\n' > "$STATE/last-update-check"
+receipt_start '/repo/plans/run-a/PLAN.md'
+said ' UNAVAILABLE none' "an unproved legacy current cache minted a current receipt"
+didnt_say ' CACHED_CURRENT cached' "an unproved legacy current cache was trusted"
+
+# ─── receipts are run-bound, generation-bound, and one-time ──────────────────
+# A legacy run has no prior receipt state; its first recovery creates and
+# consumes generation one normally.
+clear_state; set_local 1.54.0; set_remote 1.54.0
+receipt_start '/repo/plans/legacy/PLAN.md'
+LEGACY_CHALLENGE="$CHALLENGE"
+receipt_consume '/repo/plans/legacy/PLAN.md' "$LEGACY_CHALLENGE"
+[ "$CONSUME_STATUS" -eq 0 ] || fail "the first recovery of a legacy run was refused"
+
+# A successful consume spends the receipt. Same-run replay and a second
+# recovery that skipped a fresh check both fail.
+receipt_consume '/repo/plans/legacy/PLAN.md' "$LEGACY_CHALLENGE"
+[ "$CONSUME_STATUS" -ne 0 ] || fail "a spent receipt was replayed in the same run"
+receipt_consume '/repo/plans/legacy/PLAN.md' "$LEGACY_CHALLENGE"
+[ "$CONSUME_STATUS" -ne 0 ] || fail "a second recovery proceeded without a new update check"
+
+# A post-compaction start replaces the generation. The old challenge—including
+# unconsumed crash residue—cannot satisfy the new recovery.
+clear_state; set_local 1.54.0; set_remote 1.54.0
+receipt_start '/repo/plans/run-a/PLAN.md'; OLD_CHALLENGE="$CHALLENGE"
+receipt_start '/repo/plans/run-a/PLAN.md'; NEW_CHALLENGE="$CHALLENGE"
+[ "$OLD_CHALLENGE" != "$NEW_CHALLENGE" ] || fail "a new recovery reused the prior challenge"
+receipt_consume '/repo/plans/run-a/PLAN.md' "$OLD_CHALLENGE"
+[ "$CONSUME_STATUS" -ne 0 ] || fail "unconsumed crash residue satisfied the next recovery"
+receipt_consume '/repo/plans/run-a/PLAN.md' "$NEW_CHALLENGE"
+[ "$CONSUME_STATUS" -eq 0 ] || fail "the replacement post-compaction receipt was refused"
+
+# Wrong-run and wrong-challenge attempts fail without spending the valid
+# receipt; a fabricated challenge models a checker invocation that was skipped.
+receipt_start '/repo/plans/run-a/PLAN.md'; VALID_CHALLENGE="$CHALLENGE"
+receipt_consume '/repo/plans/run-b/PLAN.md' "$VALID_CHALLENGE"
+[ "$CONSUME_STATUS" -ne 0 ] || fail "a receipt was accepted for the wrong durable run"
+receipt_consume '/repo/plans/run-a/PLAN.md' 'g999999'
+[ "$CONSUME_STATUS" -ne 0 ] || fail "a wrong or fabricated challenge was accepted"
+receipt_consume '/repo/plans/run-a/PLAN.md' "$VALID_CHALLENGE"
+[ "$CONSUME_STATUS" -eq 0 ] || fail "a wrong-run/challenge attempt spent the valid receipt"
 
 # ─── the writer field is what pln-update-apply actually writes ───────────────
 # Pinned as a shape rather than a value: first field the version, the rest free

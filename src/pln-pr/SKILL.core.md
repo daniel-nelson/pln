@@ -9,27 +9,7 @@ You are running the user's personal PR workflow. It is the ship half of a plan: 
 
 <!-- pln:include compaction-recovery -->
 
-<!-- pln:only claude -->
-**Resolve pln's helpers**: `{{PLN_PR_CMD}}` reuses `{{PLN_CMD}}`'s `bin/` scripts. They live at the pln repo root, one level *above* this skill's own directory, so `${CLAUDE_SKILL_DIR}/bin` does **not** point at them (this skill is a subdirectory of the pln repo, symlinked in as its own command). Find the install once and reuse it:
-<!-- pln:endonly -->
-<!-- pln:only codex -->
-**Resolve pln's helpers**: `{{PLN_PR_CMD}}` reuses `{{PLN_CMD}}`'s `bin/` scripts, which live at the pln repo root, one level *above* this skill's own directory. Find the install once and reuse it:
-<!-- pln:endonly -->
-
-```bash
-_PLN_DIR=""
-for d in "$HOME/.claude/skills/pln" "$HOME/.agents/skills/pln" ".claude/skills/pln" ".agents/skills/pln"; do
-  [ -x "$d/bin/pln-config" ] && _PLN_DIR="$d" && break
-done
-echo "PLN_DIR: ${_PLN_DIR:-none}"
-```
-
-<!-- pln:only claude -->
-If `PLN_DIR` is `none`, the helpers aren't found: skip the config-gated notification setup below and treat notifications as off. The skill still works end to end; you just won't get pushes. Every `pln-config` / `pln-notify-desktop` call below is `"$_PLN_DIR/bin/..."` and only runs when `_PLN_DIR` is set.
-<!-- pln:endonly -->
-<!-- pln:only codex -->
-If `PLN_DIR` is `none`, the helpers aren't found: skip the config-gated notification setup below and treat notifications as off. The skill still works end to end; you just won't get desktop notifications. Every `pln-config` / `pln-notify-desktop` call below is `"$_PLN_DIR/bin/..."` and only runs when `_PLN_DIR` is set — substitute the real path, since each shell call starts fresh and the variable does not persist.
-<!-- pln:endonly -->
+<!-- pln:include update-check -->
 
 <!-- pln:include pr-notify-setup -->
 

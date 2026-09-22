@@ -522,6 +522,24 @@ for host in claude codex; do
     "$host settled-candidate rule no longer distinguishes itself from the removed round cap"
   hasnt "$WORK/$host/phases/pln-pr/ship-watch.md" 'the branch ships without them' \
     "$host closing message regained a tally of work nobody is doing"
+  # 1.92.0 settled only after a clean post-fix round, which one run never
+  # reached in four rounds while its cumulative repair diff grew from +859 to
+  # +1427 lines. The anchor now moves to the commit the last successful
+  # post-fix reader read, and a failed reader leaves it where it was.
+  hasnt "$WORK/$host/phases/pln-pr/fix.md" 'post-fix assurance on that candidate clean' \
+    "$host settled candidate still waits for a clean round that may never come"
+  hasnt "$WORK/$host/phases/pln-pr/fix.md" 'which shrinks as the repairs land' \
+    "$host fix phase still claims a cumulative repair diff shrinks"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'git diff <Settled candidate> <candidate commit>' \
+    "$host later post-fix readers are not briefed with the exact repair range"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'diff-fingerprint --root <repository-root> --base <Settled candidate>' \
+    "$host scoped repair diff has no mechanical identity"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'from the post-fix merge result, never at dispatch' \
+    "$host settled candidate can advance on a reader nobody counted"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'A failed or uncounted reader leaves `Settled candidate` where it was' \
+    "$host a failed post-fix reader can advance the anchor past bytes nobody read"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'base code or an earlier round'"'"'s repair code' \
+    "$host made-reachable exception narrowed to base code"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Settled candidate' \
     "$host ledger no longer carries the settled candidate across a compaction"
   has "$WORK/$host/SKILL.md" 'at most two exact operations' "$host /pln router lost the direct lookup budget"

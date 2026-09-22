@@ -88,7 +88,25 @@ a lens or adversarial agent that completed, a `codex review` pass that came back
 <!-- pln:endonly -->
 If none succeeded, you have no coverage, not a clean bill of health. Do not write an empty `REVIEW.md` and do not proceed to the PR. Stop, say plainly that the review could not run, and let the user retry or review manually. An empty *merged findings* set is only "clean" when it comes from reviewers that ran and found nothing.
 
-Never open a reviewer or peer result in coordinator context. Collect only fixed success/failure metadata and raw artifact paths, then spawn one fresh `judgment`-profile merge worker under `{{SKILL_DIR}}/src/workers/pr-review-merge.md`. Its assignment carries `REVIEW.md`, the exact diff base/tree fingerprint, successful-reader metadata, every raw artifact path, `<plan-dir>/evidence/pr-review-merge.md`, `<plan-dir>/results/pr-review-merge.txt`, routing attribution, and a 4096-byte budget. It alone reads, validates, translates, and merges raw findings.
+Never open a reviewer or peer result in coordinator context. Write fixed success/failure metadata and raw artifact paths to `<plan-dir>/evidence/pr-review-readers.tsv`, then use `pln-build-review-brief --mode pr-merge` to assemble `<plan-dir>/evidence/pr-review-merge.brief`. Pass the merge-worker contract first; repository root; the exact candidate hash plus `review.commands` and `review.environment`; `PLAN.md` when present; `REVIEW.md`; the diff map; reader metadata; one role/path pair per raw artifact; and each active host skill-catalog root. The helper inventories every repository `AGENTS.md`/`CLAUDE.md` regardless of Git ignore state while excluding `.git`, plus every `SKILL.md` below the recorded roots; hex-encodes branch-controlled strings; records path/size/digest metadata without copying optional prose; and refuses a brief over 65536 bytes. Its ordinary plan-review mode remains a separate byte-compatible interface.
+
+```bash
+"$PLN_BIN/pln-build-review-brief" --mode pr-merge \
+  --contract "{{SKILL_DIR}}/src/workers/pr-review-merge.md" \
+  --root "<repository-root>" --candidate "<candidate-sha256>" \
+  --commands "<plan-dir>/evidence/review.commands" \
+  --environment "<plan-dir>/evidence/review.environment" \
+  --plan "<plan-dir>/PLAN.md" --ledger "<plan-dir>/REVIEW.md" \
+  --diff-map "<plan-dir>/evidence/diff-files.txt" \
+  --reader-metadata "<plan-dir>/evidence/pr-review-readers.tsv" \
+  --artifact "<reader-role>" "<raw-artifact>" \
+  --skill-root "$(dirname "{{SKILL_DIR}}")" \
+  --out "<plan-dir>/evidence/pr-review-merge.brief"
+```
+
+Repeat `--artifact` for every reader and `--skill-root` for any additional active host catalog. Omit `--plan` only for a standalone run with no plan; every other named file is required. If an instruction or skill manifest exceeds the helper's deterministic count bound, stop for a narrower mechanically complete catalog or explicit bounded rediscovery; never silently truncate it.
+
+Spawn one fresh `judgment`-profile merge worker under `{{SKILL_DIR}}/src/workers/pr-review-merge.md` on that prepared brief, plus `<plan-dir>/evidence/pr-review-merge.md`, `<plan-dir>/results/pr-review-merge.txt`, routing attribution, and a 4096-byte budget. The brief is the primary context inventory instead of an ad hoc list of pointers. The worker must verify it with `pln-build-review-brief --verify-pr-merge` before and after parsing artifacts; failed candidate, path, symlink, size, digest, instruction-manifest, or skill-manifest verification is failed coverage, never a clean reader. The worker still reads applicable instructions and mandatory skills, reopens cited source, reruns reproductions, traces production reachability, and confirms shipped consequences independently.
 
 The merge worker applies these ledger rules:
 

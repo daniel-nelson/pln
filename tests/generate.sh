@@ -1547,6 +1547,22 @@ for root in "$real_c" "$real_x"; do
   has "$review" '"verified"|"unverified"' "$review lost evidence-state findings"
   has "$review" 'structural_evidence?' "$review lost backward-compatible structural evidence"
   has "$review" 'direct callers or consumers' "$review lost changed-responsibility consumer traversal"
+  has "$review" 'pln-build-review-brief --mode pr-merge' \
+    "$review no longer dispatches PR merge through the prepared-context owner"
+  has "$review" 'contract first' "$review lost contract-first prepared context"
+  has "$review" 'hex-encodes branch-controlled strings' \
+    "$review no longer keeps branch-controlled metadata in the typed schema"
+  has "$review" 'regardless of Git ignore state while excluding `.git`' \
+    "$review lets Git ignore rules omit instructions or repository internals enter the manifest"
+  has "$review" 'refuses a brief over 65536 bytes' "$review lost the prepared-context byte cap"
+  has "$review" 'pln-build-review-brief --verify-pr-merge' \
+    "$review no longer verifies candidate, manifests, and artifacts"
+  has "$review" 'reopens cited source, reruns reproductions, traces production reachability' \
+    "$review lets prepared metadata replace independent semantic checks"
+  has "$scope" 'evidence/review.commands' "$scope lost the review command-fingerprint input"
+  has "$scope" 'evidence/review.environment' "$scope lost the review environment-fingerprint input"
+  has "$scope" 'instruction manifest, skill manifest, or review artifact' \
+    "$scope no longer invalidates prepared context when a manifest or artifact changes"
   hasnt "$review" 'DIFF_LINES < 30' "$review retained the line-count shortcut"
   hasnt "$review" 'confidence: 1-10' "$review retained reviewer self-scoring"
   has "$review" 'routes nothing' "$review still lets a reader's own severity authorize work"

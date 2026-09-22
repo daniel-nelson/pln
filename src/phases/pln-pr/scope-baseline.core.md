@@ -78,6 +78,8 @@ One message, in the option-message shape, naming the concrete signal that drove 
 
 Determine the gauntlet commands from `PLAN.md`'s Verification section when present (coordination-state exception); otherwise root `CLAUDE.md`/`AGENTS.md` reads are exceptions for the project's test/build/lint commands. Nested instruction or manifest discovery goes through evidence. If ambiguity remains, judgment decides whether one clear command set exists; otherwise ask the user once — do not guess and run invented commands.
 
+Before review dispatch, write the ordered review command set to `<plan-dir>/evidence/review.commands` and a normalized non-secret environment description to `<plan-dir>/evidence/review.environment`. Compute and persist tree, command, environment, and candidate hashes with `bin/pln-assurance fingerprint`. These exact files and the candidate hash bind the later PR-merge prepared context; any changed source, command, environment, instruction manifest, skill manifest, or review artifact makes that context fail verification rather than silently describe a different candidate.
+
 **Split what you find into static checks and the behavior suite, and record both sets.** They cost different things and catch different failures, and treating them as one set is why a three-file change can run a project's whole suite seven times.
 
 - **Static checks** are the fast, deterministic ones over the tree as it stands: lint, format, type-check, build, spec/schema generation, and any "is the generated artifact current" check. They finish in seconds to a couple of minutes, they are exactly what an agent's edit breaks most often, and a lint error that reaches CI wastes an entire CI run to say something a local command would have said immediately.

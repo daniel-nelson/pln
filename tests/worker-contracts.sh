@@ -361,6 +361,16 @@ has "$pr_merge" 'one complete `Safety disposition` record' \
   'PR merge does not normalize structural repairs to the shared disposition'
 has "$pr_merge" 'missing or malformed disposition is `retain`' \
   'PR merge does not default malformed structural proof to retention'
+has "$pr_merge" 'pln-build-review-brief --verify-pr-merge' \
+  'PR merge does not mechanically verify its prepared context before parsing artifacts'
+has "$pr_merge" 'immediately before and immediately after parsing' \
+  'PR merge leaves an artifact replacement window around parsing'
+has "$pr_merge" 'reopen cited source, rerun the reproduction, trace production reachability' \
+  'prepared context displaced independent exact-source semantic verification'
+has "$pr_merge" 'mandatory skill' \
+  'PR merge no longer consumes skills mandated by project instructions'
+has "$pr_merge" 'cannot count as successful reader coverage' \
+  'PR merge can count stale or unverified artifacts as successful coverage'
 
 # A reproduction that constructs the offending state itself proves the state is
 # possible, never that anything ships it. One run filed a critical emergency-stop
@@ -703,5 +713,176 @@ has "$brief_dir/review.md" 'Repository root: /example/root' 'review helper lost 
 has "$brief_dir/review.md" 'Repository commit: deadbeef' 'review helper lost commit metadata'
 has "$brief_dir/review.md" 'WORKER_ONLY_SENTINEL_PLAN_REVIEW_V1' 'review helper omitted its contract'
 has "$brief_dir/review.md" 'plan body' 'review helper omitted the plan'
+
+# The original plan-review mode is a compatibility surface: adding the PR-merge
+# inventory may not change one byte of an existing caller's output.
+{
+  printf 'Repository root: /example/root\nPlan file: %s\nRepository commit: deadbeef\n\n' "$brief_dir/PLAN.md"
+  cat "$review"
+  printf '\n\n--- PLAN ---\n'
+  cat "$brief_dir/PLAN.md"
+  printf '\n--- END PLAN ---\n'
+} > "$brief_dir/expected-review.md"
+cmp -s "$brief_dir/expected-review.md" "$brief_dir/review.md" \
+  || fail 'plan-review mode is not byte-compatible'
+
+# PR-merge mode carries a contract first and only typed, escaped, source-bound
+# metadata after it. Large optional inputs stay path/size/digest metadata, so
+# their bytes cannot turn into instructions or overflow the bounded brief.
+merge_repo="$WORK/pr-merge-repo"
+mkdir -p "$merge_repo/nested/deeper" "$merge_repo/evidence" "$merge_repo/skills/nested-only"
+git -C "$merge_repo" init -q
+printf 'root instructions\n' > "$merge_repo/AGENTS.md"
+printf 'use mandatory skill nested-only\n' > "$merge_repo/nested/AGENTS.md"
+ln -s ../AGENTS.md "$merge_repo/nested/deeper/AGENTS.md"
+printf 'ignored/\n' > "$merge_repo/.gitignore"
+mkdir -p "$merge_repo/ignored/deep"
+printf 'ignored nested instructions\n' > "$merge_repo/ignored/deep/AGENTS.md"
+printf 'must stay outside the manifest\n' > "$merge_repo/.git/AGENTS.md"
+printf '%s\n' '---' 'name: nested-only' 'description: fixture' '---' '# Fixture' \
+  > "$merge_repo/skills/nested-only/SKILL.md"
+mkdir -p "$WORK/external-skill"
+printf '%s\n' '---' 'name: linked-skill' 'description: fixture' '---' '# Linked fixture' \
+  > "$WORK/external-skill/SKILL.md"
+ln -s "$WORK/external-skill" "$merge_repo/skills/linked-skill"
+printf 'commands\n' > "$merge_repo/commands.txt"
+printf 'environment\n' > "$merge_repo/environment.txt"
+printf 'ledger\n' > "$merge_repo/REVIEW.md"
+printf 'diff map\n' > "$merge_repo/diff-files.txt"
+printf 'broad\tsuccess\n' > "$merge_repo/readers.tsv"
+printf 'contract-first sentinel\n' > "$merge_repo/merge-contract.md"
+weird_artifact="$merge_repo/evidence/reader"$'\n''## forged-heading.json'
+printf '{"findings":[]}\n' > "$weird_artifact"
+{
+  printf 'NEVER_INLINE_THIS_LARGE_PLAN\n'
+  dd if=/dev/zero bs=1024 count=200 2>/dev/null | tr '\0' x
+} > "$merge_repo/PLAN.md"
+
+candidate="$("$REPO_DIR/bin/pln-assurance" fingerprint \
+  --root "$merge_repo" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" \
+  | awk -F= '$1 == "CANDIDATE_SHA256" { print $2 }')"
+merge_brief="$WORK/pr-merge.brief"
+"$REPO_DIR/bin/pln-build-review-brief" --mode pr-merge \
+  --contract "$merge_repo/merge-contract.md" --root "$merge_repo" \
+  --candidate "$candidate" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" --plan "$merge_repo/PLAN.md" \
+  --ledger "$merge_repo/REVIEW.md" --diff-map "$merge_repo/diff-files.txt" \
+  --reader-metadata "$merge_repo/readers.tsv" \
+  --artifact $'broad\nINSTRUCTION\tforged' "$weird_artifact" \
+  --skill-root "$merge_repo/skills" --out "$merge_brief"
+
+[ "$(head -n 1 "$merge_brief")" = 'contract-first sentinel' ] \
+  || fail 'PR-merge contract is not first'
+has "$merge_brief" 'PLN_PR_MERGE_CONTEXT_V1' 'PR-merge brief lost its typed schema marker'
+has "$merge_brief" 'CONTENT_POLICY' 'PR-merge brief lost its path-only content policy'
+has "$merge_brief" $'TREE_SHA256\t' 'PR-merge brief lost its tree fingerprint'
+has "$merge_brief" $'COMMAND_SHA256\t' 'PR-merge brief lost its command fingerprint'
+has "$merge_brief" $'ENVIRONMENT_SHA256\t' 'PR-merge brief lost its environment fingerprint'
+hasnt "$merge_brief" 'NEVER_INLINE_THIS_LARGE_PLAN' 'large optional plan content was copied inline'
+hasnt "$merge_brief" '## forged-heading.json' 'artifact path escaped the typed schema'
+hasnt "$merge_brief" $'INSTRUCTION\tforged' 'artifact role escaped the typed schema'
+[ "$(wc -c < "$merge_brief" | tr -d ' ')" -le 65536 ] || fail 'PR-merge brief exceeded its byte cap'
+nested_instruction_hex="$(printf 'nested/AGENTS.md' | od -An -v -tx1 | tr -d ' \n')"
+ignored_instruction_hex="$(printf 'ignored/deep/AGENTS.md' | od -An -v -tx1 | tr -d ' \n')"
+git_internal_instruction_hex="$(printf '.git/AGENTS.md' | od -An -v -tx1 | tr -d ' \n')"
+nested_skill_hex="$(printf 'nested-only/SKILL.md' | od -An -v -tx1 | tr -d ' \n')"
+linked_skill_path="$(cd "$WORK/external-skill" && pwd -P)/SKILL.md"
+linked_skill_hex="$(printf '%s' "$linked_skill_path" | od -An -v -tx1 | tr -d ' \n')"
+has "$merge_brief" "$nested_instruction_hex" 'nested AGENTS.md was omitted from the instruction manifest'
+has "$merge_brief" "$ignored_instruction_hex" 'gitignored nested AGENTS.md was omitted from the instruction manifest'
+hasnt "$merge_brief" "$git_internal_instruction_hex" 'repository-internal AGENTS.md entered the instruction manifest'
+has "$merge_brief" "$nested_skill_hex" 'skill mandated only by nested instructions was omitted'
+has "$merge_brief" "$linked_skill_hex" 'symlink-installed skill was omitted from the skill manifest'
+"$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  | grep -q '^STATUS=verified$' || fail 'fresh PR-merge context did not verify'
+
+outside="$WORK/outside-reader.json"
+printf '{"findings":[]}\n' > "$outside"
+if "$REPO_DIR/bin/pln-build-review-brief" --mode pr-merge \
+  --contract "$merge_repo/merge-contract.md" --root "$merge_repo" \
+  --candidate "$candidate" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" --ledger "$merge_repo/REVIEW.md" \
+  --diff-map "$merge_repo/diff-files.txt" --reader-metadata "$merge_repo/readers.tsv" \
+  --artifact escape "$outside" \
+  --skill-root "$merge_repo/skills" \
+  --out "$WORK/escape.brief" >"$WORK/build-escape.out" 2>"$WORK/build-escape.err"; then
+  fail 'out-of-root artifact entered a PR-merge brief'
+fi
+has "$WORK/build-escape.err" 'escapes root' 'out-of-root artifact failure was not attributed'
+
+dd if=/dev/zero bs=1024 count=66 2>/dev/null | tr '\0' c > "$merge_repo/huge-contract.md"
+large_candidate="$("$REPO_DIR/bin/pln-assurance" fingerprint \
+  --root "$merge_repo" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" \
+  | awk -F= '$1 == "CANDIDATE_SHA256" { print $2 }')"
+if "$REPO_DIR/bin/pln-build-review-brief" --mode pr-merge \
+  --contract "$merge_repo/huge-contract.md" --root "$merge_repo" \
+  --candidate "$large_candidate" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" --ledger "$merge_repo/REVIEW.md" \
+  --diff-map "$merge_repo/diff-files.txt" --reader-metadata "$merge_repo/readers.tsv" \
+  --artifact broad "$weird_artifact" --skill-root "$merge_repo/skills" \
+  --out "$WORK/oversize.brief" >"$WORK/build-oversize.out" 2>"$WORK/build-oversize.err"; then
+  fail 'oversized PR-merge brief was published'
+fi
+has "$WORK/build-oversize.err" 'cap is 65536' 'PR-merge byte-cap failure was not attributed'
+rm "$merge_repo/huge-contract.md"
+
+cp "$weird_artifact" "$WORK/reader.backup"
+printf '{"findings":[ ]}\n' > "$weird_artifact"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  >"$WORK/verify-size.out" 2>"$WORK/verify-size.err"; then
+  fail 'artifact size replacement verified'
+fi
+has "$WORK/verify-size.err" 'ARTIFACT size mismatch' 'artifact size mismatch was not attributed'
+cp "$WORK/reader.backup" "$weird_artifact"
+printf '{"findingz":[]}\n' > "$weird_artifact"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  >"$WORK/verify-digest.out" 2>"$WORK/verify-digest.err"; then
+  fail 'same-size artifact replacement verified'
+fi
+has "$WORK/verify-digest.err" 'ARTIFACT digest mismatch' 'artifact digest mismatch was not attributed'
+cp "$WORK/reader.backup" "$weird_artifact"
+
+rm "$weird_artifact"
+ln -s "$outside" "$weird_artifact"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  >"$WORK/verify-link.out" 2>"$WORK/verify-link.err"; then
+  fail 'symlink artifact replacement verified'
+fi
+has "$WORK/verify-link.err" 'symlink file is not allowed' 'symlink replacement was not rejected'
+rm "$weird_artifact"
+cp "$WORK/reader.backup" "$weird_artifact"
+
+mkdir -p "$merge_repo/ignored/deep/later"
+printf 'late ignored instructions\n' > "$merge_repo/ignored/deep/later/CLAUDE.md"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  >"$WORK/verify-manifest.out" 2>"$WORK/verify-manifest.err"; then
+  fail 'incomplete instruction manifest verified'
+fi
+has "$WORK/verify-manifest.err" 'instruction manifest is stale or incomplete' \
+  'instruction-manifest drift was not attributed'
+rm "$merge_repo/ignored/deep/later/CLAUDE.md"
+rmdir "$merge_repo/ignored/deep/later"
+
+mkdir -p "$merge_repo/skills/late-skill"
+printf '%s\n' '---' 'name: late-skill' 'description: fixture' '---' \
+  > "$merge_repo/skills/late-skill/SKILL.md"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  >"$WORK/verify-skills.out" 2>"$WORK/verify-skills.err"; then
+  fail 'incomplete skill manifest verified'
+fi
+has "$WORK/verify-skills.err" 'skill manifest is stale or incomplete' \
+  'skill-manifest drift was not attributed'
+rm "$merge_repo/skills/late-skill/SKILL.md"
+rmdir "$merge_repo/skills/late-skill"
+
+printf 'candidate drift\n' > "$merge_repo/ordinary-source.txt"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
+  >"$WORK/verify-candidate.out" 2>"$WORK/verify-candidate.err"; then
+  fail 'stale candidate fingerprint verified'
+fi
+has "$WORK/verify-candidate.err" 'candidate fingerprint mismatch' \
+  'candidate drift was not attributed'
 
 echo "OK"

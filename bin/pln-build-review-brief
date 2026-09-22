@@ -1,44 +1,466 @@
 #!/usr/bin/env bash
-# pln-build-review-brief — assemble one byte-identical plan review brief for
-# native and prompt-in/text-out readers without loading either input in the
-# coordinator conversation.
+# pln-build-review-brief — assemble source-bound review briefs without loading
+# their branch-controlled inputs in the coordinator conversation.
 set -euo pipefail
 
 usage() {
-  echo "Usage: pln-build-review-brief --contract FILE --plan FILE --root DIR --commit SHA --out FILE" >&2
+  cat >&2 <<'EOF'
+Usage:
+  pln-build-review-brief --contract FILE --plan FILE --root DIR --commit SHA --out FILE
+  pln-build-review-brief --mode pr-merge --contract FILE --root DIR \
+    --candidate SHA256 --commands FILE --environment FILE \
+    [--plan FILE] [--ledger FILE] [--diff-map FILE] [--reader-metadata FILE] \
+    [--artifact ROLE FILE]... [--skill-root DIR]... --out FILE
+  pln-build-review-brief --verify-pr-merge FILE
+EOF
   exit 2
 }
 
-CONTRACT=""
-PLAN=""
-ROOT=""
-COMMIT=""
-OUT=""
+fail() {
+  echo "pln-build-review-brief: $*" >&2
+  exit 1
+}
+
+sha256_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk 'NR == 1 { print $1; exit }'
+  else
+    shasum -a 256 "$1" | awk 'NR == 1 { print $1; exit }'
+  fi
+}
+
+hex_encode() {
+  LC_ALL=C printf '%s' "$1" | od -An -v -tx1 | tr -d ' \n'
+}
+
+hex_decode() {
+  local input="$1" output="" pair char
+  [ $(( ${#input} % 2 )) -eq 0 ] || fail "malformed hex string"
+  while [ -n "$input" ]; do
+    pair="${input:0:2}"
+    case "$pair" in 00|*[!0-9a-f]*|'') fail "malformed hex string" ;; esac
+    printf -v char '%b' "\\x$pair"
+    output+="$char"
+    input="${input:2}"
+  done
+  printf '%s' "$output"
+}
+
+file_size() {
+  wc -c < "$1" | tr -d ' '
+}
+
+canonical_root() {
+  [ -d "$1" ] || fail "missing root directory (hex=$(hex_encode "$1"))"
+  (cd "$1" && pwd -P)
+}
+
+# Resolve a regular file through its physical parent. The final component may
+# not be a symlink. Callers compare the result with an allowed physical root.
+canonical_file() {
+  local path="$1" parent_input parent base
+  [ -e "$path" ] || fail "missing file (hex=$(hex_encode "$path"))"
+  [ ! -L "$path" ] || fail "symlink file is not allowed (hex=$(hex_encode "$path"))"
+  [ -f "$path" ] && [ -r "$path" ] || fail "unreadable regular file (hex=$(hex_encode "$path"))"
+  case "$path" in
+    */*) parent_input="${path%/*}"; base="${path##*/}"; [ -n "$parent_input" ] || parent_input=/ ;;
+    *) parent_input=.; base="$path" ;;
+  esac
+  parent="$(cd "$parent_input" && pwd -P)" || fail "cannot resolve parent (hex=$(hex_encode "$path"))"
+  printf '%s/%s' "$parent" "$base"
+}
+
+canonical_file_follow() {
+  local path="$1" parent_input parent target hops=0
+  while [ -L "$path" ]; do
+    hops=$((hops + 1))
+    [ "$hops" -le 40 ] || fail "symlink chain exceeds 40 hops (hex=$(hex_encode "$1"))"
+    case "$path" in
+      */*) parent_input="${path%/*}"; [ -n "$parent_input" ] || parent_input=/ ;;
+      *) parent_input=. ;;
+    esac
+    parent="$(cd "$parent_input" && pwd -P)" || fail "cannot resolve symlink parent (hex=$(hex_encode "$path"))"
+    target="$(readlink "$path")"
+    case "$target" in /*) path="$target" ;; *) path="$parent/$target" ;; esac
+  done
+  canonical_file "$path"
+}
+
+confined_file() {
+  local root="$1" path="$2" absolute
+  case "$path" in /*) ;; *) path="$root/$path" ;; esac
+  absolute="$(canonical_file "$path")"
+  case "$absolute" in "$root"/*) ;; *) fail "file escapes root (root_hex=$(hex_encode "$root") path_hex=$(hex_encode "$path"))" ;; esac
+  printf '%s' "$absolute"
+}
+
+fingerprint_output() {
+  local root="$1" commands="$2" environment="$3"
+  "$(dirname "$0")/pln-assurance" fingerprint \
+    --root "$root" --commands "$commands" --environment "$environment"
+}
+
+inventory_line() {
+  local kind="$1" root="$2" path="$3" role="${4:-}" absolute relative
+  absolute="$(confined_file "$root" "$path")"
+  relative="${absolute#"$root"/}"
+  if [ -n "$role" ]; then
+    printf '%s\t%s\t%s\t%s\t%s\n' "$kind" "$(hex_encode "$role")" \
+      "$(hex_encode "$relative")" "$(file_size "$absolute")" "$(sha256_file "$absolute")"
+  else
+    printf '%s\t%s\t%s\t%s\n' "$kind" "$(hex_encode "$relative")" \
+      "$(file_size "$absolute")" "$(sha256_file "$absolute")"
+  fi
+}
+
+instruction_line() {
+  local root="$1" path="$2" logical absolute
+  case "$path" in "$root"/*) logical="${path#"$root"/}" ;; *) fail "instruction path escapes root" ;; esac
+  absolute="$(canonical_file_follow "$path")"
+  case "$absolute" in "$root"/*) ;; *) fail "instruction symlink escapes root (path_hex=$(hex_encode "$path"))" ;; esac
+  printf 'INSTRUCTION\t%s\t%s\t%s\n' "$(hex_encode "$logical")" \
+    "$(file_size "$absolute")" "$(sha256_file "$absolute")"
+}
+
+discover_instructions() {
+  local root="$1" path base count=0 list
+  list="$(mktemp "${TMPDIR:-/tmp}/pln-pr-instruction-list.XXXXXX")"
+  # Instruction applicability is independent of Git tracking/ignore state.
+  # Walk project files, but never treat Git's administrative directory as
+  # project content and never traverse symlinked directories.
+  if ! find "$root" \
+    \( -type d -name .git -prune \) -o \
+    \( \( -type f -o -type l \) \( -name AGENTS.md -o -name CLAUDE.md \) -print0 \) \
+    > "$list"; then
+    rm -f "$list"
+    fail "could not enumerate repository instructions"
+  fi
+  while IFS= read -r -d '' path; do
+    base="${path##*/}"
+    case "$base" in AGENTS.md|CLAUDE.md)
+      instruction_line "$root" "$path"
+      count=$((count + 1))
+      [ "$count" -le 256 ] || fail "instruction manifest exceeds 256 files"
+      ;;
+    esac
+  done < "$list"
+  rm -f "$list"
+}
+
+discover_skills() {
+  local root="$1" path absolute count=0 list
+  list="$(mktemp "${TMPDIR:-/tmp}/pln-pr-skill-list.XXXXXX")"
+  if ! find -L "$root" -type f -name SKILL.md -print0 > "$list"; then
+    rm -f "$list"
+    fail "could not enumerate skill root (hex=$(hex_encode "$root"))"
+  fi
+  while IFS= read -r -d '' path; do
+    absolute="$(canonical_file_follow "$path")"
+    printf 'SKILL\t%s\t%s\t%s\n' "$(hex_encode "$absolute")" \
+      "$(file_size "$absolute")" "$(sha256_file "$absolute")"
+    count=$((count + 1))
+    [ "$count" -le 512 ] || fail "skill manifest exceeds 512 files"
+  done < "$list"
+  rm -f "$list"
+}
+
+build_plan_review() {
+  local contract="$1" plan="$2" root="$3" commit="$4" out="$5" tmp
+  [ -f "$contract" ] && [ -r "$contract" ] || fail "unreadable contract: $contract"
+  [ -f "$plan" ] && [ -r "$plan" ] || fail "unreadable plan: $plan"
+
+  mkdir -p "$(dirname "$out")"
+  tmp="$(mktemp "${TMPDIR:-/tmp}/pln-review-brief.XXXXXX")"
+  trap 'rm -f "$tmp"' EXIT
+  {
+    printf 'Repository root: %s\nPlan file: %s\nRepository commit: %s\n\n' "$root" "$plan" "$commit"
+    cat "$contract"
+    printf '\n\n--- PLAN ---\n'
+    cat "$plan"
+    printf '\n--- END PLAN ---\n'
+  } > "$tmp"
+  mv "$tmp" "$out"
+  trap - EXIT
+}
+
+build_pr_merge() {
+  local contract="$1" root="$2" candidate="$3" commands="$4" environment="$5" out="$6"
+  shift 6
+  local root_real contract_real commands_real environment_real actual tree command_hash environment_hash fingerprints tmp body instructions skills
+  local kind role path skill_root skill_real size index
+  local -a artifacts=() skill_roots=()
+
+  root_real="$(canonical_root "$root")"
+  contract_real="$(canonical_file "$contract")"
+  commands_real="$(confined_file "$root_real" "$commands")"
+  environment_real="$(confined_file "$root_real" "$environment")"
+  case "$candidate" in ''|*[!0-9a-f]*) fail "candidate must be a lowercase hexadecimal digest" ;; esac
+  [ "${#candidate}" -eq 64 ] || fail "candidate must be a 64-character sha256 digest"
+
+  while [ $# -gt 0 ]; do
+    kind="$1"; shift
+    case "$kind" in
+      artifact)
+        [ $# -ge 2 ] || usage
+        [ -n "$1" ] && [ -n "$2" ] || fail "artifact role and path must be non-empty"
+        artifacts+=("$1" "$2"); shift 2
+        ;;
+      skill-root)
+        [ $# -ge 1 ] || usage
+        skill_roots+=("$1"); shift
+        ;;
+      *) fail "internal unknown PR-merge input: $kind" ;;
+    esac
+  done
+  [ "${#skill_roots[@]}" -gt 0 ] || fail "PR-merge mode requires at least one complete skill root"
+
+  fingerprints="$(fingerprint_output "$root_real" "$commands_real" "$environment_real")"
+  tree="$(printf '%s\n' "$fingerprints" | awk -F= '$1 == "TREE_SHA256" { print $2 }')"
+  command_hash="$(printf '%s\n' "$fingerprints" | awk -F= '$1 == "COMMAND_SHA256" { print $2 }')"
+  environment_hash="$(printf '%s\n' "$fingerprints" | awk -F= '$1 == "ENVIRONMENT_SHA256" { print $2 }')"
+  actual="$(printf '%s\n' "$fingerprints" | awk -F= '$1 == "CANDIDATE_SHA256" { print $2 }')"
+  [ -n "$tree" ] && [ -n "$command_hash" ] && [ -n "$environment_hash" ] && [ -n "$actual" ] \
+    || fail "could not compute complete candidate fingerprints"
+  [ "$actual" = "$candidate" ] || fail "candidate fingerprint mismatch: expected $candidate, got $actual"
+
+  tmp="$(mktemp "${TMPDIR:-/tmp}/pln-pr-merge-brief.XXXXXX")"
+  body="$(mktemp "${TMPDIR:-/tmp}/pln-pr-merge-body.XXXXXX")"
+  instructions="$(mktemp "${TMPDIR:-/tmp}/pln-pr-instructions.XXXXXX")"
+  skills="$(mktemp "${TMPDIR:-/tmp}/pln-pr-skills.XXXXXX")"
+  trap 'rm -f "$tmp" "$body" "$instructions" "$skills"' EXIT
+
+  discover_instructions "$root_real" | LC_ALL=C sort > "$instructions"
+  : > "$skills"
+  for skill_root in "${skill_roots[@]}"; do
+    skill_real="$(canonical_root "$skill_root")"
+    printf 'SKILL_ROOT\t%s\n' "$(hex_encode "$skill_real")" >> "$skills"
+    discover_skills "$skill_real" | LC_ALL=C sort >> "$skills"
+  done
+
+  {
+    printf 'PLN_PR_MERGE_CONTEXT_V1\n'
+    printf 'ROOT\t%s\n' "$(hex_encode "$root_real")"
+    printf 'TREE_SHA256\t%s\n' "$tree"
+    printf 'COMMAND_SHA256\t%s\n' "$command_hash"
+    printf 'ENVIRONMENT_SHA256\t%s\n' "$environment_hash"
+    printf 'CANDIDATE_SHA256\t%s\n' "$candidate"
+    inventory_line COMMANDS "$root_real" "$commands_real"
+    inventory_line ENVIRONMENT "$root_real" "$environment_real"
+    for ((index=0; index<${#artifacts[@]}; index+=2)); do
+      role="${artifacts[index]}"; path="${artifacts[index+1]}"
+      inventory_line ARTIFACT "$root_real" "$path" "$role"
+    done
+    cat "$instructions"
+    cat "$skills"
+    printf 'INSTRUCTION_SET_SHA256\t%s\n' "$(sha256_file "$instructions")"
+    printf 'SKILL_SET_SHA256\t%s\n' "$(sha256_file "$skills")"
+    printf 'CONTENT_POLICY\thex-path-size-sha256-only\n'
+    printf 'END_PLN_PR_MERGE_CONTEXT\n'
+  } > "$body"
+
+  {
+    cat "$contract_real"
+    printf '\n\n'
+    cat "$body"
+  } > "$tmp"
+  size="$(file_size "$tmp")"
+  [ "$size" -le 65536 ] || fail "PR-merge brief is $size bytes; cap is 65536"
+  mkdir -p "$(dirname "$out")"
+  mv "$tmp" "$out"
+  rm -f "$body" "$instructions" "$skills"
+  trap - EXIT
+}
+
+verify_pr_merge() {
+  local brief="$1" brief_real data root_hex root tree command_hash environment_hash candidate commands environment actual fingerprints
+  local type a b c d role_hex rel_hex expected_size expected_digest path absolute
+  local instructions recorded_skills fresh skill_roots marker_count size skill_base
+  brief_real="$(canonical_file "$brief")"
+  size="$(file_size "$brief_real")"
+  [ "$size" -le 65536 ] || fail "PR-merge brief exceeds 65536-byte cap"
+  marker_count="$(grep -c '^PLN_PR_MERGE_CONTEXT_V1$' "$brief_real" || true)"
+  [ "$marker_count" = 1 ] || fail "PR-merge brief has missing or duplicate schema marker"
+
+  data="$(mktemp "${TMPDIR:-/tmp}/pln-pr-verify-data.XXXXXX")"
+  instructions="$(mktemp "${TMPDIR:-/tmp}/pln-pr-verify-instructions.XXXXXX")"
+  recorded_skills="$(mktemp "${TMPDIR:-/tmp}/pln-pr-verify-skills.XXXXXX")"
+  fresh="$(mktemp "${TMPDIR:-/tmp}/pln-pr-verify-fresh.XXXXXX")"
+  skill_roots="$(mktemp "${TMPDIR:-/tmp}/pln-pr-verify-roots.XXXXXX")"
+  trap 'rm -f "$data" "$instructions" "$recorded_skills" "$fresh" "$skill_roots"' EXIT
+  awk 'seen { print } /^PLN_PR_MERGE_CONTEXT_V1$/ { seen=1 }' "$brief_real" > "$data"
+  : > "$instructions"; : > "$recorded_skills"; : > "$skill_roots"
+
+  root=""; tree=""; command_hash=""; environment_hash=""; candidate=""; commands=""; environment=""
+  local seen_tree=0 seen_command_hash=0 seen_environment_hash=0 seen_candidate=0 seen_commands=0 seen_environment=0 seen_instruction_digest=0 seen_skill_digest=0 seen_policy=0 seen_end=0
+  while IFS=$'\t' read -r type a b c d; do
+    if [ "$seen_end" -eq 1 ] && [ -n "$type" ]; then
+      fail "field follows END_PLN_PR_MERGE_CONTEXT"
+    fi
+    case "$type" in
+      ROOT)
+        [ -z "$root" ] || fail "duplicate ROOT field"
+        root="$(hex_decode "$a")"
+        [ "$root" = "$(canonical_root "$root")" ] || fail "non-canonical root in PR-merge brief"
+        ;;
+      TREE_SHA256)
+        [ "$seen_tree" -eq 0 ] || fail "duplicate TREE_SHA256 field"
+        tree="$a"; seen_tree=1
+        ;;
+      COMMAND_SHA256)
+        [ "$seen_command_hash" -eq 0 ] || fail "duplicate COMMAND_SHA256 field"
+        command_hash="$a"; seen_command_hash=1
+        ;;
+      ENVIRONMENT_SHA256)
+        [ "$seen_environment_hash" -eq 0 ] || fail "duplicate ENVIRONMENT_SHA256 field"
+        environment_hash="$a"; seen_environment_hash=1
+        ;;
+      CANDIDATE_SHA256)
+        [ "$seen_candidate" -eq 0 ] || fail "duplicate CANDIDATE_SHA256 field"
+        candidate="$a"; seen_candidate=1
+        ;;
+      COMMANDS|ENVIRONMENT|INSTRUCTION)
+        [ -n "$root" ] || fail "$type precedes ROOT"
+        rel_hex="$a"; expected_size="$b"; expected_digest="$c"
+        path="$(hex_decode "$rel_hex")"
+        if [ "$type" = INSTRUCTION ]; then
+          absolute="$(canonical_file_follow "$root/$path")"
+          case "$absolute" in "$root"/*) ;; *) fail "instruction symlink escapes root (path_hex=$(hex_encode "$path"))" ;; esac
+        else
+          absolute="$(confined_file "$root" "$root/$path")"
+        fi
+        [ "$(file_size "$absolute")" = "$expected_size" ] || fail "$type size mismatch (path_hex=$(hex_encode "$path"))"
+        actual="$(sha256_file "$absolute")"
+        [ "$actual" = "$expected_digest" ] || fail "$type digest mismatch (path_hex=$(hex_encode "$path") expected=$expected_digest got=$actual)"
+        case "$type" in
+          COMMANDS) [ "$seen_commands" -eq 0 ] || fail "duplicate COMMANDS field"; commands="$absolute"; seen_commands=1 ;;
+          ENVIRONMENT) [ "$seen_environment" -eq 0 ] || fail "duplicate ENVIRONMENT field"; environment="$absolute"; seen_environment=1 ;;
+          INSTRUCTION) printf '%s\t%s\t%s\t%s\n' "$type" "$a" "$b" "$c" >> "$instructions" ;;
+        esac
+        ;;
+      ARTIFACT)
+        [ -n "$root" ] || fail "ARTIFACT precedes ROOT"
+        role_hex="$a"; rel_hex="$b"; expected_size="$c"; expected_digest="$d"
+        hex_decode "$role_hex" >/dev/null
+        path="$(hex_decode "$rel_hex")"
+        absolute="$(confined_file "$root" "$root/$path")"
+        [ "$(file_size "$absolute")" = "$expected_size" ] || fail "ARTIFACT size mismatch (path_hex=$(hex_encode "$path"))"
+        actual="$(sha256_file "$absolute")"
+        [ "$actual" = "$expected_digest" ] || fail "ARTIFACT digest mismatch (path_hex=$(hex_encode "$path") expected=$expected_digest got=$actual)"
+        ;;
+      SKILL_ROOT)
+        path="$(hex_decode "$a")"
+        path="$(canonical_root "$path")"
+        printf '%s\n' "$(hex_encode "$path")" >> "$skill_roots"
+        printf '%s\t%s\n' "$type" "$a" >> "$recorded_skills"
+        ;;
+      SKILL)
+        rel_hex="$a"; expected_size="$b"; expected_digest="$c"
+        path="$(hex_decode "$rel_hex")"
+        absolute="$(canonical_file_follow "$path")"
+        [ "$(file_size "$absolute")" = "$expected_size" ] || fail "SKILL size mismatch (path_hex=$(hex_encode "$path"))"
+        actual="$(sha256_file "$absolute")"
+        [ "$actual" = "$expected_digest" ] || fail "SKILL digest mismatch (path_hex=$(hex_encode "$path") expected=$expected_digest got=$actual)"
+        printf '%s\t%s\t%s\t%s\n' "$type" "$a" "$b" "$c" >> "$recorded_skills"
+        ;;
+      INSTRUCTION_SET_SHA256)
+        [ "$seen_instruction_digest" -eq 0 ] || fail "duplicate instruction manifest digest"
+        [ "$(sha256_file "$instructions")" = "$a" ] || fail "instruction manifest digest mismatch"
+        seen_instruction_digest=1
+        ;;
+      SKILL_SET_SHA256)
+        [ "$seen_skill_digest" -eq 0 ] || fail "duplicate skill manifest digest"
+        [ "$(sha256_file "$recorded_skills")" = "$a" ] || fail "skill manifest digest mismatch"
+        seen_skill_digest=1
+        ;;
+      CONTENT_POLICY)
+        [ "$seen_policy" -eq 0 ] || fail "duplicate content policy"
+        [ "$a" = hex-path-size-sha256-only ] || fail "unknown content policy"
+        seen_policy=1
+        ;;
+      END_PLN_PR_MERGE_CONTEXT) seen_end=1 ;;
+      '') ;;
+      *) fail "unknown PR-merge field: $type" ;;
+    esac
+  done < "$data"
+
+  [ -n "$root" ] && [ -n "$tree" ] && [ -n "$command_hash" ] && [ -n "$environment_hash" ] && \
+    [ -n "$candidate" ] && [ -n "$commands" ] && [ -n "$environment" ] && \
+    [ "$seen_instruction_digest" -eq 1 ] && [ "$seen_skill_digest" -eq 1 ] && \
+    [ "$seen_policy" -eq 1 ] && [ "$seen_end" -eq 1 ] \
+    || fail "incomplete PR-merge context"
+
+  discover_instructions "$root" | LC_ALL=C sort > "$fresh"
+  cmp -s "$instructions" "$fresh" || fail "instruction manifest is stale or incomplete"
+  : > "$fresh"
+  while IFS= read -r root_hex; do
+    path="$(hex_decode "$root_hex")"
+    printf 'SKILL_ROOT\t%s\n' "$root_hex" >> "$fresh"
+    discover_skills "$path" | LC_ALL=C sort >> "$fresh"
+  done < "$skill_roots"
+  cmp -s "$recorded_skills" "$fresh" || fail "skill manifest is stale or incomplete"
+
+  fingerprints="$(fingerprint_output "$root" "$commands" "$environment")"
+  actual="$(printf '%s\n' "$fingerprints" | awk -F= '$1 == "CANDIDATE_SHA256" { print $2 }')"
+  [ "$actual" = "$candidate" ] || fail "candidate fingerprint mismatch: expected $candidate, got $actual"
+  [ "$(printf '%s\n' "$fingerprints" | awk -F= '$1 == "TREE_SHA256" { print $2 }')" = "$tree" ] \
+    || fail "tree fingerprint mismatch"
+  [ "$(printf '%s\n' "$fingerprints" | awk -F= '$1 == "COMMAND_SHA256" { print $2 }')" = "$command_hash" ] \
+    || fail "command fingerprint mismatch"
+  [ "$(printf '%s\n' "$fingerprints" | awk -F= '$1 == "ENVIRONMENT_SHA256" { print $2 }')" = "$environment_hash" ] \
+    || fail "environment fingerprint mismatch"
+  printf 'STATUS=verified\nCANDIDATE_SHA256=%s\n' "$candidate"
+  trap - EXIT
+  rm -f "$data" "$instructions" "$recorded_skills" "$fresh" "$skill_roots"
+}
+
+MODE="plan-review"
+VERIFY=""
+CONTRACT=""; PLAN=""; ROOT=""; COMMIT=""; OUT=""
+CANDIDATE=""; COMMANDS=""; ENVIRONMENT=""; LEDGER=""; DIFF_MAP=""; READER_METADATA=""
+ARTIFACT_ARGS=(); SKILL_ROOT_ARGS=()
+RAW_ARTIFACT_COUNT=0
 while [ $# -gt 0 ]; do
   case "$1" in
+    --mode) MODE="${2:-}"; shift 2 ;;
+    --verify-pr-merge) VERIFY="${2:-}"; shift 2 ;;
     --contract) CONTRACT="${2:-}"; shift 2 ;;
     --plan) PLAN="${2:-}"; shift 2 ;;
     --root) ROOT="${2:-}"; shift 2 ;;
     --commit) COMMIT="${2:-}"; shift 2 ;;
     --out) OUT="${2:-}"; shift 2 ;;
+    --candidate) CANDIDATE="${2:-}"; shift 2 ;;
+    --commands) COMMANDS="${2:-}"; shift 2 ;;
+    --environment) ENVIRONMENT="${2:-}"; shift 2 ;;
+    --ledger) LEDGER="${2:-}"; shift 2 ;;
+    --diff-map) DIFF_MAP="${2:-}"; shift 2 ;;
+    --reader-metadata) READER_METADATA="${2:-}"; shift 2 ;;
+    --artifact) ARTIFACT_ARGS+=(artifact "${2:-}" "${3:-}"); RAW_ARTIFACT_COUNT=$((RAW_ARTIFACT_COUNT + 1)); shift 3 ;;
+    --skill-root) SKILL_ROOT_ARGS+=(skill-root "${2:-}"); shift 2 ;;
     -h|--help) usage ;;
     *) echo "pln-build-review-brief: unknown argument '$1'" >&2; usage ;;
   esac
 done
 
-[ -n "$CONTRACT" ] && [ -n "$PLAN" ] && [ -n "$ROOT" ] && [ -n "$COMMIT" ] && [ -n "$OUT" ] || usage
-[ -f "$CONTRACT" ] && [ -r "$CONTRACT" ] || { echo "pln-build-review-brief: unreadable contract: $CONTRACT" >&2; exit 1; }
-[ -f "$PLAN" ] && [ -r "$PLAN" ] || { echo "pln-build-review-brief: unreadable plan: $PLAN" >&2; exit 1; }
+if [ -n "$VERIFY" ]; then
+  [ "$MODE" = plan-review ] || usage
+  verify_pr_merge "$VERIFY"
+  exit 0
+fi
 
-mkdir -p "$(dirname "$OUT")"
-TMP="$(mktemp "${TMPDIR:-/tmp}/pln-review-brief.XXXXXX")"
-trap 'rm -f "$TMP"' EXIT
-{
-  printf 'Repository root: %s\nPlan file: %s\nRepository commit: %s\n\n' "$ROOT" "$PLAN" "$COMMIT"
-  cat "$CONTRACT"
-  printf '\n\n--- PLAN ---\n'
-  cat "$PLAN"
-  printf '\n--- END PLAN ---\n'
-} > "$TMP"
-mv "$TMP" "$OUT"
-trap - EXIT
+if [ "$MODE" = plan-review ]; then
+  [ -n "$CONTRACT" ] && [ -n "$PLAN" ] && [ -n "$ROOT" ] && [ -n "$COMMIT" ] && [ -n "$OUT" ] || usage
+  build_plan_review "$CONTRACT" "$PLAN" "$ROOT" "$COMMIT" "$OUT"
+elif [ "$MODE" = pr-merge ]; then
+  [ -n "$CONTRACT" ] && [ -n "$ROOT" ] && [ -n "$CANDIDATE" ] && \
+    [ -n "$COMMANDS" ] && [ -n "$ENVIRONMENT" ] && [ -n "$LEDGER" ] && \
+    [ -n "$DIFF_MAP" ] && [ -n "$READER_METADATA" ] && [ -n "$OUT" ] && \
+    [ "$RAW_ARTIFACT_COUNT" -gt 0 ] || usage
+  [ -n "$PLAN" ] && ARTIFACT_ARGS+=(artifact plan "$PLAN")
+  [ -n "$LEDGER" ] && ARTIFACT_ARGS+=(artifact review-ledger "$LEDGER")
+  [ -n "$DIFF_MAP" ] && ARTIFACT_ARGS+=(artifact diff-map "$DIFF_MAP")
+  [ -n "$READER_METADATA" ] && ARTIFACT_ARGS+=(artifact reader-metadata "$READER_METADATA")
+  build_pr_merge "$CONTRACT" "$ROOT" "$CANDIDATE" "$COMMANDS" "$ENVIRONMENT" "$OUT" \
+    "${ARTIFACT_ARGS[@]}" "${SKILL_ROOT_ARGS[@]}"
+else
+  fail "unknown mode: $MODE"
+fi

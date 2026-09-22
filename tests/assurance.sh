@@ -3,12 +3,14 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ASSURANCE="$REPO_DIR/bin/pln-assurance"
+GAUNTLET="$REPO_DIR/bin/pln-gauntlet"
 SIMPLIFY="$REPO_DIR/bin/pln-simplify"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 has_line() { printf '%s\n' "$1" | grep -Fqx "$2" || fail "$3"; }
 
 [ -x "$ASSURANCE" ] || fail "missing executable assurance helper: $ASSURANCE"
+[ -x "$GAUNTLET" ] || fail "missing executable gauntlet helper: $GAUNTLET"
 
 # Semantic signals decide the floor. Numeric size can raise R1 to R2 but can
 # never lower an R3 change.
@@ -110,6 +112,16 @@ first="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.
 second="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt")"
 [ "$first" = "$second" ] || fail 'unchanged candidate fingerprint was not deterministic'
 
+review_before="$($ASSURANCE diff-fingerprint --root "$FIXTURE" --base HEAD)"
+has_line "$review_before" "DIFF_BASE=$(git -C "$FIXTURE" rev-parse HEAD)" \
+  'review fingerprint lost its exact merge base'
+printf 'two\n' > "$FIXTURE/source.txt"
+review_after="$($ASSURANCE diff-fingerprint --root "$FIXTURE" --base HEAD)"
+[ "$review_before" != "$review_after" ] || fail 'changed reviewed diff preserved its fingerprint'
+printf 'one\n' > "$FIXTURE/source.txt"
+[ "$($ASSURANCE diff-fingerprint --root "$FIXTURE" --base HEAD)" = "$review_before" ] \
+  || fail 'restored reviewed diff did not restore its fingerprint'
+
 # Where the bytes are recorded is not what they are. Staging and committing an
 # already-verified tree change HEAD and `git status` while leaving every file
 # identical, so the fingerprint must not move — and must return to its earlier
@@ -141,6 +153,84 @@ printf 'bash tests/a.sh\n' > "$FIXTURE/commands.txt"
 printf 'runtime=node-24\ntimezone=America/Los_Angeles\n' > "$FIXTURE/environment.txt"
 environment_changed="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt")"
 [ "$environment_changed" != "$first" ] || fail 'environment edit did not invalidate fingerprint'
+
+# The command artifact is the declaration boundary for safe gauntlet
+# parallelism. Legacy lists remain serial. V1 groups may overlap only when the
+# project declared the group and no dependency, exclusive resource, or tree
+# mutation makes the pair unsafe. Results are joined in declaration order.
+GAUNTLET_OUT="$(mktemp -d "${TMPDIR:-/tmp}/pln-gauntlet-test.XXXXXX")"
+trap 'rm -rf "$FIXTURE" "$FIXTURE-unknown" "$FIXTURE-shallow" "$GAUNTLET_OUT"' EXIT
+printf 'runtime=test\nexecutor=worker\n' > "$GAUNTLET_OUT/environment.txt"
+printf 'printf first > %s/legacy-first\ntest -f %s/legacy-first\n' "$GAUNTLET_OUT" "$GAUNTLET_OUT" > "$GAUNTLET_OUT/legacy.commands"
+"$GAUNTLET" run --root "$FIXTURE" --commands "$GAUNTLET_OUT/legacy.commands" \
+  --environment "$GAUNTLET_OUT/environment.txt" --logs "$GAUNTLET_OUT/legacy-logs" \
+  --status "$GAUNTLET_OUT/legacy.status"
+has_line "$(cat "$GAUNTLET_OUT/legacy.status")" $'RESULT\t2\tpass\t0' \
+  'legacy command list did not execute serially'
+
+{
+  printf 'PLN_GAUNTLET_V1\n'
+  printf 'a\t-\tfast\t-\tclean\tworker\ttouch %s/a.started; i=0; while [ ! -e %s/b.started ] && [ $i -lt 40 ]; do sleep 0.05; i=$((i+1)); done; test -e %s/b.started; touch %s/a.done\n' "$GAUNTLET_OUT" "$GAUNTLET_OUT" "$GAUNTLET_OUT" "$GAUNTLET_OUT"
+  printf 'b\t-\tfast\t-\tclean\tworker\ttouch %s/b.started; i=0; while [ ! -e %s/a.started ] && [ $i -lt 40 ]; do sleep 0.05; i=$((i+1)); done; test -e %s/a.started; touch %s/b.done\n' "$GAUNTLET_OUT" "$GAUNTLET_OUT" "$GAUNTLET_OUT" "$GAUNTLET_OUT"
+  printf 'after\ta,b\t-\t-\tclean\tworker\ttest -e %s/a.done && test -e %s/b.done\n' "$GAUNTLET_OUT" "$GAUNTLET_OUT"
+  printf 'lock-a\tafter\tlocked\tdb\tclean\tworker\tmkdir %s/lock; sleep 0.1; rmdir %s/lock\n' "$GAUNTLET_OUT" "$GAUNTLET_OUT"
+  printf 'lock-b\tafter\tlocked\tdb\tclean\tworker\tmkdir %s/lock; sleep 0.1; rmdir %s/lock\n' "$GAUNTLET_OUT" "$GAUNTLET_OUT"
+  printf 'mutator-a\tlock-a,lock-b\tmutators\t-\tmutates\tworker\tmkdir %s/mutator-lock; sleep 0.1; rmdir %s/mutator-lock\n' "$GAUNTLET_OUT" "$GAUNTLET_OUT"
+  printf 'mutator-b\tlock-a,lock-b\tmutators\t-\tmutates\tworker\tmkdir %s/mutator-lock; sleep 0.1; rmdir %s/mutator-lock\n' "$GAUNTLET_OUT" "$GAUNTLET_OUT"
+} > "$GAUNTLET_OUT/declared.commands"
+"$GAUNTLET" run --root "$FIXTURE" --commands "$GAUNTLET_OUT/declared.commands" \
+  --environment "$GAUNTLET_OUT/environment.txt" --logs "$GAUNTLET_OUT/declared-logs" \
+  --status "$GAUNTLET_OUT/declared.status"
+[ "$(grep '^RESULT' "$GAUNTLET_OUT/declared.status" | cut -f2 | paste -sd, -)" = 'a,b,after,lock-a,lock-b,mutator-a,mutator-b' ] \
+  || fail 'declared gauntlet results lost deterministic declaration order'
+[ "$(find "$GAUNTLET_OUT/declared-logs" -name '*.log' | wc -l | tr -d ' ')" -eq 7 ] \
+  || fail 'declared gauntlet did not keep one raw log per command'
+
+printf 'runtime=test\nexecutor=coordinator\n' > "$GAUNTLET_OUT/environment-executor.txt"
+worker_identity="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$GAUNTLET_OUT/declared.commands" --environment "$GAUNTLET_OUT/environment.txt")"
+coordinator_identity="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$GAUNTLET_OUT/declared.commands" --environment "$GAUNTLET_OUT/environment-executor.txt")"
+[ "$worker_identity" != "$coordinator_identity" ] \
+  || fail 'executor requirement did not participate in candidate identity'
+
+printf 'PLN_GAUNTLET_V1\ncoord\t-\t-\t-\tclean\tcoordinator\ttest ! -e %s/coordinator-ran; touch %s/coordinator-ran\nwork\tcoord\t-\t-\tclean\tworker\ttest -e %s/coordinator-ran; touch %s/worker-ran\n' \
+  "$GAUNTLET_OUT" "$GAUNTLET_OUT" "$GAUNTLET_OUT" "$GAUNTLET_OUT" > "$GAUNTLET_OUT/executors.commands"
+if "$GAUNTLET" run --root "$FIXTURE" --commands "$GAUNTLET_OUT/executors.commands" \
+  --environment "$GAUNTLET_OUT/environment.txt" --logs "$GAUNTLET_OUT/unsafe-default-logs" \
+  --status "$GAUNTLET_OUT/unsafe-default.status" >/dev/null 2>&1; then
+  fail 'default executor ran a declared coordinator-only command'
+fi
+[ ! -e "$GAUNTLET_OUT/coordinator-ran" ] \
+  || fail 'default executor refusal happened after coordinator-only execution'
+"$GAUNTLET" run --root "$FIXTURE" --commands "$GAUNTLET_OUT/executors.commands" \
+  --environment "$GAUNTLET_OUT/environment.txt" --logs "$GAUNTLET_OUT/coordinator-logs" \
+  --status "$GAUNTLET_OUT/coordinator.status" --executor coordinator
+[ ! -e "$GAUNTLET_OUT/worker-ran" ] || fail 'coordinator pass ran a worker command'
+has_line "$(cat "$GAUNTLET_OUT/coordinator.status")" $'RESULT\twork\tdeferred\t-' \
+  'coordinator pass did not defer worker command'
+"$GAUNTLET" run --root "$FIXTURE" --commands "$GAUNTLET_OUT/executors.commands" \
+  --environment "$GAUNTLET_OUT/environment.txt" --logs "$GAUNTLET_OUT/worker-logs" \
+  --status "$GAUNTLET_OUT/worker.status" --executor worker --completed "$GAUNTLET_OUT/coordinator.status"
+[ -e "$GAUNTLET_OUT/worker-ran" ] || fail 'worker pass did not run after coordinator prerequisite'
+has_line "$(cat "$GAUNTLET_OUT/worker.status")" $'RESULT\tcoord\tpass\t0' \
+  'worker pass did not consume coordinator result'
+
+printf 'PLN_GAUNTLET_V1\nfail\t-\t-\t-\tclean\tworker\texit 7\nblocked\tfail\t-\t-\tclean\tworker\texit 0\n' > "$GAUNTLET_OUT/fail.commands"
+if "$GAUNTLET" run --root "$FIXTURE" --commands "$GAUNTLET_OUT/fail.commands" \
+  --environment "$GAUNTLET_OUT/environment.txt" --logs "$GAUNTLET_OUT/fail-logs" \
+  --status "$GAUNTLET_OUT/fail.status" >/dev/null 2>&1; then
+  fail 'failed/incomplete gauntlet returned success'
+fi
+has_line "$(cat "$GAUNTLET_OUT/fail.status")" $'RESULT\tfail\tfail\t7' 'failed command lost its exit status'
+has_line "$(cat "$GAUNTLET_OUT/fail.status")" $'RESULT\tblocked\tincomplete\t-' 'dependent command was not fail-closed incomplete'
+
+printf 'PLN_GAUNTLET_V1\nmutate\t-\t-\t-\tmutates\tworker\tprintf changed > source.txt\n' > "$GAUNTLET_OUT/mutate.commands"
+if "$GAUNTLET" run --root "$FIXTURE" --commands "$GAUNTLET_OUT/mutate.commands" \
+  --environment "$GAUNTLET_OUT/environment.txt" --logs "$GAUNTLET_OUT/mutate-logs" \
+  --status "$GAUNTLET_OUT/mutate.status" >/dev/null 2>&1; then
+  fail 'command-caused tree mutation returned success'
+fi
+has_line "$(cat "$GAUNTLET_OUT/mutate.status")" 'TREE_MUTATION=detected' 'tree mutation was not recorded fail-closed'
+git -C "$FIXTURE" checkout -q -- source.txt
 
 # A tracked symlink to a directory must fingerprint (git hash-object on the
 # path follows the link and dies), and retargeting the link must invalidate.

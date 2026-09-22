@@ -854,6 +854,26 @@ for host_out in "$real_c" "$real_x"; do
     "$ship_file dropped the project's instructions as the whole-suite escape hatch"
   has "$ship_file" 'There is no CI that will run it' \
     "$ship_file lost the no-CI justification, where the local run is the only run"
+  has "$scope_file" 'PR disposition: ready' \
+    "$scope_file no longer treats a plain PR request as ready"
+  has "$scope_file" 'PLN_GAUNTLET_V1' \
+    "$scope_file lost project-declared gauntlet parallelism"
+  has "$ship_file" 'Run the cheap declared gates now, before fingerprinting or dispatching the functional gauntlet' \
+    "$ship_file spends the gauntlet before cheap base/version/package gates"
+  has "$ship_file" 'Compare its `DIFF_BASE` and `REVIEW_DIFF_SHA256` with the ledger-bound reviewed subject' \
+    "$ship_file refreshes base without reconciling the reviewed diff"
+  has "$ship_file" 'A pure version bump never triggers the functional gauntlet' \
+    "$ship_file runs the functional gauntlet for a version-only correction"
+  has "$ship_file" '--status <plan-root>/evidence/final-gauntlet.coordinator.status --executor coordinator' \
+    "$ship_file does not route known coordinator commands there first"
+  has "$ship_file" '--executor worker --completed <plan-root>/evidence/final-gauntlet.coordinator.status' \
+    "$ship_file worker pass lacks the exact coordinator-status prerequisite"
+  has "$ship_file" 'A plain put-up/open/create request, including `review=none` or “skip review,” is `ready`' \
+    "$ship_file exact review-none ready-PR trace still enters draft watch"
+  has "$ship_file" 'adding `--draft` only for `keep-draft` or `policy-draft`' \
+    "$ship_file can add --draft to a plain ready request"
+  has "$ship_file" 'A new ready PR offers optional CI watching but never starts it unprompted' \
+    "$ship_file starts CI watch for a ready handoff"
   # An empty check list means "no CI here" only for a PR that could merge. A
   # conflicting one may report the same empty list because the forge cannot build
   # the merge commit its checks run against, so the mergeability question has to

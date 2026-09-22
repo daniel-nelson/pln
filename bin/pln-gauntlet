@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+# pln-gauntlet — execute an explicitly declared verification command graph.
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'USAGE'
+Usage:
+  pln-gauntlet run --root DIR --commands FILE --environment FILE --logs DIR --status FILE
+                   [--executor all|worker|coordinator] [--completed STATUS_FILE]
+
+Legacy command files contain one shell command per nonempty line and run serially.
+A declared file has this tab-separated form:
+
+  PLN_GAUNTLET_V1
+  ID  DEPS  PARALLEL_GROUP  EXCLUSIVE_RESOURCES  TREE_MODE  EXECUTOR  COMMAND
+
+DEPS and EXCLUSIVE_RESOURCES are comma-separated IDs/names or "-". TREE_MODE
+is clean or mutates; EXECUTOR is worker or coordinator. Only ready commands in
+the same named parallel group may overlap. Tree mutation always fails the run.
+For a V1 graph containing a coordinator command, --executor all is refused:
+run the coordinator pass explicitly, then the worker pass with --completed.
+USAGE
+  exit 2
+}
+
+sha256_from_fingerprint() {
+  "$assurance" fingerprint --root "$root" --commands "$commands" --environment "$environment" \
+    | sed -n 's/^TREE_SHA256=//p'
+}
+
+command_name_ok() {
+  case "$1" in '' | *[!a-zA-Z0-9._-]*) return 1 ;; *) return 0 ;; esac
+}
+
+contains_csv() {
+  local csv="$1" needle="$2"
+  case ",$csv," in *",$needle,"*) return 0 ;; *) return 1 ;; esac
+}
+
+id_index() {
+  local needle="$1" j
+  for ((j = 0; j < count; j++)); do
+    [ "${ids[$j]}" = "$needle" ] && { printf '%s\n' "$j"; return 0; }
+  done
+  return 1
+}
+
+deps_state() {
+  local deps_csv="$1" dep idx saw_incomplete=0
+  [ "$deps_csv" = "-" ] && { printf 'ready\n'; return; }
+  IFS=',' read -r -a dep_list <<< "$deps_csv"
+  for dep in "${dep_list[@]}"; do
+    idx="$(id_index "$dep")" || { printf 'invalid\n'; return; }
+    case "${states[$idx]}" in
+      pass) ;;
+      fail | incomplete) printf 'blocked\n'; return ;;
+      *) saw_incomplete=1 ;;
+    esac
+  done
+  if [ "$saw_incomplete" -eq 1 ]; then printf 'waiting\n'; else printf 'ready\n'; fi
+}
+
+command="${1:-}"
+[ "$command" = run ] || usage
+shift
+
+root="" commands="" environment="" logs="" status_file="" selected_executor="all" completed_file=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --root) root="${2:-}"; shift 2 ;;
+    --commands) commands="${2:-}"; shift 2 ;;
+    --environment) environment="${2:-}"; shift 2 ;;
+    --logs) logs="${2:-}"; shift 2 ;;
+    --status) status_file="${2:-}"; shift 2 ;;
+    --executor) selected_executor="${2:-}"; shift 2 ;;
+    --completed) completed_file="${2:-}"; shift 2 ;;
+    *) usage ;;
+  esac
+done
+[ -d "$root" ] && [ -f "$commands" ] && [ -f "$environment" ] \
+  && [ -n "$logs" ] && [ -n "$status_file" ] || usage
+case "$selected_executor" in all | worker | coordinator) ;; *) usage ;; esac
+[ -z "$completed_file" ] || [ -f "$completed_file" ] || usage
+
+root="$(cd "$root" && pwd -P)"
+script_dir="$(cd "$(dirname "$0")" && pwd -P)"
+assurance="$script_dir/pln-assurance"
+[ -x "$assurance" ] || { echo "pln-gauntlet: missing pln-assurance beside helper" >&2; exit 2; }
+mkdir -p "$logs" "$(dirname "$status_file")"
+logs="$(cd "$logs" && pwd -P)"
+
+ids=() deps=() groups=() resources=() tree_modes=() executors=() invocations=() states=() exits=()
+count=0
+first_line="$(sed -n '1p' "$commands")"
+if [ "$first_line" = "PLN_GAUNTLET_V1" ]; then
+  while IFS=$'\t' read -r id dep group resource tree_mode executor invocation; do
+    [ -n "$id$dep$group$resource$tree_mode$executor$invocation" ] || continue
+    command_name_ok "$id" || { echo "pln-gauntlet: invalid command id: $id" >&2; exit 2; }
+    [ -n "$invocation" ] || { echo "pln-gauntlet: empty command for $id" >&2; exit 2; }
+    case "$dep" in '') echo "pln-gauntlet: empty dependency field for $id" >&2; exit 2 ;; esac
+    case "$group" in - | *[!a-zA-Z0-9._-]*) [ "$group" = - ] || { echo "pln-gauntlet: invalid group for $id" >&2; exit 2; } ;; esac
+    case "$tree_mode" in clean | mutates) ;; *) echo "pln-gauntlet: invalid tree mode for $id" >&2; exit 2 ;; esac
+    case "$executor" in worker | coordinator) ;; *) echo "pln-gauntlet: invalid executor for $id" >&2; exit 2 ;; esac
+    if id_index "$id" >/dev/null 2>&1; then echo "pln-gauntlet: duplicate command id: $id" >&2; exit 2; fi
+    ids[$count]="$id"; deps[$count]="$dep"; groups[$count]="$group"; resources[$count]="$resource"
+    tree_modes[$count]="$tree_mode"; executors[$count]="$executor"; invocations[$count]="$invocation"
+    states[$count]="pending"; exits[$count]="-"; count=$((count + 1))
+  done < <(tail -n +2 "$commands")
+else
+  previous="-"
+  while IFS= read -r invocation || [ -n "$invocation" ]; do
+    [ -n "$invocation" ] || continue
+    case "$invocation" in \#*) continue ;; esac
+    id="$((count + 1))"
+    ids[$count]="$id"; deps[$count]="$previous"; groups[$count]="-"; resources[$count]="-"
+    tree_modes[$count]="clean"; executors[$count]="worker"; invocations[$count]="$invocation"
+    states[$count]="pending"; exits[$count]="-"; previous="$id"; count=$((count + 1))
+  done < "$commands"
+fi
+[ "$count" -gt 0 ] || { echo "pln-gauntlet: command file is empty" >&2; exit 2; }
+
+if [ "$first_line" = "PLN_GAUNTLET_V1" ] && [ "$selected_executor" = all ]; then
+  for ((i = 0; i < count; i++)); do
+    if [ "${executors[$i]}" = coordinator ]; then
+      echo "pln-gauntlet: V1 graph contains coordinator command ${ids[$i]}; use --executor coordinator, then --executor worker --completed <coordinator-status>" >&2
+      exit 2
+    fi
+  done
+fi
+
+# Validate every dependency before any command runs.
+for ((i = 0; i < count; i++)); do
+  [ "${deps[$i]}" = - ] && continue
+  IFS=',' read -r -a dep_list <<< "${deps[$i]}"
+  for dep in "${dep_list[@]}"; do
+    dep_i="$(id_index "$dep")" || { echo "pln-gauntlet: ${ids[$i]} depends on unknown command $dep" >&2; exit 2; }
+    [ "$dep_i" -ne "$i" ] || { echo "pln-gauntlet: ${ids[$i]} depends on itself" >&2; exit 2; }
+  done
+done
+
+# A coordinator pass can intentionally defer worker commands. A later worker
+# pass admits coordinator commands only when the earlier status proves they
+# passed; this is what prevents a known coordinator-only command being tried in
+# the worker first.
+remaining="$count"
+if [ "$selected_executor" != all ]; then
+  for ((i = 0; i < count; i++)); do
+    [ "${executors[$i]}" = "$selected_executor" ] && continue
+    if [ "$selected_executor" = coordinator ]; then
+      states[$i]=deferred; exits[$i]=-; remaining=$((remaining - 1))
+    elif [ -n "$completed_file" ]; then
+      completed_line="$(awk -F '\t' -v id="${ids[$i]}" '$1 == "RESULT" && $2 == id { print $3 "\t" $4; exit }' "$completed_file")"
+      completed_state="${completed_line%%$'\t'*}"
+      completed_exit="${completed_line#*$'\t'}"
+      if [ "$completed_state" = pass ]; then
+        states[$i]=pass; exits[$i]="$completed_exit"; remaining=$((remaining - 1))
+      else
+        states[$i]=incomplete; exits[$i]=-; remaining=$((remaining - 1))
+      fi
+    else
+      states[$i]=incomplete; exits[$i]=-; remaining=$((remaining - 1))
+    fi
+  done
+fi
+
+initial_tree="$(sha256_from_fingerprint)"
+tree_mutation=none
+while [ "$remaining" -gt 0 ]; do
+  first=-1
+  for ((i = 0; i < count; i++)); do
+    [ "${states[$i]}" = pending ] || continue
+    dep_state="$(deps_state "${deps[$i]}")"
+    if [ "$dep_state" = blocked ]; then
+      states[$i]=incomplete; exits[$i]=-; remaining=$((remaining - 1))
+    elif [ "$dep_state" = ready ] && [ "$first" -lt 0 ]; then
+      first=$i
+    fi
+  done
+  [ "$remaining" -gt 0 ] || break
+  if [ "$first" -lt 0 ]; then
+    for ((i = 0; i < count; i++)); do
+      if [ "${states[$i]}" = pending ]; then states[$i]=incomplete; remaining=$((remaining - 1)); fi
+    done
+    break
+  fi
+
+  wave=("$first")
+  group="${groups[$first]}"
+  held="${resources[$first]}"
+  if [ "$group" != - ] && [ "${tree_modes[$first]}" = clean ]; then
+    for ((i = first + 1; i < count; i++)); do
+      [ "${states[$i]}" = pending ] && [ "${groups[$i]}" = "$group" ] \
+        && [ "${tree_modes[$i]}" = clean ] || continue
+      [ "$(deps_state "${deps[$i]}")" = ready ] || continue
+      conflict=0
+      if [ "${resources[$i]}" != - ] && [ "$held" != - ]; then
+        IFS=',' read -r -a resource_list <<< "${resources[$i]}"
+        for resource in "${resource_list[@]}"; do contains_csv "$held" "$resource" && conflict=1; done
+      fi
+      [ "$conflict" -eq 0 ] || continue
+      wave+=("$i")
+      if [ "${resources[$i]}" != - ]; then
+        if [ "$held" = - ]; then held="${resources[$i]}"; else held="$held,${resources[$i]}"; fi
+      fi
+    done
+  fi
+
+  pids=()
+  for i in "${wave[@]}"; do
+    log="$logs/${ids[$i]}.log"
+    exit_record="$logs/${ids[$i]}.exit"
+    (
+      set +e
+      cd "$root" && bash -c "${invocations[$i]}" > "$log" 2>&1
+      code=$?
+      printf '%s\n' "$code" > "$exit_record"
+    ) &
+    pids+=("$!")
+  done
+  for pid in "${pids[@]}"; do wait "$pid"; done
+  for i in "${wave[@]}"; do
+    exit_record="$logs/${ids[$i]}.exit"
+    if [ ! -s "$exit_record" ]; then
+      states[$i]=incomplete; exits[$i]=-
+    else
+      code="$(sed -n '1p' "$exit_record")"
+      exits[$i]="$code"
+      if [ "$code" -eq 0 ]; then states[$i]=pass; else states[$i]=fail; fi
+    fi
+    remaining=$((remaining - 1))
+  done
+
+  current_tree="$(sha256_from_fingerprint)"
+  if [ "$current_tree" != "$initial_tree" ]; then
+    tree_mutation=detected
+    for ((i = 0; i < count; i++)); do
+      if [ "${states[$i]}" = pending ]; then states[$i]=incomplete; exits[$i]=-; remaining=$((remaining - 1)); fi
+    done
+  fi
+done
+
+tmp_status="$status_file.tmp.$$"
+: > "$tmp_status"
+aggregate=pass
+for ((i = 0; i < count; i++)); do
+  printf 'RESULT\t%s\t%s\t%s\n' "${ids[$i]}" "${states[$i]}" "${exits[$i]}" >> "$tmp_status"
+  if [ "${states[$i]}" != pass ] && ! { [ "$selected_executor" = coordinator ] && [ "${states[$i]}" = deferred ]; }; then
+    aggregate=fail
+  fi
+done
+printf 'TREE_MUTATION=%s\nAGGREGATE=%s\n' "$tree_mutation" "$aggregate" >> "$tmp_status"
+mv "$tmp_status" "$status_file"
+[ "$tree_mutation" = none ] && [ "$aggregate" = pass ]

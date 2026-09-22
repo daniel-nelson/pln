@@ -10,6 +10,8 @@ Read this file in full before the first reviewer or peer action. Keep `Phase: re
 
 Every state change in this phase is a complete next-generation candidate published through `{{OUTPUT_ROOT}}/bin/pln-publish-review` with the current ledger digest/generation. The merge worker writes its complete candidate only to the assigned evidence path; it never writes canonical `REVIEW.md`. Validate its bounded envelope, then publish that candidate. On stale rejection, discard it, reread canonical state, and reconcile rather than overwriting newer work.
 
+Every reader and merge is bound to the ledger's exact diff base and reviewed-diff SHA-256. If a later base refresh produces the same byte-identical diff, this review remains usable; if either the merge base or diff bytes move in a way that changes that subject, invalidate the review and return here before deciding whether any gauntlet evidence can be reused. Version-only verification reuse never authorizes review reuse for a changed diff.
+
 After the merged ledger is durable, set `Review status` and then set `Phase: fix` when acted-on findings remain or `Phase: ship-watch` when none remain. Read the mapped phase before its first action.
 
 <!-- pln:include followup-filing -->

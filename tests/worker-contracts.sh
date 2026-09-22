@@ -498,6 +498,16 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln/interview.md" 'no direct retirement found' \
     "$host interview no longer records the directly caused retirement outcome"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Possibly unbounded metadata' "$host PR scope phase lost file-first metadata collection"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'PR disposition: ready' \
+    "$host plain PR request no longer records ready disposition"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'PLN_GAUNTLET_V1' \
+    "$host scope phase lost declared gauntlet graph format"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Legacy plain command lists remain serial' \
+    "$host scope phase infers parallelism for legacy commands"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'known coordinator-only command is assigned `coordinator` and run there on its first attempt' \
+    "$host scope phase still burns a worker attempt on known coordinator-only work"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'assigned executor and its required terminal/network/filesystem/browser' \
+    "$host environment identity lost executor requirements"
   has "$WORK/$host/phases/pln-pr/review.md" 'src/workers/pr-review-merge.md' "$host PR review phase lost file-first merge ownership"
   has "$WORK/$host/phases/pln-pr/review.md" 'Never open a reviewer or peer result' "$host PR review reads raw findings into the coordinator"
   has "$WORK/$host/phases/pln-pr/review.md" 'current owners, closest analogues, and direct callers or consumers' \
@@ -575,6 +585,23 @@ for host in claude codex; do
     "$host Step 7 lost the fact that lets one agent hold the context firewall"
   has "$step7" 'so the context firewall holds without a second agent between you and the result' \
     "$host Step 7 states the bounded-metadata fact without saying it is why one agent suffices"
+  has "$step7" 'bin/pln-gauntlet' "$host Step 7 does not use the declared gauntlet runner"
+  has "$step7" '--status <plan-root>/evidence/final-gauntlet.coordinator.status --executor coordinator' \
+    "$host Step 7 does not run the coordinator subset explicitly first"
+  has "$step7" '--executor worker --completed <plan-root>/evidence/final-gauntlet.coordinator.status' \
+    "$host Step 7 worker can omit the coordinator-status handoff"
+  has "$step7" 'refuses the default `--executor all`' \
+    "$host Step 7 allows the default executor to collapse coordinator/worker ownership"
+  has "$step7" 'src/workers/context-envelope.md' \
+    "$host Step 7 worker does not read the shared envelope format"
+  has "$step7" 'bin/pln-read-envelope --root <plan-root> --max-bytes 2048' \
+    "$host Step 7 worker does not self-validate its envelope"
+  has "$step7" 'coordinator runs the same `pln-read-envelope` command itself and remains authoritative' \
+    "$host Step 7 worker self-validation displaced coordinator authority"
+  has "$step7" 'A pure version bump never triggers the functional gauntlet' \
+    "$host Step 7 reruns functional verification for a version-only correction"
+  has "$step7" 'mixed version-and-code delta' \
+    "$host Step 7 reuses functional evidence across mixed changes"
   # A rerun at elevated access can pass because of the privilege, and nothing
   # tells that apart from a command that merely needed it. So the result is
   # disclosed rather than absorbed into a green nobody can audit.
@@ -592,8 +619,6 @@ for host in claude codex; do
     "$host Step 7 no longer declares its worker brief self-contained"
   hasnt "$ship_watch" 'final-verification' \
     "$host ship-watch phase sends the final-gauntlet worker to the contract it must not read"
-  hasnt "$step7" 'src/workers/' \
-    "$host Step 7 points its worker at a contract file instead of the inline brief"
   # Scoped to the brief itself, not the file: ship-watch legitimately names a
   # host in its pln:only blocks, while the brief is the part a worker reads, and
   # this step is authorized to word it for its own register. The quoted block is
@@ -607,6 +632,14 @@ for host in claude codex; do
     hasnt "$brief" "$brief_term" \
       "$host Step 7 brief names a host, CLI or sandbox product: $brief_term"
   done
+  has "$ship_watch" 'A plain put-up/open/create request, including `review=none` or “skip review,” is `ready`' \
+    "$host exact late-skip trace still becomes an implicit draft"
+  has "$ship_watch" 'adding `--draft` only for `keep-draft` or `policy-draft`' \
+    "$host ready PR path can still receive --draft"
+  has "$ship_watch" 'A new ready PR offers optional CI watching but never starts it unprompted' \
+    "$host ready PR path still enters mandatory CI watch"
+  has "$ship_watch" 'an update to an already-open PR never touches its draft/ready state' \
+    "$host existing PR disposition can be rewritten"
   # The same refusal rule is coordinator text in three skills now, and
   # bin/pln-generate resolves pln:include only in src/**/*.core.md, so none of
   # the three can share one fragment with the worker contract or with each

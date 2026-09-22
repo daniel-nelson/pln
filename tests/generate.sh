@@ -418,9 +418,9 @@ has "$real_c/phases/pln/implementation.md" 'SendMessage' \
   "the claude build lost native blocker continuation"
 has "$real_c/phases/pln-pr/review.md" 'pipeline(' \
   "the claude build lost current Workflow fan-out mechanics"
-has "$real_x/phases/pln/implementation.md" 'followup_task' \
+has "$real_x/phases/pln/implementation.md" 'send_input' \
   "the codex build lost current native blocker continuation"
-has "$real_x/SKILL.md" 'send_message' \
+has "$real_x/SKILL.md" 'interrupt: true' \
   "the codex build lost current running-agent steering"
 for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
   has "$f" 'A quiet `wait_agent` timeout is not evidence that the child is still running' \
@@ -496,7 +496,7 @@ has "$real_c/phases/pln-pr/ship-watch.md" 'keep the same parent turn active' \
 
 has "$real_x/phases/pln/implementation.md" 'pln-scheduler finish-check' \
   "the codex implementation phase has no manifest-backed finish gate"
-has "$real_x/phases/pln/implementation.md" '`list_agents` after every quiet timeout' \
+has "$real_x/phases/pln/implementation.md" 'Read the mailbox after every quiet timeout' \
   "the codex implementation phase can miss a completion between waits"
 has "$real_x/phases/pln/implementation.md" 'Never send a final response from `Phase: implementation`' \
   "the codex implementation phase can still end while work is active"
@@ -505,12 +505,24 @@ for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
   hasnt "$f" 'JSON.parse' "$f still treats Workflow args as a string"
   hasnt "$f" 'agentType' "$f still uses the historical Workflow agent option"
 done
+# The Codex multi-agent surface, as every Codex session on the maintainer's machine
+# has ever exposed it (CLI 0.155.1 and earlier): spawn_agent, wait_agent, send_input,
+# resume_agent, close_agent. From 1.32.0 to 1.93.0 the build named four tools that
+# do not exist there and forbade naming the three that do; a coordinator told to
+# reconcile with `list_agents` could not, and closed six mid-work children unguided.
 for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
-  hasnt "$f" 'resume_agent' "$f still names the historical Codex resume tool"
-  hasnt "$f" 'send_input' "$f still names the historical Codex input tool"
-  hasnt "$f" 'close_agent' "$f still names the historical Codex close tool"
+  has "$f" 'A running child is never closed' "$f lets the coordinator close a running child"
+  has "$f" 'fork_context: false' "$f does not spawn with the exposed fork argument"
   hasnt "$f" 'multi_agent_v2' "$f still pins a superseded Codex feature generation"
   hasnt "$f" 'Pin to V1' "$f still pins Codex multi-agent V1"
+done
+while IFS= read -r f; do
+  for phantom in list_agents followup_task send_message interrupt_agent fork_turns; do
+    hasnt "$f" "$phantom" "$f names \`$phantom\`, which the Codex CLI does not expose"
+  done
+done < <(find "$real_x" -name '*.md' | grep -v slack)
+for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
+  has "$f" 'A running Agent is never stopped' "$f lets the coordinator stop a running Agent"
 done
 has "$real_c/phases/pln-pr/fix.md" 'coordinator stages explicit paths and commits each completed cluster' \
   "the claude fix fan-out has no executable commit ownership"
@@ -754,7 +766,7 @@ done
 # Invariants and native mechanics each have one generated home.
 has "$real_c/phases/pln/implementation.md" 'directly addressable Agents rather than Workflow' \
   "the Claude implementation phase lost item 2 native mechanics"
-has "$real_x/phases/pln/implementation.md" 'followup_task' \
+has "$real_x/phases/pln/implementation.md" 'send_input' \
   "the Codex implementation phase lost item 2 native mechanics"
 for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
   has "$f" 'run-manifest.tsv' "$f lost durable execution state"

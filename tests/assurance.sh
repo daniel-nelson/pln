@@ -110,6 +110,24 @@ first="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.
 second="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt")"
 [ "$first" = "$second" ] || fail 'unchanged candidate fingerprint was not deterministic'
 
+# Where the bytes are recorded is not what they are. Staging and committing an
+# already-verified tree change HEAD and `git status` while leaving every file
+# identical, so the fingerprint must not move — and must return to its earlier
+# value when the content does. It once folded both in, and the commit that
+# followed a passing gauntlet invalidated it and bought a second full run of the
+# same commands over the same content.
+FP() { $ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt"; }
+printf 'pending\n' > "$FIXTURE/pending.txt"
+untracked_fp="$(FP)"
+[ "$untracked_fp" != "$first" ] || fail 'a new untracked file did not invalidate fingerprint'
+git -C "$FIXTURE" add pending.txt
+[ "$(FP)" = "$untracked_fp" ] || fail 'staging an unchanged file moved the fingerprint'
+git -C "$FIXTURE" commit -qm pending
+[ "$(FP)" = "$untracked_fp" ] || fail 'committing an unchanged tree moved the fingerprint'
+git -C "$FIXTURE" rm -q pending.txt
+git -C "$FIXTURE" commit -qm drop-pending
+[ "$(FP)" = "$first" ] || fail 'restoring the content did not restore the fingerprint'
+
 printf 'two\n' > "$FIXTURE/source.txt"
 tree_changed="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt")"
 [ "$tree_changed" != "$first" ] || fail 'working-tree edit did not invalidate fingerprint'

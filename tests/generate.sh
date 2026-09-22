@@ -842,6 +842,19 @@ for host_out in "$real_c" "$real_x"; do
     "$ship_file dropped the project's instructions as the whole-suite escape hatch"
   has "$ship_file" 'There is no CI that will run it' \
     "$ship_file lost the no-CI justification, where the local run is the only run"
+  # An empty check list means "no CI here" only for a PR that could merge. A
+  # conflicting one may report the same empty list because the forge cannot build
+  # the merge commit its checks run against, so the mergeability question has to
+  # be asked first or the no-CI rule marks a conflicting PR ready and calls it
+  # shipped. Order is the whole guard, so the test pins the order.
+  has "$ship_file" 'Not mergeable — leave it in draft' \
+    "$ship_file lost the mergeability guard before the no-CI shortcut"
+  mergeable_at="$(grep -n 'Not mergeable — leave it in draft' "$ship_file" | head -1 | cut -d: -f1)"
+  nocifirst_at="$(grep -n 'No CI configured — undraft immediately' "$ship_file" | head -1 | cut -d: -f1)"
+  [ -n "$mergeable_at" ] && [ -n "$nocifirst_at" ] \
+    || fail "$ship_file is missing one of the mergeability/no-CI rules"
+  [ "$mergeable_at" -lt "$nocifirst_at" ] \
+    || fail "$ship_file asks about CI before mergeability, so a conflicting PR reads as a repo with no CI"
   # Touching tests buys those tests, never the suite — feature specs least of all.
   has "$ship_file" 'argues for **targeted tests instead**' \
     "$ship_file lets a test-touching change escalate to the whole suite"

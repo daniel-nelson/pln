@@ -6,6 +6,14 @@ usage() {
   cat >&2 <<'USAGE'
 Usage:
   pln-assurance classify --signals CSV --substantive-files N --non-generated-lines N
+      signals (R1) routine
+              (R2) dependencies builds configuration generators public-contracts
+                   missing-coverage multiple-subsystems
+              (R3) authentication trust secrets privacy production-data money
+                   external-effects destructive-migrations concurrency transactions
+                   iac ci-security compatibility ai-safety eval-safety
+                   critical-conflict unknown
+              any other token classifies R3 as unknown:<token>
   pln-assurance roster --risk R1|R2|R3 --areas CSV --adversary peer|local
   pln-assurance repair-key --kind behavioral|structural --boundary TEXT --check TEXT [--owner TEXT]
   pln-assurance repair-action --disposition new|persisted|needs-decision|out-of-scope|destructive|worker-blocked --failed-attempts N
@@ -208,15 +216,15 @@ case "$command" in
 
     root="$(cd "$root" && pwd -P)"
     manifest="$(mktemp "${TMPDIR:-/tmp}/pln-assurance-tree.XXXXXX")"
-    status_file="$(mktemp "${TMPDIR:-/tmp}/pln-assurance-status.XXXXXX")"
-    trap 'rm -f "$manifest" "$status_file"' EXIT
-    head="$(git -C "$root" rev-parse HEAD)"
-    git -C "$root" status --porcelain=v2 -z > "$status_file"
-    {
-      printf 'HEAD\0%s\0STATUS\0' "$head"
-      cat "$status_file"
-      printf '\0FILES\0'
-    } > "$manifest"
+    trap 'rm -f "$manifest"' EXIT
+    # The tree hash covers the bytes a gauntlet runs against and nothing else:
+    # every tracked and untracked-but-not-ignored path, its mode, and its
+    # content. HEAD and `git status` are deliberately absent. They describe
+    # where those bytes are recorded, not what they are, so including them made
+    # committing an already-verified tree — which changes both while leaving
+    # every file identical — invalidate the run and repeat the whole gauntlet on
+    # the same content.
+    printf 'FILES\0' > "$manifest"
     while IFS= read -r -d '' path; do
       printf '%s\0' "$path" >> "$manifest"
       if [ -L "$root/$path" ]; then

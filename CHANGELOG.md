@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.94.0 — 2026-09-21
+
+### Fixed
+
+- **Committing a verified tree made the final gauntlet run a second time on identical bytes.** `bin/pln-assurance fingerprint` folded `git rev-parse HEAD` and `git status --porcelain` into the tree hash alongside every file's path, mode and content. A `/pln-pr` run verifies the candidate, commits it, and then finds the candidate hash has moved — so the verification it just paid for no longer applies to anything, and Step 7's "gauntlet — once" runs the whole set again over files that did not change. Observed on a real run: `TREE_SHA256` `6d202ca7…` before the commit, `5a46ab98…` after, no file touched in between, five minutes to reach the same answer. On a repository whose gauntlet is the full suite it is the full suite twice.
+
+  The hash now covers the bytes and nothing else. HEAD and the status line say where the bytes are recorded, not what they are, which is not what a gauntlet result depends on. A rebase that pulls in new commits still invalidates verification, because the incoming code changes the files; a commit that changes no file no longer does. `bin/pln-simplify fingerprint` already excluded commit identity for the same reason, so the two now agree. `tests/assurance.sh` holds it: staging and committing an unchanged tree must not move the fingerprint, and restoring the content must restore it.
+
+- **A classification worker had to reverse-engineer pln's own vocabulary on every run.** `src/workers/assurance-classification.md` told it to "return the semantic signals accepted by `bin/pln-assurance classify`" and named the risk *concepts* in prose — but not the literal tokens, which existed only inside a `case` statement at `bin/pln-assurance:72`, and not in `--help`. So a worker holding the ideas but not the spellings had to go find them. One measured run did exactly that: `rg` across the whole installed skill, `classify --help` (which answered nothing), 260 lines of the script's source, a second `rg` for specialist-area names that do not exist as a closed set, and finally two previous runs' evidence files to copy the format from. About two minutes of a four-and-a-half-minute classification, repeated every run, in every repository.
+
+  The contract now spells the accepted tokens by tier, says that an unrecognized one classifies R3 as `unknown:<token>` rather than being corrected, and says outright that specialist areas are open text with no list to hunt for — which is what the second search was looking for. `classify --help` repeats the list, since that is the first place a worker looks. `tests/worker-contracts.sh` holds all three to each other: every token the contract documents must be one the binary accepts and `--help` prints, and every token the binary accepts must be documented or be a declared alias of one that is.
+
+- **A pull request that conflicts with its base could be marked ready and handed over as finished.** Step 9 watches a new draft PR until its required checks go green, and carries a shortcut: a repository that reports no checks at all was never going to turn any of them green, so mark the PR ready and stop. A PR that cannot merge may report that same empty list for an unrelated reason — the forge runs its checks against a merge commit it cannot construct — and from the list alone the two states are identical. The shortcut would fire, and a conflicting PR would close the run looking shipped.
+
+  Step 9 now asks whether the PR can merge before it reads the check list, and a definite `CONFLICTING` leaves it in draft, notifies, and says in one line that resolving the conflict is the user's. `UNKNOWN` continues rather than blocking, because the forge computes mergeability lazily and reports it for a PR opened seconds ago; it is re-asked once at the first watch interval. This run still never rebases: it has already pushed, and rewriting a branch under an open PR is not something to do unasked. `tests/generate.sh` pins the order of the two rules in both hosts' builds, since the order is the entire guard.
+
 ## 1.93.0 — 2026-09-21
 
 ### Added

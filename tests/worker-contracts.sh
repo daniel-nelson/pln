@@ -194,6 +194,35 @@ assurance="$REPO_DIR/src/workers/assurance-classification.md"
 has "$assurance" 'Classify meaning, not line count' 'assurance worker regressed to size-only risk'
 has "$assurance" 'Unknown or conflicting risk' 'assurance worker no longer fails closed'
 has "$assurance" 'SPECIALIST_AREAS=' 'assurance worker lost deterministic roster inputs'
+
+# The signal vocabulary lives in a case statement in bin/pln-assurance. A worker
+# told only to "return the signals accepted by" that helper had to go find it:
+# one real run grepped the whole skill, read 260 lines of the script, and then
+# read two past runs' evidence files to recover the spellings — about two minutes
+# of a five-minute classification, on every run. The contract and --help now
+# carry the list, so all three copies are held to the binary that accepts them.
+ASSURANCE_BIN="$REPO_DIR/bin/pln-assurance"
+contract_signals="$(sed -n 's/^- Raises to R\([23]\): //p;s/^- Routine: //p' "$assurance" | tr -d '`' | tr ' ' '\n' | grep -v '^$')"
+[ -n "$contract_signals" ] || fail 'assurance contract no longer spells out the accepted signal tokens'
+for token in $contract_signals; do
+  out="$("$ASSURANCE_BIN" classify --signals "$token" --substantive-files 1 --non-generated-lines 1)"
+  case "$out" in
+    *"REASON=unknown:$token"*) fail "assurance contract documents '$token', which bin/pln-assurance does not accept" ;;
+  esac
+  grep -qF -- "$token" "$WORK/assurance-help.txt" 2>/dev/null || {
+    "$ASSURANCE_BIN" > "$WORK/assurance-help.txt" 2>&1 || true
+    grep -qF -- "$token" "$WORK/assurance-help.txt" || fail "pln-assurance --help omits the accepted signal '$token'"
+  }
+done
+# And nothing the helper accepts may go undocumented. Aliases of a documented
+# spelling are the deliberate exception: one canonical token per concept.
+aliases='auth public-contract destructive-migration unresolved-critical-conflict'
+accepted="$(grep -E '^        [a-z][a-z |-]*\)$' "$ASSURANCE_BIN" | tr '|)' '\n\n' | sed 's/[^a-z-]//g' | grep -v '^$')"
+[ -n "$accepted" ] || fail 'could not read the accepted signal set out of bin/pln-assurance'
+for token in $accepted; do
+  case " $aliases " in *" $token "*) continue ;; esac
+  grep -qF -- "$token" "$assurance" || fail "bin/pln-assurance accepts '$token' but the worker contract never names it"
+done
 has "$verification" 'Do not fix a failure inline' 'verification contract may hide a failed gate'
 
 simplify_map="$REPO_DIR/src/workers/simplification-map.md"

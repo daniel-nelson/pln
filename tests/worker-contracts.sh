@@ -475,6 +475,21 @@ for host in claude codex; do
     "$host reviewer brief lost the test-only reachability answer"
   has "$WORK/$host/phases/pln-pr/fix.md" '`reached_by: test-only` is never one of these questions' \
     "$host fix phase can route an unreachable finding to a user decision"
+  # No fix worker was ever told about `smaller_fix`, and one full fix added a
+  # persisted escalation transition and a handoff that spawned four later
+  # findings. The worker builds the smaller repair and stops on new behavior.
+  has "$WORK/$host/phases/pln-pr/fix.md" 'each with its `fix` and `smaller_fix` copied verbatim' \
+    "$host fix-worker brief no longer carries the smaller repair"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'Build `smaller_fix` unless it is `none found`' \
+    "$host fix worker no longer builds the smaller repair by default"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'breaks a contract, consumer or invariant the reason names' \
+    "$host fix worker honours any rejection reason, so it never builds the smaller repair"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'a persisted-state write or state transition, a call with an external effect' \
+    "$host fix worker can build new stateful or consequential behavior without asking"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'return `BLOCKED:` naming both' \
+    "$host new-behavior stop no longer routes through the worker blocker"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'never returns this `BLOCKED:`' \
+    "$host a test-only finding can spend a user decision through the new-behavior stop"
   has "$WORK/$host/phases/pln-pr/review.md" 'on_base: string' \
     "$host review phase no longer asks whether the base already fails"
   has "$WORK/$host/phases/pln-pr/review.md" 'with the same input your reproduction uses' \

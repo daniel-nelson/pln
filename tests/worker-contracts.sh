@@ -335,9 +335,17 @@ has "$preflight" 'current git branch and status' 'pre-flight contract lost git-s
 
 interview="$REPO_DIR/src/workers/interview-research.md"
 has "$interview" '## Item mode' 'interview contract lost item research mode'
-has "$interview" '## Decision-record-query mode' 'interview contract lost record-query mode'
+has "$interview" '## Record-check mode' 'interview contract lost record-check mode'
 has "$interview" 'Check exactly the one proposed ask-lane question' \
   'record research is no longer query-scoped'
+has "$interview" '`settles`, `partly settles`, or `does not settle`' \
+  'record check no longer returns the bounded three-way outcome'
+has "$interview" 'Recommend nothing' 'record check may recommend an option'
+hasnt "$interview" 'Decision-record-query' 'the retired evidence-profile record lookup is still a mode'
+hasnt "$REPO_DIR/src/workers/evidence-collection.md" 'prior-record retrieval' \
+  'evidence collection still lists the retired record lookup'
+hasnt "$REPO_DIR/src/shared/model-routing-policy.md" 'prior-record retrieval' \
+  'routing policy still lists the retired record lookup as evidence work'
 has "$interview" 'Do not read prior plans or architecture-decision records in this mode' \
   'item research may trawl prior decisions'
 has "$interview" 'current owner, closest analogues, and material producers, callers, and consumers' \
@@ -622,7 +630,9 @@ for host in claude codex; do
   has "$WORK/$host/pln-pr/SKILL.md" 'at most two exact operations' "$host /pln-pr router lost the direct lookup budget"
   has "$WORK/$host/pln-pr/SKILL.md" 'routing.tsv' "$host /pln-pr router lost the local routing ledger"
   has "$WORK/$host/phases/pln/outline.md" 'Preflight is judgment work' "$host preflight no longer stays frontier"
-  has "$WORK/$host/phases/pln/interview.md" 'candidate prior-record matches' "$host interview lost the prior-record evidence/judgment split"
+  has "$WORK/$host/phases/pln/interview.md" 'one fresh `judgment` worker' "$host interview lost the one-worker record check"
+  hasnt "$WORK/$host/phases/pln/interview.md" 'candidate prior-record matches' \
+    "$host interview still splits the record check into lookup and judgment"
   has "$WORK/$host/phases/pln/interview.md" 'strongest existing-owner route' \
     "$host interview no longer gates new durable concepts on system fit"
   has "$WORK/$host/phases/pln/interview.md" 'do not admit the new concept' \

@@ -825,7 +825,8 @@ for host_out in "$real_c" "$real_x"; do
   # "Before the first proposal for every active item".
   has "$interview_file" 'Every active item is researched before the walk begins' \
     "$interview_file makes per-item research optional"
-  has "$interview_file" 'decision-record-query mode' "$interview_file lost query-scoped prior-decision checks"
+  has "$interview_file" 'record-check mode' "$interview_file lost query-scoped prior-decision checks"
+  has "$interview_file" 'as one concurrent wave' "$interview_file checks prior decisions one question at a time"
   has "$outline_file" '.git/info/exclude' "$outline_file does not keep local plans out of .gitignore"
   has "$outline_file" 'Outside a git worktree' "$outline_file does not allocate an external non-git run directory"
   hasnt "$f" 'WORKER_ONLY_SENTINEL_' "$f embedded worker-only runtime instructions"

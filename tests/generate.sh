@@ -410,7 +410,8 @@ has "$real_x/phases/pln/implementation.md" 'commit owner: coordinator' \
 # not by historical feature flags or tool names. Claude's sequential item loop
 # needs an addressable background Agent so a blocker can continue through
 # SendMessage; Workflow stays for true fan-out. Codex continuation starts a new
-# turn on the same idle agent with followup_task. Nested CLI helpers remain only
+# turn on the same idle agent, through whichever tool set the session exposes
+# (the table in the spawn fragment). Nested CLI helpers remain only
 # as the old/disabled-host fallback and the cross-provider peer boundary.
 has "$real_c/phases/pln/implementation.md" 'directly addressable Agents rather than Workflow' \
   "the claude build does not use addressable background Agents for item work"
@@ -418,15 +419,22 @@ has "$real_c/phases/pln/implementation.md" 'SendMessage' \
   "the claude build lost native blocker continuation"
 has "$real_c/phases/pln-pr/review.md" 'pipeline(' \
   "the claude build lost current Workflow fan-out mechanics"
-has "$real_x/phases/pln/implementation.md" 'send_input' \
+has "$real_x/phases/pln/implementation.md" 'continue that idle identity' \
   "the codex build lost current native blocker continuation"
-has "$real_x/SKILL.md" 'interrupt: true' \
-  "the codex build lost current running-agent steering"
 for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" '| Steer a running child |' \
+    "$f lost current running-agent steering"
   has "$f" 'A quiet `wait_agent` timeout is not evidence that the child is still running' \
     "$f does not require mailbox reconciliation after quiet waits"
   has "$f" 'A child completion cannot start a new coordinator turn after you send the final response' \
     "$f does not explain why a running coordinator may not end its turn"
+done
+# The durable-goal paragraph governs an unattended run, which in /pln begins at
+# implementation; it lives in that phase and in the /pln-pr router, never the
+# /pln router, whose byte ceiling the two-surface tool table needed.
+hasnt "$real_x/SKILL.md" 'create_goal' \
+  "the codex /pln router still carries the durable-goal paragraph its implementation phase owns"
+for f in "$real_x/pln-pr/SKILL.md" "$real_x/phases/pln/implementation.md"; do
   has "$f" 'explicitly asks for persistence across turns' \
     "$f does not recognize an explicit durable-goal request"
   has "$f" '`create_goal`' \
@@ -434,6 +442,8 @@ for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
   has "$f" 'the manifest and wait loop remain the fallback' \
     "$f lets a missing goal tool become a user-facing blocker"
 done
+hasnt "$real_c/phases/pln/implementation.md" 'create_goal' \
+  "the claude implementation phase received Codex-only durable-goal mechanics"
 for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
   hasnt "$f" 'create_goal' "$f received Codex-only durable-goal mechanics"
   has "$f" 'Never launch idle Bash merely to keep the parent turn open' \
@@ -505,27 +515,45 @@ for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
   hasnt "$f" 'JSON.parse' "$f still treats Workflow args as a string"
   hasnt "$f" 'agentType' "$f still uses the historical Workflow agent option"
 done
-# The Codex multi-agent surface, as every Codex session on the maintainer's machine
-# has ever exposed it (CLI 0.155.1 and earlier): spawn_agent, wait_agent, send_input,
-# resume_agent, close_agent. From 1.32.0 to 1.93.0 the build named four tools that
-# do not exist there and forbade naming the three that do; a coordinator told to
-# reconcile with `list_agents` could not, and closed six mid-work children unguided.
+# Codex gives each session one of two multi-agent tool sets, chosen per model by
+# its server-side catalog rather than by CLI version or local config: one with
+# send_input/resume_agent/close_agent and `fork_context`, one with list_agents/
+# followup_task/send_message/interrupt_agent and `fork_turns`. 1.93.0 named only
+# the second and 1.94.0 only the first; each was right for one model and wrong
+# for the other, and a coordinator follows its exposed tool list over the text.
+# So both sets are named, and only in the spawn fragment's job table: every other
+# Codex passage names the job. Which set a real session gets is not testable here.
+codex_set_names='send_input|resume_agent|close_agent|fork_context|fork_turns|list_agents|followup_task|send_message|interrupt_agent|agent_id|interrupt: true|status map'
 for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
   has "$f" 'A running child is never closed' "$f lets the coordinator close a running child"
-  has "$f" 'fork_context: false' "$f does not spawn with the exposed fork argument"
+  for term in 'fork_context: false' 'fork_turns: "none"' '`send_input`' '`followup_task`' \
+    '`close_agent`' '`list_agents`' '`interrupt_agent`' \
+    'nothing: a finished child holds no slot'; do
+    has "$f" "$term" "$f's Codex job table lost $term"
+  done
+  stray="$(grep -nE "$codex_set_names" "$f" | grep -vE '^[0-9]+:\|' || true)"
+  [ -z "$stray" ] || fail "$f names a single tool set outside the job table: $stray"
   hasnt "$f" 'multi_agent_v2' "$f still pins a superseded Codex feature generation"
   hasnt "$f" 'Pin to V1' "$f still pins Codex multi-agent V1"
 done
 while IFS= read -r f; do
-  for phantom in list_agents followup_task send_message interrupt_agent fork_turns; do
-    hasnt "$f" "$phantom" "$f names \`$phantom\`, which the Codex CLI does not expose"
-  done
+  case "$f" in "$real_x/SKILL.md"|"$real_x/pln-pr/SKILL.md") continue ;; esac
+  stray="$(grep -nE "$codex_set_names" "$f" || true)"
+  [ -z "$stray" ] || fail "$f names a single Codex tool set; name the job instead: $stray"
 done < <(find "$real_x" -name '*.md' | grep -v slack)
+has "$real_x/phases/pln-pr/fix.md" 'continue the same idle agent with the answer' \
+  "the codex fix phase lost native continuation of a blocked cluster"
+has "$real_x/phases/pln/blocker.md" 'Continue the idle blocked agent' \
+  "the codex blocker phase lost native continuation of a blocked item"
+while IFS= read -r f; do
+  stray="$(grep -nE "$codex_set_names" "$f" || true)"
+  [ -z "$stray" ] || fail "$f carries Codex tool names into the claude build: $stray"
+done < <(find "$real_c" -name '*.md' | grep -v slack)
 for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
   has "$f" 'A running Agent is never stopped' "$f lets the coordinator stop a running Agent"
 done
-has "$real_c/phases/pln-pr/fix.md" 'coordinator stages explicit paths and commits each completed cluster' \
-  "the claude fix fan-out has no executable commit ownership"
+has "$real_c/phases/pln-pr/fix.md" 'stages only the leased paths, and commits the cluster' \
+  "the claude fix phase has no executable commit ownership"
 has "$real_x/phases/pln-pr/review.md" 'Start independent slots concurrently' \
   "the codex build does not use native concurrency for independent review slots"
 has "$real_x/phases/pln-pr/review.md" 'before entering the shared `wait_agent` mailbox loop' \
@@ -766,7 +794,7 @@ done
 # Invariants and native mechanics each have one generated home.
 has "$real_c/phases/pln/implementation.md" 'directly addressable Agents rather than Workflow' \
   "the Claude implementation phase lost item 2 native mechanics"
-has "$real_x/phases/pln/implementation.md" 'send_input' \
+has "$real_x/phases/pln/implementation.md" 'continue that idle identity' \
   "the Codex implementation phase lost item 2 native mechanics"
 for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
   has "$f" 'run-manifest.tsv' "$f lost durable execution state"
@@ -792,7 +820,7 @@ has "$real_c/phases/pln/implementation.md" 'isolation: "worktree"' \
   'the Claude implementation phase lost native worktree isolation'
 has "$real_x/phases/pln/implementation.md" 'git worktree add --detach' \
   'the Codex implementation phase lost orchestrator-created worktrees'
-has "$real_c/phases/pln-pr/fix.md" 'coordinator stages explicit paths and commits each completed cluster' \
+has "$real_c/phases/pln-pr/fix.md" 'coordinator validates the result and diff, stages only the leased paths' \
   "the Claude fix phase lost coordinator commit ownership"
 has "$real_x/phases/pln-pr/review.md" 'Start independent slots concurrently' \
   "the Codex fix phase lost native concurrency semantics"
@@ -825,7 +853,8 @@ for host_out in "$real_c" "$real_x"; do
   # "Before the first proposal for every active item".
   has "$interview_file" 'Every active item is researched before the walk begins' \
     "$interview_file makes per-item research optional"
-  has "$interview_file" 'decision-record-query mode' "$interview_file lost query-scoped prior-decision checks"
+  has "$interview_file" 'record-check mode' "$interview_file lost query-scoped prior-decision checks"
+  has "$interview_file" 'as one concurrent wave' "$interview_file checks prior decisions one question at a time"
   has "$outline_file" '.git/info/exclude' "$outline_file does not keep local plans out of .gitignore"
   has "$outline_file" 'Outside a git worktree' "$outline_file does not allocate an external non-git run directory"
   hasnt "$f" 'WORKER_ONLY_SENTINEL_' "$f embedded worker-only runtime instructions"
@@ -903,6 +932,51 @@ for host_out in "$real_c" "$real_x"; do
     "$review_file lost the reader a bounded re-review always keeps"
   has "$review_file" 'never on the tier or on the first pass' \
     "$review_file lets a bounded roster shrink the tier or the first review pass"
+  # Classification belongs to the first pass; a bounded round re-classifies only
+  # for a signal the first pass did not record, and leans toward re-classifying.
+  has "$review_file" 'A bounded round (Re-review after a rewrite, below) dispatches no classification' \
+    "$review_file re-classifies a plan's risk on every bounded round"
+  has "$review_file" 'where you cannot tell, re-classify' \
+    "$review_file lost the fail-toward-re-classifying rule for a bounded round"
+  # An all-empty round skips the merge only on the helper's roster-aware verdict,
+  # and the coordinator then writes the round's record the merge would have.
+  has "$review_file" 'merge-skip --roles' \
+    "$review_file decides an empty round without the roster-aware helper"
+  has "$review_file" 'Only `SKIP_MERGE=yes` skips the merge' \
+    "$review_file lets a non-yes merge-skip verdict skip the merge"
+  has "$review_file" "remove the in-scope items' earlier Review findings" \
+    "$review_file leaves a skipped bounded round's superseded findings standing"
+  has "$review_file" 'the skipped empty round above is the one record you write' \
+    "$review_file lost the one exception to the merge worker owning PLAN.md edits"
+  # The classifier starts beside the broad reviewer, which every tier's roster
+  # holds; the roster that follows dispatches everything but that reader, and
+  # the broad reviewer is joined before the merge.
+  has "$review_file" 'spawn the classifier and the broad reviewer together' \
+    "$review_file makes the broad plan reviewer wait for risk classification"
+  has "$review_file" 'its broad slot is the reader already running' \
+    "$review_file lets the validated roster spawn a second broad plan reviewer"
+  has "$review_file" 'never a second broad' \
+    "$review_file's host fragment re-dispatches the broad reviewer with the roster"
+  pr_scope_file="$host_out/phases/pln-pr/scope-baseline.md"
+  pr_review_file="$host_out/phases/pln-pr/review.md"
+  has "$pr_scope_file" 'snapshot --repo . --out "<plan-dir>/evidence/clean-tree.tsv" --summary 5' \
+    "$pr_scope_file reads a dirty tree through a worker instead of the bounded snapshot summary"
+  has "$pr_scope_file" 'If `test -s` says that file is empty, the tree is clean' \
+    "$pr_scope_file spends more than a file test on a clean tree"
+  has "$pr_scope_file" 'bin/pln-assurance diff-stats --root .' \
+    "$pr_scope_file no longer computes the diff totals with the helper"
+  hasnt "$pr_scope_file" 'Assign that artifact to an evidence worker' \
+    "$pr_scope_file kept the status evidence worker"
+  hasnt "$pr_scope_file" 'frontend flag' \
+    "$pr_scope_file kept the frontend flag nothing reads"
+  has "$pr_scope_file" 'leave `Risk tier` empty' \
+    "$pr_scope_file classifies before review even when the depth is already known"
+  has "$pr_review_file" 'An empty `Risk tier` in this phase is scope-baseline handing classification over' \
+    "$pr_review_file treats an empty tier in the review phase as a missing baseline"
+  has "$pr_review_file" 'the broad slot is the reader already running, never a second one' \
+    "$pr_review_file lets the roster spawn a second broad PR reviewer"
+  has "$pr_review_file" 'never a second broad' \
+    "$pr_review_file's dispatch fragment re-dispatches the running broad reviewer"
   has "$outline_file" "A location the project's own instructions name wins over both defaults" \
     "$outline_file lost the instruction-named plan location"
   has "$outline_file" 'In a git worktree, and with no such location named' \
@@ -1178,6 +1252,13 @@ for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
   # phase's contract finds nothing and pays a round trip for it.
   has "$f" 'there is no separate contract file for a fix or a post-fix verifier' \
     "$f leaves a run to hunt src/workers/ for a contract that is not there"
+  # The post-fix merge is the one exception, and it gets the first merge's
+  # prepared brief: a round that borrowed that contract without the brief spent
+  # minutes hunting for it and messaged the coordinator.
+  has "$f" 'The post-fix merge is the exception' \
+    "$f sends the post-fix merge to hunt for a contract"
+  has "$f" 'pln-build-review-brief" --mode pr-merge' \
+    "$f post-fix merge gets no prepared brief"
   # Execution is linear since 1.60.0: no isolated worktree is assigned.
   hasnt "$f" 'assigned isolated worktree' \
     "$f still sends a fix worker to an isolated worktree execution no longer creates"
@@ -1189,9 +1270,11 @@ done
 # a real run spent 3.6 minutes of frontier effort answering a question with one
 # possible answer while the user waited for a one-file fix.
 for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
-  has "$f" 'A single cluster is not a scheduling problem' \
-    "$f spawns a scheduling worker for one cluster"
-  has "$f" 'With two or more clusters' "$f drops the scheduling worker where it is needed"
+  has "$f" 'No worker schedules a repair round' \
+    "$f spawns a scheduling worker for a repair round"
+  # The merge that declared the clusters writes their node file; no round
+  # spawns a scheduling worker (5-7 min each, ~25 min over one run).
+  hasnt "$f" 'With two or more clusters' "$f still spawns a scheduling worker per repair round"
   hasnt "$f" 'Parallelize only one manifest wave' \
     "$f still describes parallel fix waves that execution no longer has"
 done
@@ -1230,12 +1313,73 @@ for f in "$real_c/phases/pln/review-approval.md" "$real_c/phases/pln-pr/review.m
     "$f lost the portable not-authenticated explanation"
 done
 
+# ─── the broad reviewer starts with the classifier, on each host's own terms ──
+# Codex holds a finished child's slot until it is freed, so the classifier's
+# slot is freed before the specialists spawn; Claude joins a named background
+# Agent beside the roster's Workflow.
+for f in "$real_x/phases/pln/review-approval.md" "$real_x/phases/pln-pr/review.md"; do
+  has "$f" "free" "$f never frees a finished child's slot"
+  hasnt "$f" 'named background `Agent`' "the codex build carries Claude's broad-reviewer handle"
+done
+has "$real_x/phases/pln/review-approval.md" 'When the classifier returns, free its slot' \
+  'the codex plan review keeps the finished classifier in a reader slot'
+has "$real_x/phases/pln-pr/review.md" "free the finished classifier's slot first" \
+  'the codex PR review keeps the finished classifier in a reader slot'
+for f in "$real_c/phases/pln/review-approval.md" "$real_c/phases/pln-pr/review.md"; do
+  has "$f" 'named background `Agent`' "$f does not hold the early broad reviewer as its own Agent"
+done
+has "$real_c/phases/pln-pr/review.md" "wait for its notification as well as the Workflow's" \
+  'the claude PR review builds the merge before the early broad reviewer returns'
+
 # ─── the Codex fragment now asserts the overlap, because a run proved it ─────
 # It was deliberately silent from 1.25.0 until a real run existed.
 has "$real_x/phases/pln/review-approval.md" 'Verified on a real Codex run' \
   'the codex plan review no longer records whether the peer overlap works'
 hasnt "$real_c/phases/pln/review-approval.md" 'Verified on a real Codex run' \
   "the claude build carries Codex's run evidence"
+
+# ─── the adversarial substitute starts when the host has a slot for it ───────
+# The shared rule once said "a substitute's spawn among the other spawns" on
+# both hosts. On Codex's default four slots (coordinator included) three readers
+# fill the session, so that was unfollowable, and every observed Codex round
+# spawned the substitute only when the first reader finished — while the peer's
+# usage-limit notice reached the user as a bare STATUS=error. So the shared text
+# is host-neutral and each host's roster instructions carry its own timing: on
+# Claude, among the other spawns; on Codex, at once, else the first freed slot,
+# and a peer already out of quota is skipped for the rest of that review.
+for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-approval.md" \
+         "$real_c/phases/pln-pr/review.md" "$real_x/phases/pln-pr/review.md"; do
+  has "$f" 'Start it as soon as the host has a slot for it' \
+    "$f lost the host-neutral substitute timing rule"
+  hasnt "$f" "a substitute's spawn among the other spawns" \
+    "$f still carries the unconditional shared timing Codex's slot cap forbids"
+  has "$f" '`<peer>-usage-limit` means the peer ran and its provider refused it for quota' \
+    "$f does not relay why a peer that ran failed"
+done
+for f in "$real_c/phases/pln/review-approval.md" "$real_c/phases/pln-pr/review.md"; do
+  has "$f" "substitute's spawn goes among the other spawns" \
+    "$f lost Claude's substitute timing"
+  hasnt "$f" 'first slot a finished reader frees' "$f carries Codex's slot-cap timing"
+  hasnt "$f" 'max_concurrent_threads_per_session' "$f names a Codex setting"
+done
+for f in "$real_x/phases/pln/review-approval.md" "$real_x/phases/pln-pr/review.md"; do
+  hasnt "$f" 'among the other spawns' "$f tells Codex to spawn a fourth reader its slots cannot hold"
+  has "$f" "the moment the peer's no-send or failure is known" \
+    "$f waits for a reader before spawning the substitute"
+  has "$f" 'Only if that spawn is refused for capacity' "$f lost the capacity fallback"
+  has "$f" 'first slot a finished reader frees' "$f does not say where a refused substitute goes"
+  has "$f" 'close a finished reader to free it; never a running one' \
+    "$f frees a slot by closing a running reader"
+  # Named only because a manual check showed it changes the stated slot count
+  # (2026-09-22, gpt-5.6-sol: 4 by default, 6 with the key at 6), and only as
+  # the user's own setting.
+  has "$f" 'features.multi_agent_v2.max_concurrent_threads_per_session' \
+    "$f does not name the user's setting that raises the slot count"
+  has "$f" 'pln never writes it' "$f lets the run change the user's Codex config"
+  has "$f" 'A peer already out of quota is not called again in the same review' \
+    "$f calls a peer it already knows is out of quota"
+  has "$f" 'since the limit resets' "$f skips the peer beyond the review that saw the limit"
+done
 
 # ─── a plan directory outside the repository gets a writable artifact root ───
 # A native subagent inherits the coordinator's write boundary, and neither host

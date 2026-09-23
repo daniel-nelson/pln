@@ -19,6 +19,7 @@ for name in context-envelope evidence-collection preflight-research interview-re
   [ -s "$file" ] || fail "missing or empty worker contract: $file"
   has "$file" 'WORKER_ONLY_SENTINEL_' "$file has no worker-only sentinel"
   for host_term in Claude Codex 'spawn_agent' 'wait_agent' 'resume_agent' \
+    'send_input' 'close_agent' 'followup_task' 'list_agents' \
     'agentType' 'Agent tool' 'Workflow('; do
     hasnt "$file" "$host_term" "$file contains host mechanics: $host_term"
   done
@@ -113,6 +114,11 @@ has "$scheduling" 'Unknown targets or uncertain independence use `UNKNOWN`' \
   'scheduling contract no longer serializes uncertainty'
 has "$scheduling" 'Known consolidation, replacement, or retirement targets' \
   'scheduling leases omit known anti-bloat write targets'
+# PR fix rounds no longer spawn this worker: the merge that declares the
+# clusters writes their node file under these rules, so they keep one owner.
+hasnt "$scheduling" 'pr-fix-clusters' 'scheduling contract still offers a PR fix-cluster mode'
+has "$scheduling" 'starts every independent fix cluster fresh' \
+  'scheduling contract lost the independent-cluster-fresh rule the PR merge applies'
 
 verification="$REPO_DIR/src/workers/final-verification.md"
 has "$verification" 'full gauntlet' 'verification contract lost the full gauntlet'
@@ -196,12 +202,17 @@ has "$policy" 'the outcome is recorded as a **qualified pass**' \
   'assurance policy lost the qualified-pass outcome for a rerun refused command'
 has "$policy" 'not the reuse of a green this rule governs' \
   'assurance policy no longer separates a qualified pass from reusing a green under a matching seal'
+has "$policy" 'A bounded plan re-review reuses the recorded tier' \
+  'assurance policy re-classifies every bounded plan re-review'
+has "$policy" 'it starts beside the broad reviewer' \
+  'assurance policy makes every reader wait for risk classification'
 
 
 assurance="$REPO_DIR/src/workers/assurance-classification.md"
 has "$assurance" 'Classify meaning, not line count' 'assurance worker regressed to size-only risk'
 has "$assurance" 'Unknown or conflicting risk' 'assurance worker no longer fails closed'
 has "$assurance" 'SPECIALIST_AREAS=' 'assurance worker lost deterministic roster inputs'
+has "$assurance" 'pln-assurance diff-stats' 'assurance worker recounts the diff the helper already totalled'
 
 # The signal vocabulary lives in a case statement in bin/pln-assurance. A worker
 # told only to "return the signals accepted by" that helper had to go find it:
@@ -330,9 +341,17 @@ has "$preflight" 'current git branch and status' 'pre-flight contract lost git-s
 
 interview="$REPO_DIR/src/workers/interview-research.md"
 has "$interview" '## Item mode' 'interview contract lost item research mode'
-has "$interview" '## Decision-record-query mode' 'interview contract lost record-query mode'
+has "$interview" '## Record-check mode' 'interview contract lost record-check mode'
 has "$interview" 'Check exactly the one proposed ask-lane question' \
   'record research is no longer query-scoped'
+has "$interview" '`settles`, `partly settles`, or `does not settle`' \
+  'record check no longer returns the bounded three-way outcome'
+has "$interview" 'Recommend nothing' 'record check may recommend an option'
+hasnt "$interview" 'Decision-record-query' 'the retired evidence-profile record lookup is still a mode'
+hasnt "$REPO_DIR/src/workers/evidence-collection.md" 'prior-record retrieval' \
+  'evidence collection still lists the retired record lookup'
+hasnt "$REPO_DIR/src/shared/model-routing-policy.md" 'prior-record retrieval' \
+  'routing policy still lists the retired record lookup as evidence work'
 has "$interview" 'Do not read prior plans or architecture-decision records in this mode' \
   'item research may trawl prior decisions'
 has "$interview" 'current owner, closest analogues, and material producers, callers, and consumers' \
@@ -392,6 +411,40 @@ has "$pr_merge" 'is `informational` whatever the reader marked it' \
   'PR merge lets an unreachable finding keep a critical severity'
 has "$pr_merge" 'never routed `needs-decision`, and never raises a blocker' \
   'PR merge can still spend a user decision on a test-only finding'
+
+# A defect the base branch already had is not this branch's to repair. One run
+# auto-repaired a take-back prune that behaved identically on its diff base, and
+# that 230-line repair produced a later finding of its own. Provenance is keyed
+# to the reproduction's input and consequence, not to where the code sits, and
+# the merge worker confirms it rather than taking the reader's word.
+has "$pr_merge" '`on_base`' 'PR merge no longer confirms base provenance'
+has "$pr_merge" "builds the reproduction's own input" \
+  'PR merge can call a finding pre-existing on a base failure reached by a different input'
+has "$pr_merge" 'in scope even though the base fails the same way' \
+  'PR merge lets a fix branch exclude the defect it set out to fix'
+has "$pr_merge" 'gets no repair key' 'PR merge can queue a pre-existing defect for repair'
+has "$pr_merge" "the envelope's \`pre_existing\` field" \
+  'PR merge envelope no longer names pre-existing findings for filing'
+# The post-fix merge runs on this same contract, and the settled candidate
+# advances only from the commit its envelope says the counted reader read.
+has "$pr_merge" '`reader_commit` when the assignment asks for it' \
+  'PR merge envelope cannot return the commit a post-fix reader read'
+# Every multi-cluster repair round spawned a scheduling worker (5-7 min each,
+# ~25 min in one run) whose output was always a linear order. The merge that
+# declares the clusters writes the node file instead, under the schedule
+# contract's rules by reference, and a cluster's lease covers both repairs the
+# fix worker may choose between.
+has "$pr_merge" 'apply its node schema and its edge, lease and `UNKNOWN`, cohort, dirty-state and independent-cluster-fresh rules' \
+  'PR merge writes fix nodes without the schedule contract rules'
+has "$pr_merge" 'the files of both its `fix` and its `smaller_fix`' \
+  'PR merge leases a cluster for only one of the repairs its worker may build'
+has "$pr_merge" 'row N is the Nth acted-on cluster' \
+  'PR merge node rows cannot be mapped back to clusters'
+# A post-fix finding outside the scoped range that no in-range repair made
+# reachable is filed, never repaired, on the same path as a pre-existing one.
+has "$pr_merge" 'with status `out-of-range`' 'PR merge can repair a finding outside the scoped range'
+has "$pr_merge" "the envelope's \`out_of_range\` field" \
+  'PR merge envelope does not name out-of-range findings for filing'
 
 # Even a reachable finding can carry a cathedral. The same run's proposed repair
 # for two dead fields on a persisted type was to validate every envelope against
@@ -461,6 +514,33 @@ for host in claude codex; do
     "$host reviewer brief lost the test-only reachability answer"
   has "$WORK/$host/phases/pln-pr/fix.md" '`reached_by: test-only` is never one of these questions' \
     "$host fix phase can route an unreachable finding to a user decision"
+  # No fix worker was ever told about `smaller_fix`, and one full fix added a
+  # persisted escalation transition and a handoff that spawned four later
+  # findings. The worker builds the smaller repair and stops on new behavior.
+  has "$WORK/$host/phases/pln-pr/fix.md" 'each with its `fix` and `smaller_fix` copied verbatim' \
+    "$host fix-worker brief no longer carries the smaller repair"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'Build `smaller_fix` unless it is `none found`' \
+    "$host fix worker no longer builds the smaller repair by default"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'breaks a contract, consumer or invariant the reason names' \
+    "$host fix worker honours any rejection reason, so it never builds the smaller repair"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'a persisted-state write or state transition, a call with an external effect' \
+    "$host fix worker can build new stateful or consequential behavior without asking"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'return `BLOCKED:` naming both' \
+    "$host new-behavior stop no longer routes through the worker blocker"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'never returns this `BLOCKED:`' \
+    "$host a test-only finding can spend a user decision through the new-behavior stop"
+  has "$WORK/$host/phases/pln-pr/review.md" 'on_base: string' \
+    "$host review phase no longer asks whether the base already fails"
+  has "$WORK/$host/phases/pln-pr/review.md" 'with the same input your reproduction uses' \
+    "$host reviewer brief keys base provenance to code location instead of the reproduction"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'Give each finding an `on_base`' \
+    "$host post-fix red team no longer states base provenance"
+  for phase in review fix; do
+    has "$WORK/$host/phases/pln-pr/$phase.md" "merge envelope's \`pre_existing\` and" \
+      "$host $phase phase no longer files the pre-existing findings its merge named"
+  done
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'Every `pre-existing` finding' \
+    "$host PR body and closing message can omit filed pre-existing defects"
   has "$WORK/$host/phases/pln-pr/review.md" 'smaller_fix: string' \
     "$host review phase no longer asks for the smaller repair passed over"
   has "$WORK/$host/phases/pln-pr/review.md" 'the literal `none found`' \
@@ -481,6 +561,74 @@ for host in claude codex; do
     "$host settled-candidate rule no longer distinguishes itself from the removed round cap"
   hasnt "$WORK/$host/phases/pln-pr/ship-watch.md" 'the branch ships without them' \
     "$host closing message regained a tally of work nobody is doing"
+  # 1.92.0 settled only after a clean post-fix round, which one run never
+  # reached in four rounds while its cumulative repair diff grew from +859 to
+  # +1427 lines. The anchor now moves to the commit the last successful
+  # post-fix reader read, and a failed reader leaves it where it was.
+  hasnt "$WORK/$host/phases/pln-pr/fix.md" 'post-fix assurance on that candidate clean' \
+    "$host settled candidate still waits for a clean round that may never come"
+  hasnt "$WORK/$host/phases/pln-pr/fix.md" 'which shrinks as the repairs land' \
+    "$host fix phase still claims a cumulative repair diff shrinks"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'git diff <Settled candidate> <candidate commit>' \
+    "$host later post-fix readers are not briefed with the exact repair range"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'diff-fingerprint --root <repository-root> --base <Settled candidate>' \
+    "$host scoped repair diff has no mechanical identity"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'from the post-fix merge result, never at dispatch' \
+    "$host settled candidate can advance on a reader nobody counted"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'A failed or uncounted reader leaves `Settled candidate` where it was' \
+    "$host a failed post-fix reader can advance the anchor past bytes nobody read"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'base code or an earlier round'"'"'s repair code' \
+    "$host made-reachable exception narrowed to base code"
+  # 1.92.0 recorded a fingerprint here; a digest no git command resolves would
+  # make the narrowed brief a range nobody can read.
+  has "$WORK/$host/phases/pln-pr/fix.md" 'that does not resolve with `git rev-parse --verify' \
+    "$host an older release's fingerprint in Settled candidate becomes an unreadable range"
+  # Up to 1.95.0 the post-fix merge named no contract, so a worker borrowed
+  # pr-review-merge.md, hunted for the prepared brief it requires, and one round
+  # messaged the coordinator for it. It now gets that contract and that brief.
+  has "$WORK/$host/phases/pln-pr/fix.md" '--artifact post-fix-red-team' \
+    "$host post-fix merge brief does not inventory the red team's artifact"
+  has "$WORK/$host/phases/pln-pr/fix.md" '--reader-metadata "<plan-dir>/evidence/post-fix-readers.tsv"' \
+    "$host post-fix merge brief has no reader metadata"
+  has "$WORK/$host/phases/pln-pr/fix.md" '--diff-map "<plan-dir>/evidence/post-fix-diff-files.txt"' \
+    "$host post-fix merge brief has no repair-range diff map"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'src/workers/pr-review-merge.md` on that brief' \
+    "$host post-fix merge still names no contract"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'Its assignment also carries' \
+    "$host post-fix-only duties do not reach the merge worker"
+  # No per-round scheduling worker; the coordinator edits the merge's node
+  # file mechanically when the dispatched set moves.
+  hasnt "$WORK/$host/phases/pln-pr/fix.md" 'pr-fix-clusters' \
+    "$host fix phase still spawns a scheduling worker per round"
+  hasnt "$WORK/$host/phases/pln-pr/fix.md" 'With two or more clusters' \
+    "$host fix phase still branches to a scheduling worker"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'appending serially is always a valid order' \
+    "$host fix phase has no rule for clusters the merge did not declare"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'remove the rows of clusters not being dispatched' \
+    "$host fix phase builds a manifest with rows for skipped clusters"
+  has "$WORK/$host/phases/pln-pr/fix.md" '<plan-dir>/fix-nodes.tsv' \
+    "$host post-fix merge is not assigned the node output path"
+  has "$WORK/$host/phases/pln-pr/fix.md" '<plan-dir>/fix-dirty-start.tsv' \
+    "$host fix nodes are not tied to a dirty snapshot taken before the merge"
+  has "$WORK/$host/phases/pln-pr/review.md" '<plan-dir>/fix-nodes.tsv' \
+    "$host first merge is not assigned the node output path"
+  has "$WORK/$host/phases/pln-pr/review.md" '<plan-dir>/fix-dirty-start.tsv' \
+    "$host first merge has no dirty snapshot"
+  for phase in review fix; do
+    has "$WORK/$host/phases/pln-pr/$phase.md" "\`out_of_range\` fields once with" \
+      "$host $phase phase does not file out-of-range findings"
+  done
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'every `out-of-range` finding, marked as outside' \
+    "$host PR body drops findings filed as outside the scoped range"
+  # Execution is linear since 1.60.0; the wave and worktree text stayed behind.
+  for phase in fix blocker ship-watch; do
+    for stale in 'isolated wave' 'isolated sibling' 'isolated disjoint' 'per cluster with `isolation' \
+      'assigned worktree' 'concurrent writes would race' 'every cluster in the wave' \
+      'can run concurrently when leases are disjoint'; do
+      hasnt "$WORK/$host/phases/pln-pr/$phase.md" "$stale" \
+        "$host $phase phase still describes parallel fix waves: $stale"
+    done
+  done
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Settled candidate' \
     "$host ledger no longer carries the settled candidate across a compaction"
   has "$WORK/$host/SKILL.md" 'at most two exact operations' "$host /pln router lost the direct lookup budget"
@@ -488,7 +636,9 @@ for host in claude codex; do
   has "$WORK/$host/pln-pr/SKILL.md" 'at most two exact operations' "$host /pln-pr router lost the direct lookup budget"
   has "$WORK/$host/pln-pr/SKILL.md" 'routing.tsv' "$host /pln-pr router lost the local routing ledger"
   has "$WORK/$host/phases/pln/outline.md" 'Preflight is judgment work' "$host preflight no longer stays frontier"
-  has "$WORK/$host/phases/pln/interview.md" 'candidate prior-record matches' "$host interview lost the prior-record evidence/judgment split"
+  has "$WORK/$host/phases/pln/interview.md" 'one fresh `judgment` worker' "$host interview lost the one-worker record check"
+  hasnt "$WORK/$host/phases/pln/interview.md" 'candidate prior-record matches' \
+    "$host interview still splits the record check into lookup and judgment"
   has "$WORK/$host/phases/pln/interview.md" 'strongest existing-owner route' \
     "$host interview no longer gates new durable concepts on system fit"
   has "$WORK/$host/phases/pln/interview.md" 'do not admit the new concept' \
@@ -925,6 +1075,43 @@ if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
 fi
 has "$WORK/verify-candidate.err" 'candidate fingerprint mismatch' \
   'candidate drift was not attributed'
+
+# The post-fix merge reuses pr-merge mode unchanged: one red-team artifact, a
+# one-row reader table, the repair range's diff map, and no plan. It gets the
+# same confinement and digest checks as the first merge, so a red-team result
+# replaced after the brief was built fails verification instead of counting.
+printf '{"findings":[]}\n' > "$merge_repo/evidence/post-fix-red-team.json"
+printf 'post-fix-red-team\tsuccess\tevidence/post-fix-red-team.json\n' \
+  > "$merge_repo/evidence/post-fix-readers.tsv"
+printf 'M\tordinary-source.txt\n' > "$merge_repo/evidence/post-fix-diff-files.txt"
+post_fix_candidate="$("$REPO_DIR/bin/pln-assurance" fingerprint \
+  --root "$merge_repo" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" \
+  | awk -F= '$1 == "CANDIDATE_SHA256" { print $2 }')"
+post_fix_brief="$WORK/post-fix-merge.brief"
+"$REPO_DIR/bin/pln-build-review-brief" --mode pr-merge \
+  --contract "$REPO_DIR/src/workers/pr-review-merge.md" --root "$merge_repo" \
+  --candidate "$post_fix_candidate" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" --ledger "$merge_repo/REVIEW.md" \
+  --diff-map "$merge_repo/evidence/post-fix-diff-files.txt" \
+  --reader-metadata "$merge_repo/evidence/post-fix-readers.tsv" \
+  --artifact post-fix-red-team "$merge_repo/evidence/post-fix-red-team.json" \
+  --skill-root "$merge_repo/skills" --out "$post_fix_brief" >/dev/null \
+  || fail 'single-artifact post-fix merge brief was not built'
+[ "$(head -n 1 "$post_fix_brief")" = '# PR review merge contract' ] \
+  || fail 'post-fix merge brief does not carry the merge contract first'
+post_fix_role_hex="$(printf 'post-fix-red-team' | od -An -v -tx1 | tr -d ' \n')"
+[ "$(grep -c "^ARTIFACT	$post_fix_role_hex	" "$post_fix_brief")" -eq 1 ] \
+  || fail 'post-fix merge brief does not inventory exactly one red-team artifact'
+[ "$(grep -c '^ARTIFACT	' "$post_fix_brief")" -eq 4 ] \
+  || fail 'post-fix merge brief inventories artifacts beyond red team, ledger, diff map and reader table'
+"$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$post_fix_brief" \
+  | grep -q '^STATUS=verified$' || fail 'fresh post-fix merge context did not verify'
+printf '{"findings":[{"title":"x"}]}\n' > "$merge_repo/evidence/post-fix-red-team.json"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$post_fix_brief" \
+  >"$WORK/verify-post-fix.out" 2>"$WORK/verify-post-fix.err"; then
+  fail 'replaced post-fix red-team artifact verified'
+fi
 
 # REVIEW.md publication is a narrow compare-and-publish boundary. A complete
 # candidate becomes visible by one sibling rename only after its run identity,

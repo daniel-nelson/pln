@@ -2,7 +2,7 @@
 
 Risk classification is fresh `judgment` work. The assignment names the plan or file-first diff/metadata artifacts, protected choices, exact source fingerprint, evidence path, result path, and a 4096-byte budget. Read `context-envelope.md` beside this file before starting. Do not proceed on an evidence/economy route.
 
-Classify meaning, not line count. Inspect enough context to decide which of the signals below the candidate carries. Unknown or conflicting risk is the literal `unknown` signal. Separately report substantive non-generated file and line counts; they may raise risk but never lower it.
+Classify meaning, not line count. Inspect enough context to decide which of the signals below the candidate carries. Unknown or conflicting risk is the literal `unknown` signal. Separately report substantive non-generated file and line counts; they may raise risk but never lower it. When the assignment carries `pln-assurance diff-stats` totals (`FILES`, `DIFF_LINES`), those are the raw counts: start from them and subtract only the generated files you can name, rather than counting again.
 
 **The accepted signals are these exact tokens, and nothing else.** They are spelled here so this work never costs a search through pln's own source for them; `bin/pln-assurance classify` accepts these and its `--help` repeats them.
 

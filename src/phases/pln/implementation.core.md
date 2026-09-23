@@ -37,6 +37,10 @@ Leases keep their whole job and gain weight: they bound what a worker may write 
 **Whoever moves the tree re-syncs it.** When an integrated item changes dependency declarations, the coordinator brings the environment back in step with the tree it just changed — an install that is not permitted to alter the lockfile — before releasing the next item. That is a coordinator action at integration, attributed to no item and appearing on no dashboard. A worker that finds the tree's lockfile ahead of what is installed says so and stops rather than fixing it.
 
 <!-- pln:include step5-orchestration -->
+<!-- pln:only codex -->
+
+<!-- pln:include goal-persistence -->
+<!-- pln:endonly -->
 
 Each one-item assignment points the worker at `{{SKILL_DIR}}/src/workers/item-implementation.md` and supplies `PLAN.md`, item number, project root, exact worktree and write lease, cohort context (`fresh` or a checkpointed predecessor to continue), mandated-learning note, `commit owner: coordinator`, handoff path, evidence path, result path, requested/actual judgment routing, and a 2048-byte envelope budget. Do not paste the contract into the brief. On success, validate its `RESULT_FILE` through `bin/pln-read-envelope --root <artifact-root> --max-bytes 2048 <result-file>` before checkpointing, where `<artifact-root>` is the plan directory when workers write beneath it and the run's artifact directory when the plan directory sits outside the repository. The root is what the envelope reader confines the result to, so it has to be the directory the worker could actually write. Missing, empty, malformed, out-of-root, oversized, or lease-violating results fail the node and force a fresh boundary; none is treated as success.
 

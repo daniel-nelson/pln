@@ -2,4 +2,8 @@ Use one fresh non-fork `general-purpose` `Agent` call per same-model roster slot
 
 Each call's result is a pointer, the only thing that reaches this context. Independent roster slots may use one Workflow fan-out, but the validated roster cap still applies. Wait for completion and apply the same non-empty check to every slot. When announcing that the review is running, say where its live activity is: `/workflows` for a Workflow fan-out, `/tasks` for named Agent slots.
 
+**The broad reviewer before the roster.** On a first pass it starts with the classifier, before any roster exists: spawn each as its own named background `Agent` in the same message. Once the roster is validated, dispatch its other slots — never a second broad — and wait for the broad reviewer's completion notification as well as theirs before the merge check.
+
 **Alongside the peer.** Where the R3 adversarial slot uses a peer, start its shell call in the background as a tracked native Bash task and run the same-model roster slots without waiting. Retain the task handle, join it and the roster before advancing, and read only fixed metadata once all return; the merge worker reads raw artifacts. Where tracked background shell is unavailable, sequence them.
+
+**When the adversarial slot substitutes.** This host's concurrency limit leaves room for a fourth reader, so the substitute never waits for a reader to finish: a peer that could not send is known before dispatch, and its substitute's spawn goes among the other spawns; a peer that fails after starting gets its substitute spawned as soon as the failure is known, beside readers still running.

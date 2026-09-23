@@ -41,6 +41,19 @@ has "$WORK/plan/dirty.tsv" 'linked-dir/inner.txt' \
 has "$WORK/plan/dirty.tsv" $'nested-worktree/\tNESTED-REPO' \
   'dirty snapshot did not record an untracked nested repository by presence'
 
+# /pln-pr's clean-tree guard reads counts and a capped path list, never the TSV.
+summary="$("$SCHEDULER" snapshot --repo "$WORK/repo" --out "$WORK/plan/dirty-summary.tsv" --summary 2)"
+printf '%s\n' "$summary" | grep -qx 'TRACKED=1' || fail 'snapshot summary miscounted tracked changes'
+printf '%s\n' "$summary" | grep -qx 'UNTRACKED=3' || fail 'snapshot summary miscounted untracked paths'
+[ "$(printf '%s\n' "$summary" | grep -c '^DIRTY_PATH=')" -eq 2 ] || fail 'snapshot summary did not cap its path list'
+printf '%s\n' "$summary" | grep -qx 'MORE=2' || fail 'snapshot summary lost the count past its cap'
+cmp -s "$WORK/plan/dirty.tsv" "$WORK/plan/dirty-summary.tsv" || fail 'snapshot --summary changed the TSV it writes'
+plain="$("$SCHEDULER" snapshot --repo "$WORK/repo" --out "$WORK/plan/dirty-plain.tsv")"
+[ "$plain" = "SNAPSHOT=$WORK/plan/dirty-plain.tsv" ] || fail 'snapshot without --summary changed its output'
+if "$SCHEDULER" snapshot --repo "$WORK/repo" --out "$WORK/plan/dirty-bad.tsv" --summary 99 >/dev/null 2>&1; then
+  fail 'snapshot accepted an unbounded summary cap'
+fi
+
 cat > "$WORK/plan/nodes.tsv" <<'EOF'
 ITEM	DEPS	LEASES	COHORT	CONTEXT	DIRTY_STATE
 1	-	src/api	api-chain	fresh	clean
@@ -267,14 +280,17 @@ ITEM	DEPS	LEASES	COHORT	CONTEXT	DIRTY_STATE
 3	2	c	chain	reuse	clean
 4	3	d	chain	reuse	clean
 EOF
-if "$SCHEDULER" build --root "$WORK/plan" --nodes "$WORK/plan/too-long.tsv" \
-  --manifest "$WORK/plan/bad.tsv" --source-root "$WORK/repo" \
+# 1.60.0 removed the three-node cohort cap from the scheduling contract: a
+# cohort ends where the work stops being the same work, and six is only the
+# contract's backstop for the worker's judgment. The helper kept the old cap,
+# so a merge declaring four clusters on one surface died here.
+"$SCHEDULER" build --root "$WORK/plan" --nodes "$WORK/plan/too-long.tsv" \
+  --manifest "$WORK/plan/long-cohort.tsv" --source-root "$WORK/repo" \
   --source-head head --dirty-snapshot "$WORK/plan/dirty.tsv" \
-  --repo-mode git >"$WORK/out" 2>"$WORK/err"; then
-  fail 'four-node cohort unexpectedly passed validation'
-fi
-has "$WORK/err" 'cohort exceeds the three-node cap' \
-  'overlong cohort failed without naming the cap'
+  --repo-mode git >"$WORK/out" 2>"$WORK/err" \
+  || fail "four-node contiguous cohort was refused: $(cat "$WORK/err")"
+has "$WORK/plan/long-cohort.tsv" $'4\t3\td\tchain\treuse\tclean\t4\toriginal' \
+  'four-node cohort lost its fourth reuse node'
 
 "$SCHEDULER" verify --manifest "$WORK/plan/run-manifest.tsv" >/dev/null
 

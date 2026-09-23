@@ -10,7 +10,7 @@ Read this file in full before the first repository or remote action. Before dura
 
 Finish base validation, trust decisions, exact-tree fingerprinting, and any baseline result before advancing. Then set `Phase: review` and read the review phase in full. If an existing ledger shows later durable work, reconcile it and follow the router rather than overwriting or re-reviewing it.
 
-Apply the shared three-tier firewall throughout this phase. Fixed-field host/PR identity, validated refs, exact config keys, the cursor, and bounded count/byte metadata are coordinator-direct. Possibly unbounded metadata—dirty-path lists, changed-file maps, diff statistics, manifests, instruction discovery, and captured command logs—goes to files before execution and then to an evidence worker for normalization. Trust decisions, scope sufficiency, contradictory state, and whether a baseline permits shipping are judgment work. Append every route and artifact to `<plan-dir>/routing.tsv`.
+Apply the shared three-tier firewall throughout this phase. Fixed-field host/PR identity, validated refs, exact config keys, the cursor, and bounded count/byte metadata are coordinator-direct. Possibly unbounded metadata—dirty-path lists, changed-file maps, manifests, instruction discovery, and captured command logs—goes to files before execution. Dirty-tree counts and diff totals come from helpers whose output is bounded by construction (`pln-scheduler snapshot --summary`, `pln-assurance diff-stats`), so they are coordinator-direct; the rest goes to an evidence worker for normalization. Trust decisions, scope sufficiency, contradictory state, and whether a baseline permits shipping are judgment work. Append every route and artifact to `<plan-dir>/routing.tsv`.
 
 <!-- pln:include followup-filing -->
 
@@ -42,7 +42,13 @@ Print the detected base in one line, and whether it came from the override or wa
 git status --porcelain=v1 > "<plan-dir>/evidence/git-status.txt"
 ```
 
-Assign that artifact to an evidence worker for clean/dirty state, bounded counts, and at most the few paths needed to identify overlap. If it is empty, the tree is clean — continue. If it shows staged or unstaged changes that are *not* part of the branch's intended work, or many untracked files, warn the user in one line and confirm before continuing — folding unrelated edits into the diff makes the review and eventual commit wrong. Offer to proceed only against committed work (review `origin/<base>..HEAD` instead of the working tree) as the safe default, or to stash/commit the stray changes first. Do not silently review a dirty tree or open the captured path list inline.
+If `test -s` says that file is empty, the tree is clean — continue. Otherwise read bounded counts and at most five paths from the same helper the fix phase snapshots with:
+
+```bash
+"{{SKILL_DIR}}/bin/pln-scheduler" snapshot --repo . --out "<plan-dir>/evidence/clean-tree.tsv" --summary 5
+```
+
+It prints `TRACKED=` (staged or unstaged changes to tracked files), `UNTRACKED=`, up to five `DIRTY_PATH=` lines and `MORE=` for the rest; pln's own to-do list files are not counted. If it shows staged or unstaged changes that are *not* part of the branch's intended work, or many untracked files, warn the user in one line and confirm before continuing — folding unrelated edits into the diff makes the review and eventual commit wrong. Offer to proceed only against committed work (review `origin/<base>..HEAD` instead of the working tree) as the safe default, or to stash/commit the stray changes first. Do not silently review a dirty tree or open the captured path list inline.
 
 Look for the plan this branch came from: the most recently modified `./plans/<YYYY-MM-DD>-<slug>/PLAN.md` under the session CWD. If one exists, this run belongs to it — the review ledger will live beside it, and its **Verification** section names the gauntlet commands. If none exists, pln-pr runs standalone: it creates `./plans/<YYYY-MM-DD>-pr-<branch-slug>/` for `REVIEW.md`, and discovers the gauntlet itself.
 
@@ -58,19 +64,20 @@ Persist status, reason, policy mode/hash, and the emitted bypass binding in `REV
 
 When a supported repository policy makes `overdue` required, stop before review unless the user explicitly grants a **simplification freshness bypass** and gives a reason. This is separate from review skips and this repository's self-hosting exception. Store the reason and exact binding only in this nonterminal run's `REVIEW.md`. Reuse it only on crash recovery with the same durable run identity, repository, resolved base, candidate HEAD, and policy hash/schema; invalidate it on any change and consume it when the run reaches `complete` or deliberately stops. `unknown` remains non-blocking. An unsupported required policy fails closed for this aware client; older clients and direct forge commands necessarily ignore it, so repository-wide enforcement belongs in optional repository-owned CI/branch protection.
 
-Scope the diff against the freshly-fetched base. `git merge-base` is one exact bounded fact; the changed-file map and statistics are evidence-tier artifacts:
+Scope the diff against the freshly-fetched base. `git merge-base` is one exact bounded fact, and so are the diff's totals; the changed-file maps stay on disk:
 
 ```bash
 DIFF_IDENTITY=$(bin/pln-assurance diff-fingerprint --root . --base "origin/<base>")
 DIFF_BASE=<the DIFF_BASE field from that bounded result>
+DIFF_STATS=$(bin/pln-assurance diff-stats --root . --base "origin/<base>")
 git diff --numstat "$DIFF_BASE" > "<plan-dir>/evidence/diff-numstat.txt"
 git diff --name-status "$DIFF_BASE" > "<plan-dir>/evidence/diff-files.txt"
-printf '%s\n' "$DIFF_IDENTITY" > "<plan-dir>/evidence/review-diff.identity"
+printf '%s\n' "$DIFF_IDENTITY" "$DIFF_STATS" > "<plan-dir>/evidence/review-diff.identity"
 ```
 
-Have one evidence worker record the changed files, bounded totals (`DIFF_LINES`), stack markers, and frontend flag from those artifacts. Persist the exact `DIFF_BASE` and reviewed-diff SHA-256 in the ledger. The complete maps stay on disk for reviewers and the later judgment merge. If the map is malformed or needs applicability judgment, follow the shared retry/escalation rule.
+`DIFF_STATS` is five fixed fields — `FILES`, `ADDED`, `DELETED`, `DIFF_LINES` (added plus deleted) and `BINARY` — computed over the same subject the fingerprint hashes. Persist the exact `DIFF_BASE`, reviewed-diff SHA-256 and `DIFF_LINES` in the ledger. The complete maps stay on disk for reviewers and the later judgment merge. The reviewer brief's `{STACK}` comes from the plan or the root instructions read for the gauntlet commands below; when neither names a stack, leave that line out.
 
-After the maps are durable, dispatch `src/workers/assurance-classification.md`. Semantic signals and uncertainty determine R1/R2/R3; `DIFF_LINES` is only the provisional R2 size escalator and never a shortcut. Validate with `bin/pln-assurance classify` and persist the tier/signals before entering review.
+**Classify here only when the review phase cannot start it beside the broad reviewer.** When `Review depth` is already `full` or `broad` — every `{{PLN_CMD}}` hand-off, or an explicit instruction — leave `Risk tier` empty: the review phase dispatches the classifier and the broad reviewer together, since the broad reviewer is in every tier's roster. Otherwise (depth `none`, or no depth yet) dispatch `src/workers/assurance-classification.md` now, because the skip warning and the depth ask below both need the tier. Either way, give the classifier the maps and `DIFF_STATS`. Semantic signals and uncertainty determine R1/R2/R3; `DIFF_LINES` is only the provisional R2 size escalator and never a shortcut. Validate with `bin/pln-assurance classify` and persist the tier/signals before the step that needs them.
 
 **Ask for a review depth when none arrived, here, before anything expensive runs.** `REVIEW.md` now carries the tier, the signals, and the diff's size, and nothing has yet cost more than a few reads — this is the last cheap moment and the only place this question is ever asked. Ask when *both* hold: no `review=` argument and no instruction in the invoking message set a depth (Step 0), and the tier's roster is more than the one broad reviewer. Under R1 the full roster *is* the broad reviewer, so there is nothing to choose; record `full` and continue in silence.
 

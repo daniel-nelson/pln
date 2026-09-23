@@ -48,6 +48,72 @@ out="$($ASSURANCE roster --risk R2 --areas data,testing,security --adversary loc
 out="$($ASSURANCE roster --risk R1 --areas security --adversary peer)"
 [ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 1 ] || fail 'R1 roster was not broad-only'
 
+# A plan-review round whose every rostered reader wrote, this round, exactly the
+# terminal no-findings line needs no merge worker. Every other state keeps it:
+# a missing role, an artifact left from an earlier round, a failed reader, and a
+# roster where one reader found something. The verdict never carries content.
+SKIP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/pln-merge-skip-test.XXXXXX")"
+trap 'rm -rf "$SKIP_DIR"' EXIT
+touch -t 202609220900 "$SKIP_DIR/round.brief.md"
+empty_artifact() { printf 'Nothing worth changing\n' > "$SKIP_DIR/$1"; touch -t 202609220930 "$SKIP_DIR/$1"; }
+empty_artifact broad.md
+empty_artifact risk-data.md
+empty_artifact adversarial.md
+skip() {
+  "$ASSURANCE" merge-skip --since "$SKIP_DIR/round.brief.md" "$@"
+}
+out="$(skip --roles broad,risk-data,adversarial --artifact "broad=$SKIP_DIR/broad.md" \
+  --artifact "risk-data=$SKIP_DIR/risk-data.md" --artifact "adversarial=$SKIP_DIR/adversarial.md")"
+has_line "$out" 'SKIP_MERGE=yes' 'an all-empty fresh roster still ran the merge'
+has_line "$out" 'REASON=all-empty' 'an all-empty skip lost its reason'
+
+out="$(skip --roles broad,risk-data,adversarial --artifact "broad=$SKIP_DIR/broad.md" \
+  --artifact "risk-data=$SKIP_DIR/risk-data.md")"
+has_line "$out" 'SKIP_MERGE=no' 'a rostered role with no artifact skipped the merge'
+has_line "$out" 'REASON=adversarial:missing' 'a missing role was not named'
+out="$(skip --roles broad --artifact "broad=$SKIP_DIR/absent.md")"
+has_line "$out" 'REASON=broad:missing' 'an artifact path that does not exist was not missing coverage'
+
+touch -t 202609220800 "$SKIP_DIR/risk-data.md"
+out="$(skip --roles broad,risk-data --artifact "broad=$SKIP_DIR/broad.md" --artifact "risk-data=$SKIP_DIR/risk-data.md")"
+has_line "$out" 'SKIP_MERGE=no' 'an artifact from an earlier round skipped the merge'
+has_line "$out" 'REASON=risk-data:stale' 'a stale artifact was not named'
+empty_artifact risk-data.md
+
+printf 'STATUS=failed\nREASON=unauthenticated\n' > "$SKIP_DIR/adversarial.md"
+touch -t 202609220930 "$SKIP_DIR/adversarial.md"
+out="$(skip --roles broad,adversarial --artifact "broad=$SKIP_DIR/broad.md" --artifact "adversarial=$SKIP_DIR/adversarial.md")"
+has_line "$out" 'SKIP_MERGE=no' 'a failed reader counted as a clean one'
+: > "$SKIP_DIR/adversarial.md"; touch -t 202609220930 "$SKIP_DIR/adversarial.md"
+out="$(skip --roles broad,adversarial --artifact "broad=$SKIP_DIR/broad.md" --artifact "adversarial=$SKIP_DIR/adversarial.md")"
+has_line "$out" 'REASON=adversarial:empty' 'an empty reader artifact counted as a clean one'
+
+# "Nothing worth changing" also ends a review that has findings, so the test is
+# the whole file, never its last line.
+printf '1. Item 2 cites a file that does not exist.\n\nNothing worth changing\n' > "$SKIP_DIR/risk-data.md"
+touch -t 202609220930 "$SKIP_DIR/risk-data.md"
+out="$(skip --roles broad,risk-data --artifact "broad=$SKIP_DIR/broad.md" --artifact "risk-data=$SKIP_DIR/risk-data.md")"
+has_line "$out" 'SKIP_MERGE=no' 'a mixed empty/non-empty roster skipped the merge'
+has_line "$out" 'REASON=risk-data:not-empty' 'the reader with findings was not named'
+case "$out" in *'does not exist'*) fail 'merge-skip printed finding text' ;; esac
+
+ln -s "$SKIP_DIR/broad.md" "$SKIP_DIR/link.md"
+out="$(skip --roles broad --artifact "broad=$SKIP_DIR/link.md")"
+has_line "$out" 'REASON=broad:symlink' 'a symlinked artifact was followed'
+
+for bad in "--roles risk-data --artifact risk-data=$SKIP_DIR/broad.md" \
+  "--roles broad --artifact adversarial=$SKIP_DIR/broad.md" \
+  "--roles broad,broad --artifact broad=$SKIP_DIR/broad.md" \
+  "--roles broad --artifact broad=$SKIP_DIR/broad.md --artifact broad=$SKIP_DIR/broad.md"; do
+  # shellcheck disable=SC2086
+  if skip $bad >/dev/null 2>&1; then fail "merge-skip accepted a malformed roster: $bad"; fi
+done
+if "$ASSURANCE" merge-skip --roles broad --since "$SKIP_DIR/no-marker" --artifact "broad=$SKIP_DIR/broad.md" >/dev/null 2>&1; then
+  fail 'merge-skip ran without a round-start marker'
+fi
+rm -rf "$SKIP_DIR"
+trap - EXIT
+
 # Adopted shipping authorizes every new, verified, in-scope repair regardless
 # of how many prior review rounds ran. Only per-defect non-progress or a real
 # user-owned boundary can stop the unattended flow.
@@ -121,6 +187,27 @@ review_after="$($ASSURANCE diff-fingerprint --root "$FIXTURE" --base HEAD)"
 printf 'one\n' > "$FIXTURE/source.txt"
 [ "$($ASSURANCE diff-fingerprint --root "$FIXTURE" --base HEAD)" = "$review_before" ] \
   || fail 'restored reviewed diff did not restore its fingerprint'
+
+# The size facts a worker used to read off the numstat are computed over the same
+# subject: merge-base to the working tree, text lines counted, binaries apart.
+out="$($ASSURANCE diff-stats --root "$FIXTURE" --base HEAD)"
+has_line "$out" 'FILES=0' 'an empty reviewed diff reported changed files'
+has_line "$out" 'DIFF_LINES=0' 'an empty reviewed diff reported changed lines'
+printf 'two\nthree\n' > "$FIXTURE/source.txt"
+printf '\000\001binary' > "$FIXTURE/blob.bin"
+git -C "$FIXTURE" add blob.bin
+out="$($ASSURANCE diff-stats --root "$FIXTURE" --base HEAD)"
+has_line "$out" 'FILES=2' 'diff-stats miscounted changed files'
+has_line "$out" 'ADDED=2' 'diff-stats miscounted added lines'
+has_line "$out" 'DELETED=1' 'diff-stats miscounted deleted lines'
+has_line "$out" 'DIFF_LINES=3' 'DIFF_LINES is not added plus deleted'
+has_line "$out" 'BINARY=1' 'diff-stats did not count a binary file apart'
+if "$ASSURANCE" diff-stats --root "$FIXTURE" --base no-such-ref >/dev/null 2>&1; then
+  fail 'diff-stats accepted a base that is not a commit'
+fi
+git -C "$FIXTURE" rm -q --cached blob.bin
+rm -f "$FIXTURE/blob.bin"
+printf 'one\n' > "$FIXTURE/source.txt"
 
 # Where the bytes are recorded is not what they are. Staging and committing an
 # already-verified tree change HEAD and `git status` while leaving every file

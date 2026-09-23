@@ -267,14 +267,17 @@ ITEM	DEPS	LEASES	COHORT	CONTEXT	DIRTY_STATE
 3	2	c	chain	reuse	clean
 4	3	d	chain	reuse	clean
 EOF
-if "$SCHEDULER" build --root "$WORK/plan" --nodes "$WORK/plan/too-long.tsv" \
-  --manifest "$WORK/plan/bad.tsv" --source-root "$WORK/repo" \
+# 1.60.0 removed the three-node cohort cap from the scheduling contract: a
+# cohort ends where the work stops being the same work, and six is only the
+# contract's backstop for the worker's judgment. The helper kept the old cap,
+# so a merge declaring four clusters on one surface died here.
+"$SCHEDULER" build --root "$WORK/plan" --nodes "$WORK/plan/too-long.tsv" \
+  --manifest "$WORK/plan/long-cohort.tsv" --source-root "$WORK/repo" \
   --source-head head --dirty-snapshot "$WORK/plan/dirty.tsv" \
-  --repo-mode git >"$WORK/out" 2>"$WORK/err"; then
-  fail 'four-node cohort unexpectedly passed validation'
-fi
-has "$WORK/err" 'cohort exceeds the three-node cap' \
-  'overlong cohort failed without naming the cap'
+  --repo-mode git >"$WORK/out" 2>"$WORK/err" \
+  || fail "four-node contiguous cohort was refused: $(cat "$WORK/err")"
+has "$WORK/plan/long-cohort.tsv" $'4\t3\td\tchain\treuse\tclean\t4\toriginal' \
+  'four-node cohort lost its fourth reuse node'
 
 "$SCHEDULER" verify --manifest "$WORK/plan/run-manifest.tsv" >/dev/null
 

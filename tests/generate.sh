@@ -524,8 +524,8 @@ done < <(find "$real_x" -name '*.md' | grep -v slack)
 for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
   has "$f" 'A running Agent is never stopped' "$f lets the coordinator stop a running Agent"
 done
-has "$real_c/phases/pln-pr/fix.md" 'coordinator stages explicit paths and commits each completed cluster' \
-  "the claude fix fan-out has no executable commit ownership"
+has "$real_c/phases/pln-pr/fix.md" 'stages only the leased paths, and commits the cluster' \
+  "the claude fix phase has no executable commit ownership"
 has "$real_x/phases/pln-pr/review.md" 'Start independent slots concurrently' \
   "the codex build does not use native concurrency for independent review slots"
 has "$real_x/phases/pln-pr/review.md" 'before entering the shared `wait_agent` mailbox loop' \
@@ -792,7 +792,7 @@ has "$real_c/phases/pln/implementation.md" 'isolation: "worktree"' \
   'the Claude implementation phase lost native worktree isolation'
 has "$real_x/phases/pln/implementation.md" 'git worktree add --detach' \
   'the Codex implementation phase lost orchestrator-created worktrees'
-has "$real_c/phases/pln-pr/fix.md" 'coordinator stages explicit paths and commits each completed cluster' \
+has "$real_c/phases/pln-pr/fix.md" 'coordinator validates the result and diff, stages only the leased paths' \
   "the Claude fix phase lost coordinator commit ownership"
 has "$real_x/phases/pln-pr/review.md" 'Start independent slots concurrently' \
   "the Codex fix phase lost native concurrency semantics"
@@ -1196,9 +1196,11 @@ done
 # a real run spent 3.6 minutes of frontier effort answering a question with one
 # possible answer while the user waited for a one-file fix.
 for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
-  has "$f" 'A single cluster is not a scheduling problem' \
-    "$f spawns a scheduling worker for one cluster"
-  has "$f" 'With two or more clusters' "$f drops the scheduling worker where it is needed"
+  has "$f" 'No worker schedules a repair round' \
+    "$f spawns a scheduling worker for a repair round"
+  # The merge that declared the clusters writes their node file; no round
+  # spawns a scheduling worker (5-7 min each, ~25 min over one run).
+  hasnt "$f" 'With two or more clusters' "$f still spawns a scheduling worker per repair round"
   hasnt "$f" 'Parallelize only one manifest wave' \
     "$f still describes parallel fix waves that execution no longer has"
 done

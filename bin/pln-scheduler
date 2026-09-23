@@ -383,8 +383,10 @@ case "$command" in
             if (context[i] != "fresh") die("item " item[i] " requests reuse without a cohort")
             continue
           }
+          # No length cap: a cohort ends where the work stops being the same
+          # work (execution-schedule.md), which is judgment this helper cannot
+          # make. Its shape below is still checked.
           cohort_count[cohort[i]]++
-          if (cohort_count[cohort[i]] > 3) die("cohort exceeds the three-node cap: " cohort[i])
           if (cohort_count[cohort[i]] == 1) {
             if (context[i] != "fresh") die("cohort must begin with fresh context: " cohort[i])
           } else {

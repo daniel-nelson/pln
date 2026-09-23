@@ -113,6 +113,11 @@ has "$scheduling" 'Unknown targets or uncertain independence use `UNKNOWN`' \
   'scheduling contract no longer serializes uncertainty'
 has "$scheduling" 'Known consolidation, replacement, or retirement targets' \
   'scheduling leases omit known anti-bloat write targets'
+# PR fix rounds no longer spawn this worker: the merge that declares the
+# clusters writes their node file under these rules, so they keep one owner.
+hasnt "$scheduling" 'pr-fix-clusters' 'scheduling contract still offers a PR fix-cluster mode'
+has "$scheduling" 'starts every independent fix cluster fresh' \
+  'scheduling contract lost the independent-cluster-fresh rule the PR merge applies'
 
 verification="$REPO_DIR/src/workers/final-verification.md"
 has "$verification" 'full gauntlet' 'verification contract lost the full gauntlet'
@@ -410,6 +415,22 @@ has "$pr_merge" "the envelope's \`pre_existing\` field" \
 # advances only from the commit its envelope says the counted reader read.
 has "$pr_merge" '`reader_commit` when the assignment asks for it' \
   'PR merge envelope cannot return the commit a post-fix reader read'
+# Every multi-cluster repair round spawned a scheduling worker (5-7 min each,
+# ~25 min in one run) whose output was always a linear order. The merge that
+# declares the clusters writes the node file instead, under the schedule
+# contract's rules by reference, and a cluster's lease covers both repairs the
+# fix worker may choose between.
+has "$pr_merge" 'apply its node schema and its edge, lease and `UNKNOWN`, cohort, dirty-state and independent-cluster-fresh rules' \
+  'PR merge writes fix nodes without the schedule contract rules'
+has "$pr_merge" 'the files of both its `fix` and its `smaller_fix`' \
+  'PR merge leases a cluster for only one of the repairs its worker may build'
+has "$pr_merge" 'row N is the Nth acted-on cluster' \
+  'PR merge node rows cannot be mapped back to clusters'
+# A post-fix finding outside the scoped range that no in-range repair made
+# reachable is filed, never repaired, on the same path as a pre-existing one.
+has "$pr_merge" 'with status `out-of-range`' 'PR merge can repair a finding outside the scoped range'
+has "$pr_merge" "the envelope's \`out_of_range\` field" \
+  'PR merge envelope does not name out-of-range findings for filing'
 
 # Even a reachable finding can carry a cathedral. The same run's proposed repair
 # for two dead fields on a persisted type was to validate every envelope against
@@ -501,7 +522,7 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln-pr/fix.md" 'Give each finding an `on_base`' \
     "$host post-fix red team no longer states base provenance"
   for phase in review fix; do
-    has "$WORK/$host/phases/pln-pr/$phase.md" "merge envelope's \`pre_existing\` field once with" \
+    has "$WORK/$host/phases/pln-pr/$phase.md" "merge envelope's \`pre_existing\` and" \
       "$host $phase phase no longer files the pre-existing findings its merge named"
   done
   has "$WORK/$host/phases/pln-pr/ship-watch.md" 'Every `pre-existing` finding' \
@@ -561,6 +582,39 @@ for host in claude codex; do
     "$host post-fix merge still names no contract"
   has "$WORK/$host/phases/pln-pr/fix.md" 'Its assignment also carries' \
     "$host post-fix-only duties do not reach the merge worker"
+  # No per-round scheduling worker; the coordinator edits the merge's node
+  # file mechanically when the dispatched set moves.
+  hasnt "$WORK/$host/phases/pln-pr/fix.md" 'pr-fix-clusters' \
+    "$host fix phase still spawns a scheduling worker per round"
+  hasnt "$WORK/$host/phases/pln-pr/fix.md" 'With two or more clusters' \
+    "$host fix phase still branches to a scheduling worker"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'appending serially is always a valid order' \
+    "$host fix phase has no rule for clusters the merge did not declare"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'remove the rows of clusters not being dispatched' \
+    "$host fix phase builds a manifest with rows for skipped clusters"
+  has "$WORK/$host/phases/pln-pr/fix.md" '<plan-dir>/fix-nodes.tsv' \
+    "$host post-fix merge is not assigned the node output path"
+  has "$WORK/$host/phases/pln-pr/fix.md" '<plan-dir>/fix-dirty-start.tsv' \
+    "$host fix nodes are not tied to a dirty snapshot taken before the merge"
+  has "$WORK/$host/phases/pln-pr/review.md" '<plan-dir>/fix-nodes.tsv' \
+    "$host first merge is not assigned the node output path"
+  has "$WORK/$host/phases/pln-pr/review.md" '<plan-dir>/fix-dirty-start.tsv' \
+    "$host first merge has no dirty snapshot"
+  for phase in review fix; do
+    has "$WORK/$host/phases/pln-pr/$phase.md" "\`out_of_range\` fields once with" \
+      "$host $phase phase does not file out-of-range findings"
+  done
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'every `out-of-range` finding, marked as outside' \
+    "$host PR body drops findings filed as outside the scoped range"
+  # Execution is linear since 1.60.0; the wave and worktree text stayed behind.
+  for phase in fix blocker ship-watch; do
+    for stale in 'isolated wave' 'isolated sibling' 'isolated disjoint' 'per cluster with `isolation' \
+      'assigned worktree' 'concurrent writes would race' 'every cluster in the wave' \
+      'can run concurrently when leases are disjoint'; do
+      hasnt "$WORK/$host/phases/pln-pr/$phase.md" "$stale" \
+        "$host $phase phase still describes parallel fix waves: $stale"
+    done
+  done
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Settled candidate' \
     "$host ledger no longer carries the settled candidate across a compaction"
   has "$WORK/$host/SKILL.md" 'at most two exact operations' "$host /pln router lost the direct lookup budget"

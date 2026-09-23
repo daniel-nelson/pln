@@ -19,6 +19,7 @@ for name in context-envelope evidence-collection preflight-research interview-re
   [ -s "$file" ] || fail "missing or empty worker contract: $file"
   has "$file" 'WORKER_ONLY_SENTINEL_' "$file has no worker-only sentinel"
   for host_term in Claude Codex 'spawn_agent' 'wait_agent' 'resume_agent' \
+    'send_input' 'close_agent' 'followup_task' 'list_agents' \
     'agentType' 'Agent tool' 'Workflow('; do
     hasnt "$file" "$host_term" "$file contains host mechanics: $host_term"
   done

@@ -410,7 +410,8 @@ has "$real_x/phases/pln/implementation.md" 'commit owner: coordinator' \
 # not by historical feature flags or tool names. Claude's sequential item loop
 # needs an addressable background Agent so a blocker can continue through
 # SendMessage; Workflow stays for true fan-out. Codex continuation starts a new
-# turn on the same idle agent with followup_task. Nested CLI helpers remain only
+# turn on the same idle agent, through whichever tool set the session exposes
+# (the table in the spawn fragment). Nested CLI helpers remain only
 # as the old/disabled-host fallback and the cross-provider peer boundary.
 has "$real_c/phases/pln/implementation.md" 'directly addressable Agents rather than Workflow' \
   "the claude build does not use addressable background Agents for item work"
@@ -418,15 +419,22 @@ has "$real_c/phases/pln/implementation.md" 'SendMessage' \
   "the claude build lost native blocker continuation"
 has "$real_c/phases/pln-pr/review.md" 'pipeline(' \
   "the claude build lost current Workflow fan-out mechanics"
-has "$real_x/phases/pln/implementation.md" 'send_input' \
+has "$real_x/phases/pln/implementation.md" 'continue that idle identity' \
   "the codex build lost current native blocker continuation"
-has "$real_x/SKILL.md" 'interrupt: true' \
-  "the codex build lost current running-agent steering"
 for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" '| Steer a running child |' \
+    "$f lost current running-agent steering"
   has "$f" 'A quiet `wait_agent` timeout is not evidence that the child is still running' \
     "$f does not require mailbox reconciliation after quiet waits"
   has "$f" 'A child completion cannot start a new coordinator turn after you send the final response' \
     "$f does not explain why a running coordinator may not end its turn"
+done
+# The durable-goal paragraph governs an unattended run, which in /pln begins at
+# implementation; it lives in that phase and in the /pln-pr router, never the
+# /pln router, whose byte ceiling the two-surface tool table needed.
+hasnt "$real_x/SKILL.md" 'create_goal' \
+  "the codex /pln router still carries the durable-goal paragraph its implementation phase owns"
+for f in "$real_x/pln-pr/SKILL.md" "$real_x/phases/pln/implementation.md"; do
   has "$f" 'explicitly asks for persistence across turns' \
     "$f does not recognize an explicit durable-goal request"
   has "$f" '`create_goal`' \
@@ -434,6 +442,8 @@ for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
   has "$f" 'the manifest and wait loop remain the fallback' \
     "$f lets a missing goal tool become a user-facing blocker"
 done
+hasnt "$real_c/phases/pln/implementation.md" 'create_goal' \
+  "the claude implementation phase received Codex-only durable-goal mechanics"
 for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
   hasnt "$f" 'create_goal' "$f received Codex-only durable-goal mechanics"
   has "$f" 'Never launch idle Bash merely to keep the parent turn open' \
@@ -505,22 +515,40 @@ for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
   hasnt "$f" 'JSON.parse' "$f still treats Workflow args as a string"
   hasnt "$f" 'agentType' "$f still uses the historical Workflow agent option"
 done
-# The Codex multi-agent surface, as every Codex session on the maintainer's machine
-# has ever exposed it (CLI 0.155.1 and earlier): spawn_agent, wait_agent, send_input,
-# resume_agent, close_agent. From 1.32.0 to 1.93.0 the build named four tools that
-# do not exist there and forbade naming the three that do; a coordinator told to
-# reconcile with `list_agents` could not, and closed six mid-work children unguided.
+# Codex gives each session one of two multi-agent tool sets, chosen per model by
+# its server-side catalog rather than by CLI version or local config: one with
+# send_input/resume_agent/close_agent and `fork_context`, one with list_agents/
+# followup_task/send_message/interrupt_agent and `fork_turns`. 1.93.0 named only
+# the second and 1.94.0 only the first; each was right for one model and wrong
+# for the other, and a coordinator follows its exposed tool list over the text.
+# So both sets are named, and only in the spawn fragment's job table: every other
+# Codex passage names the job. Which set a real session gets is not testable here.
+codex_set_names='send_input|resume_agent|close_agent|fork_context|fork_turns|list_agents|followup_task|send_message|interrupt_agent|agent_id|interrupt: true|status map'
 for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
   has "$f" 'A running child is never closed' "$f lets the coordinator close a running child"
-  has "$f" 'fork_context: false' "$f does not spawn with the exposed fork argument"
+  for term in 'fork_context: false' 'fork_turns: "none"' '`send_input`' '`followup_task`' \
+    '`close_agent`' '`list_agents`' '`interrupt_agent`' \
+    'nothing: a finished child holds no slot'; do
+    has "$f" "$term" "$f's Codex job table lost $term"
+  done
+  stray="$(grep -nE "$codex_set_names" "$f" | grep -vE '^[0-9]+:\|' || true)"
+  [ -z "$stray" ] || fail "$f names a single tool set outside the job table: $stray"
   hasnt "$f" 'multi_agent_v2' "$f still pins a superseded Codex feature generation"
   hasnt "$f" 'Pin to V1' "$f still pins Codex multi-agent V1"
 done
 while IFS= read -r f; do
-  for phantom in list_agents followup_task send_message interrupt_agent fork_turns; do
-    hasnt "$f" "$phantom" "$f names \`$phantom\`, which the Codex CLI does not expose"
-  done
+  case "$f" in "$real_x/SKILL.md"|"$real_x/pln-pr/SKILL.md") continue ;; esac
+  stray="$(grep -nE "$codex_set_names" "$f" || true)"
+  [ -z "$stray" ] || fail "$f names a single Codex tool set; name the job instead: $stray"
 done < <(find "$real_x" -name '*.md' | grep -v slack)
+has "$real_x/phases/pln-pr/fix.md" 'continue the same idle agent with the answer' \
+  "the codex fix phase lost native continuation of a blocked cluster"
+has "$real_x/phases/pln/blocker.md" 'Continue the idle blocked agent' \
+  "the codex blocker phase lost native continuation of a blocked item"
+while IFS= read -r f; do
+  stray="$(grep -nE "$codex_set_names" "$f" || true)"
+  [ -z "$stray" ] || fail "$f carries Codex tool names into the claude build: $stray"
+done < <(find "$real_c" -name '*.md' | grep -v slack)
 for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
   has "$f" 'A running Agent is never stopped' "$f lets the coordinator stop a running Agent"
 done
@@ -766,7 +794,7 @@ done
 # Invariants and native mechanics each have one generated home.
 has "$real_c/phases/pln/implementation.md" 'directly addressable Agents rather than Workflow' \
   "the Claude implementation phase lost item 2 native mechanics"
-has "$real_x/phases/pln/implementation.md" 'send_input' \
+has "$real_x/phases/pln/implementation.md" 'continue that idle identity' \
   "the Codex implementation phase lost item 2 native mechanics"
 for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
   has "$f" 'run-manifest.tsv' "$f lost durable execution state"

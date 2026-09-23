@@ -85,6 +85,10 @@ Every reviewer, fix pass, and verification run below is a **fresh-context agent*
 How to spawn one on this host:
 
 <!-- pln:include spawn-agent -->
+<!-- pln:only codex -->
+
+<!-- pln:include goal-persistence -->
+<!-- pln:endonly -->
 
 ## Interaction discipline
 

@@ -14,7 +14,7 @@ cb02	calibration	boundary	phases	Synthetic PLAN says Phase review-approval but t
 cb03	calibration	boundary	cursor	Synthetic PLAN says item 2 integrated while its manifest says item 2 running in a retained worktree; choose ACTION from FAIL_CLOSED or RESPAWN_ITEM_2.
 cb04	calibration	boundary	routing	A worker brief asks whether two transaction paths can race and which fix to recommend; choose ACTION from HANDLE_AS_EVIDENCE or HANDLE_AS_JUDGMENT.
 cb05	calibration	boundary	scheduler	Two ready synthetic nodes both lease api/shared.ts and have no declared dependency; choose ACTION from PARALLEL or SERIALIZE.
-cb06	calibration	boundary	blockers	Interactive mode receives a blocker while an isolated sibling has completed but not integrated; choose ACTION from INTEGRATE_SIBLING or FREEZE_INTEGRATION.
+cb06	calibration	boundary	blockers	Interactive mode receives a blocker from item 3, whose partial work is uncommitted in the working tree, while item 4 is independent and dependency-ready; choose ACTION from DISPATCH_ITEM_4 or FREEZE_DISPATCH.
 cb07	calibration	boundary	assurance-r1	A two-line copy edit has direct tests and no semantic risk signal; choose RISK from R1 R2 R3.
 cb08	calibration	boundary	assurance-r2	A generator and public contract change touches 4 files and 120 lines with no critical signal; choose RISK from R1 R2 R3.
 cb09	calibration	boundary	assurance-r3	A one-line authentication trust-boundary change has tests; choose RISK from R1 R2 R3.

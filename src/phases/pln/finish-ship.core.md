@@ -16,7 +16,7 @@ Persist verification results, follow-ups, the to-do-list close, Ship choice, PR 
 
 After the last item completes, before final verification: walk back through any items marked ⏸ deferred (and any deferred sub-questions). For each, ask the user: "Revisit now, push to a future session, or drop?"
 
-Auto-mode blocked nodes are different: `run-manifest.tsv` carries each concrete handoff and marks dependency descendants `waiting`. Ask each blocking question directly, one at a time, record the answer, continue from its retained worktree, then return to `Phase: implementation` and recompute readiness. Do not fold blockers or dependency waits into the "revisit / push / drop" prompt used for genuinely deferred items.
+Auto-mode blocked nodes are different: `run-manifest.tsv` carries each concrete handoff and marks dependency descendants `waiting`. Ask each blocking question directly, one at a time, record the answer, continue from its partial work in the working tree, then return to `Phase: implementation` and recompute readiness. Do not fold blockers or dependency waits into the "revisit / push / drop" prompt used for genuinely deferred items.
 
 ### Step 7. End-of-task verification + wrap-up
 
@@ -112,5 +112,5 @@ Applies at Step 7's wrap-up, and at the equivalent point in `{{PLN_PR_CMD}}`. Th
 - **Putting the brief on the command line** — a subagent brief is a page of markdown with backticks, quotes and `$` in it. Compose it in a file and pass its contents as the child's message (or `--brief` on the fallback); hand-escaping it into an argument is how a spawn ends up running a silently truncated prompt.
 - **Reading the child's reasoning trace instead of its result** — on the native path the child returns a summary and its final message is the result; on the fallback the events file is the full trace. Read the final message; keeping the trace out of your context is the reason for spawning an agent at all.
 - **Re-spawning a blocked item instead of continuing it** — a fresh agent knows nothing of the first attempt. Continue the idle native agent (or the captured thread id on the CLI fallback); a fresh agent is only the recovery path when that identity is genuinely gone. Persist the identity in the handoff the moment `BLOCKED:` arrives.
-- **Moving blocked work through an anonymous stash** — blocker recovery is the manifest's named retained worktree plus handoff/result, not a shifting `stash@{N}`. Keep it isolated and dispatch only proven-independent nodes.
+- **Moving blocked work through an anonymous stash** — blocker recovery is the partial work left uncommitted in the working tree plus the manifest's handoff/result, not a shifting `stash@{N}`. Leave it where it is and dispatch nothing else into the tree until it resolves.
 <!-- pln:endonly -->

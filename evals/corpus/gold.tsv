@@ -24,7 +24,7 @@ cb02	frontier	ACTION	FAIL_CLOSED	hard,objective
 cb03	frontier	ACTION	FAIL_CLOSED	hard,objective
 cb04	frontier	ACTION	HANDLE_AS_JUDGMENT	hard,objective
 cb05	frontier	ACTION	SERIALIZE	hard,objective
-cb06	frontier	ACTION	FREEZE_INTEGRATION	hard,objective
+cb06	frontier	ACTION	FREEZE_DISPATCH	hard,objective
 cb07	frontier	RISK	R1	objective
 cb08	frontier	RISK	R2	objective
 cb09	frontier	RISK	R3	hard,objective,r3-recall

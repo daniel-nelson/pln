@@ -1283,6 +1283,19 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
     "$f spawns a scheduling worker for a single item"
 done
 
+# ─── /pln describes no parallel item execution ───────────────────────────────
+# Execution is linear since 1.60.0, and 1.96.0 cleared the /pln-pr side. The
+# /pln router, its phases and the item contract kept isolated worktrees, sibling
+# waves and a blocker that retained its own tree while independent items ran on.
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c"/phases/pln/*.md \
+         "$real_x"/phases/pln/*.md "$REPO_DIR/src/workers/item-implementation.md"; do
+  for stale in 'isolated disjoint' 'isolated sibling' 'isolated worktree' \
+    'retained worktree' 'assigned worktree' 'exclusive worktree' \
+    'proven-independent' 'whose lease does not touch'; do
+    hasnt "$f" "$stale" "$f still describes parallel item execution: $stale"
+  done
+done
+
 # ─── a setup gap survives to somewhere the user will actually read it ────────
 # Said only in the turn it happens, the substitution notice is lost behind hours
 # of unattended output — the same disappearance as writing it to the review

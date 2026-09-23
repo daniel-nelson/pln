@@ -362,6 +362,22 @@ has "$interview" 'localized correction inside an established owner' \
   'item research applies the heavy system-fit comparison to local corrections'
 has "$interview" 'specific acceptance criterion or invariant' \
   'item research permits unsupported claims of distinctness'
+# Interleavings (races, at-least-once delivery, retries) are found in the
+# interview, where accepting or preventing each consequence is still cheap.
+has "$interview" '`Interleavings:` is a field' \
+  'item research no longer always reports interleavings'
+has "$interview" 'whose delivery is at-least-once' \
+  'item research no longer counts at-least-once delivery as an interleaving'
+has "$interview" 'A second request to the same endpoint does not count by itself' \
+  'item research reports every web item as an interleaving'
+has "$interview" 'Two consequences are two entries' \
+  'item research merges distinct consequences into one interleaving'
+# The user's own examples stay in plans, never in rule text.
+for f in "$interview" "$REPO_DIR/src/phases/pln/interview.core.md" "$REPO_DIR/src/phases/pln/review-approval.core.md"; do
+  for name in BullMQ createOrFindBy createOrUpdateBy; do
+    hasnt "$f" "$name" "$f names a framework-specific example in an interleaving rule: $name"
+  done
+done
 
 evidence="$REPO_DIR/src/workers/evidence-collection.md"
 has "$evidence" 'mechanically closed' 'evidence worker is not limited to closed facts'
@@ -418,6 +434,37 @@ has "$pr_merge" 'never routed `needs-decision`, and never raises a blocker' \
 # to the reproduction's input and consequence, not to where the code sits, and
 # the merge worker confirms it rather than taking the reader's word.
 has "$pr_merge" '`on_base`' 'PR merge no longer confirms base provenance'
+has "$pr_merge" 'stays `deferred` under that key' \
+  'PR merge reopens a finding the fix phase deferred and filed'
+has "$pr_merge" 'is settled before any route below' \
+  'PR merge can refile a deferred finding as pre-existing or out-of-range'
+has "$pr_merge" "Record every verified \`branch\` finding's \`branch_purpose\`" \
+  'PR merge does not record which findings are the branch purpose'
+has "$pr_merge" 'An absent field reads as `none`' \
+  'PR merge leaves an absent branch purpose unread'
+# 1.97.0: a failure the user accepted in the plan is disclosed, not repaired.
+# Only the user's own recorded decision counts, quoted verbatim from a plan the
+# handing-off /pln run wrote, naming the same consequence on the same surface.
+has "$pr_merge" 'Confirm a failure the user accepted against `PLAN.md`' \
+  'PR merge repairs a failure the user accepted in the plan'
+has "$pr_merge" 'decision entry beginning `**Decision (user`' \
+  'PR merge honours an acceptance that is not the user'"'"'s recorded decision'
+has "$pr_merge" 'the marker through the next blank line' \
+  'PR merge misses an accepted decision that wraps'
+has "$pr_merge" 'on the same surface' \
+  'PR merge lets an accepted failure class cover every surface'
+has "$pr_merge" 'Acceptance is per consequence' \
+  'PR merge lets one accepted consequence cover another'
+has "$pr_merge" '`git ls-files --error-unmatch' \
+  'PR merge honours a plan that arrived with the branch'
+has "$pr_merge" '`plan authored by the handing-off run`' \
+  'PR merge honours a plan found only by the newest-plan heuristic'
+has "$pr_merge" '`no basis recorded`' \
+  'PR merge leaves the likelihood basis of an acceptance unrecorded'
+has "$pr_merge" 'before the `on_base` and scoped-range routes' \
+  'PR merge can file an accepted failure as pre-existing or out-of-range'
+has "$pr_merge" "the envelope's \`accepted\` field" \
+  'PR merge envelope does not name accepted findings'
 has "$pr_merge" "builds the reproduction's own input" \
   'PR merge can call a finding pre-existing on a base failure reached by a different input'
 has "$pr_merge" 'in scope even though the base fails the same way' \
@@ -525,10 +572,59 @@ for host in claude codex; do
     "$host fix worker honours any rejection reason, so it never builds the smaller repair"
   has "$WORK/$host/phases/pln-pr/fix.md" 'a persisted-state write or state transition, a call with an external effect' \
     "$host fix worker can build new stateful or consequential behavior without asking"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'return `BLOCKED:` naming both' \
-    "$host new-behavior stop no longer routes through the worker blocker"
+  # 1.97.0: a repair that adds new state, an effect or an export is deferred
+  # and filed rather than asked about mid-run; only the branch's own purpose
+  # and a CI fix cluster still stop through the worker blocker.
+  has "$WORK/$host/phases/pln-pr/fix.md" 'return `BLOCKED:` instead of deferring, naming both' \
+    "$host branch-purpose and CI-cluster stops no longer route through the worker blocker"
+  hasnt "$WORK/$host/phases/pln-pr/fix.md" 'do not build it: return `BLOCKED:`' \
+    "$host every new-behavior repair still stops the run with a mid-run question"
   has "$WORK/$host/phases/pln-pr/fix.md" 'never returns this `BLOCKED:`' \
     "$host a test-only finding can spend a user decision through the new-behavior stop"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'leave that finding unbuilt: no edit and no spec for it' \
+    "$host fix worker builds or half-builds a repair that adds new state, an effect or an export"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'When `smaller_fix` would add one and `fix` would not, build `fix`' \
+    "$host fix worker defers a finding one of whose repairs adds none of the three"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'and its `branch_purpose` (absent reads `none`)' \
+    "$host fix brief does not carry the branch-purpose quote"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'publish the finding with status `deferred`, keeping its repair key' \
+    "$host coordinator does not record a deferred finding a later merge can match"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'pln-todo add --status proposed' \
+    "$host coordinator does not file a deferred finding"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'pln-scheduler checkpoint --commit none' \
+    "$host a cluster whose every finding deferred has no checkpoint"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'it runs no post-fix reader and leaves `Settled candidate` unchanged' \
+    "$host a round that changed nothing still spends a post-fix reader"
+  has "$WORK/$host/phases/pln-pr/fix.md" '`fixed`, `skipped`, `deferred`, `accepted`, `pre-existing` or `out-of-range`' \
+    "$host fix-phase finish gate does not treat a deferred or accepted finding as closed"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'a `deferred` one is not repaired on this branch' \
+    "$host standing repair authority still covers a deferred finding"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'except for a finding you are leaving unbuilt, which gets no spec' \
+    "$host a deferred finding can leave a red spec behind"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'Its brief says it is a CI fix cluster' \
+    "$host a CI fix cluster can defer a red required check"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'Every `deferred` finding goes under a heading of its own' \
+    "$host PR body does not name deferred repairs"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'the message'"'"'s one closing line is `HEADS-UP:` naming them' \
+    "$host closing message does not name deferred repairs"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" '`skipped`, `deferred` and `accepted` stay as they are' \
+    "$host resume reopens a deferred or accepted finding"
+  has "$WORK/$host/phases/pln-pr/review.md" 'open/fixed/skipped/deferred/accepted/pre-existing/out-of-range status' \
+    "$host ledger status vocabulary lacks deferred or accepted"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'an `accepted` one is the user'"'"'s decision' \
+    "$host standing repair authority still covers a failure the user accepted"
+  for phase in review fix; do
+    has "$WORK/$host/phases/pln-pr/$phase.md" 'occurs byte-for-byte in that `PLAN.md`' \
+      "$host $phase coordinator publishes an accepted finding without checking its quote"
+  done
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'Every `accepted` finding goes under a heading of its own' \
+    "$host PR body does not disclose failures the plan accepted"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'any `deferred` or `accepted` finding' \
+    "$host closing message does not name accepted failures"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" '`plan authored by the handing-off run`' \
+    "$host ledger does not record whether the plan came from the handing-off run"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'record its checkpoint with `--commit none`' \
+    "$host fix invocation commits a cluster that changed nothing"
   has "$WORK/$host/phases/pln-pr/review.md" 'on_base: string' \
     "$host review phase no longer asks whether the base already fails"
   has "$WORK/$host/phases/pln-pr/review.md" 'with the same input your reproduction uses' \
@@ -647,6 +743,18 @@ for host in claude codex; do
     "$host system-fit gate incorrectly depends on plan review"
   has "$WORK/$host/phases/pln/interview.md" 'no direct retirement found' \
     "$host interview no longer records the directly caused retirement outcome"
+  has "$WORK/$host/phases/pln/interview.md" 'Interleavings are settled one consequence at a time' \
+    "$host interview does not consume the research envelope's interleavings"
+  has "$WORK/$host/phases/pln/interview.md" 'a stated exception to the durable-surface rule above' \
+    "$host a taken prevention is not reconciled with the durable-surface ask rule"
+  has "$WORK/$host/phases/pln/interview.md" 'with accepting it as the floor option' \
+    "$host an interleaving question has no accept floor"
+  has "$WORK/$host/phases/pln/interview.md" "The accept option's own line names the consequence, the surface and the likelihood basis" \
+    "$host an accepted interleaving is recorded without what /pln-pr needs to honour it"
+  has "$WORK/$host/phases/pln/interview.md" "An answer that changes an item's approach dispatches a fresh item-mode worker" \
+    "$host interview keeps research written for an approach an answer replaced"
+  has "$WORK/$host/phases/pln/review-approval.md" "record a \`Decision (user, selected)\` pair whose option line is that entry's line" \
+    "$host a gate override of a taken prevention has no recorded form"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Possibly unbounded metadata' "$host PR scope phase lost file-first metadata collection"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'PR disposition: ready' \
     "$host plain PR request no longer records ready disposition"

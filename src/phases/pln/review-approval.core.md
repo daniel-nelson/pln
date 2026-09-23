@@ -104,6 +104,8 @@ Show the user the master plan in one message, with enough in it to adopt on with
 
   Every ***flagged*** entry names the reader role(s) that raised it; duplicate defects remain one entry with complete attribution.
 
+  A prevention the plan took for an interleaving without asking (Step 3) is a ***decision*** entry that names the consequence it prevents, the surface (path, record, job or key) and the likelihood evidence. Where the user overrides one, record a `Decision (user, selected)` pair whose option line is that entry's line, plus their words, so `{{PLN_PR_CMD}}` does not rebuild what they declined.
+
   **Repairs are never listed, and neither are rejections.** A finding the reviewer raised and you repaired is you fixing your own drafting inside a document the user does not read — it was never theirs to write and is not theirs to ratify. It is recorded in its item's section, and a rejection in the dashboard's Plan review section; both are for the implementer, the reviewer, and the next revision of this filter. In the gate this rule was drawn from, sixteen of thirty-six numbered entries were repairs: 44% of the list, none of it actionable.
 
   A finding that lands on the plan as a whole rather than on any one item — a missing item, an ordering that won't work — has no row to hang under, so it goes in a trailing group after the per-item entries, numbered in its own visible space: `P1`, `P2`. It is in the dashboard's Open questions, not in an item's section, but it is one of the things the user can act on, so it gets a number like everything else.

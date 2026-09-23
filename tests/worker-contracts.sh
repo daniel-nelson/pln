@@ -362,6 +362,22 @@ has "$interview" 'localized correction inside an established owner' \
   'item research applies the heavy system-fit comparison to local corrections'
 has "$interview" 'specific acceptance criterion or invariant' \
   'item research permits unsupported claims of distinctness'
+# Interleavings (races, at-least-once delivery, retries) are found in the
+# interview, where accepting or preventing each consequence is still cheap.
+has "$interview" '`Interleavings:` is a field' \
+  'item research no longer always reports interleavings'
+has "$interview" 'whose delivery is at-least-once' \
+  'item research no longer counts at-least-once delivery as an interleaving'
+has "$interview" 'A second request to the same endpoint does not count by itself' \
+  'item research reports every web item as an interleaving'
+has "$interview" 'Two consequences are two entries' \
+  'item research merges distinct consequences into one interleaving'
+# The user's own examples stay in plans, never in rule text.
+for f in "$interview" "$REPO_DIR/src/phases/pln/interview.core.md" "$REPO_DIR/src/phases/pln/review-approval.core.md"; do
+  for name in BullMQ createOrFindBy createOrUpdateBy; do
+    hasnt "$f" "$name" "$f names a framework-specific example in an interleaving rule: $name"
+  done
+done
 
 evidence="$REPO_DIR/src/workers/evidence-collection.md"
 has "$evidence" 'mechanically closed' 'evidence worker is not limited to closed facts'
@@ -692,6 +708,18 @@ for host in claude codex; do
     "$host system-fit gate incorrectly depends on plan review"
   has "$WORK/$host/phases/pln/interview.md" 'no direct retirement found' \
     "$host interview no longer records the directly caused retirement outcome"
+  has "$WORK/$host/phases/pln/interview.md" 'Interleavings are settled one consequence at a time' \
+    "$host interview does not consume the research envelope's interleavings"
+  has "$WORK/$host/phases/pln/interview.md" 'a stated exception to the durable-surface rule above' \
+    "$host a taken prevention is not reconciled with the durable-surface ask rule"
+  has "$WORK/$host/phases/pln/interview.md" 'with accepting it as the floor option' \
+    "$host an interleaving question has no accept floor"
+  has "$WORK/$host/phases/pln/interview.md" "The accept option's own line names the consequence, the surface and the likelihood basis" \
+    "$host an accepted interleaving is recorded without what /pln-pr needs to honour it"
+  has "$WORK/$host/phases/pln/interview.md" "An answer that changes an item's approach dispatches a fresh item-mode worker" \
+    "$host interview keeps research written for an approach an answer replaced"
+  has "$WORK/$host/phases/pln/review-approval.md" "record a \`Decision (user, selected)\` pair whose option line is that entry's line" \
+    "$host a gate override of a taken prevention has no recorded form"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Possibly unbounded metadata' "$host PR scope phase lost file-first metadata collection"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'PR disposition: ready' \
     "$host plain PR request no longer records ready disposition"

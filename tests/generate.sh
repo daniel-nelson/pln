@@ -1178,6 +1178,13 @@ for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
   # phase's contract finds nothing and pays a round trip for it.
   has "$f" 'there is no separate contract file for a fix or a post-fix verifier' \
     "$f leaves a run to hunt src/workers/ for a contract that is not there"
+  # The post-fix merge is the one exception, and it gets the first merge's
+  # prepared brief: a round that borrowed that contract without the brief spent
+  # minutes hunting for it and messaged the coordinator.
+  has "$f" 'The post-fix merge is the exception' \
+    "$f sends the post-fix merge to hunt for a contract"
+  has "$f" 'pln-build-review-brief" --mode pr-merge' \
+    "$f post-fix merge gets no prepared brief"
   # Execution is linear since 1.60.0: no isolated worktree is assigned.
   hasnt "$f" 'assigned isolated worktree' \
     "$f still sends a fix worker to an isolated worktree execution no longer creates"

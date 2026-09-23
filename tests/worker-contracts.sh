@@ -406,6 +406,10 @@ has "$pr_merge" 'in scope even though the base fails the same way' \
 has "$pr_merge" 'gets no repair key' 'PR merge can queue a pre-existing defect for repair'
 has "$pr_merge" "the envelope's \`pre_existing\` field" \
   'PR merge envelope no longer names pre-existing findings for filing'
+# The post-fix merge runs on this same contract, and the settled candidate
+# advances only from the commit its envelope says the counted reader read.
+has "$pr_merge" '`reader_commit` when the assignment asks for it' \
+  'PR merge envelope cannot return the commit a post-fix reader read'
 
 # Even a reachable finding can carry a cathedral. The same run's proposed repair
 # for two dead fields on a persisted type was to validate every envelope against
@@ -540,6 +544,23 @@ for host in claude codex; do
     "$host a failed post-fix reader can advance the anchor past bytes nobody read"
   has "$WORK/$host/phases/pln-pr/fix.md" 'base code or an earlier round'"'"'s repair code' \
     "$host made-reachable exception narrowed to base code"
+  # 1.92.0 recorded a fingerprint here; a digest no git command resolves would
+  # make the narrowed brief a range nobody can read.
+  has "$WORK/$host/phases/pln-pr/fix.md" 'that does not resolve with `git rev-parse --verify' \
+    "$host an older release's fingerprint in Settled candidate becomes an unreadable range"
+  # Up to 1.95.0 the post-fix merge named no contract, so a worker borrowed
+  # pr-review-merge.md, hunted for the prepared brief it requires, and one round
+  # messaged the coordinator for it. It now gets that contract and that brief.
+  has "$WORK/$host/phases/pln-pr/fix.md" '--artifact post-fix-red-team' \
+    "$host post-fix merge brief does not inventory the red team's artifact"
+  has "$WORK/$host/phases/pln-pr/fix.md" '--reader-metadata "<plan-dir>/evidence/post-fix-readers.tsv"' \
+    "$host post-fix merge brief has no reader metadata"
+  has "$WORK/$host/phases/pln-pr/fix.md" '--diff-map "<plan-dir>/evidence/post-fix-diff-files.txt"' \
+    "$host post-fix merge brief has no repair-range diff map"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'src/workers/pr-review-merge.md` on that brief' \
+    "$host post-fix merge still names no contract"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'Its assignment also carries' \
+    "$host post-fix-only duties do not reach the merge worker"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Settled candidate' \
     "$host ledger no longer carries the settled candidate across a compaction"
   has "$WORK/$host/SKILL.md" 'at most two exact operations' "$host /pln router lost the direct lookup budget"
@@ -984,6 +1005,43 @@ if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
 fi
 has "$WORK/verify-candidate.err" 'candidate fingerprint mismatch' \
   'candidate drift was not attributed'
+
+# The post-fix merge reuses pr-merge mode unchanged: one red-team artifact, a
+# one-row reader table, the repair range's diff map, and no plan. It gets the
+# same confinement and digest checks as the first merge, so a red-team result
+# replaced after the brief was built fails verification instead of counting.
+printf '{"findings":[]}\n' > "$merge_repo/evidence/post-fix-red-team.json"
+printf 'post-fix-red-team\tsuccess\tevidence/post-fix-red-team.json\n' \
+  > "$merge_repo/evidence/post-fix-readers.tsv"
+printf 'M\tordinary-source.txt\n' > "$merge_repo/evidence/post-fix-diff-files.txt"
+post_fix_candidate="$("$REPO_DIR/bin/pln-assurance" fingerprint \
+  --root "$merge_repo" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" \
+  | awk -F= '$1 == "CANDIDATE_SHA256" { print $2 }')"
+post_fix_brief="$WORK/post-fix-merge.brief"
+"$REPO_DIR/bin/pln-build-review-brief" --mode pr-merge \
+  --contract "$REPO_DIR/src/workers/pr-review-merge.md" --root "$merge_repo" \
+  --candidate "$post_fix_candidate" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" --ledger "$merge_repo/REVIEW.md" \
+  --diff-map "$merge_repo/evidence/post-fix-diff-files.txt" \
+  --reader-metadata "$merge_repo/evidence/post-fix-readers.tsv" \
+  --artifact post-fix-red-team "$merge_repo/evidence/post-fix-red-team.json" \
+  --skill-root "$merge_repo/skills" --out "$post_fix_brief" >/dev/null \
+  || fail 'single-artifact post-fix merge brief was not built'
+[ "$(head -n 1 "$post_fix_brief")" = '# PR review merge contract' ] \
+  || fail 'post-fix merge brief does not carry the merge contract first'
+post_fix_role_hex="$(printf 'post-fix-red-team' | od -An -v -tx1 | tr -d ' \n')"
+[ "$(grep -c "^ARTIFACT	$post_fix_role_hex	" "$post_fix_brief")" -eq 1 ] \
+  || fail 'post-fix merge brief does not inventory exactly one red-team artifact'
+[ "$(grep -c '^ARTIFACT	' "$post_fix_brief")" -eq 4 ] \
+  || fail 'post-fix merge brief inventories artifacts beyond red team, ledger, diff map and reader table'
+"$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$post_fix_brief" \
+  | grep -q '^STATUS=verified$' || fail 'fresh post-fix merge context did not verify'
+printf '{"findings":[{"title":"x"}]}\n' > "$merge_repo/evidence/post-fix-red-team.json"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$post_fix_brief" \
+  >"$WORK/verify-post-fix.out" 2>"$WORK/verify-post-fix.err"; then
+  fail 'replaced post-fix red-team artifact verified'
+fi
 
 # REVIEW.md publication is a narrow compare-and-publish boundary. A complete
 # candidate becomes visible by one sibling rename only after its run identity,

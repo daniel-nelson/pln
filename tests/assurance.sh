@@ -188,6 +188,27 @@ printf 'one\n' > "$FIXTURE/source.txt"
 [ "$($ASSURANCE diff-fingerprint --root "$FIXTURE" --base HEAD)" = "$review_before" ] \
   || fail 'restored reviewed diff did not restore its fingerprint'
 
+# The size facts a worker used to read off the numstat are computed over the same
+# subject: merge-base to the working tree, text lines counted, binaries apart.
+out="$($ASSURANCE diff-stats --root "$FIXTURE" --base HEAD)"
+has_line "$out" 'FILES=0' 'an empty reviewed diff reported changed files'
+has_line "$out" 'DIFF_LINES=0' 'an empty reviewed diff reported changed lines'
+printf 'two\nthree\n' > "$FIXTURE/source.txt"
+printf '\000\001binary' > "$FIXTURE/blob.bin"
+git -C "$FIXTURE" add blob.bin
+out="$($ASSURANCE diff-stats --root "$FIXTURE" --base HEAD)"
+has_line "$out" 'FILES=2' 'diff-stats miscounted changed files'
+has_line "$out" 'ADDED=2' 'diff-stats miscounted added lines'
+has_line "$out" 'DELETED=1' 'diff-stats miscounted deleted lines'
+has_line "$out" 'DIFF_LINES=3' 'DIFF_LINES is not added plus deleted'
+has_line "$out" 'BINARY=1' 'diff-stats did not count a binary file apart'
+if "$ASSURANCE" diff-stats --root "$FIXTURE" --base no-such-ref >/dev/null 2>&1; then
+  fail 'diff-stats accepted a base that is not a commit'
+fi
+git -C "$FIXTURE" rm -q --cached blob.bin
+rm -f "$FIXTURE/blob.bin"
+printf 'one\n' > "$FIXTURE/source.txt"
+
 # Where the bytes are recorded is not what they are. Staging and committing an
 # already-verified tree change HEAD and `git status` while leaving every file
 # identical, so the fingerprint must not move — and must return to its earlier

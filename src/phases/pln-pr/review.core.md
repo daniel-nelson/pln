@@ -6,7 +6,7 @@ name: pln-pr-phase-review
 
 <!-- pln:include active-turn-lifecycle -->
 
-Read this file in full before the first reviewer or peer action. Keep `Phase: review` until successful-reader attribution, raw artifacts, merge outcome, and the complete ledger are durable. Missing, empty, or malformed reviewers are failures, never clean results.
+Read this file in full before the first reviewer or peer action. Keep `Phase: review` until successful-reader attribution, raw artifacts, merge outcome, and the complete ledger are durable. Missing, empty, or malformed reviewers are failures, never clean results. An empty `Risk tier` in this phase is scope-baseline handing classification over to Step 3, not a missing baseline.
 
 Every state change in this phase is a complete next-generation candidate published through `{{OUTPUT_ROOT}}/bin/pln-publish-review` with the current ledger digest/generation. The merge worker writes its complete candidate only to the assigned evidence path; it never writes canonical `REVIEW.md`. Validate its bounded envelope, then publish that candidate. On stale rejection, discard it, reread canonical state, and reconcile rather than overwriting newer work.
 
@@ -28,7 +28,9 @@ Every reviewer this skill spawns is the same model as the orchestrator spawning 
 
 ### Step 3. Risk-calibrated review roster
 
-Use the R1/R2/R3 classification persisted in scope-baseline and validate the roster with `bin/pln-assurance roster`; the tiers and the readers each one calls for are the assurance policy's, above. `DIFF_LINES` may raise routine work to R2 at the provisional threshold but never reduces the roster; the fewer-than-30-lines shortcut is removed.
+**Start the classifier beside the broad reviewer when scope-baseline left `Risk tier` empty.** Spawn `src/workers/assurance-classification.md` (the diff maps and `DIFF_STATS` from `review-diff.identity`) and the broad reviewer together: the broad reviewer is in every tier's roster, so nothing about it waits on the tier, and its brief binds it to the ledger's diff base, reviewed-diff SHA-256 and tree fingerprint like every reader. Validate the classifier with `bin/pln-assurance classify` and persist the tier and signals; then validate the roster and dispatch its remaining slots — the broad slot is the reader already running, never a second one. A run resumed in this phase with `Risk tier` still empty does the same, spawning the broad reviewer again only when its raw artifact is absent or empty.
+
+Otherwise the R1/R2/R3 classification is the one scope-baseline persisted. Either way, validate the roster with `bin/pln-assurance roster`; the tiers and the readers each one calls for are the assurance policy's, above. `DIFF_LINES` may raise routine work to R2 at the provisional threshold but never reduces the roster; the fewer-than-30-lines shortcut is removed.
 
 **`REVIEW.md`'s `Review depth` decides how much of that roster runs.** Only a human sets it — at `{{PLN_CMD}}`'s adoption gate, as a `review=` argument, as an instruction in the invoking message, or in answer to scope-baseline's one ask. `full` runs the validated roster above. `broad` runs the mandatory broad reviewer alone and drops every specialist and adversarial slot, whatever the tier. `none` skips review entirely, under the skip rules in the skill body. A depth is not a reclassification: persist the real tier unchanged, and say which roster actually ran and that a narrower one was chosen — giving the depth as the concrete trigger that set it rather than as a tier name — so nothing downstream reads a `broad` run on critical work as the full critical roster having found nothing. Fix, verification, and post-fix assurance are unaffected — those follow the tier, not the depth.
 

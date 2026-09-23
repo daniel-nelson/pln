@@ -41,6 +41,19 @@ has "$WORK/plan/dirty.tsv" 'linked-dir/inner.txt' \
 has "$WORK/plan/dirty.tsv" $'nested-worktree/\tNESTED-REPO' \
   'dirty snapshot did not record an untracked nested repository by presence'
 
+# /pln-pr's clean-tree guard reads counts and a capped path list, never the TSV.
+summary="$("$SCHEDULER" snapshot --repo "$WORK/repo" --out "$WORK/plan/dirty-summary.tsv" --summary 2)"
+printf '%s\n' "$summary" | grep -qx 'TRACKED=1' || fail 'snapshot summary miscounted tracked changes'
+printf '%s\n' "$summary" | grep -qx 'UNTRACKED=3' || fail 'snapshot summary miscounted untracked paths'
+[ "$(printf '%s\n' "$summary" | grep -c '^DIRTY_PATH=')" -eq 2 ] || fail 'snapshot summary did not cap its path list'
+printf '%s\n' "$summary" | grep -qx 'MORE=2' || fail 'snapshot summary lost the count past its cap'
+cmp -s "$WORK/plan/dirty.tsv" "$WORK/plan/dirty-summary.tsv" || fail 'snapshot --summary changed the TSV it writes'
+plain="$("$SCHEDULER" snapshot --repo "$WORK/repo" --out "$WORK/plan/dirty-plain.tsv")"
+[ "$plain" = "SNAPSHOT=$WORK/plan/dirty-plain.tsv" ] || fail 'snapshot without --summary changed its output'
+if "$SCHEDULER" snapshot --repo "$WORK/repo" --out "$WORK/plan/dirty-bad.tsv" --summary 99 >/dev/null 2>&1; then
+  fail 'snapshot accepted an unbounded summary cap'
+fi
+
 cat > "$WORK/plan/nodes.tsv" <<'EOF'
 ITEM	DEPS	LEASES	COHORT	CONTEXT	DIRTY_STATE
 1	-	src/api	api-chain	fresh	clean

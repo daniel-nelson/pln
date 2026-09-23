@@ -53,7 +53,7 @@ Every reviewer sees the plan but never the interview transcript or rejected opti
 
 Every item's detail section is now written, and nobody has read the plan who wasn't in the conversation that produced it. This reading happens before adoption, at the depth the assurance policy above sets.
 
-1. Use the existing `evidence/` and `results/` folders. On the first pass, dispatch `assurance-classification.md` with its result at `results/plan-classification.txt`, validate its output with `pln-assurance classify`, then create the pre-fix roster with `pln-assurance roster`. A bounded round (Re-review after a rewrite, below) dispatches no classification: it reuses the recorded tier and that result's `SIGNALS=` line, and re-classifies only when the rewritten sections carry a risk signal the line does not name. That comparison is your reading of the rewrite, the same one that chooses the round's specialists; where you cannot tell, re-classify. If plan review is off, run no readers; record the opt-out and warn only for R3.
+1. Use the existing `evidence/` and `results/` folders. On the first pass, `assurance-classification.md` — its result at `results/plan-classification.txt` — runs beside the broad reviewer, not before it: the broad reviewer is in every tier's roster, so assemble its brief (step 2) and spawn the classifier and the broad reviewer together (step 3). Validate the classifier's output with `pln-assurance classify`, then create the pre-fix roster with `pln-assurance roster`; its broad slot is the reader already running. A bounded round (Re-review after a rewrite, below) dispatches no classification: it reuses the recorded tier and that result's `SIGNALS=` line, and re-classifies only when the rewritten sections carry a risk signal the line does not name. That comparison is your reading of the rewrite, the same one that chooses the round's specialists; where you cannot tell, re-classify. If plan review is off, the classifier runs alone and no reader does; record the opt-out and warn only for R3.
 2. Assemble the broad review brief without opening the contract or plan in coordinator context:
 
    ```bash
@@ -63,7 +63,7 @@ Every item's detail section is now written, and nobody has read the plan who was
      --commit "$(git rev-parse HEAD)" --out "<plan-dir>/evidence/plan-review.brief.md"
    ```
 
-3. Spawn the fresh same-model broad reviewer on that brief. For R2/R3, assemble distinct briefs naming each rostered specialist area and spawn at most those two readers. Each writes a distinct raw artifact and returns only its pointer. Missing, empty, malformed, errored, timed-out, or wrong-tree output is failed coverage.
+3. Spawn the fresh same-model broad reviewer on that brief — on a first pass, together with the classifier. For R2/R3, once the roster exists, assemble distinct briefs naming each rostered specialist area and spawn at most those two readers. Each writes a distinct raw artifact and returns only its pointer. Missing, empty, malformed, errored, timed-out, or wrong-tree output is failed coverage.
 4. For R3, fill the roster's adversarial slot through Consulting a peer model when consent, egress policy, and repository/session classification permit; substitution into that same slot, and its attribution, are that section's. In R1/R2, consult a peer only for an explicit request or recorded assurance-first posture; it is additive and its absence does not invent a substitute slot.
 5. First ask whether the merge has anything to read, without opening a single artifact:
 

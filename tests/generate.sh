@@ -920,6 +920,35 @@ for host_out in "$real_c" "$real_x"; do
     "$review_file leaves a skipped bounded round's superseded findings standing"
   has "$review_file" 'the skipped empty round above is the one record you write' \
     "$review_file lost the one exception to the merge worker owning PLAN.md edits"
+  # The classifier starts beside the broad reviewer, which every tier's roster
+  # holds; the roster that follows dispatches everything but that reader, and
+  # the broad reviewer is joined before the merge.
+  has "$review_file" 'spawn the classifier and the broad reviewer together' \
+    "$review_file makes the broad plan reviewer wait for risk classification"
+  has "$review_file" 'its broad slot is the reader already running' \
+    "$review_file lets the validated roster spawn a second broad plan reviewer"
+  has "$review_file" 'never a second broad' \
+    "$review_file's host fragment re-dispatches the broad reviewer with the roster"
+  pr_scope_file="$host_out/phases/pln-pr/scope-baseline.md"
+  pr_review_file="$host_out/phases/pln-pr/review.md"
+  has "$pr_scope_file" 'snapshot --repo . --out "<plan-dir>/evidence/clean-tree.tsv" --summary 5' \
+    "$pr_scope_file reads a dirty tree through a worker instead of the bounded snapshot summary"
+  has "$pr_scope_file" 'If `test -s` says that file is empty, the tree is clean' \
+    "$pr_scope_file spends more than a file test on a clean tree"
+  has "$pr_scope_file" 'bin/pln-assurance diff-stats --root .' \
+    "$pr_scope_file no longer computes the diff totals with the helper"
+  hasnt "$pr_scope_file" 'Assign that artifact to an evidence worker' \
+    "$pr_scope_file kept the status evidence worker"
+  hasnt "$pr_scope_file" 'frontend flag' \
+    "$pr_scope_file kept the frontend flag nothing reads"
+  has "$pr_scope_file" 'leave `Risk tier` empty' \
+    "$pr_scope_file classifies before review even when the depth is already known"
+  has "$pr_review_file" 'An empty `Risk tier` in this phase is scope-baseline handing classification over' \
+    "$pr_review_file treats an empty tier in the review phase as a missing baseline"
+  has "$pr_review_file" 'the broad slot is the reader already running, never a second one' \
+    "$pr_review_file lets the roster spawn a second broad PR reviewer"
+  has "$pr_review_file" 'never a second broad' \
+    "$pr_review_file's dispatch fragment re-dispatches the running broad reviewer"
   has "$outline_file" "A location the project's own instructions name wins over both defaults" \
     "$outline_file lost the instruction-named plan location"
   has "$outline_file" 'In a git worktree, and with no such location named' \
@@ -1255,6 +1284,24 @@ for f in "$real_c/phases/pln/review-approval.md" "$real_c/phases/pln-pr/review.m
   has "$f" 'installed and answered its own probe with a refusal' \
     "$f lost the portable not-authenticated explanation"
 done
+
+# ─── the broad reviewer starts with the classifier, on each host's own terms ──
+# Codex holds a finished child's slot until it is freed, so the classifier's
+# slot is freed before the specialists spawn; Claude joins a named background
+# Agent beside the roster's Workflow.
+for f in "$real_x/phases/pln/review-approval.md" "$real_x/phases/pln-pr/review.md"; do
+  has "$f" "free" "$f never frees a finished child's slot"
+  hasnt "$f" 'named background `Agent`' "the codex build carries Claude's broad-reviewer handle"
+done
+has "$real_x/phases/pln/review-approval.md" 'When the classifier returns, free its slot' \
+  'the codex plan review keeps the finished classifier in a reader slot'
+has "$real_x/phases/pln-pr/review.md" "free the finished classifier's slot first" \
+  'the codex PR review keeps the finished classifier in a reader slot'
+for f in "$real_c/phases/pln/review-approval.md" "$real_c/phases/pln-pr/review.md"; do
+  has "$f" 'named background `Agent`' "$f does not hold the early broad reviewer as its own Agent"
+done
+has "$real_c/phases/pln-pr/review.md" "wait for its notification as well as the Workflow's" \
+  'the claude PR review builds the merge before the early broad reviewer returns'
 
 # ─── the Codex fragment now asserts the overlap, because a run proved it ─────
 # It was deliberately silent from 1.25.0 until a real run existed.

@@ -24,7 +24,9 @@ skill_stamp_host() {
 usage() {
   cat >&2 <<'EOF'
 Usage:
-  pln-scheduler snapshot --repo DIR --out FILE
+  pln-scheduler snapshot --repo DIR --out FILE [--summary N]
+      --summary also prints TRACKED=/UNTRACKED= counts, at most N DIRTY_PATH= lines
+      in path order, and MORE= for the rest, so a caller never reads the TSV
   pln-scheduler build --root DIR --nodes FILE --manifest FILE --source-root DIR --source-head TEXT --dirty-snapshot FILE --repo-mode git|non-git
   pln-scheduler ready --manifest FILE
   pln-scheduler claim --manifest FILE --item N --handle TEXT --worktree PATH
@@ -105,16 +107,20 @@ snapshot_tree() {
   paths="$(mktemp "${TMPDIR:-/tmp}/pln-snapshot-paths.XXXXXX")"
   tmp="$(mktemp "$out_dir/.pln-dirty.XXXXXX")"
   trap 'rm -f "$paths" "$tmp"' RETURN
+  SNAPSHOT_TRACKED=0
+  SNAPSHOT_UNTRACKED=0
 
   while IFS= read -r -d '' path; do
     single_line "dirty path" "$path"
     if todo_own_path "$repo_real" "$path"; then continue; fi
     printf '%s\n' "$path" >> "$paths"
+    SNAPSHOT_TRACKED=$((SNAPSHOT_TRACKED + 1))
   done < <(git -C "$repo_real" diff --name-only -z HEAD --)
   while IFS= read -r -d '' path; do
     single_line "dirty path" "$path"
     if todo_own_path "$repo_real" "$path"; then continue; fi
     printf '%s\n' "$path" >> "$paths"
+    SNAPSHOT_UNTRACKED=$((SNAPSHOT_UNTRACKED + 1))
   done < <(git -C "$repo_real" ls-files -o --exclude-standard -z)
 
   printf 'PATH\tHASH\n' > "$tmp"
@@ -284,17 +290,29 @@ shift
 
 case "$command" in
   snapshot)
-    repo=""; out=""
+    repo=""; out=""; summary=""
     while [ $# -gt 0 ]; do
       case "$1" in
         --repo) repo="${2:-}"; shift 2 ;;
         --out) out="${2:-}"; shift 2 ;;
+        --summary) summary="${2:-}"; shift 2 ;;
         *) usage ;;
       esac
     done
     [ -n "$repo" ] && [ -n "$out" ] || usage
+    case "$summary" in '') ;; *[!0-9]*) usage ;; *) [ "$summary" -le 50 ] || usage ;; esac
     snapshot_tree "$repo" "$out"
     printf 'SNAPSHOT=%s\n' "$out"
+    if [ -n "$summary" ]; then
+      # Bounded by construction: two counts, at most N paths, one remainder.
+      total="$(awk 'NR > 1' "$out" | wc -l | tr -d '[:space:]')"
+      printf 'TRACKED=%s\nUNTRACKED=%s\n' "$SNAPSHOT_TRACKED" "$SNAPSHOT_UNTRACKED"
+      if [ "$summary" -gt 0 ]; then
+        awk -F '\t' -v cap="$summary" 'NR > 1 && NR <= cap + 1 { print "DIRTY_PATH=" $1 }' "$out"
+      fi
+      shown=$(( total < summary ? total : summary ))
+      printf 'MORE=%s\n' "$((total - shown))"
+    fi
     ;;
 
   build)

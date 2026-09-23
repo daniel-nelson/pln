@@ -201,14 +201,17 @@ has "$policy" 'the outcome is recorded as a **qualified pass**' \
   'assurance policy lost the qualified-pass outcome for a rerun refused command'
 has "$policy" 'not the reuse of a green this rule governs' \
   'assurance policy no longer separates a qualified pass from reusing a green under a matching seal'
-has "$policy" 'a bounded plan re-review reuses the recorded tier' \
+has "$policy" 'A bounded plan re-review reuses the recorded tier' \
   'assurance policy re-classifies every bounded plan re-review'
+has "$policy" 'it starts beside the broad reviewer' \
+  'assurance policy makes every reader wait for risk classification'
 
 
 assurance="$REPO_DIR/src/workers/assurance-classification.md"
 has "$assurance" 'Classify meaning, not line count' 'assurance worker regressed to size-only risk'
 has "$assurance" 'Unknown or conflicting risk' 'assurance worker no longer fails closed'
 has "$assurance" 'SPECIALIST_AREAS=' 'assurance worker lost deterministic roster inputs'
+has "$assurance" 'pln-assurance diff-stats' 'assurance worker recounts the diff the helper already totalled'
 
 # The signal vocabulary lives in a case statement in bin/pln-assurance. A worker
 # told only to "return the signals accepted by" that helper had to go find it:

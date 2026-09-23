@@ -201,6 +201,8 @@ has "$policy" 'the outcome is recorded as a **qualified pass**' \
   'assurance policy lost the qualified-pass outcome for a rerun refused command'
 has "$policy" 'not the reuse of a green this rule governs' \
   'assurance policy no longer separates a qualified pass from reusing a green under a matching seal'
+has "$policy" 'a bounded plan re-review reuses the recorded tier' \
+  'assurance policy re-classifies every bounded plan re-review'
 
 
 assurance="$REPO_DIR/src/workers/assurance-classification.md"

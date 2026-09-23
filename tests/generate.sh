@@ -904,6 +904,22 @@ for host_out in "$real_c" "$real_x"; do
     "$review_file lost the reader a bounded re-review always keeps"
   has "$review_file" 'never on the tier or on the first pass' \
     "$review_file lets a bounded roster shrink the tier or the first review pass"
+  # Classification belongs to the first pass; a bounded round re-classifies only
+  # for a signal the first pass did not record, and leans toward re-classifying.
+  has "$review_file" 'A bounded round (Re-review after a rewrite, below) dispatches no classification' \
+    "$review_file re-classifies a plan's risk on every bounded round"
+  has "$review_file" 'where you cannot tell, re-classify' \
+    "$review_file lost the fail-toward-re-classifying rule for a bounded round"
+  # An all-empty round skips the merge only on the helper's roster-aware verdict,
+  # and the coordinator then writes the round's record the merge would have.
+  has "$review_file" 'merge-skip --roles' \
+    "$review_file decides an empty round without the roster-aware helper"
+  has "$review_file" 'Only `SKIP_MERGE=yes` skips the merge' \
+    "$review_file lets a non-yes merge-skip verdict skip the merge"
+  has "$review_file" "remove the in-scope items' earlier Review findings" \
+    "$review_file leaves a skipped bounded round's superseded findings standing"
+  has "$review_file" 'the skipped empty round above is the one record you write' \
+    "$review_file lost the one exception to the merge worker owning PLAN.md edits"
   has "$outline_file" "A location the project's own instructions name wins over both defaults" \
     "$outline_file lost the instruction-named plan location"
   has "$outline_file" 'In a git worktree, and with no such location named' \

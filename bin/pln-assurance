@@ -15,6 +15,12 @@ Usage:
                    critical-conflict unknown
               any other token classifies R3 as unknown:<token>
   pln-assurance roster --risk R1|R2|R3 --areas CSV --adversary peer|local
+  pln-assurance merge-skip --roles CSV --since FILE --artifact ROLE=PATH [--artifact ROLE=PATH ...]
+      prints SKIP_MERGE=yes only when every role in the round's roster (broad
+      among them) has an artifact newer than FILE, the round's start marker,
+      whose whole content is the reviewer's terminal "Nothing worth changing"
+      line; otherwise SKIP_MERGE=no and the first role:state that failed.
+      Never prints artifact content. Exit 2 (usage) also means: run the merge.
   pln-assurance repair-key --kind behavioral|structural --boundary TEXT --check TEXT [--owner TEXT]
   pln-assurance repair-action --disposition new|persisted|needs-decision|out-of-scope|destructive|worker-blocked --failed-attempts N
   pln-assurance diff-fingerprint --root DIR --base REF
@@ -131,6 +137,68 @@ case "$command" in
         printf 'SLOT\tadversarial\tsame-model\n'
       fi
     fi
+    ;;
+
+  merge-skip)
+    # Decides only the one mechanically closed case of a plan-review round: every
+    # rostered reader produced, this round, exactly the terminal no-findings line.
+    # Any other state — a role with no artifact, an artifact left from an earlier
+    # round, an empty or failed reader, one real finding — keeps the merge worker.
+    roles=""
+    since=""
+    pairs=()
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --roles) roles="${2:-}"; shift 2 ;;
+        --since) since="${2:-}"; shift 2 ;;
+        --artifact) pairs+=("${2:-}"); shift 2 ;;
+        *) usage ;;
+      esac
+    done
+    [ -n "$roles" ] && [ -n "$since" ] || usage
+    [ -f "$since" ] || { echo "pln-assurance: --since marker is not a file: $since" >&2; exit 2; }
+
+    IFS=',' read -r -a role_list <<< "$roles"
+    declared="|"
+    for role in "${role_list[@]}"; do
+      case "$role" in '' | *[!A-Za-z0-9-]*) echo "pln-assurance: bad role name: '$role'" >&2; exit 2 ;; esac
+      case "$declared" in *"|$role|"*) echo "pln-assurance: role listed twice: $role" >&2; exit 2 ;; esac
+      declared="${declared}${role}|"
+    done
+    case "$declared" in *"|broad|"*) ;; *) echo 'pln-assurance: the roster has no broad role' >&2; exit 2 ;; esac
+
+    mapped="|"
+    for pair in ${pairs[@]+"${pairs[@]}"}; do
+      role="${pair%%=*}"
+      case "$pair" in *=?*) ;; *) echo "pln-assurance: --artifact wants ROLE=PATH: '$pair'" >&2; exit 2 ;; esac
+      case "$declared" in *"|$role|"*) ;; *) echo "pln-assurance: artifact for a role not in the roster: $role" >&2; exit 2 ;; esac
+      case "$mapped" in *"|$role|"*) echo "pln-assurance: two artifacts for role: $role" >&2; exit 2 ;; esac
+      mapped="${mapped}${role}|"
+    done
+
+    verdict_no() { printf 'SKIP_MERGE=no\nREASON=%s:%s\n' "$1" "$2"; exit 0; }
+    for role in "${role_list[@]}"; do
+      path=""
+      for pair in ${pairs[@]+"${pairs[@]}"}; do
+        [ "${pair%%=*}" = "$role" ] && path="${pair#*=}"
+      done
+      [ -n "$path" ] || verdict_no "$role" missing
+      [ ! -L "$path" ] || verdict_no "$role" symlink
+      [ -e "$path" ] || verdict_no "$role" missing
+      [ -f "$path" ] || verdict_no "$role" not-regular
+      [ "$path" -nt "$since" ] || verdict_no "$role" stale
+      size="$(LC_ALL=C wc -c < "$path")"
+      size="${size//[[:space:]]/}"
+      [ "$size" -gt 0 ] || verdict_no "$role" empty
+      # The terminal line is 22 bytes; anything much larger carries findings, and
+      # is never read into this process at all.
+      [ "$size" -le 64 ] || verdict_no "$role" not-empty
+      body="$(LC_ALL=C tr -d '\r' < "$path")"
+      body="${body#"${body%%[![:space:]]*}"}"
+      body="${body%"${body##*[![:space:]]}"}"
+      [ "$body" = 'Nothing worth changing' ] || verdict_no "$role" not-empty
+    done
+    printf 'SKIP_MERGE=yes\nREASON=all-empty\n'
     ;;
 
   repair-key)

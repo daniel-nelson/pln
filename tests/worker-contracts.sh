@@ -436,12 +436,35 @@ has "$pr_merge" 'never routed `needs-decision`, and never raises a blocker' \
 has "$pr_merge" '`on_base`' 'PR merge no longer confirms base provenance'
 has "$pr_merge" 'stays `deferred` under that key' \
   'PR merge reopens a finding the fix phase deferred and filed'
-has "$pr_merge" 'is settled before either route below' \
+has "$pr_merge" 'is settled before any route below' \
   'PR merge can refile a deferred finding as pre-existing or out-of-range'
 has "$pr_merge" "Record every verified \`branch\` finding's \`branch_purpose\`" \
   'PR merge does not record which findings are the branch purpose'
 has "$pr_merge" 'An absent field reads as `none`' \
   'PR merge leaves an absent branch purpose unread'
+# 1.97.0: a failure the user accepted in the plan is disclosed, not repaired.
+# Only the user's own recorded decision counts, quoted verbatim from a plan the
+# handing-off /pln run wrote, naming the same consequence on the same surface.
+has "$pr_merge" 'Confirm a failure the user accepted against `PLAN.md`' \
+  'PR merge repairs a failure the user accepted in the plan'
+has "$pr_merge" 'decision entry beginning `**Decision (user`' \
+  'PR merge honours an acceptance that is not the user'"'"'s recorded decision'
+has "$pr_merge" 'the marker through the next blank line' \
+  'PR merge misses an accepted decision that wraps'
+has "$pr_merge" 'on the same surface' \
+  'PR merge lets an accepted failure class cover every surface'
+has "$pr_merge" 'Acceptance is per consequence' \
+  'PR merge lets one accepted consequence cover another'
+has "$pr_merge" '`git ls-files --error-unmatch' \
+  'PR merge honours a plan that arrived with the branch'
+has "$pr_merge" '`plan authored by the handing-off run`' \
+  'PR merge honours a plan found only by the newest-plan heuristic'
+has "$pr_merge" '`no basis recorded`' \
+  'PR merge leaves the likelihood basis of an acceptance unrecorded'
+has "$pr_merge" 'before the `on_base` and scoped-range routes' \
+  'PR merge can file an accepted failure as pre-existing or out-of-range'
+has "$pr_merge" "the envelope's \`accepted\` field" \
+  'PR merge envelope does not name accepted findings'
 has "$pr_merge" "builds the reproduction's own input" \
   'PR merge can call a finding pre-existing on a base failure reached by a different input'
 has "$pr_merge" 'in scope even though the base fails the same way' \
@@ -572,8 +595,8 @@ for host in claude codex; do
     "$host a cluster whose every finding deferred has no checkpoint"
   has "$WORK/$host/phases/pln-pr/fix.md" 'it runs no post-fix reader and leaves `Settled candidate` unchanged' \
     "$host a round that changed nothing still spends a post-fix reader"
-  has "$WORK/$host/phases/pln-pr/fix.md" '`fixed`, `skipped`, `deferred`, `pre-existing` or `out-of-range`' \
-    "$host fix-phase finish gate does not treat a deferred finding as closed"
+  has "$WORK/$host/phases/pln-pr/fix.md" '`fixed`, `skipped`, `deferred`, `accepted`, `pre-existing` or `out-of-range`' \
+    "$host fix-phase finish gate does not treat a deferred or accepted finding as closed"
   has "$WORK/$host/phases/pln-pr/fix.md" 'a `deferred` one is not repaired on this branch' \
     "$host standing repair authority still covers a deferred finding"
   has "$WORK/$host/phases/pln-pr/fix.md" 'except for a finding you are leaving unbuilt, which gets no spec' \
@@ -584,10 +607,22 @@ for host in claude codex; do
     "$host PR body does not name deferred repairs"
   has "$WORK/$host/phases/pln-pr/ship-watch.md" 'the message'"'"'s one closing line is `HEADS-UP:` naming them' \
     "$host closing message does not name deferred repairs"
-  has "$WORK/$host/phases/pln-pr/scope-baseline.md" '`skipped` and `deferred` stay as they are' \
-    "$host resume reopens a deferred finding"
-  has "$WORK/$host/phases/pln-pr/review.md" 'open/fixed/skipped/deferred/pre-existing/out-of-range status' \
-    "$host ledger status vocabulary lacks deferred"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" '`skipped`, `deferred` and `accepted` stay as they are' \
+    "$host resume reopens a deferred or accepted finding"
+  has "$WORK/$host/phases/pln-pr/review.md" 'open/fixed/skipped/deferred/accepted/pre-existing/out-of-range status' \
+    "$host ledger status vocabulary lacks deferred or accepted"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'an `accepted` one is the user'"'"'s decision' \
+    "$host standing repair authority still covers a failure the user accepted"
+  for phase in review fix; do
+    has "$WORK/$host/phases/pln-pr/$phase.md" 'occurs byte-for-byte in that `PLAN.md`' \
+      "$host $phase coordinator publishes an accepted finding without checking its quote"
+  done
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'Every `accepted` finding goes under a heading of its own' \
+    "$host PR body does not disclose failures the plan accepted"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'any `deferred` or `accepted` finding' \
+    "$host closing message does not name accepted failures"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" '`plan authored by the handing-off run`' \
+    "$host ledger does not record whether the plan came from the handing-off run"
   has "$WORK/$host/phases/pln-pr/fix.md" 'record its checkpoint with `--commit none`' \
     "$host fix invocation commits a cluster that changed nothing"
   has "$WORK/$host/phases/pln-pr/review.md" 'on_base: string' \

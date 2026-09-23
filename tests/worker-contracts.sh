@@ -418,6 +418,14 @@ has "$pr_merge" 'never routed `needs-decision`, and never raises a blocker' \
 # to the reproduction's input and consequence, not to where the code sits, and
 # the merge worker confirms it rather than taking the reader's word.
 has "$pr_merge" '`on_base`' 'PR merge no longer confirms base provenance'
+has "$pr_merge" 'stays `deferred` under that key' \
+  'PR merge reopens a finding the fix phase deferred and filed'
+has "$pr_merge" 'is settled before either route below' \
+  'PR merge can refile a deferred finding as pre-existing or out-of-range'
+has "$pr_merge" "Record every verified \`branch\` finding's \`branch_purpose\`" \
+  'PR merge does not record which findings are the branch purpose'
+has "$pr_merge" 'An absent field reads as `none`' \
+  'PR merge leaves an absent branch purpose unread'
 has "$pr_merge" "builds the reproduction's own input" \
   'PR merge can call a finding pre-existing on a base failure reached by a different input'
 has "$pr_merge" 'in scope even though the base fails the same way' \
@@ -525,10 +533,47 @@ for host in claude codex; do
     "$host fix worker honours any rejection reason, so it never builds the smaller repair"
   has "$WORK/$host/phases/pln-pr/fix.md" 'a persisted-state write or state transition, a call with an external effect' \
     "$host fix worker can build new stateful or consequential behavior without asking"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'return `BLOCKED:` naming both' \
-    "$host new-behavior stop no longer routes through the worker blocker"
+  # 1.97.0: a repair that adds new state, an effect or an export is deferred
+  # and filed rather than asked about mid-run; only the branch's own purpose
+  # and a CI fix cluster still stop through the worker blocker.
+  has "$WORK/$host/phases/pln-pr/fix.md" 'return `BLOCKED:` instead of deferring, naming both' \
+    "$host branch-purpose and CI-cluster stops no longer route through the worker blocker"
+  hasnt "$WORK/$host/phases/pln-pr/fix.md" 'do not build it: return `BLOCKED:`' \
+    "$host every new-behavior repair still stops the run with a mid-run question"
   has "$WORK/$host/phases/pln-pr/fix.md" 'never returns this `BLOCKED:`' \
     "$host a test-only finding can spend a user decision through the new-behavior stop"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'leave that finding unbuilt: no edit and no spec for it' \
+    "$host fix worker builds or half-builds a repair that adds new state, an effect or an export"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'When `smaller_fix` would add one and `fix` would not, build `fix`' \
+    "$host fix worker defers a finding one of whose repairs adds none of the three"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'and its `branch_purpose` (absent reads `none`)' \
+    "$host fix brief does not carry the branch-purpose quote"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'publish the finding with status `deferred`, keeping its repair key' \
+    "$host coordinator does not record a deferred finding a later merge can match"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'pln-todo add --status proposed' \
+    "$host coordinator does not file a deferred finding"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'pln-scheduler checkpoint --commit none' \
+    "$host a cluster whose every finding deferred has no checkpoint"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'it runs no post-fix reader and leaves `Settled candidate` unchanged' \
+    "$host a round that changed nothing still spends a post-fix reader"
+  has "$WORK/$host/phases/pln-pr/fix.md" '`fixed`, `skipped`, `deferred`, `pre-existing` or `out-of-range`' \
+    "$host fix-phase finish gate does not treat a deferred finding as closed"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'a `deferred` one is not repaired on this branch' \
+    "$host standing repair authority still covers a deferred finding"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'except for a finding you are leaving unbuilt, which gets no spec' \
+    "$host a deferred finding can leave a red spec behind"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'Its brief says it is a CI fix cluster' \
+    "$host a CI fix cluster can defer a red required check"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'Every `deferred` finding goes under a heading of its own' \
+    "$host PR body does not name deferred repairs"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'the message'"'"'s one closing line is `HEADS-UP:` naming them' \
+    "$host closing message does not name deferred repairs"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" '`skipped` and `deferred` stay as they are' \
+    "$host resume reopens a deferred finding"
+  has "$WORK/$host/phases/pln-pr/review.md" 'open/fixed/skipped/deferred/pre-existing/out-of-range status' \
+    "$host ledger status vocabulary lacks deferred"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'record its checkpoint with `--commit none`' \
+    "$host fix invocation commits a cluster that changed nothing"
   has "$WORK/$host/phases/pln-pr/review.md" 'on_base: string' \
     "$host review phase no longer asks whether the base already fails"
   has "$WORK/$host/phases/pln-pr/review.md" 'with the same input your reproduction uses' \

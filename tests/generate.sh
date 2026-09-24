@@ -895,6 +895,37 @@ for host_out in "$real_c" "$real_x"; do
     "$review_file_peer lets a gate-strike comment quote the owner"
   has "$review_file_peer" 'where they gave none, nothing beyond the facts is added' \
     "$review_file_peer lets a gate-strike comment invent a reason nobody gave"
+  # 1.99.0: one pushback after an answer that accepts a harm the question named
+  # without mentioning it, in the interview and at a gate strike. Each phase
+  # file names the rules it overrides, so the shared style text stays untouched;
+  # the voice override exists only where the voice rule does, in Claude's build.
+  for g in "$interview_file" "$review_file_peer"; do
+    has "$g" 'accepts a harm it does not mention' "$g lost the one-time pushback after an answer"
+    has "$g" 'lost or duplicated data, money, an irreversible effect or one outside the system' \
+      "$g lost the pushback's trigger: a consequence the question named"
+    has "$g" 'Once only: the second reply is recorded as given' "$g lets the pushback repeat"
+    has "$g" '"(Pushback by the agent: …)", ' "$g records the pushback without marking it as the agent's"
+    has "$g" "quotes the user's words from both replies verbatim" \
+      "$g records a repeated answer without both of the user's replies"
+    has "$g" 'For this one pushback these rules give way: ' "$g no longer names the rules the pushback overrides"
+    has "$g" 'not re-offering an option the user already answered' "$g pushback contradicts the no-re-offer rule"
+    has "$g" 'the one-line echo, which carries the answer and nothing else' "$g pushback contradicts the one-line echo"
+    has "$g" 'never arguing for an option after the list' "$g pushback contradicts never arguing after the list"
+    has "$g" '"the user ratifies", which reads a bare selector' "$g pushback contradicts the user-ratifies tell"
+    if [ "$host_out" = "$real_c" ]; then
+      has "$g" "The voice pass's cut of anything already said in this conversation gives way too" \
+        "$g pushback contradicts Claude's voice pass"
+    else
+      hasnt "$g" 'The voice pass' "$g names a Claude voice rule Codex's build does not have"
+    fi
+  done
+  has "$interview_file" 'A bare selector mentions nothing' "$interview_file lets a bare-letter accept skip the pushback"
+  has "$interview_file" 'push back when something seems off' \
+    "$interview_file lost the Posture principle a compacted session needs for the pushback"
+  has "$interview_file" 'this pushback is then the first follow-up that rule asks, not a separate one' \
+    "$interview_file asks an accepted risk's pushback and its follow-up as two questions"
+  has "$review_file_peer" 'as the walk'"'"'s first question' \
+    "$review_file_peer pushes back on a strike separately from its walk"
   has "$outline_file" '.git/info/exclude' "$outline_file does not keep local plans out of .gitignore"
   has "$outline_file" 'Outside a git worktree' "$outline_file does not allocate an external non-git run directory"
   hasnt "$f" 'WORKER_ONLY_SENTINEL_' "$f embedded worker-only runtime instructions"

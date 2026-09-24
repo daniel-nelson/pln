@@ -853,8 +853,18 @@ for host_out in "$real_c" "$real_x"; do
   # "Before the first proposal for every active item".
   has "$interview_file" 'Every active item is researched before the walk begins' \
     "$interview_file makes per-item research optional"
-  has "$interview_file" 'record-check mode' "$interview_file lost query-scoped prior-decision checks"
-  has "$interview_file" 'as one concurrent wave' "$interview_file checks prior decisions one question at a time"
+  # 1.99.0 removed the check against earlier plans. These are keyed on the
+  # check's own words, so a generic phrase elsewhere cannot hold them up.
+  for gone in 'Before asking, check the record' 'record-check mode' 'the record check included' 'plan_corpus'; do
+    for g in "$f" "$interview_file" "$outline_file"; do
+      hasnt "$g" "$gone" "$g still carries the removed check against earlier plans: $gone"
+    done
+  done
+  # The one rule the check introduced that outlived it.
+  has "$interview_file" 'Nor is a decision already reflected in the codebase changed silently, whoever made it' \
+    "$interview_file lost the rule that a decision already in the codebase is not reversed silently"
+  has "$interview_file" 'and the `Documented behavior:` field did not list' \
+    "$interview_file no longer scopes the not-changed-silently rule to what the documented-behavior list missed"
   has "$outline_file" '.git/info/exclude' "$outline_file does not keep local plans out of .gitignore"
   has "$outline_file" 'Outside a git worktree' "$outline_file does not allocate an external non-git run directory"
   hasnt "$f" 'WORKER_ONLY_SENTINEL_' "$f embedded worker-only runtime instructions"

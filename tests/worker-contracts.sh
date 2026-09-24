@@ -335,25 +335,21 @@ has "$implementation" 'rerun the same admitted behavior suite' \
 
 preflight="$REPO_DIR/src/workers/preflight-research.md"
 has "$preflight" '8192-byte envelope budget' 'pre-flight contract lost its budget'
-has "$preflight" 'Locate, but do not read or summarize, prior decision records' \
-  'pre-flight contract reads prior decisions instead of locating them'
+hasnt "$preflight" 'plan_corpus' 'pre-flight contract still reads the removed plan_corpus key'
+hasnt "$preflight" 'prior decision records' 'pre-flight contract still locates records for the removed check'
 has "$preflight" 'current git branch and status' 'pre-flight contract lost git-state discovery'
 
 interview="$REPO_DIR/src/workers/interview-research.md"
 has "$interview" '## Item mode' 'interview contract lost item research mode'
-has "$interview" '## Record-check mode' 'interview contract lost record-check mode'
-has "$interview" 'Check exactly the one proposed ask-lane question' \
-  'record research is no longer query-scoped'
-has "$interview" '`settles`, `partly settles`, or `does not settle`' \
-  'record check no longer returns the bounded three-way outcome'
-has "$interview" 'Recommend nothing' 'record check may recommend an option'
+hasnt "$interview" 'Record-check mode' 'interview contract still carries the removed record-check mode'
+hasnt "$interview" 'record-check mode' 'interview contract still names the removed record-check mode'
 hasnt "$interview" 'Decision-record-query' 'the retired evidence-profile record lookup is still a mode'
 hasnt "$REPO_DIR/src/workers/evidence-collection.md" 'prior-record retrieval' \
   'evidence collection still lists the retired record lookup'
 hasnt "$REPO_DIR/src/shared/model-routing-policy.md" 'prior-record retrieval' \
   'routing policy still lists the retired record lookup as evidence work'
-has "$interview" 'Do not read prior plans or architecture-decision records in this mode' \
-  'item research may trawl prior decisions'
+has "$interview" 'Do not read earlier `{{PLN_CMD}}` plans' \
+  'item research may trawl earlier plans'
 has "$interview" 'current owner, closest analogues, and material producers, callers, and consumers' \
   'item research lost the existing-system ownership map'
 has "$interview" 'reuse, extension, consolidation, replacement, and directly caused retirement routes' \
@@ -802,9 +798,10 @@ for host in claude codex; do
   has "$WORK/$host/pln-pr/SKILL.md" 'at most two exact operations' "$host /pln-pr router lost the direct lookup budget"
   has "$WORK/$host/pln-pr/SKILL.md" 'routing.tsv' "$host /pln-pr router lost the local routing ledger"
   has "$WORK/$host/phases/pln/outline.md" 'Preflight is judgment work' "$host preflight no longer stays frontier"
-  has "$WORK/$host/phases/pln/interview.md" 'one fresh `judgment` worker' "$host interview lost the one-worker record check"
-  hasnt "$WORK/$host/phases/pln/interview.md" 'candidate prior-record matches' \
-    "$host interview still splits the record check into lookup and judgment"
+  hasnt "$WORK/$host/phases/pln/interview.md" 'Before asking, check the record' \
+    "$host interview still carries the removed check against earlier plans"
+  hasnt "$WORK/$host/phases/pln/interview.md" 'record-check mode' \
+    "$host interview still dispatches the removed record-check worker"
   has "$WORK/$host/phases/pln/interview.md" 'strongest existing-owner route' \
     "$host interview no longer gates new durable concepts on system fit"
   has "$WORK/$host/phases/pln/interview.md" 'do not admit the new concept' \

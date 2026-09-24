@@ -860,6 +860,17 @@ for host_out in "$real_c" "$real_x"; do
       hasnt "$g" "$gone" "$g still carries the removed check against earlier plans: $gone"
     done
   done
+  # 1.99.0 fixed two stale lines: a pointer to a section deleted in fb58d26,
+  # and Codex's voice rule naming a recommendation that style-formatting
+  # forbids. The voice fragment reaches /pln-pr's router too.
+  hasnt "$f" 'Why a user decision is never moved' \
+    "$f still points at a section that no longer exists"
+  has "$f" 'It outranks the two tests above.' \
+    "$f lost the rule that an override landing on a user decision outranks the fork tests"
+  for g in "$f" "$host_out/pln-pr/SKILL.md"; do
+    hasnt "$g" 'moves the recommendation' \
+      "$g's voice rule still names a recommendation, which style-formatting forbids"
+  done
   # The one rule the check introduced that outlived it.
   has "$interview_file" 'Nor is a decision already reflected in the codebase changed silently, whoever made it' \
     "$interview_file lost the rule that a decision already in the codebase is not reversed silently"

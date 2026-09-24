@@ -88,13 +88,13 @@ eq "$("$BIN" get peer_command)" "$CMD" "a value containing spaces was truncated"
 eq "$("$BIN" get notify_push)" "true" "rewriting one key disturbed another"
 
 # --- a filesystem path survives whole, spaces and all ------------------------
-# plan_corpus holds a directory the user names, and a home directory with a
-# space in it is ordinary on macOS. A get that stopped at the first space would
-# point the record check at a path that doesn't exist.
-CORPUS="/Users/sam jones/Documents/decision records"
-"$BIN" set plan_corpus "$CORPUS"
-eq "$("$BIN" get plan_corpus)" "$CORPUS" "a path containing spaces was truncated"
-eq "$(grep -c '^plan_corpus:' "$CONFIG")" "1" "set appended a second line instead of rewriting the first"
+# A key can hold a directory the user names, and a home directory with a space
+# in it is ordinary on macOS. A get that stopped at the first space would hand
+# its reader a path that doesn't exist.
+NOTES="/Users/sam jones/Documents/bearbnb notes"
+"$BIN" set notes_dir "$NOTES"
+eq "$("$BIN" get notes_dir)" "$NOTES" "a path containing spaces was truncated"
+eq "$(grep -c '^notes_dir:' "$CONFIG")" "1" "set appended a second line instead of rewriting the first"
 
 # --- surrounding whitespace is trimmed, on both sides -------------------------
 printf 'padded:    spaced value   \n' >> "$CONFIG"

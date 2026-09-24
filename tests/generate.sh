@@ -853,8 +853,105 @@ for host_out in "$real_c" "$real_x"; do
   # "Before the first proposal for every active item".
   has "$interview_file" 'Every active item is researched before the walk begins' \
     "$interview_file makes per-item research optional"
-  has "$interview_file" 'record-check mode' "$interview_file lost query-scoped prior-decision checks"
-  has "$interview_file" 'as one concurrent wave' "$interview_file checks prior decisions one question at a time"
+  # 1.99.0 removed the check against earlier plans. These are keyed on the
+  # check's own words, so a generic phrase elsewhere cannot hold them up.
+  for gone in 'Before asking, check the record' 'record-check mode' 'the record check included' 'plan_corpus'; do
+    for g in "$f" "$interview_file" "$outline_file"; do
+      hasnt "$g" "$gone" "$g still carries the removed check against earlier plans: $gone"
+    done
+  done
+  # 1.99.0 fixed two stale lines: a pointer to a section deleted in fb58d26,
+  # and Codex's voice rule naming a recommendation that style-formatting
+  # forbids. The voice fragment reaches /pln-pr's router too.
+  hasnt "$f" 'Why a user decision is never moved' \
+    "$f still points at a section that no longer exists"
+  has "$f" 'It outranks the two tests above.' \
+    "$f lost the rule that an override landing on a user decision outranks the fork tests"
+  for g in "$f" "$host_out/pln-pr/SKILL.md"; do
+    hasnt "$g" 'moves the recommendation' \
+      "$g's voice rule still names a recommendation, which style-formatting forbids"
+  done
+  # The one rule the check introduced that outlived it.
+  has "$interview_file" 'Nor is a decision already reflected in the codebase changed silently, whoever made it' \
+    "$interview_file lost the rule that a decision already in the codebase is not reversed silently"
+  has "$interview_file" 'and the `Documented behavior:` field did not list' \
+    "$interview_file no longer scopes the not-changed-silently rule to what the documented-behavior list missed"
+  # 1.99.0: an accepted risk becomes a tradeoff comment beside the code, built
+  # from recorded facts rather than the owner's words, in the interview and at
+  # a gate strike. The review-approval phase loads only its own file, so the
+  # gate carries the whole rule, walk included.
+  has "$interview_file" 'An accepted risk is written down beside the code' \
+    "$interview_file lost the accepted-risk comment rule"
+  has "$interview_file" 'is an acceptable tradeoff for' \
+    "$interview_file lost the tradeoff shape of an accepted-risk comment"
+  has "$interview_file" 'restated in plain words in that shape, never quoted' \
+    "$interview_file lets an accepted-risk comment quote the owner"
+  has "$interview_file" 'the sentence carries the recorded facts and nothing beyond them' \
+    "$interview_file lets an accepted-risk comment invent a reason nobody gave"
+  has "$interview_file" 'the surface is the first thing asked for' \
+    "$interview_file records an owner-originated accept that names no surface"
+  has "$interview_file" 'is recorded as unknown, with what research checked; that ends the asking' \
+    "$interview_file presses for a missing likelihood or cost with no end"
+  has "$interview_file" 'Its acceptance criteria also rewrite the line it reverses' \
+    "$interview_file leaves a stale reason on a documented line the owner reversed"
+  has "$review_file_peer" 'so walk the struck entry before recording anything' \
+    "$review_file_peer records a gate strike of a prevention without walking it"
+  has "$review_file_peer" 'the walk happens here, as a question, one per turn' \
+    "$review_file_peer sends a gate strike back to an interview this phase cannot reach"
+  has "$review_file_peer" 'An adopt reply that carries a strike does not adopt until that walk is done' \
+    "$review_file_peer adopts past an unwalked gate strike"
+  has "$review_file_peer" 'is an acceptable tradeoff for avoiding' \
+    "$review_file_peer lost the tradeoff comment for a gate strike"
+  has "$review_file_peer" 'a reason the user gave is restated in plain words, never quoted' \
+    "$review_file_peer lets a gate-strike comment quote the owner"
+  has "$review_file_peer" 'where they gave none, nothing beyond the facts is added' \
+    "$review_file_peer lets a gate-strike comment invent a reason nobody gave"
+  # 1.99.0: one pushback after an answer that accepts a harm the question named
+  # without mentioning it, in the interview and at a gate strike. Each phase
+  # file names the rules it overrides, so the shared style text stays untouched;
+  # the voice override exists only where the voice rule does, in Claude's build.
+  for g in "$interview_file" "$review_file_peer"; do
+    has "$g" 'accepts a harm it does not mention' "$g lost the one-time pushback after an answer"
+    has "$g" 'lost or duplicated data, money, an irreversible effect or one outside the system' \
+      "$g lost the pushback's trigger: a consequence the question named"
+    has "$g" 'Once only: the second reply is recorded as given' "$g lets the pushback repeat"
+    has "$g" '"(Pushback by the agent: …)", ' "$g records the pushback without marking it as the agent's"
+    has "$g" "quotes the user's words from both replies verbatim" \
+      "$g records a repeated answer without both of the user's replies"
+    has "$g" 'For this one pushback these rules give way: ' "$g no longer names the rules the pushback overrides"
+    has "$g" 'not re-offering an option the user already answered' "$g pushback contradicts the no-re-offer rule"
+    has "$g" 'the one-line echo, which carries the answer and nothing else' "$g pushback contradicts the one-line echo"
+    has "$g" 'never arguing for an option after the list' "$g pushback contradicts never arguing after the list"
+    has "$g" '"the user ratifies", which reads a bare selector' "$g pushback contradicts the user-ratifies tell"
+    if [ "$host_out" = "$real_c" ]; then
+      has "$g" "The voice pass's cut of anything already said in this conversation gives way too" \
+        "$g pushback contradicts Claude's voice pass"
+    else
+      hasnt "$g" 'The voice pass' "$g names a Claude voice rule Codex's build does not have"
+    fi
+  done
+  has "$interview_file" 'A bare selector mentions nothing' "$interview_file lets a bare-letter accept skip the pushback"
+  has "$interview_file" 'push back when something seems off' \
+    "$interview_file lost the Posture principle a compacted session needs for the pushback"
+  has "$interview_file" 'this pushback is then the first follow-up that rule asks, not a separate one' \
+    "$interview_file asks an accepted risk's pushback and its follow-up as two questions"
+  has "$review_file_peer" 'as the walk'"'"'s first question' \
+    "$review_file_peer pushes back on a strike separately from its walk"
+  # 1.99.0: a bare selector is asked why when the item's section will write the
+  # reason down, read off the section as it stands; "no reason given" only on a
+  # decline. The pushback and an accepted risk's follow-up carry the why in the
+  # same question, so one bare accept costs one extra turn.
+  hasnt "$interview_file" 'leave it at that' "$interview_file still records a bare selector without asking why"
+  has "$interview_file" 'requires a line stating why this decision was made' \
+    "$interview_file lost the ask-why rule for a reason the section will write down"
+  has "$interview_file" 'as it stands when the answer arrives' \
+    "$interview_file forecasts the ask-why trigger instead of reading the section"
+  has "$interview_file" 'Write "no reason given" when the user declines to give one' \
+    "$interview_file records no reason given without the user declining"
+  has "$interview_file" 'that one question also asks why, and the reason is asked again, once, only if its reply still gives none' \
+    "$interview_file asks why as a separate question from the pushback"
+  has "$interview_file" "Never attach a rationale the user didn't give" \
+    "$interview_file lost the ban on inventing a rationale"
   has "$outline_file" '.git/info/exclude' "$outline_file does not keep local plans out of .gitignore"
   has "$outline_file" 'Outside a git worktree' "$outline_file does not allocate an external non-git run directory"
   hasnt "$f" 'WORKER_ONLY_SENTINEL_' "$f embedded worker-only runtime instructions"

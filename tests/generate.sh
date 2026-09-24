@@ -926,6 +926,21 @@ for host_out in "$real_c" "$real_x"; do
     "$interview_file asks an accepted risk's pushback and its follow-up as two questions"
   has "$review_file_peer" 'as the walk'"'"'s first question' \
     "$review_file_peer pushes back on a strike separately from its walk"
+  # 1.99.0: a bare selector is asked why when the item's section will write the
+  # reason down, read off the section as it stands; "no reason given" only on a
+  # decline. The pushback and an accepted risk's follow-up carry the why in the
+  # same question, so one bare accept costs one extra turn.
+  hasnt "$interview_file" 'leave it at that' "$interview_file still records a bare selector without asking why"
+  has "$interview_file" 'requires a line stating why this decision was made' \
+    "$interview_file lost the ask-why rule for a reason the section will write down"
+  has "$interview_file" 'as it stands when the answer arrives' \
+    "$interview_file forecasts the ask-why trigger instead of reading the section"
+  has "$interview_file" 'Write "no reason given" when the user declines to give one' \
+    "$interview_file records no reason given without the user declining"
+  has "$interview_file" 'that one question also asks why, and the reason is asked again, once, only if its reply still gives none' \
+    "$interview_file asks why as a separate question from the pushback"
+  has "$interview_file" "Never attach a rationale the user didn't give" \
+    "$interview_file lost the ban on inventing a rationale"
   has "$outline_file" '.git/info/exclude' "$outline_file does not keep local plans out of .gitignore"
   has "$outline_file" 'Outside a git worktree' "$outline_file does not allocate an external non-git run directory"
   hasnt "$f" 'WORKER_ONLY_SENTINEL_' "$f embedded worker-only runtime instructions"

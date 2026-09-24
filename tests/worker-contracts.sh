@@ -372,6 +372,20 @@ has "$interview" 'A second request to the same endpoint does not count by itself
   'item research reports every web item as an interleaving'
 has "$interview" 'Two consequences are two entries' \
   'item research merges distinct consequences into one interleaving'
+# Deliberate behavior the code documents is inventoried before any approach
+# exists, because the reversal it guards against is written by the coordinator
+# afterwards; the interview, not research, compares the plan against it.
+has "$interview" '`Documented behavior:` is a field' \
+  'item research no longer inventories documented deliberate behavior'
+has "$interview" 'The list does not depend on an approach' \
+  'the documented-behavior inventory is keyed to an approach research has not seen'
+has "$interview" 'removes outright is not listed' \
+  'item research lists code the user asked to remove'
+# The owner rejected an implementation backstop and a /pln-pr stop for it.
+for f in "$REPO_DIR/src/workers/item-implementation.md" "$REPO_DIR/src/workers/pr-review-merge.md" \
+         "$REPO_DIR/src/phases/pln/review-approval.core.md"; do
+  hasnt "$f" 'Documented behavior' "$f consumes the documented-behavior inventory outside the interview"
+done
 # The user's own examples stay in plans, never in rule text.
 for f in "$interview" "$REPO_DIR/src/phases/pln/interview.core.md" "$REPO_DIR/src/phases/pln/review-approval.core.md"; do
   for name in BullMQ createOrFindBy createOrUpdateBy; do
@@ -474,6 +488,24 @@ has "$pr_merge" "the envelope's \`pre_existing\` field" \
   'PR merge envelope no longer names pre-existing findings for filing'
 # The post-fix merge runs on this same contract, and the settled candidate
 # advances only from the commit its envelope says the counted reader read.
+# 1.98.0: a constraint the owner stated ("don't add protections for problems
+# we haven't seen", "stop before expanding scope") never reached repair design.
+# The merge worker quotes, per repair, the recorded entry it contravenes; the
+# fix worker builds only an unquoted repair or defers naming the quote.
+has "$pr_merge" "Record every verified actionable finding's \`owner_constraint_fix\` and \`owner_constraint_smaller_fix\`" \
+  'PR merge does not say which repair an owner constraint rules out'
+has "$pr_merge" 'an entry that a later entry lifts is never quoted' \
+  'PR merge can apply a constraint the owner has since lifted'
+has "$pr_merge" 'either field may instead quote a `PLAN.md` entry beginning `**Decision (user`' \
+  'PR merge cannot apply a constraint the owner stated during /pln'
+has "$pr_merge" 'a candidate that changes it is malformed' \
+  'PR merge can rewrite the owner constraints it quotes from'
+has "$pr_merge" '`Constraints judged: <n>`' \
+  'PR merge does not record how many owner constraints it judged against'
+has "$pr_merge" 'When the assignment names a constraint re-judge' \
+  'a constraint stated mid-run never reaches findings already merged'
+has "$pr_merge" 'or contravened a constraint the owner stated' \
+  'PR merge deferred paragraph names only the three additions'
 has "$pr_merge" '`reader_commit` when the assignment asks for it' \
   'PR merge envelope cannot return the commit a post-fix reader read'
 # Every multi-cluster repair round spawned a scheduling worker (5-7 min each,
@@ -623,6 +655,44 @@ for host in claude codex; do
     "$host closing message does not name accepted failures"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" '`plan authored by the handing-off run`' \
     "$host ledger does not record whether the plan came from the handing-off run"
+  # 1.98.0: owner constraints are recorded at scope-baseline, appended mid-run,
+  # byte-checked at every merge publish, and steer each fix brief.
+  has "$WORK/$host/pln-pr/SKILL.md" 'review depth, owner constraints,' \
+    "$host /pln-pr router State summary omits owner constraints"
+  has "$WORK/$host/pln-pr/SKILL.md" 'is appended verbatim to `Owner constraints` in a candidate of its own' \
+    "$host a constraint the owner states mid-run is not recorded"
+  has "$WORK/$host/pln-pr/SKILL.md" 'before the next review brief is assembled' \
+    "$host a mid-run constraint can land after the next brief digests the ledger"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Review depth, Owner constraints,' \
+    "$host initial ledger State has no owner-constraints field"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'or the literal `none stated`' \
+    "$host scope-baseline leaves an empty owner-constraints field ambiguous"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'are never a source' \
+    "$host tool or worker text can be recorded as an owner constraint"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" "sed -n '<line>p' <path>" \
+    "$host a constraint quoted from a named file is recorded unchecked"
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'this is not a question and adds no stop' \
+    "$host recording owner constraints adds a stop before the PR"
+  has "$WORK/$host/phases/pln-pr/review.md" 'byte-identical to the canonical field the merge was dispatched on' \
+    "$host review coordinator publishes a merge that rewrote owner constraints"
+  has "$WORK/$host/phases/pln-pr/review.md" '`owner_constraint_fix`, `owner_constraint_smaller_fix`' \
+    "$host ledger findings do not carry the owner-constraint fields"
+  has "$WORK/$host/phases/pln-pr/fix.md" '`owner_constraint_fix` and `owner_constraint_smaller_fix` — the owner'"'"'s constraint' \
+    "$host fix brief does not carry the owner-constraint quotes"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'Never build a repair whose field is a quote' \
+    "$host fix worker can build a repair the owner ruled out"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'or the owner'"'"'s constraint it contravenes, quoted' \
+    "$host a constraint deferral does not name its quote"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'or the owner constraint that ruled it out, quoted' \
+    "$host a filed constraint deferral does not name its quote"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'an assignment naming it a constraint re-judge' \
+    "$host a mid-run constraint never re-judges open findings"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'than the ledger header'"'"'s `Constraints judged`' \
+    "$host fix phase cannot tell that a constraint arrived after the last merge"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'byte-identical to the canonical field the merge was dispatched on' \
+    "$host post-fix coordinator publishes a merge that rewrote owner constraints"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'for one the owner'"'"'s constraints ruled out, the constraint, quoted' \
+    "$host PR body does not name a constraint deferral's quote"
   has "$WORK/$host/phases/pln-pr/fix.md" 'record its checkpoint with `--commit none`' \
     "$host fix invocation commits a cluster that changed nothing"
   has "$WORK/$host/phases/pln-pr/review.md" 'on_base: string' \
@@ -751,6 +821,18 @@ for host in claude codex; do
     "$host an interleaving question has no accept floor"
   has "$WORK/$host/phases/pln/interview.md" "The accept option's own line names the consequence, the surface and the likelihood basis" \
     "$host an accepted interleaving is recorded without what /pln-pr needs to honour it"
+  has "$WORK/$host/phases/pln/interview.md" 'Documented behavior is not changed as a side effect' \
+    "$host interview does not consume the research envelope's documented behavior"
+  has "$WORK/$host/phases/pln/interview.md" 'with keeping the current behavior as one option, one reversal per question' \
+    "$host a side-effect reversal is not its own question with a keep option"
+  has "$WORK/$host/phases/pln/interview.md" "on every later rewrite of the item's section" \
+    "$host a reversal written into the section after step 6 is never compared"
+  has "$WORK/$host/phases/pln/interview.md" 'agent-written item text, a `Decision (agent)` or a disclosed decision never exempts it' \
+    "$host agent-written plan text exempts a reversal of documented behavior"
+  has "$WORK/$host/phases/pln/interview.md" 'is settled by that interleaving question and not asked again here' \
+    "$host one documented design can be asked about twice"
+  has "$WORK/$host/phases/pln/interview.md" 'gets its Reversals line and no gate disclosure' \
+    "$host an asked reversal is repeated at the gate"
   has "$WORK/$host/phases/pln/interview.md" "An answer that changes an item's approach dispatches a fresh item-mode worker" \
     "$host interview keeps research written for an approach an answer replaced"
   has "$WORK/$host/phases/pln/review-approval.md" "record a \`Decision (user, selected)\` pair whose option line is that entry's line" \

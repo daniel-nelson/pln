@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.100.0 — 2026-09-24
+
+### Changed
+
+- **`/pln-pr` asks before a consequential repair, reminds once after five minutes, then continues after five more minutes if unanswered.** The previous rule deferred and filed ordinary findings whose only repair added stored state, an outside effect or a public interface. The owner clarified that this can waste an unattended work window: ask before choosing the larger repair, but do not leave an overnight run idle for lack of a reply. The fix worker now stops before an edit or spec, with the proposed and smaller repairs and their effects. The coordinator records the selected repair, candidate and ask time in `REVIEW.md`, sends the question through the host's enabled notification channels, sends a second notice five minutes later if needed, and uses the owner's standing timeout instruction to resume that exact repair after another five minutes. A reply before continuation takes precedence. The new `bin/pln-decision-window` computes each boundary from the recorded Unix times; a missed reminder must be sent before its own five-minute interval starts. Needs-a-decision repairs use the same window. Explicit owner constraints are never lifted by a timeout. Test-only findings whose only repair is consequential, and findings with no repair left under an owner constraint, retain the deferred route. The branch-purpose or CI case of a constraint conflict still needs an explicit answer. The timer requires the parent turn to remain active; an interrupted run resumes from its ledger timestamps. `tests/assurance.sh` pins the time boundaries, and `tests/worker-contracts.sh` pins the generated instructions for both hosts. These tests verify the contract and helper, not how reliably a host delivers notifications or keeps a live turn attached.
+
 ## 1.99.0 — 2026-09-24
 
 ### Changed

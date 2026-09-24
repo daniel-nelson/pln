@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ASSURANCE="$REPO_DIR/bin/pln-assurance"
+DECISION_WINDOW="$REPO_DIR/bin/pln-decision-window"
 GAUNTLET="$REPO_DIR/bin/pln-gauntlet"
 SIMPLIFY="$REPO_DIR/bin/pln-simplify"
 
@@ -10,7 +11,28 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 has_line() { printf '%s\n' "$1" | grep -Fqx "$2" || fail "$3"; }
 
 [ -x "$ASSURANCE" ] || fail "missing executable assurance helper: $ASSURANCE"
+[ -x "$DECISION_WINDOW" ] || fail "missing executable decision-window helper: $DECISION_WINDOW"
 [ -x "$GAUNTLET" ] || fail "missing executable gauntlet helper: $GAUNTLET"
+
+# Each notice starts its own five-minute interval. A restarted run that missed
+# the reminder must send it, then wait five minutes from when it actually sent.
+out="$($DECISION_WINDOW --asked-at 1000 --now 1299)"
+has_line "$out" 'STATUS=wait' 'decision window reminded before five minutes'
+has_line "$out" 'WAIT_SECONDS=1' 'first deadline was not measured from the ask'
+out="$($DECISION_WINDOW --asked-at 1000 --now 1300)"
+has_line "$out" 'STATUS=remind' 'decision window skipped the reminder'
+out="$($DECISION_WINDOW --asked-at 1000 --now 2000)"
+has_line "$out" 'STATUS=remind' 'a missed reminder silently authorized a repair'
+out="$($DECISION_WINDOW --asked-at 1000 --reminded-at 2000 --now 2299)"
+has_line "$out" 'STATUS=wait' 'decision window continued before the second five minutes'
+out="$($DECISION_WINDOW --asked-at 1000 --reminded-at 2000 --now 2300)"
+has_line "$out" 'STATUS=proceed' 'decision window stayed blocked after both notices'
+if "$DECISION_WINDOW" --asked-at 1000 --reminded-at 999 --now 2300 >/dev/null 2>&1; then
+  fail 'decision window accepted a reminder before its question'
+fi
+if "$DECISION_WINDOW" --asked-at 1000 --now 999 >/dev/null 2>&1; then
+  fail 'decision window accepted a clock before the question'
+fi
 
 # Semantic signals decide the floor. Numeric size can raise R1 to R2 but can
 # never lower an R3 change.

@@ -500,8 +500,8 @@ has "$pr_merge" '`Constraints judged: <n>`' \
   'PR merge does not record how many owner constraints it judged against'
 has "$pr_merge" 'When the assignment names a constraint re-judge' \
   'a constraint stated mid-run never reaches findings already merged'
-has "$pr_merge" 'or contravened a constraint the owner stated' \
-  'PR merge deferred paragraph names only the three additions'
+has "$pr_merge" 'the owner'"'"'s recorded constraint ruled out every available repair' \
+  'PR merge deferred paragraph still treats consequential repairs as automatic deferrals'
 has "$pr_merge" '`reader_commit` when the assignment asks for it' \
   'PR merge envelope cannot return the commit a post-fix reader read'
 # Every multi-cluster repair round spawned a scheduling worker (5-7 min each,
@@ -600,22 +600,35 @@ for host in claude codex; do
     "$host fix worker honours any rejection reason, so it never builds the smaller repair"
   has "$WORK/$host/phases/pln-pr/fix.md" 'a persisted-state write or state transition, a call with an external effect' \
     "$host fix worker can build new stateful or consequential behavior without asking"
-  # 1.97.0: a repair that adds new state, an effect or an export is deferred
-  # and filed rather than asked about mid-run; only the branch's own purpose
-  # and a CI fix cluster still stop through the worker blocker.
-  has "$WORK/$host/phases/pln-pr/fix.md" 'return `BLOCKED:` instead of deferring, naming both' \
-    "$host branch-purpose and CI-cluster stops no longer route through the worker blocker"
-  hasnt "$WORK/$host/phases/pln-pr/fix.md" 'do not build it: return `BLOCKED:`' \
-    "$host every new-behavior repair still stops the run with a mid-run question"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'never returns this `BLOCKED:`' \
+  # Consequential production repairs ask once, remind once, then continue on
+  # the recorded selected repair if no answer arrived. Owner constraints bind.
+  has "$WORK/$host/phases/pln-pr/fix.md" 'Do this regardless of `branch_purpose` or CI status' \
+    "$host still defers an ordinary reachable consequential repair"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'before editing or writing its spec' \
+    "$host worker can edit before the consequential-repair question"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'coordinator'"'"'s recorded user answer or timeout authorization' \
+    "$host worker repeats the same blocker after a timed answer"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'For needs-a-decision findings, select and record the repair' \
+    "$host design decisions still wait indefinitely without a selected fallback"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'pln-decision-window --asked-at' \
+    "$host blocker phase lost the durable two-notice timer"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 're-check for a reply' \
+    "$host timer can override an answer that arrived at its deadline"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'fire enabled notifications again' \
+    "$host reminder is silent"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'a reminder that was never sent must be sent' \
+    "$host interrupted window can proceed without the second notice"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'A timeout never lifts an owner constraint' \
+    "$host timer can override an explicit owner constraint"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'A `reached_by: test-only` finding whose only available repair' \
     "$host a test-only finding can spend a user decision through the new-behavior stop"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'leave that finding unbuilt: no edit and no spec for it' \
-    "$host fix worker builds or half-builds a repair that adds new state, an effect or an export"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'If no repair is left to build because of the owner'"'"'s recorded constraints' \
+    "$host worker can override an explicit owner constraint"
   has "$WORK/$host/phases/pln-pr/fix.md" 'When `smaller_fix` would add one and `fix` would not, build `fix`' \
-    "$host fix worker defers a finding one of whose repairs adds none of the three"
+    "$host fix worker asks unnecessarily when an available repair adds none of the three"
   has "$WORK/$host/phases/pln-pr/fix.md" 'and its `branch_purpose` (absent reads `none`)' \
     "$host fix brief does not carry the branch-purpose quote"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'publish the finding with status `deferred`, keeping its repair key' \
+  has "$WORK/$host/phases/pln-pr/fix.md" 'At the checkpoint publish `deferred`' \
     "$host coordinator does not record a deferred finding a later merge can match"
   has "$WORK/$host/phases/pln-pr/fix.md" 'pln-todo add --status proposed' \
     "$host coordinator does not file a deferred finding"
@@ -629,8 +642,8 @@ for host in claude codex; do
     "$host standing repair authority still covers a deferred finding"
   has "$WORK/$host/phases/pln-pr/fix.md" 'except for a finding you are leaving unbuilt, which gets no spec' \
     "$host a deferred finding can leave a red spec behind"
-  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'Its brief says it is a CI fix cluster' \
-    "$host a CI fix cluster can defer a red required check"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'a consequential repair takes the same two-notice window' \
+    "$host a CI fix cluster lost the timed consequential-repair question"
   has "$WORK/$host/phases/pln-pr/ship-watch.md" 'Every `deferred` finding goes under a heading of its own' \
     "$host PR body does not name deferred repairs"
   has "$WORK/$host/phases/pln-pr/ship-watch.md" 'the message'"'"'s one closing line is `HEADS-UP:` naming them' \
@@ -677,9 +690,9 @@ for host in claude codex; do
     "$host fix brief does not carry the owner-constraint quotes"
   has "$WORK/$host/phases/pln-pr/fix.md" 'Never build a repair whose field is a quote' \
     "$host fix worker can build a repair the owner ruled out"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'or the owner'"'"'s constraint it contravenes, quoted' \
+  has "$WORK/$host/phases/pln-pr/fix.md" 'name it as deferred with the quoted constraint' \
     "$host a constraint deferral does not name its quote"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'or the owner constraint that ruled it out, quoted' \
+  has "$WORK/$host/phases/pln-pr/fix.md" 'record the quoted constraint and keep its repair key' \
     "$host a filed constraint deferral does not name its quote"
   has "$WORK/$host/phases/pln-pr/fix.md" 'an assignment naming it a constraint re-judge' \
     "$host a mid-run constraint never re-judges open findings"
@@ -687,7 +700,7 @@ for host in claude codex; do
     "$host fix phase cannot tell that a constraint arrived after the last merge"
   has "$WORK/$host/phases/pln-pr/fix.md" 'byte-identical to the canonical field the merge was dispatched on' \
     "$host post-fix coordinator publishes a merge that rewrote owner constraints"
-  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'for one the owner'"'"'s constraints ruled out, the constraint, quoted' \
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'naming the owner constraint that ruled out every repair, quoted' \
     "$host PR body does not name a constraint deferral's quote"
   has "$WORK/$host/phases/pln-pr/fix.md" 'record its checkpoint with `--commit none`' \
     "$host fix invocation commits a cluster that changed nothing"

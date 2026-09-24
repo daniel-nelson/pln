@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Classify a durable two-notice decision window. Times are Unix seconds.
+set -euo pipefail
+
+usage() {
+  echo 'Usage: pln-decision-window --asked-at SECONDS [--reminded-at SECONDS] [--now SECONDS]' >&2
+  exit 2
+}
+
+number() {
+  case "$1" in '' | *[!0-9]*) return 1 ;; *) return 0 ;; esac
+}
+
+asked=""
+reminded=""
+now=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --asked-at) [ "$#" -ge 2 ] || usage; asked="$2"; shift 2 ;;
+    --reminded-at) [ "$#" -ge 2 ] || usage; reminded="$2"; shift 2 ;;
+    --now) [ "$#" -ge 2 ] || usage; now="$2"; shift 2 ;;
+    *) usage ;;
+  esac
+done
+
+number "$asked" || usage
+if [ -n "$reminded" ]; then number "$reminded" || usage; fi
+if [ -z "$now" ]; then now="$(date +%s)"; fi
+number "$now" || usage
+[ "$now" -ge "$asked" ] || usage
+if [ -n "$reminded" ]; then
+  [ "$reminded" -ge "$asked" ] && [ "$now" -ge "$reminded" ] || usage
+  deadline=$((reminded + 300))
+  if [ "$now" -ge "$deadline" ]; then status=proceed; wait_seconds=0
+  else status=wait; wait_seconds=$((deadline - now)); fi
+else
+  deadline=$((asked + 300))
+  if [ "$now" -ge "$deadline" ]; then status=remind; wait_seconds=0
+  else status=wait; wait_seconds=$((deadline - now)); fi
+fi
+
+printf 'STATUS=%s\nDEADLINE=%s\nWAIT_SECONDS=%s\n' "$status" "$deadline" "$wait_seconds"

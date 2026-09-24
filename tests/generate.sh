@@ -865,6 +865,36 @@ for host_out in "$real_c" "$real_x"; do
     "$interview_file lost the rule that a decision already in the codebase is not reversed silently"
   has "$interview_file" 'and the `Documented behavior:` field did not list' \
     "$interview_file no longer scopes the not-changed-silently rule to what the documented-behavior list missed"
+  # 1.99.0: an accepted risk becomes a tradeoff comment beside the code, built
+  # from recorded facts rather than the owner's words, in the interview and at
+  # a gate strike. The review-approval phase loads only its own file, so the
+  # gate carries the whole rule, walk included.
+  has "$interview_file" 'An accepted risk is written down beside the code' \
+    "$interview_file lost the accepted-risk comment rule"
+  has "$interview_file" 'is an acceptable tradeoff for' \
+    "$interview_file lost the tradeoff shape of an accepted-risk comment"
+  has "$interview_file" 'restated in plain words in that shape, never quoted' \
+    "$interview_file lets an accepted-risk comment quote the owner"
+  has "$interview_file" 'the sentence carries the recorded facts and nothing beyond them' \
+    "$interview_file lets an accepted-risk comment invent a reason nobody gave"
+  has "$interview_file" 'the surface is the first thing asked for' \
+    "$interview_file records an owner-originated accept that names no surface"
+  has "$interview_file" 'is recorded as unknown, with what research checked; that ends the asking' \
+    "$interview_file presses for a missing likelihood or cost with no end"
+  has "$interview_file" 'Its acceptance criteria also rewrite the line it reverses' \
+    "$interview_file leaves a stale reason on a documented line the owner reversed"
+  has "$review_file_peer" 'so walk the struck entry before recording anything' \
+    "$review_file_peer records a gate strike of a prevention without walking it"
+  has "$review_file_peer" 'the walk happens here, as a question, one per turn' \
+    "$review_file_peer sends a gate strike back to an interview this phase cannot reach"
+  has "$review_file_peer" 'An adopt reply that carries a strike does not adopt until that walk is done' \
+    "$review_file_peer adopts past an unwalked gate strike"
+  has "$review_file_peer" 'is an acceptable tradeoff for avoiding' \
+    "$review_file_peer lost the tradeoff comment for a gate strike"
+  has "$review_file_peer" 'a reason the user gave is restated in plain words, never quoted' \
+    "$review_file_peer lets a gate-strike comment quote the owner"
+  has "$review_file_peer" 'where they gave none, nothing beyond the facts is added' \
+    "$review_file_peer lets a gate-strike comment invent a reason nobody gave"
   has "$outline_file" '.git/info/exclude' "$outline_file does not keep local plans out of .gitignore"
   has "$outline_file" 'Outside a git worktree' "$outline_file does not allocate an external non-git run directory"
   hasnt "$f" 'WORKER_ONLY_SENTINEL_' "$f embedded worker-only runtime instructions"

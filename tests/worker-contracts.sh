@@ -372,6 +372,20 @@ has "$interview" 'A second request to the same endpoint does not count by itself
   'item research reports every web item as an interleaving'
 has "$interview" 'Two consequences are two entries' \
   'item research merges distinct consequences into one interleaving'
+# Deliberate behavior the code documents is inventoried before any approach
+# exists, because the reversal it guards against is written by the coordinator
+# afterwards; the interview, not research, compares the plan against it.
+has "$interview" '`Documented behavior:` is a field' \
+  'item research no longer inventories documented deliberate behavior'
+has "$interview" 'The list does not depend on an approach' \
+  'the documented-behavior inventory is keyed to an approach research has not seen'
+has "$interview" 'removes outright is not listed' \
+  'item research lists code the user asked to remove'
+# The owner rejected an implementation backstop and a /pln-pr stop for it.
+for f in "$REPO_DIR/src/workers/item-implementation.md" "$REPO_DIR/src/workers/pr-review-merge.md" \
+         "$REPO_DIR/src/phases/pln/review-approval.core.md"; do
+  hasnt "$f" 'Documented behavior' "$f consumes the documented-behavior inventory outside the interview"
+done
 # The user's own examples stay in plans, never in rule text.
 for f in "$interview" "$REPO_DIR/src/phases/pln/interview.core.md" "$REPO_DIR/src/phases/pln/review-approval.core.md"; do
   for name in BullMQ createOrFindBy createOrUpdateBy; do
@@ -807,6 +821,18 @@ for host in claude codex; do
     "$host an interleaving question has no accept floor"
   has "$WORK/$host/phases/pln/interview.md" "The accept option's own line names the consequence, the surface and the likelihood basis" \
     "$host an accepted interleaving is recorded without what /pln-pr needs to honour it"
+  has "$WORK/$host/phases/pln/interview.md" 'Documented behavior is not changed as a side effect' \
+    "$host interview does not consume the research envelope's documented behavior"
+  has "$WORK/$host/phases/pln/interview.md" 'with keeping the current behavior as one option, one reversal per question' \
+    "$host a side-effect reversal is not its own question with a keep option"
+  has "$WORK/$host/phases/pln/interview.md" "on every later rewrite of the item's section" \
+    "$host a reversal written into the section after step 6 is never compared"
+  has "$WORK/$host/phases/pln/interview.md" 'agent-written item text, a `Decision (agent)` or a disclosed decision never exempts it' \
+    "$host agent-written plan text exempts a reversal of documented behavior"
+  has "$WORK/$host/phases/pln/interview.md" 'is settled by that interleaving question and not asked again here' \
+    "$host one documented design can be asked about twice"
+  has "$WORK/$host/phases/pln/interview.md" 'gets its Reversals line and no gate disclosure' \
+    "$host an asked reversal is repeated at the gate"
   has "$WORK/$host/phases/pln/interview.md" "An answer that changes an item's approach dispatches a fresh item-mode worker" \
     "$host interview keeps research written for an approach an answer replaced"
   has "$WORK/$host/phases/pln/review-approval.md" "record a \`Decision (user, selected)\` pair whose option line is that entry's line" \

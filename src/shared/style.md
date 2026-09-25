@@ -60,7 +60,7 @@ Write so someone outside this project follows it on the first read. This is the 
 - Use the word you would use with a friend who isn't an engineer. "load-bearing" and "moves the needle" dress a plain idea up; say "important", "what everything depends on".
 - A noun phrase you assembled is not a name. "the fifteen-minute expiry", "the fourth-slot collision" each hide a sentence. Write the sentence, with the real values in it.
 - Explaining a cause means giving the steps, not the end of the chain. A result stated on its own is what the user quotes back asking what it means.
-- When they say they don't follow, start over in different words, not the same sentence more gently.
+- When they say they don't follow, give an example (The example option, below); abstract rewording has not worked.
 
 ### Ending a message
 

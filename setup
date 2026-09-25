@@ -61,6 +61,11 @@ case "$HOST" in
   *) echo "Built for Claude Code. Restart Claude Code to pick up the new skills." ;;
 esac
 
+# The one-time markers below live in ~/.pln. A state dir that cannot be written
+# (a sandbox that allows the install but not ~/.pln) must not fail setup — that
+# would fail an upgrade whose install succeeded — so a marker that cannot be
+# recorded is dropped and its nudge shows again next time.
+
 # ─── One-time optional economy-evidence nudge ───────────────
 # This is setup-time discoverability only. `/pln` never interrupts an
 # interview to advertise it, and an older host without usable model/effort
@@ -78,7 +83,7 @@ if [ "$("$SKILL_DIR/bin/pln-config" get economy_nudge_shown 2>/dev/null)" != "tr
     echo "  Same-host work currently inherits your selected model; implementation, review, and"
     echo "  user-facing decisions always stay on the judgment profile. Enable the narrow lane with:"
     echo "  \"$SKILL_DIR/bin/pln-config\" set evidence_profile economy"
-    "$SKILL_DIR/bin/pln-config" set economy_nudge_shown true >/dev/null
+    "$SKILL_DIR/bin/pln-config" set economy_nudge_shown true >/dev/null 2>&1 || true
   fi
 fi
 
@@ -109,7 +114,7 @@ if [ "$("$SKILL_DIR/bin/pln-config" get peer_nudge_shown 2>/dev/null)" != "true"
   else
     # Ready, consent-pending, or already declined — all settled states that
     # don't need re-checking on the next setup run.
-    "$SKILL_DIR/bin/pln-config" set peer_nudge_shown true >/dev/null
+    "$SKILL_DIR/bin/pln-config" set peer_nudge_shown true >/dev/null 2>&1 || true
   fi
 fi
 
@@ -136,6 +141,6 @@ if [ "$("$SKILL_DIR/bin/pln-config" get peer_egress_nudge_shown 2>/dev/null)" !=
     echo "    sends material not marked sensitive/local-only without asking again, or"
     echo "  \"$SKILL_DIR/bin/pln-config\" set peer_egress approved-only"
     echo "    sends only material explicitly approved for peer egress; other material stays local without prompting."
-    "$SKILL_DIR/bin/pln-config" set peer_egress_nudge_shown true >/dev/null
+    "$SKILL_DIR/bin/pln-config" set peer_egress_nudge_shown true >/dev/null 2>&1 || true
   fi
 fi

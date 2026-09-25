@@ -161,7 +161,7 @@ route="$("$ROUTER" resolve --host claude --profile judgment \
 eq "$(route_field STATUS "$route")" "ok" "a named hosting model blocked judgment dispatch"
 eq "$(route_field MODEL "$route")" "claude-sonnet-5" "a named hosting model was silently upgraded"
 eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "a named hosting model was overridden"
-eq "$(route_field EFFORT "$route")" "high" "Claude judgment did not request high effort"
+eq "$(route_field EFFORT "$route")" "medium" "Claude judgment did not inherit the session's effort"
 
 route="$("$ROUTER" resolve --host codex --profile judgment \
   --current-model custom-gateway-model)"
@@ -174,12 +174,13 @@ route="$("$ROUTER" resolve --host codex --profile judgment)"
 eq "$(route_field STATUS "$route")" "ok" "an unreported hosting model required confirmation"
 eq "$(route_field MODEL "$route")" "inherited-unreported" "an unreported hosting model was misattributed"
 eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "an unreported hosting model was overridden"
+eq "$(route_field EFFORT "$route")" "inherited-unreported" "judgment invented an effort the session did not report"
 
 "$BIN" set evidence_profile inherit
 route="$(PLN_STATE_DIR="$PLN_STATE_DIR" "$ROUTER" resolve --host codex --profile evidence \
   --current-model gpt-5.6-sol --current-effort high)"
 eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "default evidence routing did not inherit"
-eq "$(route_field EFFORT "$route")" "low" "bounded evidence did not use low effort"
+eq "$(route_field EFFORT "$route")" "high" "inherited evidence did not inherit the session's effort"
 
 "$BIN" set evidence_profile economy
 route="$(PLN_STATE_DIR="$PLN_STATE_DIR" "$ROUTER" resolve --host codex --profile evidence \
@@ -201,11 +202,13 @@ route="$(PLN_STATE_DIR="$PLN_STATE_DIR" PLN_ECONOMY_QUALIFICATION_FILE="$QUALIFI
   --current-model gpt-5.6-sol --current-effort high --economy-available true)"
 eq "$(route_field MODEL_ARGUMENT "$route")" "gpt-5.6-luna" "qualified opted-in Codex evidence did not use its economy profile"
 eq "$(route_field ACTUAL_PROFILE "$route")" "evidence" "economy evidence lost semantic attribution"
+eq "$(route_field EFFORT "$route")" "low" "qualified economy evidence left its qualified effort"
 
 route="$(PLN_STATE_DIR="$PLN_STATE_DIR" "$ROUTER" resolve --host codex --profile evidence \
   --current-model gpt-5.6-sol --current-effort high --economy-available false)"
 eq "$(route_field MODEL_ARGUMENT "$route")" "inherit" "unavailable economy routing did not fall back to inherit"
 eq "$(route_field FALLBACK "$route")" "economy-unavailable" "the economy fallback was not attributed"
+eq "$(route_field EFFORT "$route")" "high" "inherited fallback evidence did not inherit the session's effort"
 
 # --- durable routing ledger --------------------------------------------------
 PLAN_ROOT="$WORK/plan root"

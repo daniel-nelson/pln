@@ -1,5 +1,8 @@
 # Runtime aliases, kept host-local so shared policy never ages with model IDs.
 FRONTIER_MODEL='fable'
 ECONOMY_MODEL='sonnet'
+# Workers inherit the session's effort. JUDGMENT_EFFORT is bin/pln-eval's fixed
+# frontier-baseline setting only; EVIDENCE_EFFORT is the effort a selected
+# economy model was qualified at and runs at.
 JUDGMENT_EFFORT='high'
 EVIDENCE_EFFORT='low'

@@ -1580,6 +1580,13 @@ for f in "$real_c/phases/pln/interview.md" "$real_x/phases/pln/interview.md"; do
     "$f does not dispatch item research concurrently"
   has "$f" 'is dispatched after the wave that raised it' \
     "$f does not keep a premise-changing follow-up worker after its wave"
+  # A follow-up worker costs the user minutes before the item's question, so
+  # it has a closed list of triggers; one re-checking a source the envelope
+  # already cited met none of them and still ran.
+  has "$f" 'No follow-up worker is dispatched except on one of four triggers' \
+    "$f lets a follow-up worker run without one of its four triggers"
+  has "$f" 'adds a mandated rule the item'"'"'s research brief did not carry' \
+    "$f lost the late pre-flight mandate from the follow-up triggers"
 done
 
 # ─── a plan wider than one wave still asks its first question early ───────────
@@ -1835,6 +1842,8 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   has "$f" '`evidence`' "$f lost the bounded evidence profile"
   has "$f" 'actual profile, model, and effort' "$f does not require actual routing attribution"
   has "$f" 'always inherits the hosting model' "$f does not make judgment inheritance unconditional"
+  hasnt "$f" 'at least `high` effort' "$f still raises judgment workers above the session's effort"
+  has "$f" 'is passed no effort' "$f lets a peer be handed an effort instead of its CLI default"
   hasnt "$f" 'ask whether to inherit for this run' "$f retains the late model-inheritance gate"
   hasnt "$f" 'frontier-capability floor' "$f still claims model names are a capability test"
   has "$f" 'Start-of-invocation readiness sweep' "$f lost the early configuration sweep"
@@ -1851,6 +1860,10 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
     "$f can still block an unattended run on late peer configuration"
   has "$f" 'Before every turn that waits for user input' \
     "$f does not notify before every user-input wait"
+done
+for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" 'omit `model` and `reasoning_effort` when `MODEL_ARGUMENT=inherit`' \
+    "$f raises an inherited Codex worker's effort above the session's"
 done
 has "$real_c/SKILL.md" '`sonnet`' "the Claude build lost its economy alias"
 hasnt "$real_c/SKILL.md" 'gpt-5.6-sol' "the Claude build contains Codex model mechanics"

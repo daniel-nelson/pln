@@ -454,7 +454,8 @@ fresh
 peer "$BOTH" --host codex --brief "$BRIEF" --out "$WORK/run.out" --model some-model
 expect 2 claude ok 0 "a claude peer that answered"
 [ "$(field ACTUAL_PROFILE)" = "judgment" ] || fail "a Claude peer was not attributed as judgment"
-[ "$(field ACTUAL_EFFORT)" = "high" ] || fail "a Claude peer did not use judgment effort"
+[ "$(field ACTUAL_EFFORT)" = "peer-default-unreported" ] || fail "a Claude peer invented its effort"
+grep -q -- '--effort' "$WORK/claude.args" && fail "a Claude peer with an explicit model was handed an effort"
 [ "$(cat "$WORK/run.out")" = "claude reviewed the plan" ] \
   || fail "the claude peer's answer did not reach the result file"
 cmp -s "$BRIEF" "$WORK/claude.stdin" || fail "the brief did not reach the claude peer on stdin"
@@ -468,7 +469,8 @@ expect 2 codex ok 0 "a codex peer that answered"
 [ "$(field ACTUAL_PROFILE)" = "judgment" ] || fail "a Codex peer was not attributed as judgment"
 [ "$(field ACTUAL_MODEL)" = "peer-default-unreported" ] || fail "a Codex peer invented its default model"
 grep -q -- '--model' "$WORK/codex.args" && fail "a Codex peer forced an aging model alias"
-grep -q -- 'model_reasoning_effort=.high.' "$WORK/codex.args" || fail "a Codex peer did not request high effort"
+[ "$(field ACTUAL_EFFORT)" = "peer-default-unreported" ] || fail "a Codex peer invented its effort"
+grep -q -- 'model_reasoning_effort' "$WORK/codex.args" && fail "a Codex peer was handed an effort instead of its CLI default"
 [ "$(cat "$WORK/run.out")" = "codex reviewed the plan" ] \
   || fail "the codex peer's answer did not reach the result file"
 cmp -s "$BRIEF" "$WORK/codex.stdin" || fail "the brief did not reach the codex peer on stdin"

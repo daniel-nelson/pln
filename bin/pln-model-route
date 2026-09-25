@@ -97,12 +97,8 @@ fi
 case "$PROFILE" in inherit | judgment | evidence) ;; *) usage ;; esac
 case "$ECONOMY_AVAILABLE" in auto | true | false) ;; *) usage ;; esac
 
-judgment_effort() {
-  case "$1" in
-    high | xhigh | max | ultracode) printf '%s\n' "$1" ;;
-    *) printf '%s\n' "$JUDGMENT_EFFORT" ;;
-  esac
-}
+# Every profile inherits the session's effort; only a selected economy model
+# runs at the effort its release qualification measured (EVIDENCE_EFFORT).
 STATUS="ok"
 ACTUAL_PROFILE="$PROFILE"
 MODEL="${CURRENT_MODEL:-inherited-unreported}"
@@ -114,7 +110,6 @@ case "$PROFILE" in
   inherit)
     ;;
   judgment)
-    EFFORT="$(judgment_effort "$CURRENT_EFFORT")"
     # Model names are release metadata, not a durable capability oracle. A
     # judgment worker inherits the model selected for the hosting session,
     # whether its exact name is known, custom, or unreported.
@@ -123,7 +118,6 @@ case "$PROFILE" in
     [ -n "$EVIDENCE_PROFILE" ] || EVIDENCE_PROFILE="$($SELF_DIR/pln-config get evidence_profile 2>/dev/null || true)"
     [ -n "$EVIDENCE_PROFILE" ] || EVIDENCE_PROFILE="inherit"
     case "$EVIDENCE_PROFILE" in inherit | economy) ;; *) EVIDENCE_PROFILE="inherit" ;; esac
-    EFFORT="$EVIDENCE_EFFORT"
     if [ "$EVIDENCE_PROFILE" = "economy" ]; then
       if [ "$ECONOMY_AVAILABLE" = "auto" ]; then
         probe_controls_available && ECONOMY_AVAILABLE="true" || ECONOMY_AVAILABLE="false"
@@ -131,6 +125,7 @@ case "$PROFILE" in
       if [ "$ECONOMY_AVAILABLE" = "true" ] && economy_qualified; then
         MODEL="$ECONOMY_MODEL"
         MODEL_ARGUMENT="$ECONOMY_MODEL"
+        EFFORT="$EVIDENCE_EFFORT"
       else
         MODEL="${CURRENT_MODEL:-inherited-unreported}"
         if [ "$ECONOMY_AVAILABLE" != "true" ]; then

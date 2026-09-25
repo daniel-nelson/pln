@@ -1,5 +1,8 @@
 # Current OpenAI host targets. These age here, never in shared coordinator text.
 FRONTIER_MODEL='gpt-5.6-sol'
 ECONOMY_MODEL='gpt-5.6-luna'
+# Workers inherit the session's effort. JUDGMENT_EFFORT is bin/pln-eval's fixed
+# frontier-baseline setting only; EVIDENCE_EFFORT is the effort a selected
+# economy model was qualified at and runs at.
 JUDGMENT_EFFORT='high'
 EVIDENCE_EFFORT='low'

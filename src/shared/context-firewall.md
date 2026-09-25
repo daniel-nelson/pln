@@ -6,7 +6,7 @@ The coordinator owns conversation, durable decisions/cursors, blockers, and hand
 
 - **Coordinator-direct:** known-stop coordination state or one exact fact; at most two exact operations, 40 lines, and 2 KiB combined, provably bounded before execution. Router/active-phase, root-instruction, `PLAN.md`, and `REVIEW.md` reads are coordination-state exceptions.
 - **Evidence:** a fresh `src/workers/evidence-collection.md` worker for mechanically closed facts beyond that budget. It returns facts, citations, counterevidence, and uncertainty only. `evidence_profile` inherits by default and uses economy only after opt-in.
-- **Judgment:** a fresh `judgment`/high-effort worker for synthesis, scope/question changes, conflicting-record applicability, reversals, recommendations, architecture/API seams, concurrency/transactions, migrations/destructive lifecycle, security/privacy, external/AI/eval effects, and all review, verification, or merges.
+- **Judgment:** a fresh `judgment` worker for synthesis, scope/question changes, conflicting-record applicability, reversals, recommendations, architecture/API seams, concurrency/transactions, migrations/destructive lifecycle, security/privacy, external/AI/eval effects, and all review, verification, or merges.
 
 Raw diffs, source neighborhoods, logs, decision corpora, reviewer output, and peer output never enter coordinator context. Write them to artifacts; read only fixed metadata or validated envelopes. Possibly unbounded commands redirect before execution—post-generation `head`/`tail` is not proof of boundedness.
 

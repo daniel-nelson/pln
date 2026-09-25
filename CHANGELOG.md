@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.108.0 — 2026-09-25
+
+### Fixed
+
+- **`/pln-pr`'s review-depth question no longer offers "Show me an example".** 1.106.0 limited the option to interview, walk and repair questions, and its changelog excluded review depth, but the skill text said only "No other prompt carries it". An agent added it to the full / broad only / skip question anyway. The Style rule now names the prompts that never carry the option (outline checkpoint, plan adoption, review depth, ship, config, retry) and says a repair question is a finding that needs a decision. The review-depth ask says it has no example option.
+
 ## 1.107.0 — 2026-09-25
 
 ### Changed

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.101.0 — 2026-09-24
+
+### Fixed
+
+- **`/pln`'s outline checkpoint asks "Ready to start the interview?" again on Codex, instead of a long adopt-or-change question.** Since 1.68.0's Codex voice rule "Give the question its ground", Codex treated that prompt as a bare question stem and padded it, e.g. "The `$pln` workflow requires this outline checkpoint before the interview. Adopt this scope to discuss the City-row question next, or tell me what to change?" The outline phase now says the prompt goes out verbatim and as the whole question, with no explanation of the stop, no named first topic and no rewording. The Codex rule now covers item-level interview questions only, and says a gate prompt the phase file gives verbatim is sent as written. Nothing measures whether Codex now follows it.
+
 ## 1.100.0 — 2026-09-24
 
 ### Changed

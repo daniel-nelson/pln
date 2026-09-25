@@ -59,7 +59,8 @@ disk is moved only by `claim --steal`, never released out from under it.
 Exit codes: 0 done, 2 usage or failure, 3 refused (a collision, an occupied path,
 a live holder, no resolvable to-do list). Every subcommand resolves the to-do list
 first and reports TODO_ROOT, whether it created one, and whether the location
-question is owed.
+question is owed: LOCATION_QUESTION is answered (recorded), in-use (no answer
+recorded, but the list already holds records, so it stays where it is) or owed.
 
 Env overrides (for testing):
   PLN_TODO_DATE — the UTC date the helper writes (YYYY-MM-DD)
@@ -593,9 +594,24 @@ load_header() {
   MIGRATION_OFFERED='none'
   answered="$(header_field "$TODO_ROOT/$INDEX_NAME" 'location-answered')"
   offered="$(header_field "$TODO_ROOT/$INDEX_NAME" 'migration-offered')"
-  if [ -n "$answered" ]; then LOCATION_QUESTION='answered'; fi
+  if [ -n "$answered" ]; then LOCATION_QUESTION='answered'
+  # A list that already holds a filed record was put where it is on purpose, and
+  # its items live there: asking where it should live reads as though no list
+  # exists, and any other answer moves it. Lists from before the header recorded
+  # an answer — every one migrated off the older names — have records and no
+  # answer. An empty list left by a run that never asked is still owed.
+  elif holds_records "$TODO_ROOT"; then LOCATION_QUESTION='in-use'
+  fi
   if [ -n "$offered" ]; then MIGRATION_OFFERED="$offered"; fi
   return 0
+}
+
+holds_records() {
+  local f
+  for f in "$1/$LIVE_DIR"/*.md "$1/$DONE_DIR"/*/*.md; do
+    [ -f "$f" ] && return 0
+  done
+  return 1
 }
 
 report_notes() {

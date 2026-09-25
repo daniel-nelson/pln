@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.105.0 — 2026-09-25
+
+### Fixed
+
+- **`/pln` no longer asks where the to-do list should live when one already holds items.** The location question was owed whenever the list's header had no recorded answer. Every list created before the header recorded one, including every list moved off the older `QUEUE.md` names, has items and no answer. So `/pln` offered the three locations as though no list existed, and any answer but the current one would have moved the list. Observed on Codex: the run found `pln/TO-DO.md` with a live item, reported `CREATED=0`, and still asked. `pln-todo` now reports `LOCATION_QUESTION=in-use` for a list holding a live or archived record, and the outline step records that location without asking. A list that exists but is empty is still asked about. The question now names that list and its path, offers keeping it as the first answer, and says whether git ignores it, rather than calling it committed because it sits where option (a) would put it.
+
 ## 1.104.0 — 2026-09-25
 
 ### Fixed

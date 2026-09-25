@@ -122,6 +122,9 @@ ok "a second init in the same project" init --project "$R"
 is TODO_ROOT "$R/pln" "the second run resolved a different root"
 is RESOLVED_BY project-root "the second run did not find the existing to-do list"
 is CREATED 0 "the second run created a to-do list over one that already existed"
+# Found again but still empty: a run that created it and was stopped before
+# asking leaves nothing that chose this location, so the question stays owed.
+is LOCATION_QUESTION owed "an existing empty to-do list reported its location as settled"
 
 # The answered question and the migration offer are recorded in that header and
 # nowhere else, so no state exists outside the to-do list.
@@ -307,6 +310,10 @@ is TODO_ROOT "$R/pln" "the migration did not resolve the list it migrated"
 is RESOLVED_BY project-root "an older list was not adopted at the project-root leg"
 is CREATED 0 "the migration reported creating a list rather than renaming one"
 said 'renamed once' "the migration was not reported back"
+# A list from before the header recorded an answer holds items and no answer.
+# Its location was chosen by use, so it is not re-asked as though no list exists:
+# every answer but the current one would move it.
+is LOCATION_QUESTION in-use "a list already holding items reported the location question as owed"
 for old in QUEUE.md q done; do
   [ ! -e "$R/pln/$old" ] || fail "the migration left $old behind"
 done
@@ -333,6 +340,10 @@ ok "archiving a migrated item" archive --project "$R" --id legacy-item \
 # A second run has nothing left to do, and says nothing about a rename.
 ok "a later run over a migrated list" init --project "$R"
 didnt_say 'renamed once' "the migration ran a second time"
+# Its only live item is archived now; an archived record is use just the same.
+is LOCATION_QUESTION in-use "a list holding only archived records reported the location question as owed"
+ok "recording the in-use location" init --project "$R" --answered
+is LOCATION_QUESTION answered "recording an in-use location did not record it as answered"
 
 # The explicit leg never calls the adoption probe, so a migration hooked into
 # adoption alone would miss `init --root` — the command a user runs to point pln

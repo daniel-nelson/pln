@@ -58,6 +58,12 @@ Each of those means the question was really a disclosure. What happens to it nex
 
 Plain prose, no letters. e.g., "Adopt this as written, or change it?"
 
+### The example option
+
+An interview, walk or `{{PLN_PR_CMD}}` repair question ends with one more choice: a last letter, `**Show me an example** — one real case, run through each option`, or on a binary, "…or ask for an example." No other prompt carries it.
+
+Any example, however asked for: one case from the user's world with named people and real values, in numbered steps that show where the system acts; what each option produces there; then the question again, verbatim.
+
 ### Bullets vs. numbers — visual distinction
 
 - **Hyphen bullets** = "here's a flat list" (definitions, criteria, conditions). Not for choices.

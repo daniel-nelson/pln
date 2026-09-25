@@ -787,6 +787,8 @@ for f in "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
   has "$f" 'write durable state first, then advance `Phase`, then read the new phase file' \
     "$f lost write-then-advance semantics"
   has "$f" 'fail closed' "$f lost conflict-safe restart behavior"
+  has "$f" 'No push and no PR unless `REVIEW.md` reads `Phase: ship-watch`.' \
+    "$f lost the ledger gate on push and PR creation"
   hasnt "$f" '### Step 3. Review army' "$f still embeds the review phase"
   hasnt "$f" '### Step 4. Fix pass' "$f still embeds the fix phase"
 done

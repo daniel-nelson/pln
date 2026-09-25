@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.102.0 — 2026-09-25
+
+### Changed
+
+- **`/pln-pr` pushes and opens or updates a PR only while its ledger reads `Phase: ship-watch`.** A Codex run whose fresh-reviewer helper failed twice stopped using the ledger: it reviewed, fixed and shipped by hand, and opened the PR with `REVIEW.md` still at `scope-baseline`. It never read the ship phase, which runs the repository's version-bump rule, so the PR went up without the bump the repository requires. A new hard constraint in the router says to check the ledger's `Phase` before `git push`, `gh pr create`/`gh pr edit` or `glab mr create`/`glab mr update`. With no ledger or another phase, the command does not run and the run goes back to the phase the ledger names. A failed helper or reviewer is a blocker to record. `tests/generate.sh` pins the rule in both host builds. Nothing measures whether a model follows it.
+
 ## 1.101.0 — 2026-09-24
 
 ### Fixed

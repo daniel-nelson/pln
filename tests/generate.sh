@@ -1598,6 +1598,74 @@ for f in "$real_c/phases/pln/interview.md" "$real_x/phases/pln/interview.md"; do
     "$f no longer says plainly that research is all-items-first"
 done
 
+# ─── item research starts at the outline checkpoint ──────────────────────────
+# A measured run spent 21 minutes at the checkpoint and then 16 more before the
+# first item question, of which the research wave was 3. So the checkpoint turn
+# dispatches the first wave before its prompt and ends with it running. The
+# dispatch rules live in one fragment both phases include, each dispatch writes
+# to its own path under a recorded checksum, and the one lifecycle exception
+# that lets the turn end names only pre-flight and that wave.
+for host_out in "$real_c" "$real_x"; do
+  outline_file="$host_out/phases/pln/outline.md"
+  interview_file="$host_out/phases/pln/interview.md"
+  for f in "$outline_file" "$interview_file"; do
+    [ "$(grep -cF 'Every dispatch is recorded before it runs' "$f")" = "1" ] \
+      || fail "$f does not carry the shared research-wave fragment exactly once"
+    has "$f" 'Dispatch the item workers together in waves, await the wave' \
+      "$f lost the moved wave-dispatch rule"
+    has "$f" '`--status dispatched`' "$f does not record a dispatch before it runs"
+    has "$f" '`results/item-<N>.<seq>.txt`' "$f lets two dispatches share one results path"
+    has "$f" "Every earlier row's result is superseded and never read" \
+      "$f may read a superseded dispatch's result"
+    has "$f" '**A dropped item** — its result is never read' "$f may use a struck item's result"
+    has "$f" 'no longer matches** the item as it stands' "$f reuses research for an edited item"
+    has "$f" 'it is orphaned. Dispatch afresh at the next sequence' \
+      "$f has no rule for a dispatch whose worker a restart lost"
+  done
+  has "$outline_file" '### Item research at the checkpoint' "$outline_file does not dispatch research at the checkpoint"
+  has "$outline_file" 'dispatches the first wave before the verbatim prompt' \
+    "$outline_file does not dispatch the first wave before the checkpoint prompt"
+  has "$outline_file" 'less every worker still in flight, a running pre-flight included' \
+    "$outline_file sizes the checkpoint wave without counting pre-flight"
+  has "$outline_file" 'Delegated mode dispatches nothing here' "$outline_file changed delegated-mode dispatch"
+  has "$outline_file" "The active-turn lifecycle's one named exception lives here" \
+    "$outline_file cannot end the checkpoint turn with research running"
+  has "$outline_file" 'the pre-flight research worker, and the checkpoint' \
+    "$outline_file does not name exactly what the exception covers"
+  has "$outline_file" 'gets no output at all — no tool call and no text' \
+    "$outline_file lets a wake-up under the open checkpoint print"
+  # The checkpoint's own turn boundary is unchanged: dispatch is not a question.
+  has "$outline_file" 'Dispatching is not a question, it shows the user nothing, and it does not move the stop' \
+    "$outline_file lets checkpoint dispatch change the stop"
+  for rel in phases/pln/outline.md phases/pln/interview.md phases/pln/implementation.md phases/pln-pr/review.md; do
+    has "$host_out/$rel" 'The outline phase names the one exception to this paragraph, and nothing else is one' \
+      "$host_out/$rel does not bound the lifecycle's exception to the outline phase"
+  done
+done
+has "$real_c/phases/pln/outline.md" 'Wave width: up to 15 item workers at once' "the claude outline has no wave width"
+has "$real_c/phases/pln/outline.md" 'the wave is one `Workflow` fan-out' "the claude checkpoint wave can wake the coordinator once per item"
+hasnt "$real_c/phases/pln/outline.md" 'children outlive the turn' "codex checkpoint mechanics leaked into the claude build"
+has "$real_x/phases/pln/outline.md" 'Wave width: up to 3 item workers at once' "the codex outline has no wave width"
+has "$real_x/phases/pln/outline.md" 'At the outline checkpoint the children outlive the turn' "the codex build does not say checkpoint children survive the turn"
+hasnt "$real_x/phases/pln/outline.md" 'Workflow' "claude checkpoint mechanics leaked into the codex build"
+has "$real_x/SKILL.md" "Only the outline phase's lifecycle exception, preflight and the checkpoint wave, may be left running" \
+  "the codex router's reconcile rule contradicts the outline exception"
+# The checksum command is run, not only read: it must select one item's row and
+# section, ignore a numbered list inside another item, and move on an edit.
+sum_cmd="$(awk '/^```bash$/{b=1;next} /^```$/{b=0} b && /cksum$/' "$real_c/phases/pln/outline.md")"
+[ -n "$sum_cmd" ] || fail "the outline carries no runnable item checksum command"
+sum_dir="$(mktemp -d "${TMPDIR:-/tmp}/pln-itemsum.XXXXXX")"
+printf '## Status\n\n1. Export — ⬜ pending\n2. Delete — ⬜ pending\n\n## Open questions\n\n1. stray\n\n---\n\n## Item details\n\n### 1. Export\n\nbody one\n\n### 2. Delete\n\n1. step\n' > "$sum_dir/PLAN.md"
+item_sum() { (cd "$sum_dir" && eval "${sum_cmd//<N>/$1}"); }
+sel="$(cd "$sum_dir" && eval "$(printf '%s' "${sum_cmd//<N>/1}" | sed 's/ | cksum$//')")"
+[ "$sel" = "$(printf '1. Export — ⬜ pending\n### 1. Export\n\nbody one\n')" ] \
+  || fail "the item checksum command selects the wrong lines: $sel"
+one="$(item_sum 1)"; two="$(item_sum 2)"
+sed -i.bak 's/^1\. step$/1. step changed/' "$sum_dir/PLAN.md"
+[ "$(item_sum 1)" = "$one" ] || fail "editing item 2 changed item 1's checksum"
+[ "$(item_sum 2)" != "$two" ] || fail "editing item 2 did not change its checksum"
+rm -rf "$sum_dir"
+
 # The coordinator's pre-flight step may read the root instruction file that
 # governs its own conduct. Forbidding that outright produced a rule the model
 # correctly broke, in any repository whose AGENTS.md says to read CLAUDE.md.

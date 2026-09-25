@@ -6,9 +6,11 @@ name: pln-phase-outline
 
 <!-- pln:include active-turn-lifecycle -->
 
-Read this file in full before the first outline action. It owns pre-flight, plan allocation, skeleton creation, the editable outline checkpoint, and the transition into interview. It does not own any item-level interview question or implementation.
+Read this file in full before the first outline action. It owns pre-flight, plan allocation, skeleton creation, the editable outline checkpoint and the item research it dispatches, and the transition into interview. It does not own any item-level interview question or implementation.
 
 Create `PLAN.md` with `Phase: outline` in its own top-level `## Phase` section before showing the dashboard. If the user edits scope, update the skeleton and keep `Phase: outline`. In normal and auto modes, missing confirmation leaves `Phase: outline`: do not infer confirmation from auto mode or start the interview, review, scheduling, or implementation. After the user accepts the displayed outline—or after delegated mode displays it—finish all outline writes, set `Phase: interview`, then read the mapped interview phase in full before its first action.
+
+**The active-turn lifecycle's one named exception lives here.** An outline turn that ends on a question — from the to-do-location question through every showing of the outline checkpoint — may end with two kinds of work still running: the pre-flight research worker, and the checkpoint's item research wave. Nothing else qualifies. The question is open, so the lifecycle's hold applies in full: step 2 of its terminal-state audit (consume every completed result) is waived while it stands, and each worker finishes into its own artifacts, unread. A completion that wakes the coordinator while that question is open gets no output at all — no tool call and no text. The user's answer ends the hold: that turn reconciles every handle and consumes whatever has landed before it does anything else.
 
 ## The workflow (sequential steps)
 
@@ -154,9 +156,22 @@ Items in the dashboard are one-line summaries. Detail sections are stub-brief at
 
 This checkpoint is the user's scope-editing surface: a chapter-outline view for understanding the whole shape and removing, adding, renaming, or reordering items while those changes are still cheap, before entering item-level discussion. It is distinct from Step 4's approval of the fully resolved plan before implementation.
 
+In normal and auto modes the checkpoint turn dispatches item research before it asks — see *Item research at the checkpoint* below. Dispatching is not a question, it shows the user nothing, and it does not move the stop.
+
 After writing the skeleton, **stop**. In normal mode, show the user the complete dashboard (not the whole file), ask no item-level interview question in that turn, and perform no implementation. Prompt, verbatim and as the whole question: "Plan written to `<path>`. Ready to start the interview?" Do not explain why the run stopped, name the first interview topic, or reword it into an adopt-or-change question. Only an affirmative answer to the current outline begins the interview phase (Step 3). If the user changes the outline instead, update the skeleton before the interview starts, re-show the complete dashboard, and ask again.
 
 In delegated mode there is nothing to ask: show the dashboard and go straight into Step 3 (see Delegated mode). Auto mode is not advance authorization: it grants neither this checkpoint confirmation nor master-plan adoption, and changes only Step 5 blocker handling after adoption (see Auto-mode behavior).
+
+### Item research at the checkpoint
+
+The user's reading time at the checkpoint is when item research runs, so it is not left for the answer. In normal and auto modes, the turn that shows the dashboard dispatches the first wave before the verbatim prompt: every active item the reuse rules below say needs a dispatch, up to the host's wave width less every worker still in flight, a running pre-flight included. Later waves wait for the interview's walk, as below. Then ask the prompt and end the turn. Nothing is read while the checkpoint stands open (see the lifecycle exception at the top of this file); on the user's answer, reconcile first. Each re-showing after a scope edit dispatches the same way, and the interview settles whatever remains when the user says yes. Delegated mode dispatches nothing here: it does not stop at the checkpoint, so the interview's own dispatch loses nothing.
+
+Classification, the brief, the per-dispatch record, and reuse are the interview's own rules, unchanged:
+
+<!-- pln:include item-research-wave -->
+
+<!-- pln:include research-fanout -->
+
 ## Plan file conventions
 
 - Where the project's instructions name a plans location, the directory is `<that path>/<YYYY-MM-DD>-<slug>/`. Otherwise, in a git worktree it is `./plans/<YYYY-MM-DD>-<slug>/`, relative to the session CWD rather than the git root; outside one, the external temporary run directory allocated in Step 1, and no local `plans/` directory.

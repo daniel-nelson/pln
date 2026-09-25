@@ -27,7 +27,7 @@ _AUTO=""
 echo "AUTO_UPGRADE=$_AUTO SKILL_DIR=$_SKILL_DIR"
 ```
 
-**If `AUTO_UPGRADE=true`:** Skip the prompt. Say "Auto-upgrading pln v{old} → v{new}..." and go straight to Step 2. If anything in Step 2–4 fails during an auto-upgrade, restore from backup and warn: "Auto-upgrade failed — restored previous version. Invoke pln-update again to retry."
+**If `AUTO_UPGRADE=true`:** Skip the prompt. Say "Auto-upgrading pln v{old} → v{new}..." and go straight to Step 2. If Step 2 fails, follow **If an upgrade fails** there.
 
 **Otherwise**, ask in plain text (no `AskUserQuestion`):
 
@@ -117,11 +117,29 @@ Read the script's output and relay it:
 - One `COPY <dir> <old> -> <new> <status>` line per copy. Statuses: `upgraded`,
   `unchanged` (already current), `stashed` (upgraded, but local git changes were
   stashed — tell the user to `git stash pop` in that dir), `dev-symlink-skipped`
-  (a developer install; leave it, they `git pull` the source clone), `failed`.
+  (a developer install; leave it, they `git pull` the source clone),
+  `failed:<reason>` (the copy did not upgrade; `failed:not-writable` means a
+  write into it was refused before anything changed — a read-only install, or a
+  sandbox that confines writes to the workspace).
 - `SUMMARY <oldmin> -> <new> (<u> upgraded, <c> unchanged, <s> skipped, <f> failed)`.
 
-If any copy is `failed`, tell the user which one and that they can invoke
-pln-update again. The script writes the just-upgraded marker and clears the update
+**If an upgrade fails** — the script exits 2 (remote unreachable, before any
+copy is tried) or any copy is `failed:<reason>`:
+
+1. Retry once, escalated, if this run was not already escalated, the host
+   sandboxes commands and offers escalation, and the failure is one the sandbox
+   can cause: exit 2, `failed:not-writable`, `failed:fetch-failed` or
+   `failed:clone-failed`. Rerun `"$APPLY"` as **Sandboxed hosts** above says.
+   One retry per invocation, never a loop.
+2. Otherwise — any other reason, an escalated run that failed, or a host with no
+   sandbox — tell the user in one line which copy failed and why. The remedy is
+   to invoke pln-update again, except `setup-failed` on a git copy (its `COPY`
+   line shows the new version, so the check will not offer the upgrade again):
+   name `./setup` in that directory, plus `git stash pop` there if
+   `git stash list` shows the upgrade stashed local changes.
+
+Then carry on: Step 3 if any copy upgraded, then Step 4. A failed upgrade never
+stops the run. The script writes the just-upgraded marker and clears the update
 cache itself when at least one copy was upgraded.
 
 **Fallback (only if `NO_APPLY_SCRIPT`):** every installed copy predates this
@@ -175,4 +193,4 @@ echo "UPDATE_CHECK_OK=$UPDATE_CHECK_OK"; echo "UPDATE_CHECK_OUTPUT=$UPDATE_CHECK
 
 2. If `UPGRADE_AVAILABLE <old> <new>` appears: run the inline flow (Step 2 reconcile onward). The `--plan` preview is a good idea here so the user sees which copies are behind before anything changes.
 
-3. **If `UPDATE_CHECK_OK=false`** (script missing or sandbox-blocked): don't trust silence. Run the reconcile directly — `bin/pln-update-apply` fetches the remote version itself and is a no-op for copies already current, so it's safe to run even when the check couldn't confirm. Locate it as in Step 2 and run `"$APPLY" --plan` then `"$APPLY"`, running `"$APPLY"` as **Sandboxed hosts** in Step 2 says. If no copy ships the script either, use the Step 2 fallback loop.
+3. **If `UPDATE_CHECK_OK=false`** (script missing or sandbox-blocked): don't trust silence. Run the reconcile directly — `bin/pln-update-apply` fetches the remote version itself and is a no-op for copies already current, so it's safe to run even when the check couldn't confirm. Locate it as in Step 2 and run `"$APPLY" --plan` then `"$APPLY"`, running `"$APPLY"` as **Sandboxed hosts** in Step 2 says and handling a failure as **If an upgrade fails** there says. If no copy ships the script either, use the Step 2 fallback loop.

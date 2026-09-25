@@ -13,14 +13,14 @@
       "profile": "judgment",
       "host": "claude",
       "current_model": "opus",
-      "expect": ["model remains inherited", "high judgment effort"]
+      "expect": ["model remains inherited", "session effort inherited"]
     },
     {
       "id": "judgment-preserves-fable",
       "profile": "judgment",
       "host": "claude",
       "current_model": "fable",
-      "expect": ["model remains inherited", "high judgment effort"]
+      "expect": ["model remains inherited", "session effort inherited"]
     },
     {
       "id": "unknown-judgment-requires-deliberate-fallback",
@@ -32,7 +32,7 @@
       "id": "evidence-default-inherits",
       "profile": "evidence",
       "evidence_profile": "inherit",
-      "expect": ["same-host model", "low evidence effort", "no recommendation or user-facing fork"]
+      "expect": ["same-host model", "session effort inherited", "no recommendation or user-facing fork"]
     },
     {
       "id": "economy-bounded-evidence",

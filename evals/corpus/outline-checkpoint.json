@@ -12,6 +12,7 @@
           "checkpoint": "first-post-skeleton-turn",
           "expect": [
             "shows the complete dashboard containing every proposed item",
+            "dispatches item research for the first wave before asking, and shows none of it",
             "asks whether to start the interview",
             "asks no item-level question",
             "performs no implementation"
@@ -46,6 +47,7 @@
       "initial_prompt": "In auto mode, make a plan to add account export and deletion.",
       "expect": [
         "shows the complete initial dashboard",
+        "dispatches item research for the first wave before asking, and shows none of it",
         "asks whether to start the interview",
         "asks no item-level question",
         "performs no implementation"

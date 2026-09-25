@@ -1580,6 +1580,13 @@ for f in "$real_c/phases/pln/interview.md" "$real_x/phases/pln/interview.md"; do
     "$f does not dispatch item research concurrently"
   has "$f" 'is dispatched after the wave that raised it' \
     "$f does not keep a premise-changing follow-up worker after its wave"
+  # A follow-up worker costs the user minutes before the item's question, so
+  # it has a closed list of triggers; one re-checking a source the envelope
+  # already cited met none of them and still ran.
+  has "$f" 'No follow-up worker is dispatched except on one of four triggers' \
+    "$f lets a follow-up worker run without one of its four triggers"
+  has "$f" 'adds a mandated rule the item'"'"'s research brief did not carry' \
+    "$f lost the late pre-flight mandate from the follow-up triggers"
 done
 
 # ─── a plan wider than one wave still asks its first question early ───────────
@@ -1596,6 +1603,119 @@ for f in "$real_c/phases/pln/interview.md" "$real_x/phases/pln/interview.md"; do
     "$f does not keep one item's own research ahead of its own question"
   has "$f" 'Every active item is researched before the walk begins' \
     "$f no longer says plainly that research is all-items-first"
+done
+
+# ─── item research starts at the outline checkpoint ──────────────────────────
+# A measured run spent 21 minutes at the checkpoint and then 16 more before the
+# first item question, of which the research wave was 3. So the checkpoint turn
+# dispatches the first wave before its prompt and ends with it running. The
+# dispatch rules live in one fragment both phases include, each dispatch writes
+# to its own path under a recorded checksum, and the one lifecycle exception
+# that lets the turn end names only pre-flight and that wave.
+for host_out in "$real_c" "$real_x"; do
+  outline_file="$host_out/phases/pln/outline.md"
+  interview_file="$host_out/phases/pln/interview.md"
+  for f in "$outline_file" "$interview_file"; do
+    [ "$(grep -cF 'Every dispatch is recorded before it runs' "$f")" = "1" ] \
+      || fail "$f does not carry the shared research-wave fragment exactly once"
+    has "$f" 'Dispatch the item workers together in waves, await the wave' \
+      "$f lost the moved wave-dispatch rule"
+    has "$f" '`--status dispatched`' "$f does not record a dispatch before it runs"
+    has "$f" '`results/item-<N>.<seq>.txt`' "$f lets two dispatches share one results path"
+    has "$f" "Every earlier row's result is superseded and never read" \
+      "$f may read a superseded dispatch's result"
+    has "$f" '**A dropped item** — its result is never read' "$f may use a struck item's result"
+    has "$f" 'no longer matches** the item as it stands' "$f reuses research for an edited item"
+    has "$f" 'it is orphaned. Dispatch afresh at the next sequence' \
+      "$f has no rule for a dispatch whose worker a restart lost"
+  done
+  has "$outline_file" '### Item research at the checkpoint' "$outline_file does not dispatch research at the checkpoint"
+  has "$outline_file" 'dispatches the first wave before the verbatim prompt' \
+    "$outline_file does not dispatch the first wave before the checkpoint prompt"
+  has "$outline_file" 'less every worker still in flight, a running pre-flight included' \
+    "$outline_file sizes the checkpoint wave without counting pre-flight"
+  has "$outline_file" 'Delegated mode dispatches nothing here' "$outline_file changed delegated-mode dispatch"
+  has "$outline_file" "The active-turn lifecycle's one named exception lives here" \
+    "$outline_file cannot end the checkpoint turn with research running"
+  has "$outline_file" 'the pre-flight research worker, and the checkpoint' \
+    "$outline_file does not name exactly what the exception covers"
+  has "$outline_file" 'gets no output at all — no tool call and no text' \
+    "$outline_file lets a wake-up under the open checkpoint print"
+  # The checkpoint's own turn boundary is unchanged: dispatch is not a question.
+  has "$outline_file" 'Dispatching is not a question, it shows the user nothing, and it does not move the stop' \
+    "$outline_file lets checkpoint dispatch change the stop"
+  for rel in phases/pln/outline.md phases/pln/interview.md phases/pln/implementation.md phases/pln-pr/review.md; do
+    has "$host_out/$rel" 'The outline phase names the one exception to this paragraph, and nothing else is one' \
+      "$host_out/$rel does not bound the lifecycle's exception to the outline phase"
+  done
+done
+has "$real_c/phases/pln/outline.md" 'Wave width: up to 15 item workers at once' "the claude outline has no wave width"
+has "$real_c/phases/pln/outline.md" 'the wave is one `Workflow` fan-out' "the claude checkpoint wave can wake the coordinator once per item"
+hasnt "$real_c/phases/pln/outline.md" 'children outlive the turn' "codex checkpoint mechanics leaked into the claude build"
+has "$real_x/phases/pln/outline.md" 'Wave width: up to 3 item workers at once' "the codex outline has no wave width"
+has "$real_x/phases/pln/outline.md" 'At the outline checkpoint the children outlive the turn' "the codex build does not say checkpoint children survive the turn"
+hasnt "$real_x/phases/pln/outline.md" 'Workflow' "claude checkpoint mechanics leaked into the codex build"
+has "$real_x/SKILL.md" "Only the outline phase's lifecycle exception, preflight and the checkpoint wave, may be left running" \
+  "the codex router's reconcile rule contradicts the outline exception"
+# The checksum command is run, not only read: it must select one item's row and
+# section, ignore a numbered list inside another item, and move on an edit.
+sum_cmd="$(awk '/^```bash$/{b=1;next} /^```$/{b=0} b && /cksum$/' "$real_c/phases/pln/outline.md")"
+[ -n "$sum_cmd" ] || fail "the outline carries no runnable item checksum command"
+sum_dir="$(mktemp -d "${TMPDIR:-/tmp}/pln-itemsum.XXXXXX")"
+printf '## Status\n\n1. Export — ⬜ pending\n2. Delete — ⬜ pending\n\n## Open questions\n\n1. stray\n\n---\n\n## Item details\n\n### 1. Export\n\nbody one\n\n### 2. Delete\n\n1. step\n' > "$sum_dir/PLAN.md"
+item_sum() { (cd "$sum_dir" && eval "${sum_cmd//<N>/$1}"); }
+sel="$(cd "$sum_dir" && eval "$(printf '%s' "${sum_cmd//<N>/1}" | sed 's/ | cksum$//')")"
+[ "$sel" = "$(printf '1. Export — ⬜ pending\n### 1. Export\n\nbody one\n')" ] \
+  || fail "the item checksum command selects the wrong lines: $sel"
+one="$(item_sum 1)"; two="$(item_sum 2)"
+sed -i.bak 's/^1\. step$/1. step changed/' "$sum_dir/PLAN.md"
+[ "$(item_sum 1)" = "$one" ] || fail "editing item 2 changed item 1's checksum"
+[ "$(item_sum 2)" != "$two" ] || fail "editing item 2 did not change its checksum"
+rm -rf "$sum_dir"
+
+# ─── pre-flight runs beside item research, not ahead of it ───────────────────
+# The measured run spent 4m18s in pre-flight and its merge before any item
+# could start. Pre-flight now goes out once the authorship answer is in, before
+# the to-do-location question; an invocation that enumerates its items sends
+# the item wave with it. It keeps a per-dispatch record like an item, and one
+# still running at the checkpoint answer is the interview's to merge.
+for host_out in "$real_c" "$real_x"; do
+  outline_file="$host_out/phases/pln/outline.md"
+  interview_file="$host_out/phases/pln/interview.md"
+  has "$outline_file" 'Dispatch mandatory pre-flight research as soon as nothing forbids reading' \
+    "$outline_file still holds pre-flight until after the setup questions"
+  pf_line="$(grep -nF 'Dispatch mandatory pre-flight research as soon as' "$outline_file" | cut -d: -f1)"
+  todo_line="$(grep -nF 'Settle where the project to-do list lives' "$outline_file" | cut -d: -f1)"
+  [ "$pf_line" -lt "$todo_line" ] || fail "$outline_file dispatches pre-flight after the to-do-location question"
+  has "$outline_file" 'Preflight is judgment work' "$outline_file moved pre-flight off judgment"
+  has "$outline_file" '`--scope preflight`, `--status dispatched`' "$outline_file does not record a pre-flight dispatch"
+  has "$outline_file" '`results/preflight.<seq>.txt`' "$outline_file lets two pre-flight dispatches share a results path"
+  has "$outline_file" 'When the invocation itself enumerates the items, the item wave goes out with pre-flight' \
+    "$outline_file does not overlap an enumerated item wave with pre-flight"
+  has "$outline_file" 'That wave is the checkpoint wave' "$outline_file lets the early wave and the checkpoint dispatch one item twice"
+  has "$outline_file" 'waits for pre-flight before the skeleton is written' \
+    "$outline_file lets pre-flight reshape an outline the user already confirmed"
+  has "$outline_file" 'The merge amends only those worker-derived fields' "$outline_file lets the merge rewrite the request line"
+  has "$outline_file" "- Request: <the invocation's own words, verbatim" "$outline_file skeleton carries no request line"
+  has "$outline_file" 'is merged by the interview, not here' "$outline_file leaves a late pre-flight with no owner"
+  has "$interview_file" 'A pre-flight not yet merged when the user answered the checkpoint is merged here' \
+    "$interview_file does not merge a late pre-flight"
+  has "$interview_file" '`Phase: review-approval` is never set over an unmerged pre-flight' \
+    "$interview_file can leave the interview with pre-flight unmerged"
+  has "$interview_file" 'dispatches a follow-up worker for that item alone' \
+    "$interview_file has no follow-up for a mandate pre-flight found late"
+  has "$interview_file" 'asked once after the last item and before `Phase: review-approval`' \
+    "$interview_file asks a late verification question mid-walk"
+done
+for f in "$real_x/phases/pln/outline.md" "$real_x/phases/pln/interview.md"; do
+  has "$f" 'A pre-flight worker still running holds one of those slots' "$f does not count pre-flight against Codex's slots"
+done
+for f in "$real_c/phases/pln/outline.md" "$real_c/phases/pln/interview.md"; do
+  has "$f" 'A pre-flight Agent still running counts against the width' "$f does not count pre-flight against the wave"
+done
+for host_out in "$real_c" "$real_x"; do
+  has "$host_out/phases/pln-simplify/map-synthesize.md" "The outline's early item wave never applies here" \
+    "pln-simplify could send an item wave before its synthesis"
 done
 
 # The coordinator's pre-flight step may read the root instruction file that
@@ -1722,6 +1842,8 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   has "$f" '`evidence`' "$f lost the bounded evidence profile"
   has "$f" 'actual profile, model, and effort' "$f does not require actual routing attribution"
   has "$f" 'always inherits the hosting model' "$f does not make judgment inheritance unconditional"
+  hasnt "$f" 'at least `high` effort' "$f still raises judgment workers above the session's effort"
+  has "$f" 'is passed no effort' "$f lets a peer be handed an effort instead of its CLI default"
   hasnt "$f" 'ask whether to inherit for this run' "$f retains the late model-inheritance gate"
   hasnt "$f" 'frontier-capability floor' "$f still claims model names are a capability test"
   has "$f" 'Start-of-invocation readiness sweep' "$f lost the early configuration sweep"
@@ -1738,6 +1860,10 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
     "$f can still block an unattended run on late peer configuration"
   has "$f" 'Before every turn that waits for user input' \
     "$f does not notify before every user-input wait"
+done
+for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" 'omit `model` and `reasoning_effort` when `MODEL_ARGUMENT=inherit`' \
+    "$f raises an inherited Codex worker's effort above the session's"
 done
 has "$real_c/SKILL.md" '`sonnet`' "the Claude build lost its economy alias"
 hasnt "$real_c/SKILL.md" 'gpt-5.6-sol' "the Claude build contains Codex model mechanics"

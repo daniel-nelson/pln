@@ -6,7 +6,7 @@ name: pln-simplify-phase-map-synthesize
 
 <!-- pln:include active-turn-lifecycle -->
 
-Read this file before repository mapping, then load `{{OUTPUT_ROOT}}/phases/pln/outline.md` for root-instruction discovery, plan-directory placement, `.git/info/exclude`, pre-flight evidence routing, and its mandatory initial outline checkpoint. The specialization below changes only the evidence that shapes that outline; it does not create another planning or approval lifecycle.
+Read this file before repository mapping, then load `{{OUTPUT_ROOT}}/phases/pln/outline.md` for root-instruction discovery, plan-directory placement, `.git/info/exclude`, pre-flight evidence routing, and its mandatory initial outline checkpoint. The specialization below changes only the evidence that shapes that outline; it does not create another planning or approval lifecycle. The outline's early item wave never applies here: items come from synthesis, never from the invocation, so pre-flight is merged before the skeleton is written.
 
 <!-- pln:include followup-filing -->
 

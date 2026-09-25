@@ -341,11 +341,11 @@ if [ -n "$PEER_COMMAND" ]; then
 fi
 
 # A peer is a judgment path, never the economy lane. A known peer CLI inherits
-# that CLI's configured default model and requests judgment effort; model names
-# are not used as a capability oracle. A configured command is the user's
-# complete invocation, so its underlying model remains unreported.
+# that CLI's configured default model and effort; no effort is passed, because
+# workers run at the session's effort and a peer has no session to inherit
+# from. Model names are not used as a capability oracle. A configured command
+# is the user's complete invocation, so its underlying model remains unreported.
 ROUTED_MODEL=""
-ROUTED_EFFORT=""
 if [ "$RUNG" = "1" ]; then
   ACTUAL_PROFILE="judgment"
   ACTUAL_MODEL="configured-peer-unreported"
@@ -353,7 +353,6 @@ if [ "$RUNG" = "1" ]; then
 else
   if [ -n "$MODEL" ]; then
     ROUTED_MODEL="$MODEL"
-    ROUTED_EFFORT="high"
     ACTUAL_MODEL="$MODEL"
   elif [ -x "$SELF_DIR/pln-model-route" ]; then
     route_out="$($SELF_DIR/pln-model-route resolve --host "$PEER" --profile judgment 2>/dev/null)" || {
@@ -361,7 +360,6 @@ else
         exit 3
       }
     ROUTED_MODEL="$(printf '%s\n' "$route_out" | sed -n 's/^MODEL_ARGUMENT=//p')"
-    ROUTED_EFFORT="$(printf '%s\n' "$route_out" | sed -n 's/^EFFORT=//p')"
     if [ "$ROUTED_MODEL" = "inherit" ]; then
       ROUTED_MODEL=""
       ACTUAL_MODEL="peer-default-unreported"
@@ -372,7 +370,7 @@ else
   fi
   ACTUAL_PROFILE="judgment"
   [ "$ACTUAL_MODEL" != "unavailable" ] || ACTUAL_MODEL="peer-default-unreported"
-  ACTUAL_EFFORT="${ROUTED_EFFORT:-high}"
+  ACTUAL_EFFORT="peer-default-unreported"
 fi
 
 # Explicit local-only/sensitive instructions outrank machine-wide consent and
@@ -498,14 +496,12 @@ case "$PEER" in
     HELPER="$SELF_DIR/pln-claude-agent"
     HELPER_ARGS+=(--log "$LOG")
     [ -n "$ROUTED_MODEL" ] && HELPER_ARGS+=(--model "$ROUTED_MODEL")
-    [ -n "$ROUTED_EFFORT" ] && HELPER_ARGS+=(--effort "$ROUTED_EFFORT")
     ;;
   codex)
     HELPER="$SELF_DIR/pln-codex-agent"
     # A peer only reads; the events file is that helper's log.
     HELPER_ARGS+=(--events "$LOG" --sandbox read-only)
     [ -n "$ROUTED_MODEL" ] && HELPER_ARGS+=(--model "$ROUTED_MODEL")
-    [ -n "$ROUTED_EFFORT" ] && HELPER_ARGS+=(--effort "$ROUTED_EFFORT")
     ;;
 esac
 HELPER_ARGS+=(${ADD_ARGS[@]+"${ADD_ARGS[@]}"})

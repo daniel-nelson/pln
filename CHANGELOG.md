@@ -5,7 +5,7 @@
 ### Added
 
 - **Interview, walk and `/pln-pr` repair questions end with a "Show me an example" option.** On a lettered list it is the last letter. On a yes-or-no question it is "…or ask for an example." The option came from the past week's sessions outside this repository: 14 on Codex and 19 on Claude Code, about 280 questions. Every time pln answered a clarification with a concrete case, the user answered on the next turn. That happened 13 times, with cases like named people exchanging emails, the real values users had typed, and a two-run race trace. Every rewording that stayed abstract drew another request for clarification, 4 times out of 4. Clarifications came almost entirely from these question types. The outline checkpoint, the adopt-the-plan prompt, review depth, ship, provenance, config and retry prompts drew 2 clarifications across about 115 asks, so they do not get the option.
-- **Every example follows one recipe.** It uses one case from the user's world with named people and real values, told in numbered steps that show where the system acts. Then it says what each option produces in that case. It ends by asking the original question again, word for word. Twice an explanation had dropped the question, and the user had to ask what the question was.
+- **Every example follows one recipe.** It uses one case from the user's world with named people and real values, told in numbered steps that show where the system acts. Then it says what each option produces in that case. It ends by asking the original question again, word for word, with its options but without the example option. Twice an explanation had dropped the question, and the user had to ask what the question was.
 
 ### Changed
 

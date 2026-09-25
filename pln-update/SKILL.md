@@ -40,6 +40,8 @@ echo "AUTO_UPGRADE=$_AUTO SKILL_DIR=$_SKILL_DIR"
 
 Wait for the answer, then:
 
+Answers (b), (c) and (d) write to `~/.pln`, which is outside the workspace, so run their commands as **Sandboxed hosts** in Step 2 says.
+
 **(a) Yes, upgrade now:** proceed to Step 2.
 
 **(b) Always keep me up to date:**
@@ -84,6 +86,15 @@ does that in a single pass and prints per-copy results.
 Find a copy that ships the script (prefer the newest, since a stale copy may
 predate it), then run it:
 
+**Sandboxed hosts.** The apply step writes the install directories, which sit
+outside the workspace, and fetches from the network. Where the host sandboxes
+commands and offers a way to request escalation, request it on the first
+attempt instead of waiting for a failure. On Codex that is
+`sandbox_permissions: "require_escalated"`, with a `justification` such as "Do
+you want to let pln-update write its installed skill copies outside this
+workspace?". Where the host offers no escalation (Codex under approval policy
+`never`, for one), run the command as it is.
+
 ```bash
 APPLY=""
 for d in "${CLAUDE_SKILL_DIR:-}" "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" ".agents/skills/pln" ".claude/skills/pln"; do
@@ -114,7 +125,7 @@ pln-update again. The script writes the just-upgraded marker and clears the upda
 cache itself when at least one copy was upgraded.
 
 **Fallback (only if `NO_APPLY_SCRIPT`):** every installed copy predates this
-updater, so reconcile the git copies inline:
+updater, so reconcile the git copies inline, run as **Sandboxed hosts** above says:
 
 ```bash
 for d in "$HOME/.agents/skills/pln" "$HOME/.claude/skills/pln" ".agents/skills/pln" ".claude/skills/pln"; do
@@ -164,4 +175,4 @@ echo "UPDATE_CHECK_OK=$UPDATE_CHECK_OK"; echo "UPDATE_CHECK_OUTPUT=$UPDATE_CHECK
 
 2. If `UPGRADE_AVAILABLE <old> <new>` appears: run the inline flow (Step 2 reconcile onward). The `--plan` preview is a good idea here so the user sees which copies are behind before anything changes.
 
-3. **If `UPDATE_CHECK_OK=false`** (script missing or sandbox-blocked): don't trust silence. Run the reconcile directly — `bin/pln-update-apply` fetches the remote version itself and is a no-op for copies already current, so it's safe to run even when the check couldn't confirm. Locate it as in Step 2 and run `"$APPLY" --plan` then `"$APPLY"`. If no copy ships the script either, use the Step 2 fallback loop.
+3. **If `UPDATE_CHECK_OK=false`** (script missing or sandbox-blocked): don't trust silence. Run the reconcile directly — `bin/pln-update-apply` fetches the remote version itself and is a no-op for copies already current, so it's safe to run even when the check couldn't confirm. Locate it as in Step 2 and run `"$APPLY" --plan` then `"$APPLY"`, running `"$APPLY"` as **Sandboxed hosts** in Step 2 says. If no copy ships the script either, use the Step 2 fallback loop.

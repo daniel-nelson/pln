@@ -30,7 +30,13 @@
 #   PLN_SKILL_DIR        — single-dir mode: scan ONLY this dir (also locates bin/)
 #   PLN_SKILL_DIRS       — explicit space-separated dir list to scan
 #   PLN_REMOTE_URL       — override remote VERSION URL
-#   PLN_STATE_DIR        — override ~/.pln state directory
+#   PLN_STATE_DIR        — override ~/.pln state directory (receipts included)
+#
+# Receipts are per-run and short-lived, and they live in a per-user temp dir,
+# `${TMPDIR:-/tmp}/pln-update-receipts-<uid>`, not in `~/.pln`: a sandboxed
+# Codex run can write its temp dirs but not `~/.pln`, and a receipt kept there
+# made every sandboxed `--start` exit 4. Cache, marker and config stay in
+# `~/.pln`. With `PLN_STATE_DIR` set the receipts stay under it.
 set -euo pipefail
 
 SELF_DIR="${PLN_SKILL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -39,7 +45,17 @@ CACHE_FILE="$STATE_DIR/last-update-check"
 MARKER_FILE="$STATE_DIR/just-upgraded-from"
 SNOOZE_FILE="$STATE_DIR/update-snoozed"
 REMOTE_URL="${PLN_REMOTE_URL:-https://raw.githubusercontent.com/daniel-nelson/pln/main/VERSION}"
-RECEIPT_DIR="$STATE_DIR/update-receipts"
+RECEIPT_UID="$(id -u 2>/dev/null || true)"
+if [ -n "${PLN_STATE_DIR:-}" ]; then
+  RECEIPT_PARENT="$STATE_DIR"
+  RECEIPT_DIR="$STATE_DIR/update-receipts"
+else
+  RECEIPT_PARENT="${TMPDIR:-/tmp}"
+  while [ "${#RECEIPT_PARENT}" -gt 1 ] && [ "${RECEIPT_PARENT%/}" != "$RECEIPT_PARENT" ]; do
+    RECEIPT_PARENT="${RECEIPT_PARENT%/}"
+  done
+  RECEIPT_DIR="${RECEIPT_PARENT%/}/pln-update-receipts-$RECEIPT_UID"
+fi
 RECEIPT_MODE=false
 RECEIPT_RUN=""
 RECEIPT_KEY=""
@@ -56,9 +72,29 @@ valid_run_id() {
   return 0
 }
 
+# receipt_dir_ready — create the receipt dir private to this user, and refuse
+# it unless it is a real directory (not a symlink: `-d`, `-O` and `mkdir -p`
+# all follow one) owned by this uid with no group or other permission bits. In
+# a shared `/tmp` anything less lets another local user plant or read receipts,
+# and a directory already open is refused rather than repaired, because what
+# was planted in it before this run would still be there.
+receipt_dir_ready() {
+  local listing owner
+  case "$RECEIPT_UID" in ''|*[!0-9]*) return 1 ;; esac
+  if [ ! -e "$RECEIPT_DIR" ] && [ ! -L "$RECEIPT_DIR" ]; then
+    mkdir -p "$RECEIPT_PARENT" 2>/dev/null || return 1
+    mkdir -m 700 "$RECEIPT_DIR" 2>/dev/null || true
+  fi
+  [ ! -L "$RECEIPT_DIR" ] && [ -d "$RECEIPT_DIR" ] && [ -O "$RECEIPT_DIR" ] || return 1
+  listing="$(LC_ALL=C ls -ldn "$RECEIPT_DIR" 2>/dev/null)" || return 1
+  case "$listing" in d???------*) ;; *) return 1 ;; esac
+  owner="$(printf '%s\n' "$listing" | awk '{ print $3; exit }')"
+  [ "$owner" = "$RECEIPT_UID" ]
+}
+
 receipt_lock() {
   local key="$1" tries=0
-  mkdir -p "$RECEIPT_DIR" 2>/dev/null || return 1
+  receipt_dir_ready || return 1
   while ! mkdir "$RECEIPT_DIR/$key.lock" 2>/dev/null; do
     tries=$((tries + 1))
     [ "$tries" -lt 4 ] || return 1

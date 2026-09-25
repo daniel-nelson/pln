@@ -226,4 +226,22 @@ echo "$OUT" | grep -q 'bounded fact-and-citation collection' \
 [ "$(env PLN_STATE_DIR="$STORE" "$SKILL/bin/pln-config" get economy_nudge_shown)" = "" ] \
   || fail "unavailable economy routing marked the notice as shown"
 
+# --- a state dir that cannot be written never fails setup --------------------
+# The nudge markers are the only thing setup writes to ~/.pln. On a sandbox
+# that allows the install but not ~/.pln, a shown nudge must not turn a working
+# build into a failed one; it simply shows again next time. Skipped for root,
+# which chmod does not stop.
+if [ "$(id -u)" != "0" ]; then
+  rm -rf "$STORE"; mkdir -p "$STORE"; chmod a-w "$STORE"
+  RC=0
+  OUT="$(env PATH="$BASE_PATH" HOME="$FAKE_HOME" PLN_HOST=codex PLN_STATE_DIR="$STORE" \
+    FAKE_PEER_SCENARIO=ready FAKE_ECONOMY_SCENARIO=available "$SKILL/setup" 2>&1)" || RC=$?
+  chmod u+w "$STORE"
+  [ "$RC" -eq 0 ] || fail "setup exited $RC when its state dir could not be written — output:\n$OUT"
+  echo "$OUT" | grep -q 'bounded fact-and-citation collection' \
+    || fail "an unwritable state dir suppressed the economy notice — output:\n$OUT"
+  [ "$(env PLN_STATE_DIR="$STORE" "$SKILL/bin/pln-config" get economy_nudge_shown)" = "" ] \
+    || fail "an unwritable state dir still recorded a marker"
+fi
+
 echo "OK"

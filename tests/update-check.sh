@@ -15,7 +15,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+trap 'chmod -R u+w "$WORK" 2>/dev/null; rm -rf "$WORK"' EXIT
 
 FAILED=0
 fail() { printf 'FAIL: %s\n' "$1"; FAILED=1; }
@@ -212,6 +212,103 @@ receipt_consume '/repo/plans/run-a/PLAN.md' 'g999999'
 [ "$CONSUME_STATUS" -ne 0 ] || fail "a wrong or fabricated challenge was accepted"
 receipt_consume '/repo/plans/run-a/PLAN.md' "$VALID_CHALLENGE"
 [ "$CONSUME_STATUS" -eq 0 ] || fail "a wrong-run/challenge attempt spent the valid receipt"
+
+# ─── receipts live in a per-user temp dir a sandboxed run can write ──────────
+# Codex's workspace-write sandbox grants the workspace and the temp dirs, never
+# `~/.pln`, so a receipt kept there made every sandboxed `--start` exit 4 before
+# it reached the remote. With no `PLN_STATE_DIR` override the receipts move to
+# `$TMPDIR/pln-update-receipts-<uid>`; cache, marker and config stay put.
+#
+# Shared `/tmp` is why the directory is checked before use: a symlink planted
+# at that name, another user's directory, or one anyone else can write would
+# let another local user forge a `VERIFIED_CURRENT` receipt. Each is refused
+# with the same exit 4 as any other receipt-state failure.
+UID_NOW="$(id -u)"
+THOME="$WORK/home"
+TTMP="$WORK/tmp"
+tmp_env() { # tmp_env <cmd args...> — no PLN_STATE_DIR, scratch HOME and TMPDIR
+  env -u PLN_STATE_DIR HOME="$THOME" TMPDIR="$TTMP/" PATH="${TPATH:-$PATH}" \
+    PLN_SKILL_DIR="$INSTALL" PLN_REMOTE_URL="file://$REMOTE_FILE" "$@"
+}
+tmp_start() { # tmp_start <run-id>
+  OUT="$(tmp_env "$INSTALL/bin/pln-update-check" --start "$1" 2>&1)"
+  START_STATUS=$?
+  CHALLENGE="$(printf '%s\n' "$OUT" | awk '/^UPDATE_RECEIPT_READY / { print $2; exit }')"
+}
+tmp_consume() { # tmp_consume <run-id> <challenge>
+  OUT="$(tmp_env "$INSTALL/bin/pln-update-check" --consume "$1" "$2" 2>&1)"
+  CONSUME_STATUS=$?
+}
+tmp_reset() {
+  [ -d "$THOME" ] && chmod -R u+w "$THOME" 2>/dev/null
+  [ -d "$TTMP" ] && chmod -R u+w "$TTMP" 2>/dev/null
+  rm -rf "$THOME" "$TTMP"
+  mkdir -p "$THOME/.pln" "$TTMP"
+}
+TRDIR="$TTMP/pln-update-receipts-$UID_NOW"
+set_local 1.53.0; set_remote 1.54.0
+
+# A read-only `~/.pln` no longer stops the receipt round trip. Skipped for
+# root, which a mode bit never refuses.
+if [ "$UID_NOW" != "0" ]; then
+  tmp_reset; chmod a-w "$THOME/.pln"
+  tmp_start '/repo/plans/sandboxed/PLAN.md'
+  [ "$START_STATUS" -eq 0 ] || fail "--start with a read-only ~/.pln exited $START_STATUS"
+  said ' UPGRADE_AVAILABLE verified' "--start with a read-only ~/.pln lost the real verdict"
+  tmp_consume '/repo/plans/sandboxed/PLAN.md' "$CHALLENGE"
+  [ "$CONSUME_STATUS" -eq 0 ] || fail "--consume with a read-only ~/.pln exited $CONSUME_STATUS"
+  said 'UPDATE_RECEIPT_CONSUMED UPGRADE_AVAILABLE verified' \
+    "--consume with a read-only ~/.pln lost the real verdict"
+  [ -d "$TRDIR" ] && [ ! -L "$TRDIR" ] || fail "the receipt did not land under \$TMPDIR/pln-update-receipts-<uid>"
+  case "$(ls -ld "$TRDIR" 2>/dev/null)" in
+    d???------*) ;;
+    *) fail "the temp receipt dir was created open to others: $(ls -ld "$TRDIR" 2>/dev/null)" ;;
+  esac
+  [ -e "$THOME/.pln/update-receipts" ] && fail "a receipt was still written under ~/.pln"
+  chmod u+w "$THOME/.pln"
+fi
+
+# A symlink at the receipt path is refused, whoever owns its target.
+tmp_reset; mkdir -m 700 "$WORK/tmp-target"; ln -s "$WORK/tmp-target" "$TRDIR"
+tmp_start '/repo/plans/linked/PLAN.md'
+[ "$START_STATUS" -eq 4 ] || fail "a symlink to a user-owned dir was used as the receipt dir (exit $START_STATUS)"
+[ -z "$(ls -A "$WORK/tmp-target")" ] || fail "--start wrote through a symlinked receipt dir"
+rm -rf "$WORK/tmp-target"
+
+tmp_reset; ln -s / "$TRDIR"
+tmp_start '/repo/plans/linked/PLAN.md'
+[ "$START_STATUS" -eq 4 ] || fail "a symlink to a root-owned dir was used as the receipt dir (exit $START_STATUS)"
+
+# A directory of ours that group or other can write into is refused, not
+# repaired: anything planted before this run would already be inside it.
+tmp_reset; mkdir "$TRDIR"; chmod 775 "$TRDIR"
+tmp_start '/repo/plans/open/PLAN.md'
+[ "$START_STATUS" -eq 4 ] || fail "a group/other-accessible receipt dir was used (exit $START_STATUS)"
+[ -z "$(ls -A "$TRDIR")" ] || fail "--start wrote into a group/other-accessible receipt dir"
+
+# Another user's directory. A non-root test cannot create one, so a fake `id`
+# on PATH names a different uid: the directory named for that uid then exists
+# and is owned by someone else — the real user — which is the refused case.
+OTHER_UID=$((UID_NOW + 1))
+REAL_ID="$(command -v id)"
+FAKEID="$WORK/fakeid"; mkdir -p "$FAKEID"
+cat > "$FAKEID/id" <<EOF
+#!/bin/sh
+[ "\$1" = "-u" ] && { echo $OTHER_UID; exit 0; }
+exec "$REAL_ID" "\$@"
+EOF
+chmod +x "$FAKEID/id"
+tmp_reset; mkdir -m 700 "$TTMP/pln-update-receipts-$OTHER_UID"
+TPATH="$FAKEID:$PATH" tmp_start '/repo/plans/foreign/PLAN.md'
+[ "$START_STATUS" -eq 4 ] || fail "another user's receipt dir was used (exit $START_STATUS)"
+[ -z "$(ls -A "$TTMP/pln-update-receipts-$OTHER_UID")" ] || fail "--start wrote into another user's receipt dir"
+
+# The PLN_STATE_DIR override still keeps receipts under it, which is what
+# isolates every other case in this file.
+clear_state
+receipt_start '/repo/plans/override/PLAN.md'
+[ -d "$STATE/update-receipts" ] || fail "PLN_STATE_DIR no longer relocates the receipts"
+tmp_reset
 
 # ─── the writer field is what pln-update-apply actually writes ───────────────
 # Pinned as a shape rather than a value: first field the version, the rest free

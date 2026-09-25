@@ -1666,6 +1666,51 @@ sed -i.bak 's/^1\. step$/1. step changed/' "$sum_dir/PLAN.md"
 [ "$(item_sum 2)" != "$two" ] || fail "editing item 2 did not change its checksum"
 rm -rf "$sum_dir"
 
+# ─── pre-flight runs beside item research, not ahead of it ───────────────────
+# The measured run spent 4m18s in pre-flight and its merge before any item
+# could start. Pre-flight now goes out once the authorship answer is in, before
+# the to-do-location question; an invocation that enumerates its items sends
+# the item wave with it. It keeps a per-dispatch record like an item, and one
+# still running at the checkpoint answer is the interview's to merge.
+for host_out in "$real_c" "$real_x"; do
+  outline_file="$host_out/phases/pln/outline.md"
+  interview_file="$host_out/phases/pln/interview.md"
+  has "$outline_file" 'Dispatch mandatory pre-flight research as soon as nothing forbids reading' \
+    "$outline_file still holds pre-flight until after the setup questions"
+  pf_line="$(grep -nF 'Dispatch mandatory pre-flight research as soon as' "$outline_file" | cut -d: -f1)"
+  todo_line="$(grep -nF 'Settle where the project to-do list lives' "$outline_file" | cut -d: -f1)"
+  [ "$pf_line" -lt "$todo_line" ] || fail "$outline_file dispatches pre-flight after the to-do-location question"
+  has "$outline_file" 'Preflight is judgment work' "$outline_file moved pre-flight off judgment"
+  has "$outline_file" '`--scope preflight`, `--status dispatched`' "$outline_file does not record a pre-flight dispatch"
+  has "$outline_file" '`results/preflight.<seq>.txt`' "$outline_file lets two pre-flight dispatches share a results path"
+  has "$outline_file" 'When the invocation itself enumerates the items, the item wave goes out with pre-flight' \
+    "$outline_file does not overlap an enumerated item wave with pre-flight"
+  has "$outline_file" 'That wave is the checkpoint wave' "$outline_file lets the early wave and the checkpoint dispatch one item twice"
+  has "$outline_file" 'waits for pre-flight before the skeleton is written' \
+    "$outline_file lets pre-flight reshape an outline the user already confirmed"
+  has "$outline_file" 'The merge amends only those worker-derived fields' "$outline_file lets the merge rewrite the request line"
+  has "$outline_file" "- Request: <the invocation's own words, verbatim" "$outline_file skeleton carries no request line"
+  has "$outline_file" 'is merged by the interview, not here' "$outline_file leaves a late pre-flight with no owner"
+  has "$interview_file" 'A pre-flight not yet merged when the user answered the checkpoint is merged here' \
+    "$interview_file does not merge a late pre-flight"
+  has "$interview_file" '`Phase: review-approval` is never set over an unmerged pre-flight' \
+    "$interview_file can leave the interview with pre-flight unmerged"
+  has "$interview_file" 'dispatches a follow-up worker for that item alone' \
+    "$interview_file has no follow-up for a mandate pre-flight found late"
+  has "$interview_file" 'asked once after the last item and before `Phase: review-approval`' \
+    "$interview_file asks a late verification question mid-walk"
+done
+for f in "$real_x/phases/pln/outline.md" "$real_x/phases/pln/interview.md"; do
+  has "$f" 'A pre-flight worker still running holds one of those slots' "$f does not count pre-flight against Codex's slots"
+done
+for f in "$real_c/phases/pln/outline.md" "$real_c/phases/pln/interview.md"; do
+  has "$f" 'A pre-flight Agent still running counts against the width' "$f does not count pre-flight against the wave"
+done
+for host_out in "$real_c" "$real_x"; do
+  has "$host_out/phases/pln-simplify/map-synthesize.md" "The outline's early item wave never applies here" \
+    "pln-simplify could send an item wave before its synthesis"
+done
+
 # The coordinator's pre-flight step may read the root instruction file that
 # governs its own conduct. Forbidding that outright produced a rule the model
 # correctly broke, in any repository whose AGENTS.md says to read CLAUDE.md.

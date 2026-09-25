@@ -1509,6 +1509,20 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
   has "$f" 'the directory the worker could actually write' \
     "$f validates envelopes against a root the worker may not have reached"
 done
+# /pln-pr had no such rule: its fix workers wrote into ~/Documents, every write
+# went to Codex's approval reviewer, and one decline stopped the run to ask the
+# owner to re-authorize a PR they had already chosen.
+for f in "$real_c/phases/pln-pr/scope-baseline.md" "$real_x/phases/pln-pr/scope-baseline.md"; do
+  has "$f" 'Owner constraints, Worker artifacts,' "$f does not record a worker artifact root in State"
+  has "$f" 'pln-artifacts-' "$f names no writable artifact root for /pln-pr workers"
+  has "$f" 'the directory the worker could actually write' \
+    "$f validates /pln-pr envelopes against a root the worker may not have reached"
+done
+for f in "$real_c/phases/pln-pr/ship-watch.md" "$real_x/phases/pln-pr/ship-watch.md"; do
+  has "$f" "both mean the ledger's \`Worker artifacts\`" "$f points the gauntlet worker at the plan root"
+done
+has "$real_x/SKILL.md" 'Never ask the user to re-authorize work the plan or ledger already records' \
+  "codex /pln treats an approval-review decline as a user question"
 
 # ─── an optional review field is omitted, never abbreviated ──────────────────
 for f in "$real_c/phases/pln-pr/review.md" "$real_x/phases/pln-pr/review.md"; do

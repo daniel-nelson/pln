@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.104.0 — 2026-09-25
+
+### Fixed
+
+- **`/pln-pr` workers now write their output where the sandbox lets them, when the plan folder is outside the repository.** Since 1.62.0, `/pln` has sent worker output to a temporary artifact directory whenever the project keeps plans elsewhere, such as `~/Documents/<project>-plans/`. `/pln-pr` never followed that rule. Its reviewers, fix workers and final-gauntlet worker wrote into the plan folder itself. On Codex, every one of those writes left the sandbox and went to the host's approval reviewer. In one run the reviewer approved 77 and declined the 78th as unauthorized, because a fresh worker's transcript holds no user turn. The run stopped and asked the owner to re-authorize the PR they had already chosen. `REVIEW.md`'s State now records `Worker artifacts`, which is the plan root when it is inside the repository and otherwise the artifact directory from `/pln`'s hand-off or a new one. Worker output goes there. What the coordinator writes itself stays in the plan folder.
+- **On Codex, a child's write that the approval reviewer declined is treated as a brief that gave a path outside the sandbox, not as a question for the user.** The coordinator re-issues the assignment with paths beneath the worker artifact directory, and never asks the user to re-authorize work the plan or ledger already records.
+
 ## 1.103.0 — 2026-09-25
 
 **Codex users: the upgrade into this release still runs the old updater.** Invoke `$pln-update` once and approve it with escalation (`sandbox_permissions: "require_escalated"`). After that, the fixes below apply to later upgrades.

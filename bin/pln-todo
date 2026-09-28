@@ -1759,7 +1759,8 @@ case "$command" in
           if holder_is_dead "$rwt"; then printf '%s\n' "$rid"; fi
         done | LC_ALL=C paste -sd, -)"
     # Report only. Nothing here writes, marks or archives: a record leaves the
-    # live to-do list on the user's confirmation, never on this helper's judgment.
+    # live to-do list by a run's `archive` — an unheld [x] record on the run's own
+    # close, anything else on the user's confirmation — never on this helper's judgment.
     # That holds for a dead holder too — `release` and `claim` act on that
     # evidence, because they are a run saying what it is doing; `stale` only says
     # what it found.

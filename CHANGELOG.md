@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.109.0 — 2026-09-28
+
+### Changed
+
+- **A to-do item already marked `[x]` is archived at the next close without asking.** Before, `pln-todo stale` reported such an item as `completed-not-archived` and the close asked the user to confirm it was finished, then asked again at every later close until they answered. `[x]` already needs evidence to be set, so the close now archives it `--disposition completed` itself and says nothing. This applies when the item has no holder or its holder's worktree is gone. An item left `dropped`, an abandoned claim or an aged item still goes to the user.
+
 ## 1.108.0 — 2026-09-25
 
 ### Fixed

@@ -222,6 +222,14 @@ A closing message once said "Open follow-ups, all filed:" over six items when tw
 
 **Render the list, do not compose it.** Run `{{OUTPUT_ROOT}}/bin/pln-todo list` before writing the follow-up bullets. Each `add` printed back the exact `INDEX_LINE` it wrote; `list` prints the whole index between `INDEX_BEGIN` and `INDEX_END`. This run's follow-up bullets are the lines it filed, found there — a follow-up whose line is not between those markers cannot appear in the message, because there is nothing to render it from. This is not a check run over a finished draft; it is where the bullets come from.
 
+**A bullet is the line's claim and its locator, and nothing else from the line.** The completion marker, the `!` and the status word are the index's vocabulary, not the reader's: pasted whole, `- [ ] proposed · …` reaches the user as three tokens they were never told the meaning of. Drop all three. Where the status is something the user needs — the item is blocked, or it is waiting on them — say so in ordinary words after the claim; otherwise leave it out. Keep the claim's own words, because they are what the item will be recognized by later.
+
+```
+Filed to the to-do list in `~/Documents/bearbnb-plans/pln`:
+- a cancelled booking never releases its held dates, so the room stays unbookable → `items/cancel-releases-held-dates.md`
+- the refund total on the receipt leaves out the cleaning fee; blocked until the fee rules are settled → `items/receipt-refund-total.md`
+```
+
 **Say where they went, and claim nothing the read does not support.** Name the to-do list — `list` prints `TODO_ROOT` in the same output — and let the count be the number of lines read back. "All filed" then stops being the run's account of its own behavior, which is the sentence that was wrong, and becomes a description of a file. A `list` that fails is a failed read and fails the close with it: it prints `ITEM_COUNT` and `STATUS` even for an empty to-do list, so an empty read and a broken one are never the same thing.
 
 **None of this touches the bar.** Filing is not a way around it: a candidate that is not true when checked, that is done, or that nobody will have to act on is not filed and not mentioned. The read-back governs only what becomes of a candidate that already cleared it.

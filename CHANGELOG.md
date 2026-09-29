@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.111.0 — 2026-09-29
+
+### Changed
+
+- **Follow-ups in a closing message read as plain sentences.** The bullets still come only from lines the to-do list actually holds, but each one now shows just the item's description and its `items/…` file, under one "Filed to the to-do list in …" line. The `[ ]` checkbox, the `!` and the status word (`proposed`, `ready` and so on) are dropped. A status the user needs to know, such as blocked or waiting on them, is said in words instead. Before, a run that followed the rule exactly pasted the raw index lines, so the user saw terms like `proposed ·` that nothing explained.
+
 ## 1.110.0 — 2026-09-29
 
 ### Added

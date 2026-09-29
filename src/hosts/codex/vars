@@ -18,3 +18,9 @@ PLN_CMD=$pln
 PLN_PR_CMD=$pln-pr
 PLN_SIMPLIFY_CMD=$pln-simplify
 PLN_UPDATE_CMD=$pln-update
+# The structured-question tools, which every skill here forbids. Seen in a real
+# $pln-pr run: request_user_input_async returned {"accepted":true} (queued, not
+# answered), the user never saw the form, and the run ended pointing at "the
+# pending prompt".
+QUESTION_TOOL=the `request_user_input` or `request_user_input_async` tool
+QUESTION_TOOL_REASON=The user may never see a question queued there.

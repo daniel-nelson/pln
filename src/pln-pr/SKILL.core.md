@@ -93,7 +93,7 @@ How to spawn one on this host:
 
 ## Interaction discipline
 
-This skill follows pln's discipline. Never call the `AskUserQuestion` tool. Surface at most one decision at a time, as plain prose. When you record a user's answer, echo it back in one short line before moving on. The Style section below is the same text `{{PLN_CMD}}` carries, generated from one shared source, and it governs every message this skill produces.
+This skill follows pln's discipline. Never call {{QUESTION_TOOL}}. Surface at most one decision at a time, as plain prose, and write out in full anything you ask the user to approve — the exact commands, for a command confirmation — never pointing to it somewhere else. When you record a user's answer, echo it back in one short line before moving on. The Style section below is the same text `{{PLN_CMD}}` carries, generated from one shared source, and it governs every message this skill produces.
 
 <!-- pln:include style -->
 

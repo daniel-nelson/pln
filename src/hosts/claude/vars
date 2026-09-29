@@ -10,3 +10,6 @@ PLN_CMD=/pln
 PLN_PR_CMD=/pln-pr
 PLN_SIMPLIFY_CMD=/pln-simplify
 PLN_UPDATE_CMD=/pln-update
+# The harness's structured-question tool, which every skill here forbids.
+QUESTION_TOOL=the `AskUserQuestion` tool
+QUESTION_TOOL_REASON=The user has lost answers to it before. Hitting Escape (above the backtick) cancels the entire question and registers all queued answers as "user declined to answer."

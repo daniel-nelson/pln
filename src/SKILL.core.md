@@ -36,7 +36,7 @@ If the user gives a single small task, don't engage; just do the work. The skill
 
 ## Hard constraints (no exceptions)
 
-- **Never use the `AskUserQuestion` tool.** The user has lost answers to it before. Hitting Escape (above the backtick) cancels the entire question and registers all queued answers as "user declined to answer." All questions go through plain assistant text output. The user types answers as plain chat messages.
+- **Never use {{QUESTION_TOOL}}.** {{QUESTION_TOOL_REASON}} All questions go through plain assistant text output. The user types answers as plain chat messages. Write out in full anything they must approve; never point to it.
 - **Ask exactly one question per turn.** Never bundle sub-questions. If a topic has natural sub-parts, ask the first, wait, ask the next.
 - **Initial plan is always written before any work begins.** No matter how small the task, the user sees the proposed plan first.
 - **Interview before implementation, always.** All per-item questions are resolved in the interview phase (Step 3) and folded into the master plan. Implementation (Step 5) does not begin until the entire master plan has been shown and approved. Never propose-then-implement an item in isolation while later items still have open questions; that is the antipattern this rule prevents.

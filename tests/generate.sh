@@ -1861,6 +1861,25 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   has "$f" 'Before every turn that waits for user input' \
     "$f does not notify before every user-input wait"
 done
+# Each host forbids its own structured-question tool: a question queued there
+# can be one the user never sees, and a Codex build naming only Claude's tool
+# forbids nothing.
+for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
+  has "$f" 'the `AskUserQuestion` tool' "$f does not forbid AskUserQuestion"
+  hasnt "$f" 'request_user_input' "$f names Codex's question tool"
+done
+for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" 'the `request_user_input` or `request_user_input_async` tool' \
+    "$f does not forbid Codex's question tools"
+done
+for f in "$real_c/SKILL.md" "$real_x/SKILL.md"; do
+  has "$f" 'Write out in full anything they must approve; never point to it.' \
+    "$f lets an approval ask point at text the user cannot see"
+done
+for f in "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  has "$f" 'never pointing to it somewhere else' \
+    "$f lets an approval ask point at text the user cannot see"
+done
 for f in "$real_x/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
   has "$f" 'omit `model` and `reasoning_effort` when `MODEL_ARGUMENT=inherit`' \
     "$f raises an inherited Codex worker's effort above the session's"

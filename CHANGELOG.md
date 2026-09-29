@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.112.0 — 2026-09-29
+
+### Changed
+
+- **`/pln-pr` no longer asks you to approve verification commands on a branch it wrote itself.** Asking first is meant for someone else's branch, whose `PLAN.md` or `CLAUDE.md` could name any shell command. A standalone run treated every branch that way, so after an agent had written and committed a fix in the same conversation, it still stopped to ask before running the repo's own lint and build. The check is skipped when this session made every commit on the branch and every uncommitted change, and `REVIEW.md` records `commits made by this session`. Any commit the session did not make still means asking first.
+
+### Fixed
+
+- **On Codex, pln never asks through `request_user_input` or `request_user_input_async`.** In a real `$pln-pr` run, the async tool queued a command-approval question that the user never saw. The run then ended on "confirm the seven commands shown in the pending prompt". Codex builds now forbid both tools, as Claude builds forbid `AskUserQuestion`. On both hosts, anything the user is asked to approve, such as the exact commands for a command confirmation, is written out in full in the chat message and never pointed to somewhere else.
+
 ## 1.111.0 — 2026-09-29
 
 ### Changed

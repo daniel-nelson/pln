@@ -1525,6 +1525,15 @@ ok "listing after the drop" tracker --project "$R"
 [ "$(pending_line sync-b)" = "card-b	backlog	closed	-" ] || fail "a dropped item was not owed a close ($(pending_line sync-b))"
 ok "recording the close" tracker --project "$R" --id sync-b --synced closed
 
+ok "filing an urgent item that ships before sync" add --project "$R" --id urgent-shipped --urgent \
+  --claim 'urgent work finished before its card existed' --source s
+ok "finishing it" mark --project "$R" --id urgent-shipped --state '[x]'
+ok "archiving it" archive --project "$R" --id urgent-shipped --disposition completed --evidence 'shipped'
+ok "listing the archived urgent item" tracker --project "$R"
+[ "$(pending_line urgent-shipped)" = "-	none	done	-" ] || fail "an archived item was owed urgency ($(pending_line urgent-shipped))"
+ok "recording its card without a label" tracker --project "$R" --id urgent-shipped --synced done --ref card-u
+is TRACKER_PENDING 0 "an archived urgent item stayed pending over a label it does not need"
+
 ok "filing an item that is dropped before it is synced" add --project "$R" --id never-carded \
   --claim 'dropped before any card' --source s
 ok "dropping it" archive --project "$R" --id never-carded --disposition dropped --evidence 'no'

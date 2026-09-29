@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.112.1 — 2026-09-29
+
+### Fixed
+
+- **An archived item no longer asks for an urgent label on its tracker card.** A backfill that put 41 completed items in Done without labels was left with 29 moves pending forever, one per item filed urgent. `mark` cannot reach an archived record, so nothing could clear them. Urgency is now owed only on live items.
+
 ## 1.112.0 — 2026-09-29
 
 ### Changed

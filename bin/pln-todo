@@ -1254,8 +1254,10 @@ tracker_row() {
       move = (synced != want && !(synced == "none" && want == "closed"))
       urgent = (v["urgent"] == "true") ? "true" : "false"
       had = (v["tracker_urgent"] == "true") ? "true" : "false"
+      # Urgency is about work still to be done. An archived record has none left,
+      # so its card owes no label either way, whatever the record was filed as.
       flag = "-"
-      if (want != "closed" && urgent != had && (move || synced != "none")) flag = (urgent == "true") ? "set" : "clear"
+      if (d == "" && want != "closed" && urgent != had && (move || synced != "none")) flag = (urgent == "true") ? "set" : "clear"
       if (!move && flag == "-") exit 0
       ref = v["tracker_ref"]; if (ref == "") ref = "-"
       printf "PENDING\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", v["id"], ref, synced, (move ? want : synced), flag, claim, file

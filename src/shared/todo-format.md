@@ -210,6 +210,10 @@ The archive is partitioned by month because the index is the part that grows; th
 
 Nothing waits on that answer. The candidates are named in the closing message rather than in a turn of their own, and one nobody answers is named again at the next close — so the live index is bounded by the user's confirmations rather than by a mechanism, which is what "nothing moves without them" costs.
 
+### Mirroring into a ticket tracker
+
+A project whose `CLAUDE.md`/`AGENTS.md` declares `pln-tracker: <tracker>` keeps its to-do list mirrored there, one card per item: filed goes to the backlog, claimed to in progress, archived `completed` to done (the team's "ready to deploy" or its equivalent), and any other archive to closed; urgent maps to whatever the declaration says. The to-do list stays the record. pln never talks to the tracker: each item carries the status its card was last confirmed in, the helper derives where it should be, and the agent makes the move with whatever tool its session has, then records it with `pln-todo tracker --id`. So a failed move, or a session with no tracker tool, leaves the move pending rather than lost. The mapping lives in the declaration so a teammate inherits it from git; credentials stay with the tool. Only items filed after sync is turned on are enrolled — a backfill is the user's call, never the helper's. `pln-todo tracker --guide` is the procedure.
+
 ### Reading the to-do list back at a close
 
 A closing message once said "Open follow-ups, all filed:" over six items when two were filed. The other four sat in a PR body and a review ledger for twelve hours, until someone was asked to go and check. Every word of that message was written in good faith by a run that believed it. So a close does not describe what it filed. It reads it back.

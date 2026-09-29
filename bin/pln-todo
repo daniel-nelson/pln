@@ -24,6 +24,13 @@ DECLARED_KEY='pln-todo'
 # Renaming the key would invalidate data pln does not own, so the old one keeps
 # working; two declarations that disagree fail closed rather than picking one.
 OLD_DECLARED_KEY='pln-queue'
+# The ticket tracker this project mirrors its to-do list into, declared by the
+# team in the same instruction files: `pln-tracker: <tracker>`, or `off`. The
+# helper never talks to a tracker. It records which tracker status each enrolled
+# item should be in and which one the tracker last confirmed, and the agent makes
+# the moves with whatever tool its session has — see `pln-todo tracker --guide`.
+TRACKER_KEY='pln-tracker'
+HERE="$(cd "$(dirname "$0")" && pwd)"
 
 fail() { echo "pln-todo: $*" >&2; exit 2; }
 refuse() { echo "pln-todo: $*" >&2; exit 3; }
@@ -46,6 +53,9 @@ Usage:
   pln-todo archive --id ID --disposition completed|dropped|superseded|resolved-elsewhere
                    --evidence TEXT [--month YYYY-MM]
   pln-todo stale [--days N]
+  pln-todo tracker [--id ID --synced backlog|in-progress|done|closed [--ref REF] [--urgent true|false]]
+  pln-todo tracker --guide
+  pln-todo init --tracker-offered
 
 Global options: [--project DIR] [--no-create]
 
@@ -61,6 +71,12 @@ a live holder, no resolvable to-do list). Every subcommand resolves the to-do li
 first and reports TODO_ROOT, whether it created one, and whether the location
 question is owed: LOCATION_QUESTION is answered (recorded), in-use (no answer
 recorded, but the list already holds records, so it stays where it is) or owed.
+
+TRACKER names the ticket tracker the project's CLAUDE.md/AGENTS.md declares
+(`pln-tracker: <tracker>`), `off`, or `none`; TRACKER_QUESTION is declared,
+answered or owed. While a tracker is on, the writing subcommands and `list` end
+with TRACKER_PENDING, the number of tracker moves not yet made, and `tracker`
+lists them. `pln-todo tracker --guide` says how to set up and sync.
 
 Env overrides (for testing):
   PLN_TODO_DATE — the UTC date the helper writes (YYYY-MM-DD)
@@ -165,6 +181,9 @@ CREATED=0
 NOTES=()
 SET_ANSWERED=''
 SET_OFFERED=''
+SET_TRACKER_OFFERED=''
+TRACKER='none'
+TRACKER_QUESTION='owed'
 # `list`, `check` and `stale` are reads to whoever calls them, and a read of the
 # to-do list never fails. They are the three that fall back to reading an
 # unmigratable store in place rather than refusing it.
@@ -175,7 +194,31 @@ note() { NOTES+=("$1"); }
 project_context() {
   scan_project_context "$1"
   check_declarations
+  load_tracker
 }
+
+# The team's declaration, then the person's own opt-out. Only a declaration turns
+# sync on, so a user who never answers the setup question pays nothing for it; a
+# teammate who does not want it sets `tracker_sync: off` in their own pln config
+# rather than editing a file everyone shares.
+load_tracker() {
+  local declared personal
+  declared="$(declared_for_key "$TRACKER_KEY" || true)"
+  declared="$(printf '%s' "$declared" | LC_ALL=C cut -f2)"
+  if [ -z "$declared" ]; then TRACKER='none'; return 0; fi
+  case "$declared" in
+    off | none) TRACKER='off'; return 0 ;;
+  esac
+  TRACKER="$declared"
+  personal="$("$HERE/pln-config" get tracker_sync 2>/dev/null || true)"
+  if [ "$personal" = 'off' ]; then
+    note "tracker: this project syncs to $declared, and your pln config sets tracker_sync off, so nothing is recorded for it"
+    TRACKER='off'
+  fi
+  return 0
+}
+
+tracker_on() { [ "$TRACKER" != 'none' ] && [ "$TRACKER" != 'off' ]; }
 
 scan_project_context() {
   PROJECT_DIR="$(abs_dir "$1")" || fail "project directory does not exist: $1"
@@ -603,6 +646,12 @@ load_header() {
   elif holds_records "$TODO_ROOT"; then LOCATION_QUESTION='in-use'
   fi
   if [ -n "$offered" ]; then MIGRATION_OFFERED="$offered"; fi
+  # Declared in the instruction files — on or off — is the team's answer, and
+  # outranks one person's recorded decline.
+  if declared_for_key "$TRACKER_KEY" >/dev/null 2>&1; then TRACKER_QUESTION='declared'
+  elif [ -n "$(header_field "$TODO_ROOT/$INDEX_NAME" 'tracker-offered')" ]; then TRACKER_QUESTION='answered'
+  else TRACKER_QUESTION='owed'
+  fi
   return 0
 }
 
@@ -628,6 +677,8 @@ report_resolution() {
   printf 'LOCATION_QUESTION=%s\n' "$LOCATION_QUESTION"
   printf 'MIGRATION_OFFERED=%s\n' "$MIGRATION_OFFERED"
   printf 'DECLARED_TODO=%s\n' "${DECLARED_TODO:--}"
+  printf 'TRACKER=%s\n' "$TRACKER"
+  printf 'TRACKER_QUESTION=%s\n' "$TRACKER_QUESTION"
   report_notes
 }
 
@@ -806,16 +857,19 @@ open_decide_ids() {
 # --------------------------------------------------------------- the index file
 
 render_index() {
-  local answered offered records
+  local answered offered tracker_offered records
   answered="$(header_field "$TODO_ROOT/$INDEX_NAME" 'location-answered')"
   offered="$(header_field "$TODO_ROOT/$INDEX_NAME" 'migration-offered')"
+  tracker_offered="$(header_field "$TODO_ROOT/$INDEX_NAME" 'tracker-offered')"
   if [ -n "$SET_ANSWERED" ]; then answered="$SET_ANSWERED"; fi
   if [ -n "$SET_OFFERED" ]; then offered="$SET_OFFERED"; fi
+  if [ -n "$SET_TRACKER_OFFERED" ]; then tracker_offered="$SET_TRACKER_OFFERED"; fi
 
   printf '%s\n' "$HEADER_OPEN"
   printf 'queue-root: %s\n' "$TODO_ROOT"
   if [ -n "$answered" ]; then printf 'location-answered: %s\n' "$answered"; fi
   if [ -n "$offered" ]; then printf 'migration-offered: %s\n' "$offered"; fi
+  if [ -n "$tracker_offered" ]; then printf 'tracker-offered: %s\n' "$tracker_offered"; fi
   printf '%s\n\n' "$HEADER_CLOSE"
 
   records="$(live_records)" || return 1
@@ -1164,6 +1218,178 @@ append_sub_item() {
   mv "$tmp" "$file"
 }
 
+# ---------------------------------------------------------------- the tracker
+
+# One line per enrolled record whose tracker card is not where the record says it
+# should be. Nothing is queued: what the tracker should show is derived from the
+# record every time, and `tracker_synced` is the status the tracker last
+# confirmed, so a move that failed, or a claim released before its move was made,
+# is reported again rather than lost or replayed. Records with no
+# `tracker_synced` field were never enrolled — filed before sync was turned on —
+# and are not this helper's to push: backfilling them is a decision, made by
+# recording each one with `tracker --id`.
+#   PENDING  id  ref  from  to  urgent(set|clear|-)  claim  file
+tracker_row() {
+  LC_ALL=C awk -v file="$1" '
+    function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
+    function unquote(s) { if (s ~ /^".*"$/) s = substr(s, 2, length(s) - 2); return s }
+    NR == 1 { if ($0 != "---") { skip = 1; exit 0 } inhdr = 1; next }
+    inhdr && $0 == "---" { inhdr = 0; next }
+    inhdr {
+      i = index($0, ":")
+      if (i > 0) v[trim(substr($0, 1, i - 1))] = unquote(trim(substr($0, i + 1)))
+      next
+    }
+    !claim && /^# / { claim = trim(substr($0, 3)) }
+    END {
+      if (skip || inhdr || !("tracker_synced" in v)) exit 0
+      d = v["disposition"]; st = v["state"]
+      if (d != "") want = (d == "completed") ? "done" : "closed"
+      else if (v["status"] == "dropped") want = "closed"
+      else if (st == "[x]") want = "done"
+      else if (v["claimed_by"] != "" || st == "[-]") want = "in-progress"
+      else want = "backlog"
+      synced = v["tracker_synced"]; if (synced == "") synced = "none"
+      # A card that was never made has nothing to close.
+      move = (synced != want && !(synced == "none" && want == "closed"))
+      urgent = (v["urgent"] == "true") ? "true" : "false"
+      had = (v["tracker_urgent"] == "true") ? "true" : "false"
+      flag = "-"
+      if (want != "closed" && urgent != had && (move || synced != "none")) flag = (urgent == "true") ? "set" : "clear"
+      if (!move && flag == "-") exit 0
+      ref = v["tracker_ref"]; if (ref == "") ref = "-"
+      printf "PENDING\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", v["id"], ref, synced, (move ? want : synced), flag, claim, file
+    }
+  ' "$1"
+}
+
+tracker_files() {
+  local f
+  for f in "$TODO_ROOT/$LIVE_DIR"/*.md "$TODO_ROOT/$DONE_DIR"/*/*.md; do
+    [ -f "$f" ] || continue
+    [ "$(basename "$f")" != 'index.md' ] || continue
+    LC_ALL=C grep -q '^tracker_synced:' "$f" 2>/dev/null || continue
+    printf '%s\n' "$f"
+  done
+}
+
+tracker_pending() {
+  local f
+  tracker_files | while IFS= read -r f; do tracker_row "$f"; done
+}
+
+# The last lines of every writing subcommand and of `list`, while a tracker is on:
+# the moves this call left owed, so an agent that just filed, claimed or archived
+# something sees in the same output that the tracker is behind.
+report_tracker() {
+  tracker_on || return 0
+  local n
+  n="$(tracker_pending | LC_ALL=C grep -c '' || true)"
+  printf 'TRACKER_PENDING=%s\n' "${n:-0}"
+  if [ "${n:-0}" != 0 ]; then
+    printf 'TRACKER_NEXT=run pln-todo tracker for the moves and make them in %s; pln-todo tracker --guide says how\n' "$TRACKER"
+  fi
+}
+
+# A record by id, live first, then the newest archived copy.
+record_file() {
+  local f
+  f="$(detail_path "$1")"
+  if [ -f "$f" ]; then printf '%s\n' "$f"; return 0; fi
+  f="$(ls -1 "$TODO_ROOT/$DONE_DIR"/*/"$1".md 2>/dev/null | LC_ALL=C sort | tail -1 || true)"
+  [ -n "$f" ] && [ -f "$f" ] || return 1
+  printf '%s\n' "$f"
+}
+
+tracker_guide() {
+  cat <<'GUIDE'
+# Syncing the to-do list to a ticket tracker
+
+pln never talks to a tracker. The helper records, for every enrolled item, which
+tracker status the item belongs in and which one the tracker last confirmed. You
+make each move with whatever tool this session has for the tracker in TRACKER= —
+an MCP server's tools, or a CLI such as `gh` — and then record it.
+
+Four statuses, derived from the record:
+  backlog      filed, not taken
+  in-progress  claimed by a run
+  done         completed: the team's "ready to deploy", "done" or equivalent
+  closed       dropped, superseded or resolved elsewhere
+
+## Syncing — when TRACKER_PENDING is above 0
+
+1. `pln-todo tracker` prints one PENDING line per owed move, tab-separated:
+   id, ref (the card's id, `-` if none exists yet), from, to, urgent
+   (set / clear / -), the item's claim, and its detail file.
+2. Read the mapping from the project's CLAUDE.md or AGENTS.md: the lines under
+   `pln-tracker: <tracker>`. Use the ids recorded there. Never pick a list by
+   its name at sync time.
+3. For each line:
+   - ref `-`: create the card in the `to` status's list. Title: the claim.
+     Description: the detail file's body, with the item id on its first line.
+     Apply urgency if urgent is `set`.
+   - otherwise: move card `ref` to the `to` status's list, and set or clear
+     urgency as the line says.
+4. After each one succeeds, record it:
+     pln-todo tracker --id ID --synced TO [--ref CARD-ID] [--urgent true|false]
+   Pass --ref when you created the card, and --urgent whenever you changed it.
+5. When a move fails, leave it pending and say so in one line. Never let it
+   stop the run: the next pln-todo call reports it again.
+6. When a card id no longer resolves, ask the user whether to recreate the card.
+   Do not recreate it silently.
+7. When a list id in the mapping no longer resolves, ask again for that one
+   status only, and update the mapping.
+
+Sync in the turn the call reported the moves, after the work that caused them.
+Never make a question to the user wait on it.
+
+## Setting up — when TRACKER_QUESTION=owed
+
+Ask only when the user is present and this session has tools for a ticket
+tracker (Trello, Linear, Jira, GitHub Issues, Asana, and so on). With no such
+tools, ask nothing and record nothing: once one is connected, the question comes
+back.
+
+Ask once, in a message of its own: should this project's to-do list sync to
+<tracker>?
+- No: record it with `pln-todo init --tracker-offered`. It is not asked again.
+- Yes: work out the mapping with the user, one question per turn:
+  1. List the boards or projects and ask which one.
+  2. List its lists, columns or states and propose one for each of the four
+     statuses. For `closed`, archiving or closing the card is also an answer.
+  3. Ask what "urgent" should mean: a label, a priority value, or nothing.
+     Offer what the tracker already has.
+  Then write the block below into the project's instruction file — CLAUDE.md
+  under Claude Code, AGENTS.md under Codex, or whichever of the two the project
+  already keeps — show it to the user, and say that it applies to everyone who
+  pulls the file once it is committed. Record `pln-todo init --tracker-offered`.
+
+    ## Ticket tracker
+
+    pln-tracker: trello
+    - board: Engineering (5f1c...)
+    - backlog: Backlog (60a2...)
+    - in-progress: Doing (60a3...)
+    - done: Ready to deploy (60a4...)
+    - closed: archive the card
+    - urgent: label "Urgent" (60b1...)
+
+Items filed from now on are enrolled. Items already in the list are not; the
+user decides whether to backfill them. To enrol an item, create its card and
+record it with `pln-todo tracker --id ID --synced <status> --ref CARD-ID`.
+
+## When it is off
+
+- `pln-tracker: off` in the instruction file turns sync off for everyone.
+- `pln-config set tracker_sync off` turns it off for one person.
+- A teammate whose session has no tool for the declared tracker: say so once,
+  and carry on. The moves stay pending until a session that has the tool runs.
+
+Never ask for, store or pass a tracker credential. Authentication belongs to
+the tool that talks to the tracker.
+GUIDE
+}
+
 # --------------------------------------------------------------------- dispatch
 
 command="${1:-}"
@@ -1177,28 +1403,31 @@ case "$command" in list | check | stale) READ_ONLY_CMD=1 ;; esac
 
 case "$command" in
   init)
-    explicit=''; answered=0; migration=0
+    explicit=''; answered=0; migration=0; tracker_offered=0
     while [ $# -gt 0 ]; do
       case "$1" in
         --project) project="${2:-}"; shift 2 ;;
         --root) explicit="${2:-}"; shift 2 ;;
         --answered) answered=1; shift ;;
         --migration-offered) migration=1; shift ;;
+        --tracker-offered) tracker_offered=1; shift ;;
         --no-create) create_flag=0; shift ;;
         *) usage ;;
       esac
     done
     project_context "$project"
     resolve_root "$create_flag" "$explicit" || refuse "no to-do list could be resolved under $PROJECT_DIR"
-    if [ "$answered" = 1 ] || [ "$migration" = 1 ]; then
+    if [ "$answered" = 1 ] || [ "$migration" = 1 ] || [ "$tracker_offered" = 1 ]; then
       take_lock
       if [ "$answered" = 1 ]; then SET_ANSWERED="$(today)"; fi
       if [ "$migration" = 1 ]; then SET_OFFERED="$(today)"; fi
+      if [ "$tracker_offered" = 1 ]; then SET_TRACKER_OFFERED="$(today)"; fi
       write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
       release_lock
     fi
     load_header
     report_resolution
+    report_tracker
     ;;
 
   add)
@@ -1263,6 +1492,7 @@ case "$command" in
       printf 'depends_on: %s\n' "$depends_yaml"
       printf 'touches: %s\n' "$touches_yaml"
       printf 'holds: %s\n' "$holds_yaml"
+      if tracker_on; then printf 'tracker_synced: none\n'; fi
       printf -- '---\n\n'
       printf '# %s\n\n' "$claim"
       if [ -n "$body" ]; then
@@ -1288,6 +1518,7 @@ case "$command" in
     line="$(index_line_for "$id")"
     [ -n "$line" ] || fail "the index was rebuilt without $id"
     printf 'INDEX_LINE=%s\n' "$line"
+    report_tracker
     ;;
 
   list)
@@ -1336,6 +1567,7 @@ case "$command" in
       render_index || fail "cannot render the to-do list at $TODO_ROOT"
     fi
     printf 'INDEX_END\n'
+    report_tracker
     ;;
 
   check)
@@ -1495,6 +1727,7 @@ case "$command" in
     # Read the write set back off the record rather than echoing the argument:
     # what the next claim is checked against is what the file now says.
     printf 'TOUCHES=%s\n' "$(detail_list "$detail" touches | paste -sd, - )"
+    report_tracker
     ;;
 
   # Giving an item back. Until this existed a claim had exactly two ends — the
@@ -1580,6 +1813,7 @@ case "$command" in
     line="$(index_line_for "$id")"
     [ -n "$line" ] || fail "the index was rebuilt without $id"
     printf 'INDEX_LINE=%s\n' "$line"
+    report_tracker
     ;;
 
   mark)
@@ -1661,6 +1895,7 @@ case "$command" in
     line="$(index_line_for "$id")"
     [ -n "$line" ] || fail "the index was rebuilt without $id"
     printf 'INDEX_LINE=%s\n' "$line"
+    report_tracker
     ;;
 
   archive)
@@ -1726,6 +1961,7 @@ case "$command" in
     report_resolution
     printf 'ARCHIVED=%s\nARCHIVE_FILE=%s\nARCHIVE_INDEX=%s\nDISPOSITION=%s\nSTATE=%s\n' \
       "$id" "$dest" "$month_index" "$disposition" "$state"
+    report_tracker
     ;;
 
   stale)
@@ -1794,6 +2030,63 @@ case "$command" in
       count=0
     fi
     printf 'STALE_COUNT=%s\nSTALE_DAYS=%s\nSTALE_CUTOFF=%s\n' "$count" "$days" "$cutoff"
+    ;;
+
+  tracker)
+    id=''; synced=''; ref=''; set_urgent=''; guide=0
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --project) project="${2:-}"; shift 2 ;;
+        --id) id="${2:-}"; shift 2 ;;
+        --synced) synced="${2:-}"; shift 2 ;;
+        --ref) ref="${2:-}"; shift 2 ;;
+        --urgent) set_urgent="${2:-}"; shift 2 ;;
+        --guide) guide=1; shift ;;
+        --no-create) create_flag=0; shift ;;
+        *) usage ;;
+      esac
+    done
+    if [ "$guide" = 1 ]; then tracker_guide; exit 0; fi
+    if [ -z "$id" ]; then
+      [ -z "$synced" ] && [ -z "$ref" ] && [ -z "$set_urgent" ] || usage
+      READ_ONLY_CMD=1
+      project_context "$project"
+      resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
+      load_header
+      report_resolution
+      pending="$(tracker_pending)"
+      [ -z "$pending" ] || printf '%s\n' "$pending"
+      n="$(printf '%s' "$pending" | LC_ALL=C grep -c '' || true)"
+      printf 'TRACKER_PENDING=%s\n' "${n:-0}"
+      exit 0
+    fi
+    [ -n "$synced" ] || usage
+    case "$synced" in
+      backlog | in-progress | done | closed) ;;
+      *) fail "synced must be backlog, in-progress, done or closed: $synced" ;;
+    esac
+    if [ -n "$set_urgent" ]; then
+      case "$set_urgent" in true | false) ;; *) fail "urgent must be true or false: $set_urgent" ;; esac
+    fi
+    single_line 'ref' "$ref"
+    case "$ref" in *' '*) fail "ref must be the tracker's id for the card, with no spaces: $ref" ;; esac
+
+    project_context "$project"
+    resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
+    take_lock
+    file="$(record_file "$id")" || fail "no such to-do item, live or archived: $id"
+    # Bookkeeping about a card, not a claim about the work, so no holder is
+    # checked: recording that the tracker moved changes nothing a run owns.
+    {
+      printf 'set\ttracker_synced\t%s\n' "$synced"
+      [ -z "$ref" ] || printf 'set\ttracker_ref\t%s\n' "$ref"
+      [ -z "$set_urgent" ] || printf 'set\ttracker_urgent\t%s\n' "$set_urgent"
+    } | set_fields "$file"
+    release_lock
+    load_header
+    report_resolution
+    printf 'TRACKED=%s\nTRACKER_FILE=%s\nTRACKER_SYNCED=%s\n' "$id" "$file" "$synced"
+    report_tracker
     ;;
 
   *) usage ;;

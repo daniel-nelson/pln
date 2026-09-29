@@ -1445,6 +1445,120 @@ said 'ready, blocked, decide, proposed or dropped' \
   "the status error did not name the whole closed set"
 refused "marking an item to an invented status" mark --project "$R" --id plain-work --status someday
 
+# ─── the ticket tracker ───────────────────────────────────────────────────────
+# pln never talks to a tracker, so what is under test is the bookkeeping an agent
+# syncs from: nothing is recorded until the team declares a tracker, an item filed
+# after that is enrolled and one filed before it is not, every lifecycle move is
+# derived from the record and reported until the agent records it, and one
+# person's opt-out stops it for them alone.
+pending_ids() { sed -n 's/^PENDING	\([^	]*\)	.*/\1/p' "$WORK/out" | paste -sd, -; }
+pending_line() { grep "^PENDING	$1	" "$WORK/out" | cut -f3-6; }
+
+R="$WORK/tracked"
+new_repo "$R"
+ok "init with no tracker declared" init --project "$R"
+is TRACKER none "an undeclared tracker was reported as something"
+is TRACKER_QUESTION owed "the tracker question was not owed on a fresh list"
+hasnt "$WORK/out" 'TRACKER_PENDING=' "pending moves were reported with no tracker declared"
+ok "filing before any tracker is declared" add --project "$R" --id before-sync \
+  --claim 'filed before sync was on' --source s
+hasnt "$R/pln/items/before-sync.md" 'tracker_synced' "an item filed with no tracker was enrolled"
+
+ok "declining the tracker question" init --project "$R" --tracker-offered
+is TRACKER_QUESTION answered "a declined tracker question was not recorded"
+has "$R/pln/TO-DO.md" 'tracker-offered: 2026-08-27' "the decline was not written to the header"
+
+printf '# Project\n\n## Ticket tracker\n\npln-tracker: trello\n- backlog: Backlog (b1)\n' > "$R/CLAUDE.md"
+ok "init once a tracker is declared" init --project "$R"
+is TRACKER trello "the declared tracker was not reported"
+is TRACKER_QUESTION declared "a declared tracker still reported its question as open"
+is TRACKER_PENDING 0 "a list with nothing enrolled reported pending moves"
+
+ok "filing an urgent item under sync" add --project "$R" --id sync-a --urgent \
+  --claim 'first synced item' --source s
+has "$R/pln/items/sync-a.md" 'tracker_synced: none' "an item filed under sync was not enrolled"
+is TRACKER_PENDING 1 "a newly filed item was not reported as owed"
+has "$WORK/out" 'TRACKER_NEXT=' "an owed move did not say what to do next"
+ok "filing a second item" add --project "$R" --id sync-b --claim 'second synced item' --source s
+is TRACKER_PENDING 2 "two new items were not both owed"
+
+ok "listing the owed moves" tracker --project "$R"
+[ "$(pending_ids)" = 'sync-a,sync-b' ] || fail "the owed moves were not the enrolled items ($(pending_ids))"
+[ "$(pending_line sync-a)" = "-	none	backlog	set" ] || fail "a new urgent item was not owed a card with urgency ($(pending_line sync-a))"
+[ "$(pending_line sync-b)" = "-	none	backlog	-" ] || fail "a new item was not owed a backlog card ($(pending_line sync-b))"
+said 'first synced item' "the owed move did not carry the item's claim"
+
+ok "recording a created card" tracker --project "$R" --id sync-a --synced backlog --ref card-a --urgent true
+is TRACKER_PENDING 1 "a recorded move was still owed"
+ok "recording the second card" tracker --project "$R" --id sync-b --synced backlog --ref card-b
+is TRACKER_PENDING 0 "moves were owed after every card was recorded"
+
+ok "claiming a synced item" claim --project "$R" --id sync-a --run run-t --touches src/a
+is TRACKER_PENDING 1 "a claim did not owe a move to in progress"
+ok "listing after the claim" tracker --project "$R"
+[ "$(pending_line sync-a)" = "card-a	backlog	in-progress	-" ] || fail "the claim's move was wrong ($(pending_line sync-a))"
+ok "recording the move" tracker --project "$R" --id sync-a --synced in-progress
+
+ok "releasing the claim" release --project "$R" --id sync-a --run run-t
+is TRACKER_PENDING 1 "a released claim did not owe the card back to the backlog"
+ok "claiming it again" claim --project "$R" --id sync-a --run run-t --touches src/a
+is TRACKER_PENDING 0 "a re-claim before the move was made still owed one"
+
+ok "clearing urgency" mark --project "$R" --id sync-a --run run-t --urgent false
+is TRACKER_PENDING 1 "a cleared urgency was not owed to the card"
+ok "listing the urgency change" tracker --project "$R"
+[ "$(pending_line sync-a)" = "card-a	in-progress	in-progress	clear" ] || fail "an urgency change was not reported alone ($(pending_line sync-a))"
+ok "recording the urgency change" tracker --project "$R" --id sync-a --synced in-progress --urgent false
+
+ok "finishing the item" mark --project "$R" --id sync-a --run run-t --state '[x]'
+is TRACKER_PENDING 1 "a finished item was not owed to done"
+ok "archiving it" archive --project "$R" --id sync-a --disposition completed --evidence 'commit abc'
+is TRACKER_PENDING 1 "archiving lost the owed move to done"
+ok "listing after the archive" tracker --project "$R"
+[ "$(pending_line sync-a)" = "card-a	in-progress	done	-" ] || fail "an archived completion was not owed to done ($(pending_line sync-a))"
+ok "recording an archived record" tracker --project "$R" --id sync-a --synced done
+has "$R/pln/archive/2026-08/sync-a.md" 'tracker_synced: done' "the archived record was not updated"
+is TRACKER_PENDING 0 "an archived record's move was still owed"
+
+ok "dropping the second item" archive --project "$R" --id sync-b --disposition dropped --evidence 'user said no'
+ok "listing after the drop" tracker --project "$R"
+[ "$(pending_line sync-b)" = "card-b	backlog	closed	-" ] || fail "a dropped item was not owed a close ($(pending_line sync-b))"
+ok "recording the close" tracker --project "$R" --id sync-b --synced closed
+
+ok "filing an item that is dropped before it is synced" add --project "$R" --id never-carded \
+  --claim 'dropped before any card' --source s
+ok "dropping it" archive --project "$R" --id never-carded --disposition dropped --evidence 'no'
+is TRACKER_PENDING 0 "an item with no card was owed a close"
+
+ok "the unenrolled item is still not synced" tracker --project "$R"
+didnt_say 'before-sync' "an item filed before sync was on was pushed without a backfill"
+ok "enrolling it by hand, as a backfill does" tracker --project "$R" --id before-sync --synced backlog --ref card-old
+has "$R/pln/items/before-sync.md" 'tracker_ref: card-old' "a backfilled record did not keep its card"
+
+refused "recording an invented status" tracker --project "$R" --id before-sync --synced shipped
+said 'backlog, in-progress, done or closed' "the status error did not name the closed set"
+refused "recording an item that does not exist" tracker --project "$R" --id no-such --synced backlog
+ok "the guide prints without a to-do list" tracker --guide
+said 'TRACKER_QUESTION=owed' "the guide does not cover setup"
+said 'pln-todo tracker --id ID --synced' "the guide does not say how to record a move"
+
+# One person's opt-out, in their own pln config, never in the shared file.
+export PLN_STATE_DIR="$WORK/state"
+mkdir -p "$PLN_STATE_DIR"
+printf 'tracker_sync: off\n' > "$PLN_STATE_DIR/config.yaml"
+ok "filing with sync turned off personally" add --project "$R" --id opted-out \
+  --claim 'filed by someone who opted out' --source s
+is TRACKER off "a personal opt-out did not turn the tracker off"
+said 'tracker_sync off' "the opt-out was not reported"
+hasnt "$R/pln/items/opted-out.md" 'tracker_synced' "an opted-out filing was enrolled"
+hasnt "$WORK/out" 'TRACKER_PENDING=' "an opted-out call reported pending moves"
+unset PLN_STATE_DIR
+
+printf 'pln-tracker: off\n' > "$R/CLAUDE.md"
+ok "init with the tracker declared off" init --project "$R"
+is TRACKER off "a tracker declared off was reported on"
+is TRACKER_QUESTION declared "a tracker declared off left the question open"
+
 # ─── the scratch tree is the only thing that was written ──────────────────────
 [ ! -e "$HOME/.pln" ] || fail "the helper wrote to the developer's pln state directory"
 

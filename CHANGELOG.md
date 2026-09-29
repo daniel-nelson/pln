@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.110.0 — 2026-09-29
+
+### Added
+
+- **The to-do list can mirror into a ticket tracker (Trello, Linear, Jira, GitHub Issues or any other).** pln still never talks to a tracker. Items are enrolled when filed after a project declares `pln-tracker: <tracker>` in its `CLAUDE.md`/`AGENTS.md`. The helper then works out which status each item's card belongs in: backlog when filed, in progress when claimed, done (the team's "ready to deploy" or equivalent) when archived `completed`, closed for any other archive. It also records which status the tracker last confirmed. Any `pln-todo` call that leaves a move owed ends with `TRACKER_PENDING`, and the agent makes the move with whatever tool its session has, then records it with `pln-todo tracker --id ID --synced STATUS [--ref CARD] [--urgent true|false]`. A failed move, or a teammate's session with no tracker tool, leaves the move pending instead of losing it or blocking the run. Urgency follows the item's `urgent` flag, mapped to a label, a priority or nothing.
+- **Setup is one question, asked once.** At the outline's to-do-location step, a session that has tools for a ticket tracker is asked whether to sync to it. A yes works out the board, the list for each status and what "urgent" means, one question per turn, and writes the mapping, with the tracker's ids, under the `pln-tracker:` line. Teammates inherit it from git, and credentials stay with the tracker tool. A no is recorded in the to-do list's header with `pln-todo init --tracker-offered`. A session with no tracker tools asks nothing. `pln-tracker: off` turns sync off for everyone, and `pln-config set tracker_sync off` turns it off for one person. `pln-todo tracker --guide` prints the whole procedure.
+- **Existing items are not backfilled automatically.** Only items filed after sync is on are enrolled. A backfill creates the cards and records each one with `pln-todo tracker --id`.
+
 ## 1.109.0 — 2026-09-28
 
 ### Changed

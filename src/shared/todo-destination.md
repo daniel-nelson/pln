@@ -1,4 +1,5 @@
 - **Named in either instructions file** — a filesystem path in the *project's* own file is already the to-do-list root, so the follow-ups are filed there without asking. A path named only in the global instructions file is not: it is per-machine, and converting it would give every repository on the machine one shared to-do list.
+- **A tracker the project declares with `pln-tracker:`** — the to-do list is mirrored into it item by item (`pln-todo tracker --guide`), so it is not a separate destination and the closing message says nothing further about it.
 - **Found only by convention, or not a filesystem path at all** — an issue tracker, or a `TODO.md` nobody named. pln neither writes there nor offers to: a destination that cannot become a to-do-list root cannot carry an index line, and a file nobody named may be someone's private scratch.
 
 Whatever this project names and pln did not write to, the closing message names it and says the follow-ups are in the project to-do list instead. Without that a user whose instructions name a tracker will assume the tracker has them.

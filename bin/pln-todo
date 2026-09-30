@@ -42,6 +42,7 @@ Usage:
   pln-todo add --id ID --claim TEXT --source TEXT [--status ready|blocked|decide|proposed|dropped]
                [--state "[ ]"|"[-]"|"[x]"] [--urgent] [--group TEXT] [--opened YYYY-MM-DD]
                [--depends-on CSV] [--touches CSV] [--holds CSV] [--body FILE|-]
+               [--tracker-ref REF]
   pln-todo list [--project DIR]
   pln-todo check --id ID [--against CSV] [--run TEXT]
   pln-todo claim --id ID --run TEXT [--touches CSV] [--holds CSV]
@@ -77,6 +78,8 @@ TRACKER names the ticket tracker the project's CLAUDE.md/AGENTS.md declares
 answered or owed. While a tracker is on, the writing subcommands and `list` end
 with TRACKER_PENDING, the number of tracker moves not yet made, and `tracker`
 lists them. `pln-todo tracker --guide` says how to set up and sync.
+`add --tracker-ref` enrols an item on a card that already exists, and is
+refused, naming the item as TRACKED_BY, when a live item already has that card.
 
 Env overrides (for testing):
   PLN_TODO_DATE — the UTC date the helper writes (YYYY-MM-DD)
@@ -1293,6 +1296,26 @@ report_tracker() {
   fi
 }
 
+# The live item already enrolled on card REF, if any. Two live records on one
+# card would each derive their own move for it, and the card would follow
+# whichever the agent synced last.
+live_ref_holder() {
+  local f
+  for f in "$TODO_ROOT/$LIVE_DIR"/*.md; do
+    [ -f "$f" ] || continue
+    LC_ALL=C awk -v want="$1" '
+      NR == 1 { if ($0 != "---") exit 1; next }
+      $0 == "---" { exit 1 }
+      /^tracker_ref:/ { v = $0; sub(/^tracker_ref:[ \t]*/, "", v); sub(/[ \t\r]+$/, "", v)
+        if (v ~ /^".*"$/) v = substr(v, 2, length(v) - 2)
+        exit (v == want) ? 0 : 1 }
+    ' "$f" || continue
+    basename "$f" .md
+    return 0
+  done
+  return 1
+}
+
 # A record by id, live first, then the newest archived copy.
 record_file() {
   local f
@@ -1321,8 +1344,9 @@ Four statuses, derived from the record:
 ## Syncing — when TRACKER_PENDING is above 0
 
 1. `pln-todo tracker` prints one PENDING line per owed move, tab-separated:
-   id, ref (the card's id, `-` if none exists yet), from, to, urgent
-   (set / clear / -), the item's claim, and its detail file.
+   id, ref (the card's id, `-` if none exists yet), from (`unknown` for a card
+   that existed before its item did), to, urgent (set / clear / -), the item's
+   claim, and its detail file.
 2. Read the mapping from the project's CLAUDE.md or AGENTS.md: the lines under
    `pln-tracker: <tracker>`. Use the ids recorded there. Never pick a list by
    its name at sync time.
@@ -1380,6 +1404,16 @@ Items filed from now on are enrolled. Items already in the list are not; the
 user decides whether to backfill them. To enrol an item, create its card and
 record it with `pln-todo tracker --id ID --synced <status> --ref CARD-ID`.
 
+## A run that takes no to-do item
+
+While a tracker is on, a /pln run whose plan takes no to-do item files one for
+itself at adoption and claims it, so its card shows the work in progress:
+- The request came from a card in this tracker: pass its id with
+  `add --tracker-ref CARD`. TRACKED_BY means a live item already has that card;
+  take that item instead.
+- Otherwise file it without one; the sync creates its card.
+Claim it before syncing, so the card goes straight to in-progress.
+
 ## When it is off
 
 - `pln-tracker: off` in the instruction file turns sync off for everyone.
@@ -1434,7 +1468,7 @@ case "$command" in
 
   add)
     id=''; claim=''; source=''; status='ready'; state='[ ]'; urgent='false'
-    group=''; opened=''; depends=''; touches=''; holds=''; body=''
+    group=''; opened=''; depends=''; touches=''; holds=''; body=''; tracker_ref=''
     while [ $# -gt 0 ]; do
       case "$1" in
         --project) project="${2:-}"; shift 2 ;;
@@ -1450,6 +1484,7 @@ case "$command" in
         --touches) touches="${2:-}"; shift 2 ;;
         --holds) holds="${2:-}"; shift 2 ;;
         --body) body="${2:-}"; shift 2 ;;
+        --tracker-ref) tracker_ref="${2:-}"; [ -n "$tracker_ref" ] || usage; shift 2 ;;
         --no-create) create_flag=0; shift ;;
         *) usage ;;
       esac
@@ -1461,6 +1496,8 @@ case "$command" in
     single_line 'claim' "$claim"
     single_line 'source' "$source"
     single_line 'group' "$group"
+    single_line 'tracker-ref' "$tracker_ref"
+    case "$tracker_ref" in *' '*) fail "tracker-ref must be the tracker's id for the card, with no spaces: $tracker_ref" ;; esac
     [ -n "$opened" ] || opened="$(today)"
     case "$opened" in
       [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
@@ -1469,11 +1506,20 @@ case "$command" in
 
     project_context "$project"
     resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
+    if [ -n "$tracker_ref" ] && ! tracker_on; then
+      fail "--tracker-ref needs a tracker this person syncs to, and TRACKER is $TRACKER; file the item without it"
+    fi
     take_lock
 
     detail="$(detail_path "$id")"
     if [ -e "$detail" ] || [ -L "$detail" ]; then
       refuse "an item is already filed at $detail; nothing was overwritten"
+    fi
+    if [ -n "$tracker_ref" ]; then
+      if holder_id="$(live_ref_holder "$tracker_ref")"; then
+        printf 'TRACKED_BY=%s\n' "$holder_id"
+        refuse "card $tracker_ref is already the card of live item $holder_id; take that item instead of filing a second one"
+      fi
     fi
     mkdir -p "$TODO_ROOT/$LIVE_DIR"
 
@@ -1494,7 +1540,13 @@ case "$command" in
       printf 'depends_on: %s\n' "$depends_yaml"
       printf 'touches: %s\n' "$touches_yaml"
       printf 'holds: %s\n' "$holds_yaml"
-      if tracker_on; then printf 'tracker_synced: none\n'; fi
+      # A card that already exists sits in some status nobody has read yet, so
+      # the first sync moves it to wherever the record says it belongs.
+      if [ -n "$tracker_ref" ]; then
+        printf 'tracker_synced: unknown\ntracker_ref: %s\n' "$tracker_ref"
+      elif tracker_on; then
+        printf 'tracker_synced: none\n'
+      fi
       printf -- '---\n\n'
       printf '# %s\n\n' "$claim"
       if [ -n "$body" ]; then

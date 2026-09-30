@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.113.0 — 2026-09-30
+
+### Added
+
+- **A `/pln` run that takes no to-do item files one for itself when the project syncs to a ticket tracker.** At adoption, a plan whose `## To-do items` would read `none taken` files the run as an item instead, claims it, and syncs, so its card goes straight to in progress and the close moves it to done like any other claimed item. Where the request came from a ticket the team already has, the item is enrolled on that ticket with the new `pln-todo add --tracker-ref <id>` rather than a second card being made; without one, the sync creates the card as it does for any filed item. `add --tracker-ref` is refused, naming the item as `TRACKED_BY`, when a live item already has that ticket, and the run takes that item instead. Projects with no tracker declared, and people who turned sync off, are unaffected.
+
 ## 1.112.1 — 2026-09-29
 
 ### Fixed

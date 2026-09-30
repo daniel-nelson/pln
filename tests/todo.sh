@@ -1550,6 +1550,25 @@ refused "recording an item that does not exist" tracker --project "$R" --id no-s
 ok "the guide prints without a to-do list" tracker --guide
 said 'TRACKER_QUESTION=owed' "the guide does not cover setup"
 said 'pln-todo tracker --id ID --synced' "the guide does not say how to record a move"
+said 'add --tracker-ref CARD' "the guide does not say how a run takes over an existing card"
+
+# A run that takes no to-do item files one for itself; when its request came
+# from a card the team already has, the item is enrolled on that card, so the
+# sync moves it rather than making a second one.
+ok "filing a run's own item on an existing card" add --project "$R" --id run-owned \
+  --claim 'work that began as a ticket' --source 'ticket T-1' --touches src/r --tracker-ref T-1
+has "$R/pln/items/run-owned.md" 'tracker_ref: T-1' "the existing card was not recorded"
+has "$R/pln/items/run-owned.md" 'tracker_synced: unknown' "a card of unknown status was recorded as synced somewhere"
+ok "claiming it before syncing" claim --project "$R" --id run-owned --run run-r
+ok "listing its move" tracker --project "$R"
+[ "$(pending_line run-owned)" = "T-1	unknown	in-progress	-" ] || fail "an existing card was not owed a move to in progress ($(pending_line run-owned))"
+refused "filing a second item on the same card" add --project "$R" --id run-owned-again \
+  --claim 'the same ticket again' --source 'ticket T-1' --tracker-ref T-1
+is TRACKED_BY run-owned "the refusal did not name the item that already has the card"
+[ ! -e "$R/pln/items/run-owned-again.md" ] || fail "a refused filing still wrote its record"
+refused "a card id with a space" add --project "$R" --id spaced-ref \
+  --claim 'spaced' --source s --tracker-ref 'T 2'
+ok "recording the move" tracker --project "$R" --id run-owned --synced in-progress
 
 # One person's opt-out, in their own pln config, never in the shared file.
 export PLN_STATE_DIR="$WORK/state"
@@ -1561,6 +1580,9 @@ is TRACKER off "a personal opt-out did not turn the tracker off"
 said 'tracker_sync off' "the opt-out was not reported"
 hasnt "$R/pln/items/opted-out.md" 'tracker_synced' "an opted-out filing was enrolled"
 hasnt "$WORK/out" 'TRACKER_PENDING=' "an opted-out call reported pending moves"
+refused "enrolling a card with sync turned off personally" add --project "$R" --id opted-out-card \
+  --claim 'opted out, with a card' --source s --tracker-ref T-9
+said 'TRACKER is off' "the refusal did not say sync is off"
 unset PLN_STATE_DIR
 
 printf 'pln-tracker: off\n' > "$R/CLAUDE.md"

@@ -70,6 +70,22 @@ out="$($ASSURANCE roster --risk R2 --areas data,testing,security --adversary loc
 out="$($ASSURANCE roster --risk R1 --areas security --adversary peer)"
 [ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 1 ] || fail 'R1 roster was not broad-only'
 
+# A plan's pre-adoption review is the broad reader plus, at R3, the peer's
+# independent read; specialists and a same-model substitute wait for the code.
+out="$($ASSURANCE roster --surface plan --risk R3 --areas security,data --adversary peer)"
+[ "$(printf '%s\n' "$out" | grep '^SLOT' | cut -f2 | paste -sd, -)" = 'broad,adversarial' ] \
+  || fail 'R3 plan roster was not broad plus the peer'
+has_line "$out" $'SLOT\tadversarial\tpeer' 'R3 plan roster did not attribute the peer'
+out="$($ASSURANCE roster --surface plan --risk R3 --areas security,data --adversary local)"
+[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 1 ] || fail 'R3 plan roster without a peer was not broad-only'
+out="$($ASSURANCE roster --surface plan --risk R2 --areas data,testing --adversary peer)"
+[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 1 ] || fail 'R2 plan roster ran a specialist'
+out="$($ASSURANCE roster --surface pr --risk R3 --areas security,data --adversary peer)"
+[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 4 ] || fail 'explicit PR surface lost the full R3 roster'
+if "$ASSURANCE" roster --surface code --risk R1 --areas - --adversary local >/dev/null 2>&1; then
+  fail 'roster accepted an unknown --surface'
+fi
+
 # A plan-review round whose every rostered reader wrote, this round, exactly the
 # terminal no-findings line needs no merge worker. Every other state keeps it:
 # a missing role, an artifact left from an earlier round, a failed reader, and a
@@ -371,6 +387,30 @@ if "$GAUNTLET" run --root "$FIXTURE" --commands "$GAUNTLET_OUT/mutate.commands" 
 fi
 has_line "$(cat "$GAUNTLET_OUT/mutate.status")" 'TREE_MUTATION=detected' 'tree mutation was not recorded fail-closed'
 git -C "$FIXTURE" checkout -q -- source.txt
+
+# A passing run records the candidate it ran on, and `reuse` lets it stand in
+# for a later run only on that exact candidate. A moved tree, a failed or
+# partial run, a mutated tree or a status without a fingerprint runs again.
+reuse() {
+  "$GAUNTLET" reuse --status "$1" --root "$FIXTURE" --commands "$GAUNTLET_OUT/legacy.commands" \
+    --environment "$GAUNTLET_OUT/environment.txt"
+}
+"$GAUNTLET" run --root "$FIXTURE" --commands "$GAUNTLET_OUT/legacy.commands" \
+  --environment "$GAUNTLET_OUT/environment.txt" --logs "$GAUNTLET_OUT/reuse-logs" \
+  --status "$GAUNTLET_OUT/reuse.status"
+grep -q '^CANDIDATE_SHA256=' "$GAUNTLET_OUT/reuse.status" || fail 'a passing gauntlet did not record its candidate'
+out="$(reuse "$GAUNTLET_OUT/reuse.status")"
+has_line "$out" 'REUSE=yes' 'a passing run on the unchanged candidate was not reusable'
+has_line "$out" "$(grep '^CANDIDATE_SHA256=' "$GAUNTLET_OUT/reuse.status")" 'reuse did not print the candidate it matched'
+printf 'moved\n' > "$FIXTURE/source.txt"
+has_line "$(reuse "$GAUNTLET_OUT/reuse.status")" 'REASON=candidate-moved' 'a run on an earlier tree was reused'
+git -C "$FIXTURE" checkout -q -- source.txt
+has_line "$(reuse "$GAUNTLET_OUT/fail.status")" 'REUSE=no' 'a failed run was reused'
+has_line "$(reuse "$GAUNTLET_OUT/mutate.status")" 'REUSE=no' 'a tree-mutating run was reused'
+has_line "$(reuse "$GAUNTLET_OUT/coordinator.status")" 'REUSE=no' 'a run that deferred commands was reused'
+grep -v '^CANDIDATE_SHA256=' "$GAUNTLET_OUT/reuse.status" > "$GAUNTLET_OUT/unsealed.status"
+has_line "$(reuse "$GAUNTLET_OUT/unsealed.status")" 'REASON=no-fingerprint' 'a status without a candidate was reused'
+has_line "$(reuse "$GAUNTLET_OUT/absent.status")" 'REASON=missing-status' 'a missing status was reused'
 
 # A tracked symlink to a directory must fingerprint (git hash-object on the
 # path follows the link and dies), and retargeting the link must invalidate.

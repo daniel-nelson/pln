@@ -14,7 +14,10 @@ Usage:
                    iac ci-security compatibility ai-safety eval-safety
                    critical-conflict unknown
               any other token classifies R3 as unknown:<token>
-  pln-assurance roster --risk R1|R2|R3 --areas CSV --adversary peer|local
+  pln-assurance roster --risk R1|R2|R3 --areas CSV --adversary peer|local [--surface pr|plan]
+      --surface plan (a plan's pre-adoption review) is the broad reader, plus
+      the peer adversarial slot at R3 when a peer may run; specialists and a
+      same-model adversarial substitute read the code, at PR review, instead.
   pln-assurance merge-skip --roles CSV --since FILE [--form plan|pr] --artifact ROLE=PATH [--artifact ROLE=PATH ...]
       prints SKIP_MERGE=yes only when every role in the round's roster (broad
       among them) has an artifact newer than FILE, the round's start marker,
@@ -108,20 +111,29 @@ case "$command" in
     risk=""
     areas=""
     adversary=""
+    surface="pr"
     while [ $# -gt 0 ]; do
       case "$1" in
         --risk) risk="${2:-}"; shift 2 ;;
         --areas) areas="${2:-}"; shift 2 ;;
         --adversary) adversary="${2:-}"; shift 2 ;;
+        --surface) surface="${2:-}"; shift 2 ;;
         *) usage ;;
       esac
     done
     case "$risk" in R1 | R2 | R3) ;; *) usage ;; esac
     case "$adversary" in peer | local) ;; *) usage ;; esac
+    case "$surface" in pr | plan) ;; *) usage ;; esac
 
     printf 'RISK=%s\n' "$risk"
     printf 'SLOT\tbroad\tsame-model\n'
-    if [ "$risk" = "R2" ] || [ "$risk" = "R3" ]; then
+    if [ "$surface" = "plan" ]; then
+      # A plan review reads prose. Its tier still decides whether the peer's
+      # independent read runs; the specialists run once, on the code.
+      if [ "$risk" = "R3" ] && [ "$adversary" = "peer" ]; then
+        printf 'SLOT\tadversarial\tpeer\n'
+      fi
+    elif [ "$risk" = "R2" ] || [ "$risk" = "R3" ]; then
       IFS=',' read -r -a area_list <<< "$areas"
       declared="|"
       count=0
@@ -135,7 +147,7 @@ case "$command" in
         [ "$count" -eq 2 ] && break
       done
     fi
-    if [ "$risk" = "R3" ]; then
+    if [ "$surface" = "pr" ] && [ "$risk" = "R3" ]; then
       if [ "$adversary" = "peer" ]; then
         printf 'SLOT\tadversarial\tpeer\n'
       else

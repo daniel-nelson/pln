@@ -560,8 +560,10 @@ for host in claude codex; do
     "$host coordinator no longer validates retained-behavior evidence"
   has "$WORK/$host/phases/pln/implementation.md" 'adopted system-fit outcome' \
     "$host coordinator no longer checks the bounded diff against adopted ownership"
-  has "$WORK/$host/phases/pln/implementation.md" 'same admitted behavior suite' \
+  has "$WORK/$host/phases/pln/implementation.md" 'that the two commands are the same, and that both exited zero' \
     "$host implementation checkpoint lost equivalent pre/post behavior validation"
+  has "$WORK/$host/phases/pln/implementation.md" 'Do not run them again, yourself or through another worker' \
+    "$host implementation checkpoint re-runs the worker's recorded pre/post runs"
   has "$WORK/$host/phases/pln/finish-ship.md" 'src/workers/final-verification.md' "$host finish phase does not reference verification contract"
   has "$WORK/$host/phases/pln-simplify/map-synthesize.md" 'src/workers/simplification-map.md' \
     "$host simplification phase does not reference its mapping contract"

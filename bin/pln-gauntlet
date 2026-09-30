@@ -7,6 +7,11 @@ usage() {
 Usage:
   pln-gauntlet run --root DIR --commands FILE --environment FILE --logs DIR --status FILE
                    [--executor all|worker|coordinator] [--completed STATUS_FILE]
+  pln-gauntlet reuse --status FILE --root DIR --commands FILE --environment FILE
+      REUSE=yes only when that status records a passing run of every command,
+      no tree mutation, and a CANDIDATE_SHA256 equal to the candidate's now;
+      then the four hashes follow. Otherwise REUSE=no and REASON=. Exit 2 is
+      a usage error, which also means: do not reuse.
 
 Legacy command files contain one shell command per nonempty line and run serially.
 A declared file has this tab-separated form:
@@ -61,8 +66,40 @@ deps_state() {
 }
 
 command="${1:-}"
-[ "$command" = run ] || usage
+case "$command" in run | reuse) ;; *) usage ;; esac
 shift
+
+if [ "$command" = reuse ]; then
+  # A recorded run stands in for a later one only on the exact candidate it
+  # ran on, and only when it passed whole. Anything else runs the gauntlet.
+  status_file="" root="" commands="" environment=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --status) status_file="${2:-}"; shift 2 ;;
+      --root) root="${2:-}"; shift 2 ;;
+      --commands) commands="${2:-}"; shift 2 ;;
+      --environment) environment="${2:-}"; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  [ -n "$status_file" ] && [ -d "$root" ] && [ -f "$commands" ] && [ -f "$environment" ] || usage
+  verdict_no() { printf 'REUSE=no\nREASON=%s\n' "$1"; exit 0; }
+  [ -f "$status_file" ] && [ ! -L "$status_file" ] || verdict_no missing-status
+  grep -qx 'AGGREGATE=pass' "$status_file" || verdict_no not-passed
+  grep -qx 'TREE_MUTATION=none' "$status_file" || verdict_no tree-mutated
+  unpassed="$(awk -F '\t' '$1 == "RESULT" && $3 != "pass" { print $2 ":" $3; exit }' "$status_file")"
+  [ -z "$unpassed" ] || verdict_no "result:$unpassed"
+  grep -q '^RESULT	' "$status_file" || verdict_no no-results
+  recorded="$(sed -n 's/^CANDIDATE_SHA256=//p' "$status_file" | head -n 1)"
+  [ -n "$recorded" ] || verdict_no no-fingerprint
+  script_dir="$(cd "$(dirname "$0")" && pwd -P)"
+  fingerprints="$("$script_dir/pln-assurance" fingerprint --root "$root" --commands "$commands" --environment "$environment")" \
+    || verdict_no fingerprint-failed
+  current="$(printf '%s\n' "$fingerprints" | sed -n 's/^CANDIDATE_SHA256=//p')"
+  [ "$current" = "$recorded" ] || verdict_no candidate-moved
+  printf 'REUSE=yes\n%s\n' "$fingerprints"
+  exit 0
+fi
 
 root="" commands="" environment="" logs="" status_file="" selected_executor="all" completed_file=""
 while [ $# -gt 0 ]; do
@@ -163,7 +200,8 @@ if [ "$selected_executor" != all ]; then
   done
 fi
 
-initial_tree="$(sha256_from_fingerprint)"
+initial_fingerprints="$("$assurance" fingerprint --root "$root" --commands "$commands" --environment "$environment")"
+initial_tree="$(printf '%s\n' "$initial_fingerprints" | sed -n 's/^TREE_SHA256=//p')"
 tree_mutation=none
 while [ "$remaining" -gt 0 ]; do
   first=-1
@@ -249,5 +287,7 @@ for ((i = 0; i < count; i++)); do
   fi
 done
 printf 'TREE_MUTATION=%s\nAGGREGATE=%s\n' "$tree_mutation" "$aggregate" >> "$tmp_status"
+# The candidate the commands ran on, so a later step can prove it is the same.
+[ "$tree_mutation" = none ] && printf '%s\n' "$initial_fingerprints" >> "$tmp_status"
 mv "$tmp_status" "$status_file"
 [ "$tree_mutation" = none ] && [ "$aggregate" = pass ]

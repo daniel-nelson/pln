@@ -30,6 +30,8 @@ If that base value differs from the working-tree version (the branch is already 
 
 When you do bump: raise the version per the repo's scheme (read recent changelog entries to infer major/minor/patch conventions) and add a matching changelog entry describing what shipped. If the repo's `CLAUDE.md`/`AGENTS.md` states a bump rule, follow it over the `VERSION`/`CHANGELOG.md` default. Commit these with the co-author trailer, so they are part of the tree the Step 7 gauntlet runs against.
 
+**Make the bump yourself; no worker makes it.** A version field and a changelog entry are release metadata, not the product code the context firewall keeps out of your hands, and everything the entry says is already in `PLAN.md` and `REVIEW.md`. Read only the version file and the changelog's latest headings (`grep -m 3 '^## ' CHANGELOG.md`, or the files the repository's rule names) for the format. Observed otherwise: a run spent five and a half minutes of the user's wait on a worker that changed one version line.
+
 Run the cheap declared gates now, before fingerprinting or dispatching the functional gauntlet: base/version freshness, release metadata consistency, and repository package/version validation. A failure here stops without spending the expensive run. Only after they pass, write the final command graph and environment identity.
 
 ### Step 7. Final gauntlet — once
@@ -83,7 +85,7 @@ If a second base refresh after this green run forces a release correction, snaps
 
 ### Step 8. Commit, push, and open (or update) the PR
 
-Refresh the resolved base once more before push and repeat the reviewed-diff reconciliation. If the diff changed, return to review. If only repository-declared release metadata must change, apply the proven version-only correction path above; otherwise invalidate the functional gauntlet. This is the late-drift boundary that prevents a base-relative version failure from being discovered after expensive verification with no reuse rule.
+Refresh the resolved base once more before push and repeat the reviewed-diff reconciliation. **Where the moved base conflicts with the unpushed branch only in repository-declared version/changelog lines, rebase and resolve them yourself**, re-deriving the bump from the base's new version as Step 6 does; no worker does it. A conflict in any other line is not yours to resolve: that is a changed reviewed diff. If the diff changed, return to review. If only repository-declared release metadata must change, apply the proven version-only correction path above; otherwise invalidate the functional gauntlet. This is the late-drift boundary that prevents a base-relative version failure from being discovered after expensive verification with no reuse rule.
 
 **Sweep and file before you push.** Sweep the run's own record for outstanding work (Follow-ups, below) — this is where the follow-up list is assembled, and both closes below reuse it — and file it now: one `{{OUTPUT_ROOT}}/bin/pln-todo add` per candidate that clears the bar, `--source` naming this review. Order matters because the to-do list may live *in* the repository: under a root the project's own instructions named, the filed items are tracked files, and a to-do list write after the push never reaches the pushed `HEAD` — it sits uncommitted on the machine that ran pln-pr while the branch a reviewer opens carries none of it. (Under the `.git` common-dir root, or a root outside the repository, nothing here is pushed either way; filing first is simply always correct.)
 

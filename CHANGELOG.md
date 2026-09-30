@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.115.0 — 2026-09-30
+
+### Changed
+
+- **A plan is reviewed by one reader, plus the cross-model peer on high-risk work.** Plan review used to run the same panel PR review does: a broad reader, up to two specialists (data integrity, concurrency and so on) and an adversarial reader. On high-risk work that meant reading the plan with four agents and then the code with four more. The specialists now read once, at PR review, on the code. A plan review runs the broad reader, plus the peer at the highest risk tier when one may run. When the peer can't run, the plan review goes ahead without it and says why; no same-model stand-in replaces it. `pln-assurance roster --surface plan` builds this roster.
+- **The final checks run once.** The last item's worker now runs the plan's final check list itself. `pln-gauntlet` records the exact tree those checks ran on, and `pln-gauntlet reuse` accepts that run for final verification only when the committed tree is identical and every command passed. Otherwise final verification runs as before. When an item replaces or removes code, the checkpoint now accepts the worker's own recorded before-and-after test runs (both present, same command, both passed) instead of having another agent repeat them. In one observed run, those two repeats took about sixteen minutes.
+- **Small bookkeeping no longer gets its own agent.** For plans of three or fewer items, `/pln` writes the run order itself, in plan order. The exception is an item with no declared write set, or one that depends on a later item. Both skills do their closing sweep of outstanding work themselves. `/pln-pr` makes the version bump itself, and resolves a rebase conflict limited to version and changelog lines itself. In one observed run, these took four agents and about seventeen minutes.
+
 ## 1.114.0 — 2026-09-30
 
 ### Fixed

@@ -1378,8 +1378,39 @@ for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
     "$f still describes parallel fix waves that execution no longer has"
 done
 for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
-  has "$f" 'With one pending item, write its one-node artifact directly and skip this step' \
-    "$f spawns a scheduling worker for a single item"
+  # A plan of three or fewer items runs in plan order: the coordinator writes the
+  # node file, and only an undeclared write set or a forward dependency sends
+  # it to the worker (3 min of a two-item run, 2026-09-30).
+  has "$f" 'With three or fewer pending items, write `<plan-dir>/schedule-nodes.tsv` yourself' \
+    "$f spawns a scheduling worker for a small plan"
+  has "$f" 'names a later item as something it depends on, sends the plan to the worker' \
+    "$f orders a small plan against a dependency its text declares"
+done
+
+# Checks run once (2026-09-30: the implementer, a checkpoint validator and final
+# verification ran the same commands on the same tree). The last item runs the
+# final gauntlet; Step 7 reuses it only on the exact candidate it ran on.
+for host_dir in "$real_c" "$real_x"; do
+  has "$host_dir/phases/pln/implementation.md" 'The last item runs the final gauntlet' \
+    "$host_dir implementation does not hand the last item the final gauntlet"
+  has "$host_dir/phases/pln/finish-ship.md" 'bin/pln-gauntlet reuse --status' \
+    "$host_dir final verification does not ask whether the last item's run covers the candidate"
+  has "$host_dir/phases/pln/finish-ship.md" 'Any other answer, and a run whose last item carried no gauntlet, continues below' \
+    "$host_dir final verification reuses a run the helper did not accept"
+done
+has "$REPO_DIR/src/workers/item-implementation.md" 'When the assignment names a final gauntlet, run it last' \
+  'the item contract does not run a handed final gauntlet'
+
+# Bookkeeping stays with the coordinator: the closing sweep, a version bump and
+# a version-only conflict each cost a worker 3.5-5.5 minutes on one run.
+for host_dir in "$real_c" "$real_x"; do
+  for f in "$host_dir/phases/pln/finish-ship.md" "$host_dir/phases/pln-pr/ship-watch.md"; do
+    has "$f" 'no worker does the sweep' "$f lets a worker do the closing sweep"
+  done
+  has "$host_dir/phases/pln-pr/ship-watch.md" 'Make the bump yourself; no worker makes it' \
+    "$host_dir ship-watch sends a version bump to a worker"
+  has "$host_dir/phases/pln-pr/ship-watch.md" 'rebase and resolve them yourself' \
+    "$host_dir ship-watch sends a version-only conflict to a worker"
 done
 
 # ─── /pln describes no parallel item execution ───────────────────────────────
@@ -1468,13 +1499,21 @@ for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-appr
   has "$f" '`<peer>-usage-limit` means the peer ran and its provider refused it for quota' \
     "$f does not relay why a peer that ran failed"
 done
-for f in "$real_c/phases/pln/review-approval.md" "$real_c/phases/pln-pr/review.md"; do
+# A plan review has no same-model substitute: its adversarial slot is the
+# peer's alone, so only the PR review carries each host's substitute timing.
+for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-approval.md"; do
+  has "$f" 'A plan review has no substitute' "$f lost the plan roster's no-substitute rule"
+  has "$f" 'roster --surface plan' "$f builds a plan roster with PR review's specialists"
+  hasnt "$f" "substitute's spawn goes among the other spawns" "$f still spawns a plan-review substitute"
+  hasnt "$f" 'first slot a finished reader frees' "$f still spawns a plan-review substitute"
+done
+for f in "$real_c/phases/pln-pr/review.md"; do
   has "$f" "substitute's spawn goes among the other spawns" \
     "$f lost Claude's substitute timing"
   hasnt "$f" 'first slot a finished reader frees' "$f carries Codex's slot-cap timing"
   hasnt "$f" 'max_concurrent_threads_per_session' "$f names a Codex setting"
 done
-for f in "$real_x/phases/pln/review-approval.md" "$real_x/phases/pln-pr/review.md"; do
+for f in "$real_x/phases/pln-pr/review.md"; do
   hasnt "$f" 'among the other spawns' "$f tells Codex to spawn a fourth reader its slots cannot hold"
   has "$f" "the moment the peer's no-send or failure is known" \
     "$f waits for a reader before spawning the substitute"

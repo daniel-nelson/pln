@@ -15,11 +15,13 @@ Usage:
                    critical-conflict unknown
               any other token classifies R3 as unknown:<token>
   pln-assurance roster --risk R1|R2|R3 --areas CSV --adversary peer|local
-  pln-assurance merge-skip --roles CSV --since FILE --artifact ROLE=PATH [--artifact ROLE=PATH ...]
+  pln-assurance merge-skip --roles CSV --since FILE [--form plan|pr] --artifact ROLE=PATH [--artifact ROLE=PATH ...]
       prints SKIP_MERGE=yes only when every role in the round's roster (broad
       among them) has an artifact newer than FILE, the round's start marker,
-      whose whole content is the reviewer's terminal "Nothing worth changing"
-      line; otherwise SKIP_MERGE=no and the first role:state that failed.
+      whose whole content is the reviewer's empty result: for --form plan (the
+      default) the terminal "Nothing worth changing" line, for --form pr the
+      JSON {"findings": []} with any whitespace; otherwise SKIP_MERGE=no and
+      the first role:state that failed.
       Never prints artifact content. Exit 2 (usage) also means: run the merge.
   pln-assurance repair-key --kind behavioral|structural --boundary TEXT --check TEXT [--owner TEXT]
   pln-assurance repair-action --disposition new|persisted|needs-decision|out-of-scope|destructive|worker-blocked --failed-attempts N
@@ -143,23 +145,26 @@ case "$command" in
     ;;
 
   merge-skip)
-    # Decides only the one mechanically closed case of a plan-review round: every
-    # rostered reader produced, this round, exactly the terminal no-findings line.
+    # Decides only the one mechanically closed case of a review round: every
+    # rostered reader produced, this round, exactly its form's empty result.
     # Any other state — a role with no artifact, an artifact left from an earlier
     # round, an empty or failed reader, one real finding — keeps the merge worker.
     roles=""
     since=""
+    form="plan"
     pairs=()
     while [ $# -gt 0 ]; do
       case "$1" in
         --roles) roles="${2:-}"; shift 2 ;;
         --since) since="${2:-}"; shift 2 ;;
+        --form) form="${2:-}"; shift 2 ;;
         --artifact) pairs+=("${2:-}"); shift 2 ;;
         *) usage ;;
       esac
     done
     [ -n "$roles" ] && [ -n "$since" ] || usage
     [ -f "$since" ] || { echo "pln-assurance: --since marker is not a file: $since" >&2; exit 2; }
+    case "$form" in plan | pr) ;; *) echo "pln-assurance: --form must be plan or pr, got: '$form'" >&2; exit 2 ;; esac
 
     IFS=',' read -r -a role_list <<< "$roles"
     declared="|"
@@ -193,13 +198,20 @@ case "$command" in
       size="$(LC_ALL=C wc -c < "$path")"
       size="${size//[[:space:]]/}"
       [ "$size" -gt 0 ] || verdict_no "$role" empty
-      # The terminal line is 22 bytes; anything much larger carries findings, and
-      # is never read into this process at all.
+      # Either empty result is under 64 bytes; anything larger carries findings,
+      # and is never read into this process at all.
       [ "$size" -le 64 ] || verdict_no "$role" not-empty
-      body="$(LC_ALL=C tr -d '\r' < "$path")"
-      body="${body#"${body%%[![:space:]]*}"}"
-      body="${body%"${body##*[![:space:]]}"}"
-      [ "$body" = 'Nothing worth changing' ] || verdict_no "$role" not-empty
+      if [ "$form" = pr ]; then
+        # No string content can appear in an empty findings object, so removing
+        # every whitespace byte cannot turn a finding into a match.
+        body="$(LC_ALL=C tr -d ' \t\r\n' < "$path")"
+        [ "$body" = '{"findings":[]}' ] || verdict_no "$role" not-empty
+      else
+        body="$(LC_ALL=C tr -d '\r' < "$path")"
+        body="${body#"${body%%[![:space:]]*}"}"
+        body="${body%"${body##*[![:space:]]}"}"
+        [ "$body" = 'Nothing worth changing' ] || verdict_no "$role" not-empty
+      fi
     done
     printf 'SKIP_MERGE=yes\nREASON=all-empty\n'
     ;;

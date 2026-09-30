@@ -10,8 +10,13 @@ Usage:
   pln-build-review-brief --mode pr-merge --contract FILE --root DIR \
     --candidate SHA256 --commands FILE --environment FILE \
     [--plan FILE] [--ledger FILE] [--diff-map FILE] [--reader-metadata FILE] \
-    [--artifact ROLE FILE]... [--skill-root DIR]... --out FILE
+    [--artifact ROLE FILE]... [--skill-root DIR]... [--evidence-root DIR]... --out FILE
   pln-build-review-brief --verify-pr-merge FILE
+
+In pr-merge mode every evidence file (commands, environment, plan, ledger,
+diff map, reader metadata, artifacts) must sit under --root or under one of
+the --evidence-root directories. Pass the plan root and the worker-artifact
+directory as --evidence-root when either lives outside the repository.
 EOF
   exit 2
 }
@@ -94,6 +99,30 @@ confined_file() {
   printf '%s' "$absolute"
 }
 
+# Canonical directories, besides the repository root, that evidence files may
+# live under: a plan root or worker-artifact directory outside the repository.
+EVIDENCE_ROOTS=()
+
+# An evidence file is confined to the repository root or one declared evidence
+# root. Relative paths resolve against the repository root.
+evidence_file() {
+  local root="$1" path="$2" absolute evidence_root
+  case "$path" in /*) ;; *) path="$root/$path" ;; esac
+  absolute="$(canonical_file "$path")"
+  case "$absolute" in "$root"/*) printf '%s' "$absolute"; return 0 ;; esac
+  for evidence_root in ${EVIDENCE_ROOTS[@]+"${EVIDENCE_ROOTS[@]}"}; do
+    case "$absolute" in "$evidence_root"/*) printf '%s' "$absolute"; return 0 ;; esac
+  done
+  fail "file escapes root and every --evidence-root; pass the directory holding it as --evidence-root (root_hex=$(hex_encode "$root") path_hex=$(hex_encode "$path"))"
+}
+
+# Evidence under the repository root is recorded relative to it, as before;
+# evidence under an evidence root is recorded as its absolute path.
+evidence_path() {
+  local root="$1" absolute="$2"
+  case "$absolute" in "$root"/*) printf '%s' "${absolute#"$root"/}" ;; *) printf '%s' "$absolute" ;; esac
+}
+
 fingerprint_output() {
   local root="$1" commands="$2" environment="$3"
   "$(dirname "$0")/pln-assurance" fingerprint \
@@ -102,8 +131,8 @@ fingerprint_output() {
 
 inventory_line() {
   local kind="$1" root="$2" path="$3" role="${4:-}" absolute relative
-  absolute="$(confined_file "$root" "$path")"
-  relative="${absolute#"$root"/}"
+  absolute="$(evidence_file "$root" "$path")"
+  relative="$(evidence_path "$root" "$absolute")"
   if [ -n "$role" ]; then
     printf '%s\t%s\t%s\t%s\t%s\n' "$kind" "$(hex_encode "$role")" \
       "$(hex_encode "$relative")" "$(file_size "$absolute")" "$(sha256_file "$absolute")"
@@ -187,13 +216,11 @@ build_pr_merge() {
   local contract="$1" root="$2" candidate="$3" commands="$4" environment="$5" out="$6"
   shift 6
   local root_real contract_real commands_real environment_real actual tree command_hash environment_hash fingerprints tmp body instructions skills
-  local kind role path skill_root skill_real size index
-  local -a artifacts=() skill_roots=()
+  local kind role path skill_root skill_real size index evidence_root
+  local -a artifacts=() skill_roots=() evidence_roots=()
 
   root_real="$(canonical_root "$root")"
   contract_real="$(canonical_file "$contract")"
-  commands_real="$(confined_file "$root_real" "$commands")"
-  environment_real="$(confined_file "$root_real" "$environment")"
   case "$candidate" in ''|*[!0-9a-f]*) fail "candidate must be a lowercase hexadecimal digest" ;; esac
   [ "${#candidate}" -eq 64 ] || fail "candidate must be a 64-character sha256 digest"
 
@@ -209,9 +236,18 @@ build_pr_merge() {
         [ $# -ge 1 ] || usage
         skill_roots+=("$1"); shift
         ;;
+      evidence-root)
+        [ $# -ge 1 ] || usage
+        evidence_roots+=("$1"); shift
+        ;;
       *) fail "internal unknown PR-merge input: $kind" ;;
     esac
   done
+  for evidence_root in ${evidence_roots[@]+"${evidence_roots[@]}"}; do
+    EVIDENCE_ROOTS+=("$(canonical_root "$evidence_root")")
+  done
+  commands_real="$(evidence_file "$root_real" "$commands")"
+  environment_real="$(evidence_file "$root_real" "$environment")"
   [ "${#skill_roots[@]}" -gt 0 ] || fail "PR-merge mode requires at least one complete skill root"
 
   fingerprints="$(fingerprint_output "$root_real" "$commands_real" "$environment_real")"
@@ -240,6 +276,9 @@ build_pr_merge() {
   {
     printf 'PLN_PR_MERGE_CONTEXT_V1\n'
     printf 'ROOT\t%s\n' "$(hex_encode "$root_real")"
+    for evidence_root in ${EVIDENCE_ROOTS[@]+"${EVIDENCE_ROOTS[@]}"}; do
+      printf 'EVIDENCE_ROOT\t%s\n' "$(hex_encode "$evidence_root")"
+    done
     printf 'TREE_SHA256\t%s\n' "$tree"
     printf 'COMMAND_SHA256\t%s\n' "$command_hash"
     printf 'ENVIRONMENT_SHA256\t%s\n' "$environment_hash"
@@ -271,6 +310,16 @@ build_pr_merge() {
   trap - EXIT
 }
 
+# A recorded evidence path is relative to the repository root, or absolute and
+# then under one recorded evidence root. Anything else is a forged inventory.
+verified_evidence_file() {
+  local root="$1" path="$2"
+  case "$path" in
+    /*) evidence_file "$root" "$path" ;;
+    *) confined_file "$root" "$root/$path" ;;
+  esac
+}
+
 verify_pr_merge() {
   local brief="$1" brief_real data root_hex root tree command_hash environment_hash candidate commands environment actual fingerprints
   local type a b c d role_hex rel_hex expected_size expected_digest path absolute
@@ -291,7 +340,7 @@ verify_pr_merge() {
   : > "$instructions"; : > "$recorded_skills"; : > "$skill_roots"
 
   root=""; tree=""; command_hash=""; environment_hash=""; candidate=""; commands=""; environment=""
-  local seen_tree=0 seen_command_hash=0 seen_environment_hash=0 seen_candidate=0 seen_commands=0 seen_environment=0 seen_instruction_digest=0 seen_skill_digest=0 seen_policy=0 seen_end=0
+  local seen_tree=0 seen_command_hash=0 seen_environment_hash=0 seen_candidate=0 seen_commands=0 seen_environment=0 seen_instruction_digest=0 seen_skill_digest=0 seen_policy=0 seen_end=0 seen_artifact=0
   while IFS=$'\t' read -r type a b c d; do
     if [ "$seen_end" -eq 1 ] && [ -n "$type" ]; then
       fail "field follows END_PLN_PR_MERGE_CONTEXT"
@@ -301,6 +350,14 @@ verify_pr_merge() {
         [ -z "$root" ] || fail "duplicate ROOT field"
         root="$(hex_decode "$a")"
         [ "$root" = "$(canonical_root "$root")" ] || fail "non-canonical root in PR-merge brief"
+        ;;
+      EVIDENCE_ROOT)
+        [ -n "$root" ] || fail "EVIDENCE_ROOT precedes ROOT"
+        [ "$seen_commands" -eq 0 ] && [ "$seen_environment" -eq 0 ] && [ "$seen_artifact" -eq 0 ] \
+          || fail "EVIDENCE_ROOT follows an evidence file"
+        path="$(hex_decode "$a")"
+        [ "$path" = "$(canonical_root "$path")" ] || fail "non-canonical evidence root in PR-merge brief"
+        EVIDENCE_ROOTS+=("$path")
         ;;
       TREE_SHA256)
         [ "$seen_tree" -eq 0 ] || fail "duplicate TREE_SHA256 field"
@@ -326,7 +383,7 @@ verify_pr_merge() {
           absolute="$(canonical_file_follow "$root/$path")"
           case "$absolute" in "$root"/*) ;; *) fail "instruction symlink escapes root (path_hex=$(hex_encode "$path"))" ;; esac
         else
-          absolute="$(confined_file "$root" "$root/$path")"
+          absolute="$(verified_evidence_file "$root" "$path")"
         fi
         [ "$(file_size "$absolute")" = "$expected_size" ] || fail "$type size mismatch (path_hex=$(hex_encode "$path"))"
         actual="$(sha256_file "$absolute")"
@@ -342,7 +399,8 @@ verify_pr_merge() {
         role_hex="$a"; rel_hex="$b"; expected_size="$c"; expected_digest="$d"
         hex_decode "$role_hex" >/dev/null
         path="$(hex_decode "$rel_hex")"
-        absolute="$(confined_file "$root" "$root/$path")"
+        absolute="$(verified_evidence_file "$root" "$path")"
+        seen_artifact=1
         [ "$(file_size "$absolute")" = "$expected_size" ] || fail "ARTIFACT size mismatch (path_hex=$(hex_encode "$path"))"
         actual="$(sha256_file "$absolute")"
         [ "$actual" = "$expected_digest" ] || fail "ARTIFACT digest mismatch (path_hex=$(hex_encode "$path") expected=$expected_digest got=$actual)"
@@ -417,7 +475,7 @@ MODE="plan-review"
 VERIFY=""
 CONTRACT=""; PLAN=""; ROOT=""; COMMIT=""; OUT=""
 CANDIDATE=""; COMMANDS=""; ENVIRONMENT=""; LEDGER=""; DIFF_MAP=""; READER_METADATA=""
-ARTIFACT_ARGS=(); SKILL_ROOT_ARGS=()
+ARTIFACT_ARGS=(); SKILL_ROOT_ARGS=(); EVIDENCE_ROOT_ARGS=()
 RAW_ARTIFACT_COUNT=0
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -436,6 +494,7 @@ while [ $# -gt 0 ]; do
     --reader-metadata) READER_METADATA="${2:-}"; shift 2 ;;
     --artifact) ARTIFACT_ARGS+=(artifact "${2:-}" "${3:-}"); RAW_ARTIFACT_COUNT=$((RAW_ARTIFACT_COUNT + 1)); shift 3 ;;
     --skill-root) SKILL_ROOT_ARGS+=(skill-root "${2:-}"); shift 2 ;;
+    --evidence-root) EVIDENCE_ROOT_ARGS+=(evidence-root "${2:-}"); shift 2 ;;
     -h|--help) usage ;;
     *) echo "pln-build-review-brief: unknown argument '$1'" >&2; usage ;;
   esac
@@ -460,7 +519,7 @@ elif [ "$MODE" = pr-merge ]; then
   [ -n "$DIFF_MAP" ] && ARTIFACT_ARGS+=(artifact diff-map "$DIFF_MAP")
   [ -n "$READER_METADATA" ] && ARTIFACT_ARGS+=(artifact reader-metadata "$READER_METADATA")
   build_pr_merge "$CONTRACT" "$ROOT" "$CANDIDATE" "$COMMANDS" "$ENVIRONMENT" "$OUT" \
-    "${ARTIFACT_ARGS[@]}" "${SKILL_ROOT_ARGS[@]}"
+    "${ARTIFACT_ARGS[@]}" "${SKILL_ROOT_ARGS[@]}" ${EVIDENCE_ROOT_ARGS[@]+"${EVIDENCE_ROOT_ARGS[@]}"}
 else
   fail "unknown mode: $MODE"
 fi

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.114.0 — 2026-09-30
+
+### Fixed
+
+- **`/pln-pr` goes straight to shipping when every reviewer found nothing.** Plan review already skipped its merge step when all readers came back empty; PR review did not. A run whose four reviewers all returned `{"findings": []}` spent about twenty-five more minutes, and three more agents, preparing and running a merge with nothing in it. `pln-assurance merge-skip --form pr` now recognizes a PR reviewer's empty result. When every reader wrote one after the round started, `/pln-pr` writes the zero-finding review record itself and moves to shipping. Any finding, missing reader, failed reader or leftover result from an earlier round still runs the merge.
+- **`/pln-pr` works when a project keeps its plans outside the repository.** The helper that prepares the review merge refused every evidence file outside the repository (`file escapes root`). That is where a project that keeps plans in, say, `~/Documents/` puts them, along with the temporary directory reviewers write to. A run hit this and spent thirteen minutes and two agents working around it. `pln-build-review-brief` now takes `--evidence-root` for each such directory and records it in the brief. Files there get the same size, digest and symlink checks, and a file outside the repository and every declared directory is still refused.
+
 ## 1.113.0 — 2026-09-30
 
 ### Added

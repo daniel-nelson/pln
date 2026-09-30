@@ -1201,6 +1201,77 @@ if "$REPO_DIR/bin/pln-build-review-brief" --mode pr-merge \
   fail 'out-of-root artifact entered a PR-merge brief'
 fi
 has "$WORK/build-escape.err" 'escapes root' 'out-of-root artifact failure was not attributed'
+has "$WORK/build-escape.err" 'evidence-root' 'out-of-root failure did not name the --evidence-root remedy'
+
+# A plan root and worker-artifact directory outside the repository are the
+# ordinary layout when a project keeps its plans elsewhere. Declared with
+# --evidence-root, their files enter the brief by absolute path and get the
+# same size, digest and symlink checks; undeclared, they still escape.
+external_plan="$WORK/external-plan"
+external_artifacts="$WORK/external-artifacts"
+mkdir -p "$external_plan/evidence" "$external_artifacts/evidence"
+printf 'commands\n' > "$external_plan/evidence/review.commands"
+printf 'environment\n' > "$external_plan/evidence/review.environment"
+printf 'ledger\n' > "$external_plan/REVIEW.md"
+printf 'diff map\n' > "$external_plan/evidence/diff-files.txt"
+printf 'broad\tsuccess\n' > "$external_plan/evidence/pr-review-readers.tsv"
+printf '{"findings": []}\n' > "$external_artifacts/evidence/pr-review-broad.json"
+external_candidate="$("$REPO_DIR/bin/pln-assurance" fingerprint \
+  --root "$merge_repo" --commands "$external_plan/evidence/review.commands" \
+  --environment "$external_plan/evidence/review.environment" \
+  | awk -F= '$1 == "CANDIDATE_SHA256" { print $2 }')"
+external_args=(--mode pr-merge
+  --contract "$merge_repo/merge-contract.md" --root "$merge_repo"
+  --candidate "$external_candidate"
+  --commands "$external_plan/evidence/review.commands"
+  --environment "$external_plan/evidence/review.environment"
+  --ledger "$external_plan/REVIEW.md"
+  --diff-map "$external_plan/evidence/diff-files.txt"
+  --reader-metadata "$external_plan/evidence/pr-review-readers.tsv"
+  --artifact broad "$external_artifacts/evidence/pr-review-broad.json"
+  --skill-root "$merge_repo/skills")
+if "$REPO_DIR/bin/pln-build-review-brief" "${external_args[@]}" \
+  --out "$WORK/external-undeclared.brief" >/dev/null 2>"$WORK/external-undeclared.err"; then
+  fail 'external evidence entered a PR-merge brief without --evidence-root'
+fi
+has "$WORK/external-undeclared.err" 'escapes root' 'undeclared external evidence was not attributed'
+if "$REPO_DIR/bin/pln-build-review-brief" "${external_args[@]}" \
+  --evidence-root "$external_plan" \
+  --out "$WORK/external-partial.brief" >/dev/null 2>"$WORK/external-partial.err"; then
+  fail 'an artifact outside every declared evidence root entered a PR-merge brief'
+fi
+external_brief="$WORK/external.brief"
+"$REPO_DIR/bin/pln-build-review-brief" "${external_args[@]}" \
+  --evidence-root "$external_plan" --evidence-root "$external_artifacts" \
+  --out "$external_brief" >/dev/null 2>"$WORK/external.err" \
+  || fail "PR-merge brief with declared external evidence roots was not built: $(cat "$WORK/external.err")"
+[ "$(grep -c '^EVIDENCE_ROOT	' "$external_brief")" -eq 2 ] \
+  || fail 'PR-merge brief did not record both evidence roots'
+"$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$external_brief" \
+  | grep -q '^STATUS=verified$' || fail 'PR-merge context with external evidence did not verify'
+cp "$external_artifacts/evidence/pr-review-broad.json" "$WORK/external-reader.backup"
+printf '{"findingz": []}\n' > "$external_artifacts/evidence/pr-review-broad.json"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$external_brief" \
+  >/dev/null 2>"$WORK/external-digest.err"; then
+  fail 'replaced external artifact verified'
+fi
+has "$WORK/external-digest.err" 'ARTIFACT digest mismatch' 'external artifact replacement was not attributed'
+rm "$external_artifacts/evidence/pr-review-broad.json"
+ln -s "$WORK/external-reader.backup" "$external_artifacts/evidence/pr-review-broad.json"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$external_brief" \
+  >/dev/null 2>"$WORK/external-link.err"; then
+  fail 'symlinked external artifact verified'
+fi
+has "$WORK/external-link.err" 'symlink file is not allowed' 'external symlink replacement was not rejected'
+rm "$external_artifacts/evidence/pr-review-broad.json"
+cp "$WORK/external-reader.backup" "$external_artifacts/evidence/pr-review-broad.json"
+external_root_hex="$(cd "$external_artifacts" && pwd -P | tr -d '\n' | od -An -v -tx1 | tr -d ' \n')"
+grep -v "^EVIDENCE_ROOT	$external_root_hex\$" "$external_brief" > "$WORK/external-forged.brief"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$WORK/external-forged.brief" \
+  >/dev/null 2>"$WORK/external-forged.err"; then
+  fail 'absolute evidence path outside every recorded evidence root verified'
+fi
+has "$WORK/external-forged.err" 'escapes root' 'forged absolute evidence path was not attributed'
 
 dd if=/dev/zero bs=1024 count=66 2>/dev/null | tr '\0' c > "$merge_repo/huge-contract.md"
 large_candidate="$("$REPO_DIR/bin/pln-assurance" fingerprint \

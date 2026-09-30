@@ -28,6 +28,8 @@ Every reviewer this skill spawns is the same model as the orchestrator spawning 
 
 ### Step 3. Risk-calibrated review roster
 
+**Mark the round's start before its first reader.** Run `date -u > "<plan-dir>/evidence/pr-review.round-start"` before dispatching the broad reviewer; the merge skip below counts only artifacts newer than it.
+
 **Start the classifier beside the broad reviewer when scope-baseline left `Risk tier` empty.** Spawn `src/workers/assurance-classification.md` (the diff maps and `DIFF_STATS` from `review-diff.identity`) and the broad reviewer together: the broad reviewer is in every tier's roster, so nothing about it waits on the tier, and its brief binds it to the ledger's diff base, reviewed-diff SHA-256 and tree fingerprint like every reader. Validate the classifier with `bin/pln-assurance classify` and persist the tier and signals; then validate the roster and dispatch its remaining slots — the broad slot is the reader already running, never a second one. A run resumed in this phase with `Risk tier` still empty does the same, spawning the broad reviewer again only when its raw artifact is absent or empty.
 
 Otherwise the R1/R2/R3 classification is the one scope-baseline persisted. Either way, validate the roster with `bin/pln-assurance roster`; the tiers and the readers each one calls for are the assurance policy's, above. `DIFF_LINES` may raise routine work to R2 at the provisional threshold but never reduces the roster; the fewer-than-30-lines shortcut is removed.
@@ -97,6 +99,17 @@ a lens or adversarial agent that completed, a `codex review` pass that came back
 <!-- pln:endonly -->
 If none succeeded, you have no coverage, not a clean bill of health. Do not write an empty `REVIEW.md` and do not proceed to the PR. Stop, say plainly that the review could not run, and let the user retry or review manually. An empty *merged findings* set is only "clean" when it comes from reviewers that ran and found nothing.
 
+**Skip the merge when every reader found nothing.** Ask first, without opening a single artifact:
+
+```bash
+"$PLN_BIN/pln-assurance" merge-skip --form pr \
+  --roles <every reader this round ran, comma-separated> \
+  --since "<plan-dir>/evidence/pr-review.round-start" \
+  --artifact <role>=<raw artifact path>   # once per reader that returned one
+```
+
+The roles are the second column of `pln-assurance roster`'s `SLOT` lines this round actually ran (only `broad` under `Review depth: broad`), with the peer in the slot it filled. `SKIP_MERGE=yes` means every one of them wrote, after the round began, exactly `{"findings": []}`. Then build no merge brief, take no dirty snapshot, and spawn no merge worker: stage the next-generation ledger yourself, with the persisted risk tier, role coverage naming each reader that ran and its actual route, verified/unverified/disproved counts of zero, `Constraints judged` equal to the `Owner constraints` entry count (`none stated` is zero), and no findings; set `Review status` and `Phase: ship-watch`, and publish it through `{{OUTPUT_ROOT}}/bin/pln-publish-review`. Any other output, a usage error included, keeps the merge below. Observed without this: four R3 readers returned empty arrays, and the run spent another twenty-five minutes and three agents preparing and running a merge that had nothing to merge.
+
 Never open a reviewer or peer result in coordinator context. Write fixed success/failure metadata and raw artifact paths to `<plan-dir>/evidence/pr-review-readers.tsv`, then use `pln-build-review-brief --mode pr-merge` to assemble `<plan-dir>/evidence/pr-review-merge.brief`. Pass the merge-worker contract first; repository root; the exact candidate hash plus `review.commands` and `review.environment`; `PLAN.md` when present; `REVIEW.md`; the diff map; reader metadata; one role/path pair per raw artifact; and each active host skill-catalog root. The helper inventories every repository `AGENTS.md`/`CLAUDE.md` regardless of Git ignore state while excluding `.git`, plus every `SKILL.md` below the recorded roots; hex-encodes branch-controlled strings; records path/size/digest metadata without copying optional prose; and refuses a brief over 65536 bytes. Its ordinary plan-review mode remains a separate byte-compatible interface.
 
 ```bash
@@ -110,10 +123,11 @@ Never open a reviewer or peer result in coordinator context. Write fixed success
   --reader-metadata "<plan-dir>/evidence/pr-review-readers.tsv" \
   --artifact "<reader-role>" "<raw-artifact>" \
   --skill-root "$(dirname "{{SKILL_DIR}}")" \
+  --evidence-root "<Plan root>" --evidence-root "<Worker artifacts>" \
   --out "<plan-dir>/evidence/pr-review-merge.brief"
 ```
 
-Repeat `--artifact` for every reader and `--skill-root` for any additional active host catalog. Omit `--plan` only for a standalone run with no plan; every other named file is required. If an instruction or skill manifest exceeds the helper's deterministic count bound, stop for a narrower mechanically complete catalog or explicit bounded rediscovery; never silently truncate it.
+Repeat `--artifact` for every reader and `--skill-root` for any additional active host catalog. The two `--evidence-root` values are the ledger's `Plan root` and `Worker artifacts`; the helper refuses any evidence file outside the repository and those roots, so a plan kept outside the repository needs them. Omit `--plan` only for a standalone run with no plan; every other named file is required. If an instruction or skill manifest exceeds the helper's deterministic count bound, stop for a narrower mechanically complete catalog or explicit bounded rediscovery; never silently truncate it.
 
 Before spawning the merge worker, in git, run `{{SKILL_DIR}}/bin/pln-scheduler snapshot --repo <repository-root> --out <plan-dir>/fix-dirty-start.tsv` (outside git, write a header-only snapshot); that snapshot is the one the fix phase's manifest starts from. Spawn one fresh `judgment`-profile merge worker under `{{SKILL_DIR}}/src/workers/pr-review-merge.md` on that prepared brief, plus `<plan-dir>/evidence/pr-review-merge.md`, `<plan-dir>/evidence/REVIEW.g<next-generation>.next.md`, `<plan-dir>/results/pr-review-merge.txt`, the dirty snapshot `<plan-dir>/fix-dirty-start.tsv` and the node output path `<plan-dir>/fix-nodes.tsv` as its one other allowed write, routing attribution, and a 4096-byte budget. Tell it the current Run identity and next Ledger generation. The brief is the primary context inventory instead of an ad hoc list of pointers. The worker must verify it with `pln-build-review-brief --verify-pr-merge` before and after parsing artifacts; failed candidate, path, symlink, size, digest, instruction-manifest, or skill-manifest verification is failed coverage, never a clean reader. The worker still reads applicable instructions and mandatory skills, reopens cited source, reruns reproductions, traces production reachability, and confirms shipped consequences independently.
 

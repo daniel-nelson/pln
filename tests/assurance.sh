@@ -133,6 +133,37 @@ done
 if "$ASSURANCE" merge-skip --roles broad --since "$SKIP_DIR/no-marker" --artifact "broad=$SKIP_DIR/broad.md" >/dev/null 2>&1; then
   fail 'merge-skip ran without a round-start marker'
 fi
+
+# A PR review round's readers write {"findings": [...]}; --form pr skips the
+# merge only when every one wrote the empty array, in whatever whitespace. A
+# plan-form line is not a PR reader's empty result, and neither is the reverse.
+pr_artifact() { printf '%s' "$2" > "$SKIP_DIR/$1"; touch -t 202609220930 "$SKIP_DIR/$1"; }
+pr_artifact pr-broad.json $'{"findings": []}\n'
+pr_artifact pr-peer.json $'{\n  "findings" : [ ]\n}\n'
+out="$(skip --form pr --roles broad,adversarial --artifact "broad=$SKIP_DIR/pr-broad.json" \
+  --artifact "adversarial=$SKIP_DIR/pr-peer.json")"
+has_line "$out" 'SKIP_MERGE=yes' 'an all-empty fresh PR roster still ran the merge'
+out="$(skip --form pr --roles broad --artifact "broad=$SKIP_DIR/broad.md")"
+has_line "$out" 'REASON=broad:not-empty' 'a plan-form line counted as an empty PR result'
+out="$(skip --roles broad --artifact "broad=$SKIP_DIR/pr-broad.json")"
+has_line "$out" 'REASON=broad:not-empty' 'an empty PR result counted as a plan-form line'
+pr_artifact pr-peer.json '{"findings":[{"file":"a.ts","line":1}]}'
+out="$(skip --form pr --roles broad,adversarial --artifact "broad=$SKIP_DIR/pr-broad.json" \
+  --artifact "adversarial=$SKIP_DIR/pr-peer.json")"
+has_line "$out" 'REASON=adversarial:not-empty' 'a PR reader with a finding skipped the merge'
+case "$out" in *'a.ts'*) fail 'merge-skip printed PR finding text' ;; esac
+pr_artifact pr-peer.json '{"findings":[]} {"findings":[]}'
+out="$(skip --form pr --roles adversarial,broad --artifact "broad=$SKIP_DIR/pr-broad.json" \
+  --artifact "adversarial=$SKIP_DIR/pr-peer.json")"
+has_line "$out" 'REASON=adversarial:not-empty' 'a doubled empty object counted as one'
+pr_artifact pr-peer.json '{"findings":[]}'
+touch -t 202609220800 "$SKIP_DIR/pr-peer.json"
+out="$(skip --form pr --roles broad,adversarial --artifact "broad=$SKIP_DIR/pr-broad.json" \
+  --artifact "adversarial=$SKIP_DIR/pr-peer.json")"
+has_line "$out" 'REASON=adversarial:stale' 'a PR artifact from an earlier round skipped the merge'
+if skip --form json --roles broad --artifact "broad=$SKIP_DIR/pr-broad.json" >/dev/null 2>&1; then
+  fail 'merge-skip accepted an unknown --form'
+fi
 rm -rf "$SKIP_DIR"
 trap - EXIT
 

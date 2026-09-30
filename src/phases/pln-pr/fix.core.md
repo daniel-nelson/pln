@@ -91,6 +91,7 @@ Never open that reviewer output inline. The post-fix merge gets the first merge'
   --reader-metadata "<plan-dir>/evidence/post-fix-readers.tsv" \
   --artifact post-fix-red-team "<plan-dir>/evidence/post-fix-red-team.json" \
   --skill-root "$(dirname "{{SKILL_DIR}}")" \
+  --evidence-root "<Plan root>" --evidence-root "<Worker artifacts>" \
   --out "<plan-dir>/evidence/post-fix-merge.brief"
 ```
 

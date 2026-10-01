@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.117.0 — 2026-10-01
+
+### Changed
+
+- **`/pln` maps the domain facts a task depends on before planning it.** A domain fact is a question about the product's own data, such as whether a booking is confirmed. Pre-flight research now lists each one the task reads, shows or changes, every place in the code that already answers it in every layer, the data underneath it, and a state in which two answers disagree. The plan keeps this as `## Domain facts`, below the dashboard, where the workers read it; the user isn't shown it. When a fact has no owner, or has answers that can disagree, the outline opens with an item that makes one place answer it. A term the interview introduces gets the same search before it's adopted, and defining a fact differently from its existing owner is a question for the user. Observed without this: a plan defined "booked" from one field while the code answered it from another, and the shipped page showed "Booked" beside a button offering to book. In a replay of that run's pre-flight, two runs each, the new step produced the facts table and flagged the unowned facts in both runs; without it, neither run did.
+- **Plan review can no longer decide what a fact means.** The plan reviewer checks each item against the owner of every fact it reads. The merge flags for the user, rather than repairs, any edit that defines a fact or changes its owner. The definition behind the observed bug was written by exactly such a repair.
+- **Implementation reads each fact through its recorded owner.** An item worker that needs a fact the plan doesn't list stops with a blocker instead of writing a second answer. Its result names the owner it read each fact through, and the checkpoint compares that with the plan. This replaces the self-reported "added / reused / retained duplication" lines, which nothing checked.
+- **In PR review, a second answer is a defect, not a preference.** The broad reviewer searches every layer for other answers to each fact the diff computes. When one can disagree with the new code in a reachable state, the finding names what each shows there, and the merge no longer drops it as a matter of arrangement. In a replay of a 188-file review, two runs each, this moved 4 of 13 findings onto such disagreements, against none of 16 without it. Neither version found the specific pair that review had missed, which is why the planning change carries the weight.
+- **The user chooses between rebuilding and adapting.** The fix phase no longer defaults to the smallest repair for a second answer, because the smallest repair usually keeps both answers. It asks one question with two options, each described by the code that would survive it rather than by lines changed. Adapt repairs the branch in place. Rebuild reverts the commits built on the second answer and redoes that work on the one owner. A timeout selects adapt, never rebuild.
+- **A repeat fix is traced to where the value is written.** Pre-flight lists the last 60 days of fixes to the same code. When an item corrects a value where it is read, or the same code was fixed recently, research finds the code that writes the value before a fix is proposed.
+
 ## 1.116.0 — 2026-10-01
 
 ### Fixed

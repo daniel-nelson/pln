@@ -65,7 +65,7 @@ Before producing the initial plan:
    - **When the root came from the project's own instructions**, by either route above, and they named a *file*, offer once, in a message of its own, to migrate what is in that file into the to-do list. The helper's `NOTE=` names that file when it resolved the root itself; under the other route you already read it. That is judgment work rather than parsing — what is one item, and what has gone stale — so it runs as ordinary agent work against the format below, with nothing to parse it and no subcommand that reads it. The file is read and never written: not rewritten in place, not appended to, not moved, whatever the answer and whatever gets migrated out of it. Either answer is recorded with `pln-todo init --migration-offered`; a declined offer is not re-asked. Skip the offer when `MIGRATION_OFFERED` already carries a date, and when the instructions named a directory, where there is nothing to migrate.
    - **`TRACKER_QUESTION=owed`, and this session has tools for a ticket tracker** — ask whether the to-do list should sync to it, in a message of its own after any location question, and follow the setup in `{{OUTPUT_ROOT}}/bin/pln-todo tracker --guide`. With no tracker tools, or in delegated mode, ask nothing and record nothing. `declared` and `answered` ask nothing.
    - **`DECLARED_TODO` names a path and the to-do list resolved somewhere else** — the project's own `pln/` or the shared git directory won, as they always do, and the instruction leg was never reached. The declaration is still an answer to a different question: make the same migration offer, on the same terms, for the file it names. Nothing moves the to-do list — a location answered once is not re-asked, and the offer is about lifting what is in that file into the to-do list where it already sits. Without this, a project that answered "the shared git directory" could never be offered a to-do file it declared afterwards, because the earlier leg resolves on every later call.
-6. **Merge pre-flight when it lands.** On the first turn with no question open after its envelope validates, fill Pre-flight findings from it with mandated rules, persistent TODOs, relevant repository shape and current behavior, likely touchpoints, verification commands, and git state, then append a `--status merged` row for it to `routing.tsv`. The merge amends only those worker-derived fields: the request and source-document lines are the coordinator's, written by Step 2, and are never rewritten by it. Without an enumerated skeleton, await pre-flight and merge it before Step 2. With one, it may still be running at the checkpoint; a pre-flight not merged when the user answers the checkpoint is merged by the interview, not here, so this phase's writes are finished and the transition is not held. If verification remains ambiguous after a merge made here, ask the user once, before the checkpoint, and retain the answer for this repository; after a merge the interview makes, that question is held until the walk ends, as the interview says.
+6. **Merge pre-flight when it lands.** On the first turn with no question open after its envelope validates, fill Pre-flight findings from it with mandated rules, persistent TODOs, relevant repository shape and current behavior, likely touchpoints, verification commands, git state, and its `PRIOR_FIXES` lines; write its `FACTS:` lines into `## Domain facts`; then append a `--status merged` row for it to `routing.tsv`. The merge amends only those worker-derived fields: the request and source-document lines are the coordinator's, written by Step 2, and are never rewritten by it. Without an enumerated skeleton, await pre-flight and merge it before Step 2. With one, it may still be running at the checkpoint; a pre-flight not merged when the user answers the checkpoint is merged by the interview, not here, so this phase's writes are finished and the transition is not held. If verification remains ambiguous after a merge made here, ask the user once, before the checkpoint, and retain the answer for this repository; after a merge the interview makes, that question is held until the walk ends, as the interview says.
 
 The coordinator does not go exploring in this step: no manifests, memories, documentation trees, git history, nested instruction files, or source code. The exception is the root instruction file that governs the coordinator's own conduct — `CLAUDE.md`, `AGENTS.md`, and whatever they require be read before work begins. A host that injects those has already supplied them; a host that does not leaves the coordinator to read them, and a repository whose `AGENTS.md` says "read `CLAUDE.md` in full before doing any work here" is owed that. Forbidding it outright only produced a rule the model correctly broke. What is out of bounds is reading *further* on the strength of what it found there — that is the worker's job. If pre-flight evidence is incomplete, send a narrow follow-up worker across the same firewall instead of exploring inline.
 
@@ -101,6 +101,7 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 - Request: <the invocation's own words, verbatim; written with the skeleton, before any item worker is dispatched>
 - Source document: <who wrote it, and whether its solutions are settled or open — the Step 1 answer, when the run started from a document>
 - Verification commands: `pnpm build:spec`, `pnpm lint`, `pnpm uspec`, `pnpm fspec`
+- Prior fixes to the same code: <pre-flight's `PRIOR_FIXES` lines, or none>
 
 ## Open questions
 
@@ -136,6 +137,10 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 
 ---
 
+## Domain facts
+
+- (filled from pre-flight's `FACTS:` block; grows during the interview)
+
 ## Item details
 
 ### 1. <item title>
@@ -156,6 +161,8 @@ Status legend: ⬜ pending · 🟦 in progress · ✅ done · ⏸ deferred · �
 Rows are never removed and numbers are never reused. An item that is dropped or deferred keeps its row and its number, with its status trailing; deleting it would shift every number after it and stale every reference already written down or already spoken.
 
 Items in the dashboard are one-line summaries. Detail sections are stub-brief at this point; they fill in during the interview and the per-item loop with Decisions, Commit, Open questions, Discoveries, Dead ends, Artifacts as the work unfolds.
+
+**A `foundation` fact an item reads becomes the first item.** When `## Domain facts` marks a fact `foundation` — nothing owns it, or its answers can disagree — and an item will read it, the outline opens with an item that makes one place answer it and moves the other answers onto that place, unless an item already does. Write it in the user's words ("Make one place decide whether a booking is confirmed"), not as a refactor. Consolidating a fact the task reads is part of the task, not unrelated cleanup. `## Domain facts` sits below the dashboard because it is for the workers: the checkpoint does not show it, and it reaches the user only through that item and the interview's questions. A `foundation` fact that arrives after the user confirmed the outline is an interview question instead, since the outline they confirmed is not reshaped without them.
 
 This checkpoint is the user's scope-editing surface: a chapter-outline view for understanding the whole shape and removing, adding, renaming, or reordering items while those changes are still cheap, before entering item-level discussion. It is distinct from Step 4's approval of the fully resolved plan before implementation.
 
@@ -201,6 +208,8 @@ Top-of-file dashboard carries:
 - **Verification** — pass/fail per command at task end.
 - **Spinoffs** — links to any spinoff plan files.
 - **Cross-item notes** — one line per fact more than one item turns on: a discovery a completed item makes that a later item needs (a constant to reuse, a field that changed, a trap not to repeat), and an interaction between items (a precedence order, a substitution several items make). An interaction is recorded here, not described inside each item — a subagent reads its own item and the dashboard, so two half-descriptions in two sections never get reconciled by anyone. Only what another item would get wrong without it, not every cross-reference: this is part of the dashboard every subagent already reads in full regardless of plan size, and it stays cheap only while it stays bounded.
+
+Below the dashboard, before the item sections, **Domain facts** carries one line per question about stored data that the task reads, shows, decides, or changes: the question, the owner `file:line` the plan reads it through or `foundation`, the other places that answer it, and a state in which they disagree. Pre-flight fills it and the interview adds to it. Research, plan review, implementation, and `{{PLN_PR_CMD}}`'s broad reviewer read it.
 
 Per-item detail sections carry:
 

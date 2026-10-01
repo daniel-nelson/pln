@@ -85,7 +85,13 @@ has "$implementation" 'Never edit `PLAN.md`, `REVIEW.md`, the run manifest' \
 has "$implementation" 'equally capable smaller route' \
   'implementation worker no longer prefers coherent reuse over parallel ownership'
 has "$implementation" 'Surface balance:' \
-  'implementation results lost their qualitative surface balance'
+  'implementation results lost their surface balance'
+has "$implementation" '- Facts read:' \
+  'implementation results no longer name the owner each domain fact is read through'
+hasnt "$implementation" '- Added: <new durable surface' \
+  'implementation results still carry the unchecked self-reported surface lines'
+has "$implementation" 'is a blocker, not a second answer written beside the first' \
+  'implementation worker may write a second answer to a recorded domain fact'
 has "$implementation" 'Retained behavior:' \
   'implementation surface balance no longer names retained-behavior evidence'
 has "$implementation" 'behavior-preservation.md' \
@@ -338,6 +344,29 @@ has "$preflight" '8192-byte envelope budget' 'pre-flight contract lost its budge
 hasnt "$preflight" 'plan_corpus' 'pre-flight contract still reads the removed plan_corpus key'
 hasnt "$preflight" 'prior decision records' 'pre-flight contract still locates records for the removed check'
 has "$preflight" 'current git branch and status' 'pre-flight contract lost git-state discovery'
+# Domain facts: every place that already answers a question the task reads is
+# found before anything is planned, and the plan reads each fact through one owner.
+has "$preflight" 'Map the domain facts the task depends on' 'pre-flight no longer maps domain facts'
+has "$preflight" 'in every layer — backend, frontend, background jobs, emails, scripts' \
+  'pre-flight fact search no longer crosses layers'
+has "$preflight" 'give a concrete state in which they disagree' \
+  'pre-flight no longer constructs the state where two answers disagree'
+has "$preflight" '`FACTS:`' 'pre-flight envelope lost its FACTS block'
+has "$preflight" 'List recent fixes to the same code' 'pre-flight no longer lists recent fixes'
+has "$preflight" '`PRIOR_FIXES:`' 'pre-flight envelope lost its PRIOR_FIXES block'
+has "$REPO_DIR/src/workers/interview-research.md" 'So is `Facts:`' 'item research envelope lost its Facts field'
+has "$REPO_DIR/src/workers/interview-research.md" 'trace the value to the code that writes it' \
+  'item research lets a repeat fix patch where a value is read'
+has "$REPO_DIR/src/workers/interview-research.md" 'consolidating a fact the item reads is not unrelated' \
+  'item research treats consolidating a fact the item reads as unrelated cleanup'
+has "$review" 'Check every item that reads or defines a fact in `## Domain facts`' \
+  'plan review no longer checks items against domain-fact owners'
+has "$merge" 'A repair never decides what a domain fact means' \
+  'plan-review merge may define a domain fact without the user'
+has "$REPO_DIR/src/workers/pr-review-merge.md" 'A second answer is never a preference' \
+  'PR merge may drop a second answer to a domain fact as a preference'
+has "$REPO_DIR/src/workers/pr-review-merge.md" 'second_answer: yes' \
+  'PR merge no longer marks second answers for the rebuild-or-adapt question'
 
 interview="$REPO_DIR/src/workers/interview-research.md"
 has "$interview" '## Item mode' 'interview contract lost item research mode'
@@ -554,8 +583,23 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln/review-approval.md" 'src/workers/plan-review-merge.md' "$host review phase does not reference review merge contract"
   has "$WORK/$host/phases/pln/implementation.md" 'src/workers/item-implementation.md' "$host implementation phase does not reference implementation contract"
   has "$WORK/$host/phases/pln/implementation.md" 'src/workers/execution-schedule.md' "$host implementation phase does not reference scheduling contract"
-  has "$WORK/$host/phases/pln/implementation.md" 'qualitative surface balance' \
-    "$host coordinator no longer validates implementation surface balance"
+  has "$WORK/$host/phases/pln/implementation.md" 'Compare every `Facts read` line with `## Domain facts`' \
+    "$host coordinator no longer checks the owner each domain fact is read through"
+  has "$WORK/$host/phases/pln/outline.md" '## Domain facts' "$host plan skeleton lost its Domain facts section"
+  has "$WORK/$host/phases/pln/outline.md" 'becomes the first item' \
+    "$host outline no longer opens with the foundation item for an unowned fact"
+  has "$WORK/$host/phases/pln/outline.md" 'the checkpoint does not show it' \
+    "$host outline shows the workers' Domain facts section to the user"
+  has "$WORK/$host/phases/pln/interview.md" 'An approach that reads or defines a domain fact names its owner' \
+    "$host interview no longer routes a new definition of a domain fact to the user"
+  has "$WORK/$host/phases/pln-pr/review.md" 'Every domain fact the diff newly computes is checked against every other answer to it' \
+    "$host PR review no longer searches for other answers to a fact the diff computes"
+  has "$WORK/$host/phases/pln-pr/review.md" 'A second answer to a question the repository already answers' \
+    "$host reviewers may mark a disagreeing second answer as an arrangement"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'rebuild-or-adapt question' \
+    "$host fix phase lost the rebuild-or-adapt question"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'A timeout selects adapt, never rebuild' \
+    "$host fix phase may rebuild on a timeout"
   has "$WORK/$host/phases/pln/implementation.md" 'retained behavior' \
     "$host coordinator no longer validates retained-behavior evidence"
   has "$WORK/$host/phases/pln/implementation.md" 'adopted system-fit outcome' \

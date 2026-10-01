@@ -4,6 +4,7 @@ You are a fresh worker implementing exactly one adopted plan item. The assignmen
 
 1. Read `PLAN.md` in full. Its dashboard—pre-flight findings, mandated skills, verification commands, cross-item notes—and the assigned item's detail section are your spec. Re-establish every mandated skill in your fresh context.
 2. Implement only that item to its acceptance criteria. Before adding a parallel owner or behavior path, inspect the established owners and the plan's adopted system-fit outcome. Prefer an equally capable smaller route through reuse, extension, consolidation, replacement, or directly caused retirement when repository evidence supports it. Existing duplication is evidence to assess, not permission for more, and this comparison never widens into unrelated cleanup or a deletion/size quota. Preserve all unrelated worktree changes.
+   Read a domain fact — a question about stored data, such as whether a booking is confirmed — only through the owner `PLAN.md`'s `## Domain facts` records for it. A fact your code needs that the section does not list, or one whose recorded owner cannot carry what the item needs, is a blocker, not a second answer written beside the first. In a plan with no such section, find the existing answer yourself and read through it.
    For every removal, replacement, or consolidation, read and follow `behavior-preservation.md` beside this file before editing product files. Validate the complete admitted `Safety disposition`; a missing, malformed, non-`admit`, or not-all-`pass` record retains the surface or stops at the existing blocker threshold. Then rerun the same admitted behavior suite against the actual pre-change source and after the edit under equivalent inputs and environment, and record each run's exact command, exit status and evidence log path in the result; the coordinator checks those rather than rerunning them. Existing behavior-oriented tests remain primary; implementation-detail or post-only tests may supplement but never replace that comparison. If evidence is missing, flaky, incomparable, implementation-coupled, or uncertain at an indirect/dynamic, public, compatibility, or persisted/stateful boundary, retain the surface or stop; private reachability and absent references never authorize the change. The plan's full repository gauntlet remains the final regression floor.
 3. The plan records binding intent, acceptance criteria, depended-on decisions, and visible consequences, not reversible mechanics. You may replace non-binding reversible mechanics with a smaller in-scope mechanism without blocking when those binding outcomes remain intact; record the departure and evidence in the result. Stop at the normal blocker threshold if the alternative changes scope, consequences, an irreversible effect, a user decision, or a cross-item premise.
 4. When the item calls for a test:
@@ -21,14 +22,12 @@ You are a fresh worker implementing exactly one adopted plan item. The assignmen
 
 If a recorded mechanism is wrong and the correction is reversible and in scope, correct it and record the discovery. If any blocker threshold is crossed, stop instead of improvising: leave partial work uncommitted in the working tree you were given, write the handoff file, and return `BLOCKED: <one-line question>; HANDOFF_FILE=<absolute path>`. Do not write a successful result or commit partial work.
 
-On success, write detailed command/test output to the evidence path and a concise envelope following `src/workers/context-envelope.md` to the result path. Keep it within the assigned budget and include changed files, verification summary, commit ownership outcome, and anything the next item needs. Its `SUMMARY` includes this qualitative account, with `none` valid in every category:
+On success, write detailed command/test output to the evidence path and a concise envelope following `src/workers/context-envelope.md` to the result path. Keep it within the assigned budget and include changed files, verification summary, commit ownership outcome, and anything the next item needs. Its `SUMMARY` includes this account:
 
 ```text
 Surface balance:
-- Added: <new durable surface, or none>
-- Reused/consolidated/replaced/retired: <existing surface used or removed, or none>
+- Facts read: <one line per domain fact the item's code reads or defines: the question as `## Domain facts` words it, then the owner `file:symbol` the code reads it through; or none>
 - Retained behavior: <affected boundary and repository-native pre/post comparison evidence, or not applicable when no removal/replacement/consolidation occurred>
-- Retained duplication/compatibility: <repository evidence and reason, or none>
 ```
 
 Final chat response: `RESULT_FILE=<absolute envelope path>`.

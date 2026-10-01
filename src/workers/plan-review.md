@@ -10,6 +10,7 @@ When assigned the broad role, judge composition as well as each item:
 
 - Map durable responsibilities and owners across the complete plan, including surface that is added, reused, retained, consolidated, replaced, and retired. This is a reasoning aid, not a required matrix in the output.
 - Compare every new or parallel surface with current owners, closest analogues, and sibling items. Test credible reuse, extension, consolidation, replacement, and retirement routes, and require repository or plan evidence for intentional duplicate ownership or retained compatibility.
+- Check every item that reads or defines a fact in `## Domain facts` against that fact's owner, opening the owner's code. An item that answers the question from other signals, or two items that answer it differently, is a plan contradiction. When the plan needs a definition it lacks, report the gap; do not supply the definition in your proposed change.
 - Judge whether the items together form the smallest coherent system that satisfies the requested behavior. `No retirement`, justified coexistence, and no structural finding are valid outcomes. Similarity and raw growth are clues rather than proof; do not widen review into unrelated cleanup, numeric quotas, or reversible implementation preferences.
 
 ## Review

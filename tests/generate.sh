@@ -405,6 +405,14 @@ has "$real_c/phases/pln/implementation.md" 'commit owner: coordinator' \
   "the claude build lost coordinator-owned item checkpoints"
 has "$real_x/phases/pln/implementation.md" 'commit owner: coordinator' \
   "the codex build lost coordinator-owned item commits"
+# A worker's doubt has a reader: the checkpoint records what was done about it
+# before the item commits, rather than reading STATUS: complete as a pass.
+for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
+  has "$f" 'A doubt in a validated result is settled before its item checkpoints' \
+    "$f commits an item whose worker reported a doubt without settling it"
+  has "$f" 'A doubt about whether the item'"'"'s own acceptance criteria hold is resolved or asked, never filed' \
+    "$f lets a doubt about the item's own criteria be filed away"
+done
 
 # Native orchestration contracts are deliberately tested by current surface,
 # not by historical feature flags or tool names. Claude's sequential item loop
@@ -882,6 +890,8 @@ for host_out in "$real_c" "$real_x"; do
   # from recorded facts rather than the owner's words, in the interview and at
   # a gate strike. The review-approval phase loads only its own file, so the
   # gate carries the whole rule, walk included.
+  has "$interview_file" 'An option the research doubted carries the doubt' \
+    "$interview_file offers an option without the doubt its research recorded"
   has "$interview_file" 'An accepted risk is written down beside the code' \
     "$interview_file lost the accepted-risk comment rule"
   has "$interview_file" 'is an acceptable tradeoff for' \
@@ -1022,6 +1032,16 @@ for host_out in "$real_c" "$real_x"; do
     "$ship_file lost the targeted-run rule in concrete terms"
   hasnt "$ship_file" 'not exactly subsumed by the required CI checks before pushing' \
     "$ship_file kept the subsumption bar that never fired"
+  # A local check that fails for a reason that is not the code does not hold
+  # the PR when CI will run, and the owner's "just open it" ends local checks.
+  has "$ship_file" 'If it fails, find out whether the failure is about the code before deciding the branch does not ship' \
+    "$ship_file stops a PR on a local failure without asking whether it is about the code"
+  has "$ship_file" 'The owner can open the PR without the local checks' \
+    "$ship_file re-runs local checks after the owner said to open the PR"
+  has "$ship_file" 'It also runs for any PR this run created or updated whose `Local verification` is not `passed`' \
+    "$ship_file opens an unverified PR without watching its CI"
+  has "$scope_file" 'Local verification' \
+    "$scope_file does not list Local verification among the ledger's state"
   review_file="$host_out/phases/pln/review-approval.md"
   # A bounded re-review bounds its roster too: the tier is a property of the
   # plan, but a round's readers come from what the rewritten items carry.

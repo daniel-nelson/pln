@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.118.0 — 2026-10-01
+
+### Changed
+
+- **`/pln` acts on a worker's doubt before committing its item.** Item workers already report `UNCERTAINTY` and `COUNTEREVIDENCE`, and nothing read them. Anything other than `none` there now gets a `Doubt:` line in the item's section before the checkpoint commit, saying whether it was resolved by a further run, filed to the to-do list, or asked. A doubt about the item's own acceptance criteria cannot be filed. In one run, a worker noted that live Redis calls were untested, the item was committed anyway, and the command turned out never to have worked.
+- **An interview option carries the doubt its research recorded.** When an item's research is unsure whether an option is available, what it costs or whether it works, that option's line says so. In one run, the research flagged a model as possibly unavailable to the account, the question left that out, and the user chose it. Re-tuning on another model after the merge took about three hours.
+- **`/pln-pr` doesn't hold a PR back on a local check that failed for a reason other than the code.** A failed final check is classified first, the same way a red CI check is. When the failure isn't in the code and CI will run on the branch, the PR opens, its description says which local check could not run, and the run watches CI. With no CI, the run stops and asks. Two small PRs last week stopped on "Too many open files" and on a temporary checkout's fingerprint, and both passed CI once opened.
+- **"Just open the PR" ends the local checks.** That instruction, or any request to open the PR after the run stopped on a local check, is recorded in a new `Local verification` ledger field, and the PR opens without further local checks, with CI watched. One run spent thirteen more minutes on local checks after the owner had said to open the PR.
+
 ## 1.117.0 — 2026-10-01
 
 ### Changed

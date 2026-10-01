@@ -144,6 +144,8 @@ One open PR = one version. If scope grows mid-PR, bump the single version headin
 
 Always skip `/pln-pr` in this repository. This is the repo that ships `/pln-pr`, and its own changes are verified by the `tests/` gauntlet plus a manual install, not by pointing the review army at the source that defines it. So when `/pln` reaches its Step 8 ship hand-off, or when you are asked to open, create, put up, or "ship" a PR here, treat it as an explicit skip-the-review: commit, push, and open the PR directly with `gh pr create`. Do not invoke `/pln-pr`.
 
+**Open the PR without being asked.** When a change the user asked for is done and every script in `tests/` prints `OK`, branch if you are on `main`, commit, push, and open the PR in the same turn. Do not stop to ask whether to. This file is the standing authorization. Stopping to ask costs the user a round trip: the work could already be up for review by the time they read the question. Still stop if a test fails, or if the change needs a decision only the user can make.
+
 ## Testing
 
 Run every script in `tests/` before opening a PR — each needs only bash and git, no network, no agent CLI installed, no credentials, and none of them writes to the working tree or reads the developer's own `~/.pln`. All fifteen must print `OK`:

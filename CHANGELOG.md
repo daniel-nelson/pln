@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.116.0 — 2026-10-01
+
+### Fixed
+
+- **A reviewer is no longer told to check a hash it can't reproduce.** `/pln-pr` reviewer briefs carried pln's diff and tree SHA-256s next to a "stop on a wrong tree" rule. Those hashes use `git diff` options a reviewer's own command doesn't, so a reviewer that recomputed one got a different number on the right tree. In one run the Codex peer did exactly that, stopped without reviewing, and a same-model reviewer took the run's only cross-model slot. Briefs now name three checks a reviewer can repeat exactly (the commit, the merge base, a clean `git status`) and carry no hash. A wrong-tree result now reports what the reviewer saw. When that matches the brief, `/pln-pr` runs the same reviewer again, peer included, instead of substituting one. When it doesn't match, the user is told which value differed.
+
 ## 1.115.0 — 2026-09-30
 
 ### Changed

@@ -2,6 +2,8 @@
 # pln-todo — the follow-up to-do list: resolve where it lives, file into it, read it
 # back, and move records out of it. Host-neutral: bash and git, no network and no
 # agent CLI. There is no delete subcommand — a record is archived, never destroyed.
+# `related` is the one answer to which live items are the same unit of work as
+# the ones a run is taking; `add` asks it too.
 set -euo pipefail
 
 INDEX_NAME='TO-DO.md'
@@ -45,6 +47,7 @@ Usage:
                [--tracker-ref REF]
   pln-todo list [--project DIR]
   pln-todo check --id ID [--against CSV] [--run TEXT]
+  pln-todo related --id CSV [--limit N]
   pln-todo claim --id ID --run TEXT [--touches CSV] [--holds CSV]
                  [--against CSV] [--steal HOLDER]
   pln-todo release --id ID --run TEXT
@@ -80,6 +83,16 @@ with TRACKER_PENDING, the number of tracker moves not yet made, and `tracker`
 lists them. `pln-todo tracker --guide` says how to set up and sync.
 `add --tracker-ref` enrols an item on a card that already exists, and is
 refused, naming the item as TRACKED_BY, when a live item already has that card.
+
+`related` is read-only (no lock, no write, never creates a list). It prints
+RELATED<TAB>id<TAB>kinds<TAB>state<TAB>status<TAB>holder or -<TAB>claim for
+each live item related to the named ones, then RELATED_COUNT, RELATED_SHOWN and
+RELATED=none|items. Kinds, comma-joined: depends-on, depended-on-by, names,
+named-by (the id appears in the other's body), distinct (on a `Distinct from:`
+line under `## Related`, either side), touches:<path> (both declare touches,
+neither UNKNOWN), and group:<g>, always last. Ranked dependency or name, then
+touches, then group, then id; one hop; the named ids, [x] and dropped items are
+left out; --limit defaults to 10. An unknown id exits 2.
 
 Env overrides (for testing):
   PLN_TODO_DATE — the UTC date the helper writes (YYYY-MM-DD)
@@ -975,6 +988,13 @@ declares_unknown() {
 
 # ----------------------------------------------------------------- the overlap
 
+# Prefix containment in either direction: a directory entry is a claim on a
+# region, not a string to match. Both paths arrive without a trailing slash.
+# `check`, `claim` and `related` all answer "do these write sets meet" here.
+paths_overlap() {
+  [ "$1" = "$2" ] || [ "${1#"$2"/}" != "$1" ] || [ "${2#"$1"/}" != "$2" ]
+}
+
 overlap_report() {
   # $1 = subject id, $2 = other id, $3 = the run asking, $4 = the worktree it is
   # asking from ('' for either = no exemption). One COLLISION line per shared
@@ -1014,9 +1034,7 @@ overlap_report() {
       while IFS= read -r y; do
         [ -n "$y" ] || continue
         y="${y%/}"
-        # Prefix containment in either direction: a directory entry is a claim on
-        # a region, not a string to match.
-        if [ "$x" = "$y" ] || [ "${x#"$y"/}" != "$x" ] || [ "${y#"$x"/}" != "$y" ]; then
+        if paths_overlap "$x" "$y"; then
           if [ "$exempt" = 1 ]; then
             printf 'EXEMPT\t%s\tpath\t%s\n' "$b" "$x"
           else
@@ -1118,6 +1136,172 @@ EOF
   fi
   printf 'CHECK=clear\n'
   return 0
+}
+
+# ------------------------------------------------------------ related items
+
+# Which live items are the same unit of work as the ones a run is about to take.
+# This is the one place that answers it: `related` prints it at pickup, and `add`
+# asks the same question of an item it has not filed yet. Before it, `group`,
+# `depends_on`, `touches` and a body naming another id were four separate answers
+# nobody put together, so a run could take one piece of a split task and finish
+# it while the other pieces sat unread beside it.
+#
+# One record per detail file, fields separated by \037 so an empty field survives
+# `read`: role (S for a subject, C for a candidate), id, state, status, group,
+# holder, depends_on, touches, distinct, names, claim. The lists are
+# comma-joined. `names` is the ids the body mentions with no id character on
+# either side — every live id for a subject, only the subjects' ids for a
+# candidate, because a candidate naming a third item is not a relation of ours.
+# `distinct` is read off a `Distinct from:` line under `## Related`: the filer's
+# own statement that an item it was warned about is separate work.
+relation_facts() {
+  # $1 = subject ids (CSV), $2 = every live id that is not a subject (CSV), then files
+  local subj="$1" every="$2"
+  shift 2
+  LC_ALL=C awk -v subj="$subj" -v every="$every" '
+    function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
+    function unquote(s) { if (s ~ /^".*"$/) s = substr(s, 2, length(s) - 2); return s }
+    function add(list, x) { if (index("," list ",", "," x ",")) return list; return list (list == "" ? "" : ",") x }
+    function yaml_list(s,   n, parts, j, p, out) {
+      sub(/^[ \t]*\[/, "", s); sub(/\][ \t\r]*$/, "", s)
+      n = split(s, parts, ","); out = ""
+      for (j = 1; j <= n; j++) { p = trim(parts[j]); gsub(/^"|"$/, "", p); if (p != "") out = add(out, p) }
+      return out
+    }
+    function idchar(c) { return c != "" && c ~ /[A-Za-z0-9_-]/ }
+    function names_id(s, id,   at, p, n) {
+      n = length(id); at = 0
+      while ((p = index(substr(s, at + 1), id)) > 0) {
+        p += at
+        if ((p == 1 || !idchar(substr(s, p - 1, 1))) && !idchar(substr(s, p + n, 1))) return 1
+        at = p
+      }
+      return 0
+    }
+    function flush(   role) {
+      if (!ok || f["id"] == "") return
+      role = (index("," subj ",", "," f["id"] ",")) ? "S" : "C"
+      gsub(/\t/, " ", claim)
+      printf "%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\n", role, f["id"], \
+        unquote(f["state"]), f["status"], unquote(f["group"]), f["claimed_by"], \
+        yaml_list(f["depends_on"]), yaml_list(f["touches"]), distinct, names, claim
+    }
+    BEGIN { nsj = split(subj, SJ, ","); nev = split(every, EV, ",") }
+    FNR == 1 {
+      flush(); split("", f); claim = ""; distinct = ""; names = ""; section = ""
+      ok = ($0 == "---"); inhdr = ok; next
+    }
+    !ok { next }
+    inhdr && $0 == "---" { inhdr = 0; mine = (index("," subj ",", "," f["id"] ",") > 0); next }
+    inhdr { i = index($0, ":"); if (i > 0) f[trim(substr($0, 1, i - 1))] = trim(substr($0, i + 1)); next }
+    {
+      if (claim == "" && $0 ~ /^# /) claim = trim(substr($0, 3))
+      if ($0 ~ /^## /) section = trim(substr($0, 4))
+      if (section == "Related" && $0 ~ /^[-*]?[ \t]*Distinct from:/) {
+        s = substr($0, index($0, ":") + 1)
+        while (match(s, /[a-z0-9][a-z0-9-]*/)) { distinct = add(distinct, substr(s, RSTART, RLENGTH)); s = substr(s, RSTART + RLENGTH) }
+      }
+      if (mine) { for (j = 1; j <= nev; j++) if (names_id($0, EV[j])) names = add(names, EV[j]) }
+      else { for (j = 1; j <= nsj; j++) if (names_id($0, SJ[j])) names = add(names, SJ[j]) }
+    }
+    END { flush() }
+  ' "$@"
+}
+
+# The paths two comma-joined `touches` lists share, added to RELATED_TOUCHES as
+# `touches:<path>` kinds. Nothing when either side declares no write set or an
+# unknown one: for a claim an unknown set collides with everything, which is the
+# safe answer there, but here it would make every item filed in one sentence
+# related to every other.
+RELATED_TOUCHES=''
+related_touches() {
+  local a="$1" b="$2" ra x rb y
+  [ -n "$a" ] && [ -n "$b" ] || return 0
+  case ",$a," in *,UNKNOWN,*) return 0 ;; esac
+  case ",$b," in *,UNKNOWN,*) return 0 ;; esac
+  ra="$a,"
+  while [ -n "$ra" ]; do
+    x="${ra%%,*}"; ra="${ra#*,}"; x="${x%/}"
+    rb="$b,"
+    while [ -n "$rb" ]; do
+      y="${rb%%,*}"; rb="${rb#*,}"; y="${y%/}"
+      if paths_overlap "$x" "$y"; then
+        case ",$RELATED_TOUCHES," in
+          *",touches:$x,"*) ;;
+          *) RELATED_TOUCHES="$RELATED_TOUCHES${RELATED_TOUCHES:+,}touches:$x" ;;
+        esac
+      fi
+    done
+  done
+  return 0
+}
+
+# One row per live item related to the subjects, ranked: dependency and naming
+# first, then a shared write set, then a shared group; by id within a rank. A
+# `Distinct from:` line names the id it is about, so `distinct` rides with a
+# naming kind and ranks with it.
+#   <rank> TAB <id> TAB <kinds> TAB <state> TAB <status> TAB <holder or -> TAB <claim>
+# $1 = the subject ids (CSV), then their detail files — a live record, or a
+# draft `add` has written and not yet filed. One hop: a candidate is compared
+# with the subjects, never with another candidate. Finished (`[x]`) and dropped
+# items are not candidates.
+related_rows() {
+  local subj="$1" f base every='' facts n=0 i
+  local role rid rstate rstatus rgroup rholder rdep rtch rdst rnam rclaim
+  local dep dby nm nby dst tch grp kinds rank
+  local cands=() sid=() sdep=() stch=() sdst=() snam=() sgrp=()
+  shift
+  for f in "$TODO_ROOT/$LIVE_DIR"/*.md; do
+    [ -f "$f" ] || continue
+    base="${f##*/}"; base="${base%.md}"
+    case ",$subj," in *",$base,"*) continue ;; esac
+    every="$every${every:+,}$base"
+    cands+=("$f")
+  done
+  facts="$(relation_facts "$subj" "$every" "$@" ${cands[@]+"${cands[@]}"})" || return 1
+  while IFS=$'\037' read -r role rid rstate rstatus rgroup rholder rdep rtch rdst rnam rclaim; do
+    [ "$role" = S ] || continue
+    sid[n]="$rid"; sdep[n]="$rdep"; stch[n]="$rtch"; sdst[n]="$rdst"; snam[n]="$rnam"; sgrp[n]="$rgroup"
+    n=$((n + 1))
+  done <<EOF
+$facts
+EOF
+  while IFS=$'\037' read -r role rid rstate rstatus rgroup rholder rdep rtch rdst rnam rclaim; do
+    [ "$role" = C ] || continue
+    [ "$rstate" != '[x]' ] && [ "$rstatus" != 'dropped' ] || continue
+    dep=0; dby=0; nm=0; nby=0; dst=0; grp=''; RELATED_TOUCHES=''
+    i=0
+    while [ "$i" -lt "$n" ]; do
+      case ",${sdep[i]}," in *",$rid,"*) dep=1 ;; esac
+      case ",$rdep," in *",${sid[i]},"*) dby=1 ;; esac
+      case ",${snam[i]}," in *",$rid,"*) nm=1 ;; esac
+      case ",$rnam," in *",${sid[i]},"*) nby=1 ;; esac
+      case ",${sdst[i]}," in *",$rid,"*) dst=1 ;; esac
+      case ",$rdst," in *",${sid[i]},"*) dst=1 ;; esac
+      related_touches "${stch[i]}" "$rtch"
+      if [ -n "${sgrp[i]}" ] && [ "${sgrp[i]}" = "$rgroup" ]; then grp="$rgroup"; fi
+      i=$((i + 1))
+    done
+    tch="$RELATED_TOUCHES"; kinds=''
+    [ "$dep" = 0 ] || kinds="$kinds,depends-on"
+    [ "$dby" = 0 ] || kinds="$kinds,depended-on-by"
+    [ "$nm" = 0 ] || kinds="$kinds,names"
+    [ "$nby" = 0 ] || kinds="$kinds,named-by"
+    [ "$dst" = 0 ] || kinds="$kinds,distinct"
+    [ -z "$tch" ] || kinds="$kinds,$tch"
+    # Last, because a group is free text and may itself hold a comma.
+    [ -z "$grp" ] || kinds="$kinds,group:$grp"
+    kinds="${kinds#,}"
+    [ -n "$kinds" ] || continue
+    if [ "$dep$dby$nm$nby" != 0000 ]; then rank=0
+    elif [ -n "$tch" ]; then rank=1
+    else rank=2
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$rank" "$rid" "$kinds" "$rstate" "$rstatus" "${rholder:--}" "$rclaim"
+  done <<EOF | LC_ALL=C sort -t"$(printf '\t')" -k1,1 -k2,2
+$facts
+EOF
 }
 
 # ------------------------------------------------------------------ frontmatter
@@ -1435,7 +1619,7 @@ shift
 project='.'
 create_flag=1
 
-case "$command" in list | check | stale) READ_ONLY_CMD=1 ;; esac
+case "$command" in list | check | stale | related) READ_ONLY_CMD=1 ;; esac
 
 case "$command" in
   init)
@@ -1648,6 +1832,54 @@ case "$command" in
     # to be conservative, never to disagree: without `--run` this reports every
     # overlap, and `--run R` sees exactly what `claim --run R` would see.
     run_check "$id" "$against" "$run" "$PROJECT_TOP" || true
+    ;;
+
+  related)
+    ids=''; limit=10
+    # A read: it never creates a to-do list, so a project without one is refused
+    # rather than handed an empty list it did not ask for.
+    create_flag=0
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --project) project="${2:-}"; shift 2 ;;
+        --id) ids="${2:-}"; shift 2 ;;
+        --limit) limit="${2:-}"; shift 2 ;;
+        --no-create) shift ;;
+        *) usage ;;
+      esac
+    done
+    [ -n "$ids" ] || usage
+    case "$limit" in '' | *[!0-9]*) fail "limit must be a whole number: $limit" ;; esac
+    project_context "$project"
+    resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
+    load_header
+    report_resolution
+    subjects=(); subject_ids=''
+    while IFS= read -r one; do
+      [ -n "$one" ] || continue
+      valid_id "$one" || fail "id must be lowercase letters, digits and hyphens: $one"
+      [ -f "$(detail_path "$one")" ] || fail "no such to-do item: $one"
+      case ",$subject_ids," in *",$one,"*) continue ;; esac
+      subjects+=("$(detail_path "$one")")
+      subject_ids="$subject_ids${subject_ids:+,}$one"
+    done <<EOF
+$(csv_to_lines "$ids")
+EOF
+    [ -n "$subject_ids" ] || usage
+    rows="$(related_rows "$subject_ids" "${subjects[@]}")" || fail "cannot read the to-do list's detail files"
+    count=0; shown=0
+    if [ -n "$rows" ]; then
+      count="$(printf '%s\n' "$rows" | LC_ALL=C grep -c '')"
+      while IFS="$(printf '\t')" read -r _rank rid rest; do
+        [ "$shown" -lt "$limit" ] || break
+        printf 'RELATED\t%s\t%s\n' "$rid" "$rest"
+        shown=$((shown + 1))
+      done <<EOF
+$rows
+EOF
+    fi
+    printf 'RELATED_COUNT=%s\nRELATED_SHOWN=%s\n' "$count" "$shown"
+    if [ "$count" = 0 ]; then printf 'RELATED=none\n'; else printf 'RELATED=items\n'; fi
     ;;
 
   claim)

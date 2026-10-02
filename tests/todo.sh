@@ -1445,6 +1445,111 @@ said 'ready, blocked, decide, proposed or dropped' \
   "the status error did not name the whole closed set"
 refused "marking an item to an invented status" mark --project "$R" --id plain-work --status someday
 
+# ─── related: the live items that are one unit of work with this one ──────────
+# A run that takes one piece of a split task and leaves the rest unread is the
+# failure this answers, so every relation is checked from both ends, along with
+# what must never count: a write set nobody established, a finished or dropped
+# item, and the items the run is already taking.
+R="$WORK/related"
+new_repo "$R"
+refused "related with no to-do list" related --project "$R" --id rel-subject
+[ "$Q_RC" = 3 ] || fail "related with no to-do list exited $Q_RC, expected 3"
+[ ! -e "$R/pln" ] || fail "related created a to-do list; it is a read"
+
+printf '%s\n' '## What to do' '' 'Finish what rel-names-me started, then hand off.' > "$WORK/subject-body"
+ok "filing the subject" add --project "$R" --id rel-subject --claim 'the subject' --source s \
+  --group refunds --depends-on rel-dep --touches 'app/bookings/,lib/one.rb' --body "$WORK/subject-body"
+ok "filing what the subject depends on" add --project "$R" --id rel-dep --claim 'a prerequisite' --source s
+ok "filing what the subject names" add --project "$R" --id rel-names-me --claim 'named in the subject body' --source s
+ok "filing what depends on the subject" add --project "$R" --id rel-needs --claim 'waits on it' \
+  --source s --depends-on rel-subject
+printf '%s\n' '## What to do' '' 'Same work as `rel-subject`, other half.' > "$WORK/naming-body"
+ok "filing what names the subject" add --project "$R" --id rel-namer --claim 'mentions it' \
+  --source s --body "$WORK/naming-body"
+ok "filing a narrower write set" add --project "$R" --id rel-inside --claim 'one file inside' \
+  --source s --touches 'app/bookings/cancel.rb'
+ok "filing a wider write set" add --project "$R" --id rel-around --claim 'the whole lib tree' \
+  --source s --touches 'lib/'
+ok "filing an unknown write set" add --project "$R" --id rel-unknown --claim 'nobody looked' \
+  --source s --touches 'UNKNOWN,app/bookings/'
+ok "filing no write set" add --project "$R" --id rel-undeclared --claim 'nothing declared' --source s
+ok "filing a groupmate" add --project "$R" --id rel-group --claim 'same area' --source s --group refunds
+ok "filing a finished groupmate" add --project "$R" --id rel-finished --claim 'done already' \
+  --source s --group refunds --state '[x]'
+ok "filing a dropped dependant" add --project "$R" --id rel-dropped --claim 'given up' \
+  --source s --depends-on rel-subject --status dropped
+ok "filing an id that only contains the subject's" add --project "$R" --id rel-subject-two \
+  --claim 'a longer id' --source s
+ok "filing an unrelated item" add --project "$R" --id rel-alone --claim 'nothing shared' \
+  --source s --touches 'docs/'
+# `add --distinct-from` writes this line; written by hand here so the reading
+# side is pinned on its own.
+awk '{ print } /^- filed from:/ { print "- Distinct from: rel-subject" }' \
+  "$R/pln/items/rel-alone.md" > "$WORK/alone" && cat "$WORK/alone" > "$R/pln/items/rel-alone.md"
+ok "claiming the groupmate" claim --project "$R" --id rel-group --run other-run --touches 'docs/faq.md'
+
+before="$(cd "$R/pln" && find . -type f | sort | xargs shasum)"
+ok "listing what relates to the subject" related --project "$R" --id rel-subject
+said $'RELATED\trel-dep\tdepends-on\t[ ]\tready\t-\ta prerequisite' "a dependency was not reported"
+said $'RELATED\trel-needs\tdepended-on-by\t[ ]\tready\t-\twaits on it' "a dependant was not reported"
+said $'RELATED\trel-names-me\tnames\t[ ]\tready\t-\tnamed in the subject body' \
+  "an item the subject's body names was not reported"
+said $'RELATED\trel-namer\tnamed-by\t[ ]\tready\t-\tmentions it' "an item whose body names the subject was not reported"
+said $'RELATED\trel-inside\ttouches:app/bookings\t' "a narrower write set inside the subject's was not reported"
+said $'RELATED\trel-around\ttouches:lib/one.rb\t' "a wider write set around the subject's was not reported"
+said $'RELATED\trel-group\tgroup:refunds\t[ ]\tready\tother-run\tsame area' \
+  "a groupmate was not reported with its holder"
+# The line names the subject, so the relation is a naming one too; `distinct`
+# is what tells a delegated run not to take it.
+said $'RELATED\trel-alone\tnamed-by,distinct\t' "a Distinct from: declaration was not reported as distinct"
+didnt_say $'\trel-unknown\t' "an UNKNOWN write set was reported as a shared path"
+didnt_say $'\trel-undeclared\t' "an item with no write set was reported as a shared path"
+didnt_say $'\trel-finished\t' "a finished item was reported"
+didnt_say $'\trel-dropped\t' "a dropped item was reported"
+didnt_say $'\trel-subject-two\t' "an id that only contains the subject's was reported as named"
+didnt_say $'RELATED\trel-subject\t' "the subject was reported as related to itself"
+is RELATED_COUNT 8 "related counted the wrong number of items"
+is RELATED_SHOWN 8 "related did not show every item under the default limit"
+is RELATED items "related with items did not say so"
+# Ranked: dependency and naming, then a shared path, then group; by id within each.
+appears_before "$WORK/out" $'\trel-alone\t' $'\trel-dep\t' "dependency-and-name items are not ordered by id"
+appears_before "$WORK/out" $'\trel-dep\t' $'\trel-names-me\t' "dependency-and-name items are not ordered by id"
+appears_before "$WORK/out" $'\trel-needs\t' $'\trel-around\t' "a name or dependency did not rank above a shared path"
+appears_before "$WORK/out" $'\trel-around\t' $'\trel-inside\t' "shared-path items are not ordered by id"
+appears_before "$WORK/out" $'\trel-inside\t' $'\trel-group\t' "a shared path did not rank above a group"
+after="$(cd "$R/pln" && find . -type f | sort | xargs shasum)"
+[ "$before" = "$after" ] || fail "related wrote to the to-do list; it reads and never writes"
+[ ! -e "$R/pln/.lock" ] || fail "related left a lock behind"
+
+ok "the other end of each relation" related --project "$R" --id rel-dep,rel-names-me,rel-alone
+# rel-alone's own line names the subject, so it is `names` from that end.
+said $'RELATED\trel-subject\tdepended-on-by,names,named-by,distinct\t' \
+  "the subject was not reported from the other end of its dependency, its naming and its distinct line"
+ok "a narrower write set sees the wider one" related --project "$R" --id rel-inside
+said $'RELATED\trel-subject\ttouches:app/bookings/cancel.rb\t' "the containing write set was not reported"
+didnt_say $'\trel-unknown\t' "an UNKNOWN write set was reported from the narrower side"
+
+ok "two named items are both left out" related --project "$R" --id rel-subject,rel-dep
+didnt_say $'RELATED\trel-dep\t' "a named item was reported as related to another named item"
+is RELATED_COUNT 7 "naming two items did not drop the second from the candidates"
+
+ok "a limit" related --project "$R" --id rel-subject --limit 2
+is RELATED_COUNT 8 "a limit changed the count"
+is RELATED_SHOWN 2 "a limit was not applied to what was shown"
+[ "$(grep -c '^RELATED	' "$WORK/out")" = 2 ] || fail "a limit of 2 printed a different number of lines"
+said $'RELATED\trel-alone\t' "a limit did not keep the top-ranked items"
+said $'RELATED\trel-dep\t' "a limit did not keep the top-ranked items"
+
+ok "an unrelated item" related --project "$R" --id rel-undeclared
+is RELATED none "an unrelated item did not report RELATED=none"
+is RELATED_COUNT 0 "an unrelated item counted something"
+
+refused "an unknown id" related --project "$R" --id rel-subject,rel-nowhere
+[ "$Q_RC" = 2 ] || fail "an unknown id exited $Q_RC, expected 2"
+said 'no such to-do item: rel-nowhere' "an unknown id was not named"
+refused "a limit that is not a number" related --project "$R" --id rel-subject --limit many
+said 'limit must be a whole number' "a bad limit was not explained"
+
 # ─── the ticket tracker ───────────────────────────────────────────────────────
 # pln never talks to a tracker, so what is under test is the bookkeeping an agent
 # syncs from: nothing is recorded until the team declares a tracker, an item filed

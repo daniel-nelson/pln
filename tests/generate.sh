@@ -1863,6 +1863,18 @@ for host_out in "$real_c" "$real_x"; do
     has "$host_out/$rel" 'each first takes the remainder test above' \
       "$host_out/$rel lets the outstanding sweep skip the remainder test"
   done
+  # Picking up an item shows what it is tied to: at the outline when the request
+  # names ids, and before the approval message for an id first found later. A
+  # delegated run takes the strongly related ones, never one declared distinct.
+  for rel in phases/pln/outline.md phases/pln/review-approval.md; do
+    has "$host_out/$rel" "$host_out/bin/pln-todo related --id" \
+      "$host_out/$rel does not show the items related to a to-do item the run takes"
+    has "$host_out/$rel" 'Related, not taken:' "$host_out/$rel lost the related-items dashboard line"
+  done
+  has "$host_out/phases/pln/outline.md" 'and not `distinct`' \
+    "$host_out/phases/pln/outline.md lets delegated mode take an item declared distinct"
+  has "$host_out/phases/pln/implementation.md" 'every id but those on its `Related, not taken:` line' \
+    "$host_out/phases/pln/implementation.md claims the related items the run did not take"
   hasnt "$host_out/phases/pln-simplify/verify-record.md" "$todo_marker" \
     "the to-do-list format reached a phase no door fires in"
   # Not in any router, on any host. The 60000-byte ceiling above is the reason
@@ -1871,6 +1883,7 @@ for host_out in "$real_c" "$real_x"; do
     hasnt "$host_out/$router" "$todo_marker" "$host_out/$router carries the to-do-list format"
     hasnt "$host_out/$router" "$todo_sentence" "$host_out/$router carries the list's intake rules"
     hasnt "$host_out/$router" "$remainder_anchor" "$host_out/$router carries the remainder test"
+    hasnt "$host_out/$router" 'pln-todo related' "$host_out/$router carries the related-items rule"
   done
   # The helper is named through the absolute output root baked in at generation
   # time, never through {{SKILL_DIR}}: on Codex that substitutes to $_PLN_DIR, a

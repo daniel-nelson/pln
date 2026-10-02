@@ -296,6 +296,37 @@ git -C "$FIXTURE" rm -q pending.txt
 git -C "$FIXTURE" commit -qm drop-pending
 [ "$(FP)" = "$first" ] || fail 'restoring the content did not restore the fingerprint'
 
+# One file was not enough to catch the next version of that bug. `git ls-files`
+# lists untracked paths before tracked ones, so staging a file whose name sorts
+# before, between or after the tracked names moved its record and changed the
+# hash. These names interleave with the fixture's own, and two of them carry a
+# space or a newline so the sort cannot split a path at its boundary.
+printf 'early\n' > "$FIXTURE/0 early.txt"
+printf 'middle\n' > "$FIXTURE/d-middle.txt"
+printf 'late\n' > "$FIXTURE/z
+late.txt"
+ln -s source.txt "$FIXTURE/m-link"
+interleaved_fp="$(FP)"
+git -C "$FIXTURE" add 'd-middle.txt'
+[ "$(FP)" = "$interleaved_fp" ] || fail 'staging a file between tracked names moved the fingerprint'
+git -C "$FIXTURE" add '0 early.txt' m-link
+[ "$(FP)" = "$interleaved_fp" ] || fail 'staging a file and a symlink before tracked names moved the fingerprint'
+git -C "$FIXTURE" add 'z
+late.txt'
+[ "$(FP)" = "$interleaved_fp" ] || fail 'staging a file after tracked names moved the fingerprint'
+git -C "$FIXTURE" commit -qm interleaved
+[ "$(FP)" = "$interleaved_fp" ] || fail 'committing interleaved files moved the fingerprint'
+chmod +x "$FIXTURE/d-middle.txt"
+[ "$(FP)" != "$interleaved_fp" ] || fail 'a mode change did not invalidate the fingerprint'
+chmod -x "$FIXTURE/d-middle.txt"
+rm "$FIXTURE/m-link"
+ln -s commands.txt "$FIXTURE/m-link"
+[ "$(FP)" != "$interleaved_fp" ] || fail 'a symlink retarget did not invalidate the fingerprint'
+git -C "$FIXTURE" rm -qf '0 early.txt' d-middle.txt m-link 'z
+late.txt'
+git -C "$FIXTURE" commit -qm drop-interleaved
+[ "$(FP)" = "$first" ] || fail 'removing the interleaved files did not restore the fingerprint'
+
 printf 'two\n' > "$FIXTURE/source.txt"
 tree_changed="$($ASSURANCE fingerprint --root "$FIXTURE" --commands "$FIXTURE/commands.txt" --environment "$FIXTURE/environment.txt")"
 [ "$tree_changed" != "$first" ] || fail 'working-tree edit did not invalidate fingerprint'

@@ -372,6 +372,11 @@ case "$command" in
     # committing an already-verified tree — which changes both while leaving
     # every file identical — invalidate the run and repeat the whole gauntlet on
     # the same content.
+    #
+    # The paths are sorted bytewise for the same reason. `git ls-files` emits
+    # untracked paths before tracked ones, so staging a file moved its record
+    # and changed the hash over an identical set of records. `-u` collapses the
+    # repeated entries an unmerged path gets, one per conflict stage.
     printf 'FILES\0' > "$manifest"
     while IFS= read -r -d '' path; do
       printf '%s\0' "$path" >> "$manifest"
@@ -387,7 +392,7 @@ case "$command" in
       else
         printf 'missing\0missing\0' >> "$manifest"
       fi
-    done < <(git -C "$root" ls-files -z --cached --others --exclude-standard)
+    done < <(git -C "$root" ls-files -z --cached --others --exclude-standard | LC_ALL=C sort -z -u)
 
     tree_hash="$(sha256_file "$manifest")"
     command_hash="$(sha256_file "$commands_file")"

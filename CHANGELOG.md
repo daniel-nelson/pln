@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.120.0 — 2026-10-02
+
+### Fixed
+
+- **Committing a verified tree no longer forces a second gauntlet run.** `pln-assurance fingerprint` hashed each file's record in the order `git ls-files` printed them, and that command lists untracked files before tracked ones. Staging a new file moved its record, so the same files with the same contents got a different `TREE_SHA256`. In one run the committed tree no longer matched the passing gauntlet, and every check ran a second time on unchanged files. The paths are now sorted bytewise before hashing, and a path listed more than once is hashed once. Every existing fingerprint changes once, so a gauntlet status recorded before this upgrade runs again on its next use.
+
 ## 1.119.0 — 2026-10-01
 
 ### Changed

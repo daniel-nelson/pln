@@ -56,7 +56,7 @@ Each of those means the question was really a disclosure. What happens to it nex
 
 ### Binary "adopt as written / change?" questions
 
-Plain prose, no letters. e.g., "Adopt this as written, or change it?"
+Plain prose, no letters. e.g., "Adopt this as written, or change it?" Only while the message names no alternative: once it names one anywhere, it is an option message with "as written" as `a)`.
 
 ### The example option
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.122.0 — 2026-10-02
+
+### Fixed
+
+- **Walking the flagged entries letters each question's answers.** Every walk question is now an option message: `a)` is the entry as written, then the alternative that got it flagged (or the reviewer's proposed change), then any alternative the plan rejected, then the example option. Before this, the binary "as written, or change it?" form also matched walk questions. One run asked "Keep this as written, or change it?" and then named the alternatives in a sentence with no letters. The binary form is now limited to questions that name no alternative.
+
 ## 1.121.0 — 2026-10-02
 
 ### Changed

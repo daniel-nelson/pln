@@ -1860,6 +1860,8 @@ for host_out in "$real_c" "$real_x"; do
     has "$host_out/$rel" "$subitem_anchor" \
       "$host_out/$rel files what a live item already covers as a sibling item"
     has "$host_out/$rel" 'bin/pln-todo add' "$host_out/$rel names no helper call to file with"
+    has "$host_out/$rel" 'add` with `--do` and `--done-when`' \
+      "$host_out/$rel files without the task packet add requires"
     hasnt "$host_out/$rel" "$todo_marker" "$host_out/$rel duplicated the whole to-do-list format"
   done
   for rel in phases/pln/finish-ship.md phases/pln-pr/ship-watch.md; do
@@ -1869,6 +1871,7 @@ for host_out in "$real_c" "$real_x"; do
       "$host_out/$rel sweeps what a live item already covers in as a sibling item"
     has "$host_out/$rel" 'each first takes the remainder test above' \
       "$host_out/$rel lets the outstanding sweep skip the remainder test"
+    has "$host_out/$rel" '`--do`/`--done-when`' "$host_out/$rel sweeps items in without a task packet"
   done
   # Picking up an item shows what it is tied to: at the outline when the request
   # names ids, and before the approval message for an id first found later. A

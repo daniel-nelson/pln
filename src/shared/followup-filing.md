@@ -1,4 +1,4 @@
-**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-todo add` — not by leaving it in prose for the close to remember. **Any `pln-todo` call that ends with `TRACKER_PENDING` above 0 is followed, in the same turn, by the tracker sync** that `{{OUTPUT_ROOT}}/bin/pln-todo tracker --guide` describes; a move that fails stays pending and never stops the run.
+**A follow-up named at any point in this phase is filed in the turn it is named**, by running `{{OUTPUT_ROOT}}/bin/pln-todo add` with `--do` and `--done-when` — not by leaving it in prose for the close to remember. **Any `pln-todo` call that ends with `TRACKER_PENDING` above 0 is followed, in the same turn, by the tracker sync** that `{{OUTPUT_ROOT}}/bin/pln-todo tracker --guide` describes; a move that fails stays pending and never stops the run.
 
 **A remainder of this run's own work is not a follow-up, and it is never filed.** Before filing any candidate — a discovery, a worker's doubt, a review finding, a CI failure, a sweep candidate — run the remainder test. It is a remainder when any one of these holds:
 

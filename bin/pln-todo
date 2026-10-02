@@ -41,9 +41,10 @@ usage() {
   cat >&2 <<'EOF'
 Usage:
   pln-todo init [--project DIR] [--root PATH] [--answered] [--migration-offered]
-  pln-todo add --id ID --claim TEXT --source TEXT [--status ready|blocked|decide|proposed|dropped]
+  pln-todo add --id ID --claim TEXT --source TEXT (--do TEXT --done-when TEXT | --body FILE|-)
+               [--status ready|blocked|decide|proposed|dropped]
                [--state "[ ]"|"[-]"|"[x]"] [--urgent] [--group TEXT] [--opened YYYY-MM-DD]
-               [--depends-on CSV] [--touches CSV] [--holds CSV] [--body FILE|-]
+               [--depends-on CSV] [--touches CSV] [--holds CSV]
                [--tracker-ref REF] [--distinct-from CSV]
   pln-todo list [--project DIR]
   pln-todo check --id ID [--against CSV] [--run TEXT]
@@ -89,6 +90,11 @@ with TRACKER_PENDING, the number of tracker moves not yet made, and `tracker`
 lists them. `pln-todo tracker --guide` says how to set up and sync.
 `add --tracker-ref` enrols an item on a card that already exists, and is
 refused, naming the item as TRACKED_BY, when a live item already has that card.
+
+`add` requires a task packet: --do and --done-when, written under `## What to
+do` and `## How to tell it worked`, or a --body (a file, or - for stdin) whose
+sections of those names each hold text other than the placeholder. Without one
+it exits 2 with nothing written; the body is checked before the lock.
 
 `add` asks `related`'s question of the item it is about to file, under the
 lock: a --depends-on on a live item, a body naming one, or a shared write set
@@ -168,6 +174,32 @@ abs_dir() { (cd "$1" && pwd -P); }
 
 single_line() {
   case "$2" in *$'\n'* | *$'\r'* | *$'\t'*) fail "$1 must be single-line and tab-free" ;; esac
+}
+
+# What `add` writes in a task-packet section nobody filled. It is the binary
+# signal that a record's packet is not real, so it never counts as filling one.
+PLACEHOLDER='_Not recorded when this item was filed._'
+
+# packet_filled TEXT: true when TEXT has something in it besides whitespace and
+# the placeholder.
+packet_filled() {
+  local t="$1"
+  t="${t#"${t%%[![:space:]]*}"}"; t="${t%"${t##*[![:space:]]}"}"
+  [ -n "$t" ] && [ "$t" != "$PLACEHOLDER" ]
+}
+
+# packet_unfilled < BODY: names, joined by " and ", each of the two required
+# sections the body lacks or leaves with nothing but blanks and the placeholder.
+packet_unfilled() {
+  LC_ALL=C awk -v ph="$PLACEHOLDER" '
+    function trim(s) { sub(/^[ \t\r]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
+    /^## / { h = trim($0); sec = (h == "## What to do") ? 1 : (h == "## How to tell it worked") ? 2 : 0; next }
+    sec { t = trim($0); if (t != "" && t != ph) filled[sec] = 1 }
+    END {
+      if (!filled[1]) out = "## What to do"
+      if (!filled[2]) out = out (out == "" ? "" : " and ") "## How to tell it worked"
+      if (out != "") print out
+    }'
 }
 
 valid_id() {
@@ -1179,7 +1211,7 @@ relation_facts() {
   # $1 = subject ids (CSV), $2 = every live id that is not a subject (CSV), then files
   local subj="$1" every="$2"
   shift 2
-  LC_ALL=C awk -v subj="$subj" -v every="$every" '
+  LC_ALL=C awk -v subj="$subj" -v every="$every" -v ph="$PLACEHOLDER" '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
     function unquote(s) { if (s ~ /^".*"$/) s = substr(s, 2, length(s) - 2); return s }
     function add(list, x) { if (index("," list ",", "," x ",")) return list; return list (list == "" ? "" : ",") x }
@@ -1230,7 +1262,7 @@ relation_facts() {
       }
       # The task packet headings and placeholder are the same in every record,
       # so they name nothing.
-      if ($0 ~ /^## / || $0 == "_Not recorded when this item was filed._") next
+      if ($0 ~ /^## / || $0 == ph) next
       if (mine) { for (j = 1; j <= nev; j++) if (names_id($0, EV[j], dl)) names = add(names, EV[j]) }
       else { for (j = 1; j <= nsj; j++) if (names_id($0, SJ[j], dl)) names = add(names, SJ[j]) }
     }
@@ -1241,7 +1273,7 @@ relation_facts() {
 # The paths two comma-joined `touches` lists share, added to RELATED_TOUCHES as
 # `touches:<path>` kinds. Nothing when either side declares no write set or an
 # unknown one: for a claim an unknown set collides with everything, which is the
-# safe answer there, but here it would make every item filed in one sentence
+# safe answer there, but here it would make every item filed without a write set
 # related to every other.
 RELATED_TOUCHES=''
 related_touches() {
@@ -1693,6 +1725,7 @@ case "$command" in
   add)
     id=''; claim=''; source=''; status='ready'; state='[ ]'; urgent='false'
     group=''; opened=''; depends=''; touches=''; holds=''; body=''; tracker_ref=''; distinct=''
+    do_text=''; done_when=''; have_do=0; have_done_when=0
     while [ $# -gt 0 ]; do
       case "$1" in
         --project) project="${2:-}"; shift 2 ;;
@@ -1707,7 +1740,9 @@ case "$command" in
         --depends-on) depends="${2:-}"; shift 2 ;;
         --touches) touches="${2:-}"; shift 2 ;;
         --holds) holds="${2:-}"; shift 2 ;;
-        --body) body="${2:-}"; shift 2 ;;
+        --body) body="${2:-}"; [ -n "$body" ] || usage; shift 2 ;;
+        --do) do_text="${2:-}"; have_do=1; shift 2 ;;
+        --done-when) done_when="${2:-}"; have_done_when=1; shift 2 ;;
         --tracker-ref) tracker_ref="${2:-}"; [ -n "$tracker_ref" ] || usage; shift 2 ;;
         --distinct-from) distinct="${2:-}"; [ -n "$distinct" ] || usage; shift 2 ;;
         --no-create) create_flag=0; shift ;;
@@ -1736,6 +1771,31 @@ EOF
       [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
       *) fail "opened must be YYYY-MM-DD: $opened" ;;
     esac
+    # Every item is filed so a stranger can act on it from its file alone, so
+    # the two sections nobody can reconstruct later — what to do and how to tell
+    # it worked — are required, as flags or inside a supplied body. The body is
+    # read and checked here, before the lock, so a slow or bad one never holds
+    # the list, and what was checked is what is written.
+    if [ -n "$body" ]; then
+      if [ "$have_do" = 1 ] || [ "$have_done_when" = 1 ]; then
+        fail "--body carries its own task packet; pass --do and --done-when or --body, not both; nothing was written"
+      fi
+      if [ "$body" = '-' ]; then
+        body_text="$(cat)" || fail "cannot read --body from stdin; nothing was written"
+      else
+        [ -f "$body" ] && [ -r "$body" ] || fail "cannot read --body $body; nothing was written"
+        body_text="$(cat "$body")" || fail "cannot read --body $body; nothing was written"
+      fi
+      unfilled="$(printf '%s\n' "$body_text" | packet_unfilled)"
+      [ -z "$unfilled" ] || fail "--body leaves $unfilled with no text of its own (the placeholder does not count); write it there, or pass --do and --done-when instead; nothing was written"
+    else
+      unfilled=''
+      packet_filled "$do_text" || unfilled='--do TEXT (what to do)'
+      packet_filled "$done_when" || unfilled="$unfilled${unfilled:+ and }--done-when TEXT (how to tell it worked)"
+      [ -z "$unfilled" ] || fail "add needs $unfilled, or a --body whose '## What to do' and '## How to tell it worked' sections hold them; an item has to be workable from its file alone; nothing was written"
+      single_line 'do' "$do_text"
+      single_line 'done-when' "$done_when"
+    fi
 
     project_context "$project"
     resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
@@ -1783,12 +1843,12 @@ EOF
       printf -- '---\n\n'
       printf '# %s\n\n' "$claim"
       if [ -n "$body" ]; then
-        if [ "$body" = '-' ]; then cat; else cat "$body"; fi
+        printf '%s\n' "$body_text"
       else
-        printf '## What exists and where\n\n_Not recorded when this item was filed._\n\n'
-        printf '## What to do\n\n_Not recorded when this item was filed._\n\n'
-        printf '## What has to be true first\n\n_Not recorded when this item was filed._\n\n'
-        printf '## How to tell it worked\n\n_Not recorded when this item was filed._\n\n'
+        printf '## What exists and where\n\n%s\n\n' "$PLACEHOLDER"
+        printf '## What to do\n\n%s\n\n' "$do_text"
+        printf '## What has to be true first\n\n%s\n\n' "$PLACEHOLDER"
+        printf '## How to tell it worked\n\n%s\n\n' "$done_when"
         printf '## Related\n\n- filed from: %s\n' "$source"
         [ -z "$distinct_ids" ] || printf -- '- Distinct from: %s\n' "$(printf '%s' "$distinct_ids" | sed 's/,/, /g')"
         printf '\n## Sub-items\n'
@@ -2054,11 +2114,11 @@ EOF
       fi
     fi
     # Taking an item is the moment somebody has actually looked at it, so it is
-    # the moment its write set can be declared. Filing stays free — one sentence,
-    # no fields — and the field that answers parallel-safety gets filled by the
-    # run that just read the item, under the same lock the check runs in, so the
-    # check below sees what was declared rather than the empty field it was
-    # filed with.
+    # the moment its write set can be declared. Filing asks for what to do and
+    # how to tell it worked, never for paths, and the field that answers
+    # parallel-safety gets filled by the run that just read the item, under the
+    # same lock the check runs in, so the check below sees what was declared
+    # rather than the empty field it was filed with.
     #
     # The declaration has to land before the check, because the check is what it
     # is for. But a refused claim must not leave it behind: the whole point of

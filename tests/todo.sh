@@ -66,6 +66,14 @@ is() { # is <field> <expected> <description>
   local got; got="$(field "$1")"
   [ "$got" = "$2" ] || fail "$3 ($1 was '$got', expected '$2')"
 }
+# The task packet `add` requires of every item. Words no test id matches, so
+# the packet itself never makes one item near another.
+PK=(--do 'do the work' --done-when 'the check passes')
+# section_text <file> <heading>: the non-blank lines under one `## ` heading.
+section_text() {
+  awk -v h="$2" '$0 == h { f = 1; next } /^## / { f = 0 } f && $0 !~ /^[ \t]*$/' "$1"
+}
+PLACEHOLDER='_Not recorded when this item was filed._'
 
 new_repo() { # new_repo <dir>
   local d="$1"
@@ -421,7 +429,7 @@ if [ "$(id -u)" != "0" ]; then
   is ITEM_COUNT 1 "a read of an unmigratable list did not find its item"
   said 'an item filed before the rename' "a read of an unmigratable list rendered nothing"
   ok "reporting staleness over a list that cannot be migrated" stale --project "$R"
-  refused "filing into a list that cannot be migrated" add --project "$R" \
+  refused "filing into a list that cannot be migrated" add --project "$R" "${PK[@]}" \
     --id blocked-by-permissions --claim 'cannot be filed' --source s
   said 'cannot be written' "a refused write did not say the list could not be migrated"
   [ -f "$R/pln/QUEUE.md" ] || fail "an unwritable list was migrated anyway"
@@ -432,6 +440,8 @@ fi
 R="$WORK/filing"
 new_repo "$R"
 ok "filing the first item" add --project "$R" \
+  --do 'free the held dates when a booking is cancelled' \
+  --done-when 'a cancelled booking shows its dates as open in the calendar' \
   --id cancel-releases-held-dates \
   --claim 'a cancelled booking never releases its held dates' \
   --source 'the cancellation change, PR review' \
@@ -466,10 +476,99 @@ for section in '## What exists and where' '## What to do' '## What has to be tru
   '## How to tell it worked' '## Related' '## Sub-items'; do
   has "$detail" "$section" "the detail file's packet is missing '$section'"
 done
+# The two required sections carry what the filer passed; the placeholder is
+# left only in the two the filer may not know yet.
+[ "$(section_text "$detail" '## What to do')" = 'free the held dates when a booking is cancelled' ] \
+  || fail "--do did not land under '## What to do'"
+[ "$(section_text "$detail" '## How to tell it worked')" = 'a cancelled booking shows its dates as open in the calendar' ] \
+  || fail "--done-when did not land under '## How to tell it worked'"
+for section in '## What exists and where' '## What has to be true first'; do
+  [ "$(section_text "$detail" "$section")" = "$PLACEHOLDER" ] \
+    || fail "the optional section '$section' lost its placeholder"
+done
+[ "$(grep -cxF -- "$PLACEHOLDER" "$detail")" = 2 ] \
+  || fail "the placeholder was written outside the two optional sections"
+line_is "$detail" '- filed from: the cancellation change, PR review' \
+  "the packet's ## Related does not say where the item was filed from"
+
+# ─── add: no task packet, nothing filed ───────────────────────────────────────
+# An item is filed so a stranger can pick it up from its file alone, so `add`
+# requires what to do and how to tell it worked: `--do` and `--done-when`, or a
+# `--body` whose two sections of those names hold text other than the
+# placeholder. A refusal writes nothing, and the body is read and checked
+# before the lock is taken.
+packet_before="$(cd "$R/pln" && find . -type f | sort | xargs shasum)"
+refused "filing with no task packet" add --project "$R" --id no-packet --claim 'bare' --source s
+[ "$Q_RC" = 2 ] || fail "an add with no task packet exited $Q_RC, expected 2"
+said '--do' "the packet refusal did not name --do"
+said '--done-when' "the packet refusal did not name --done-when"
+said 'nothing was written' "the packet refusal did not say the list is untouched"
+didnt_say 'INDEX_LINE=' "a refused add reported an index line"
+refused "filing with --do alone" add --project "$R" --id no-packet --claim 'bare' --source s \
+  --do 'do the work'
+said '--done-when' "a missing --done-when was not named"
+didnt_say '--do TEXT' "a --do that was passed was reported as missing"
+refused "filing with a blank --done-when" add --project "$R" --id no-packet --claim 'bare' --source s \
+  --do 'do the work' --done-when '   '
+said '--done-when' "a blank --done-when was accepted or not named"
+refused "filing the placeholder as --do" add --project "$R" --id no-packet --claim 'bare' --source s \
+  --do "$PLACEHOLDER" --done-when 'the check passes'
+said '--do TEXT' "the placeholder passed as --do was accepted or not named"
+didnt_say '--done-when TEXT' "a --done-when that was passed was reported as missing"
+refused "filing a two-line --do" add --project "$R" --id no-packet --claim 'bare' --source s \
+  --do $'line one\nline two' --done-when 'the check passes'
+said 'single-line' "a multi-line --do was not refused as such"
+
+printf '%s\n' '## What to do' '' 'Free the dates.' > "$WORK/half-body"
+refused "a body with no How to tell it worked" add --project "$R" --id no-packet --claim 'bare' \
+  --source s --body "$WORK/half-body"
+[ "$Q_RC" = 2 ] || fail "an add whose body lacks a section exited $Q_RC, expected 2"
+said '## How to tell it worked' "a body lacking a required section did not name it"
+didnt_say '## What to do' "a body's filled section was reported as missing"
+printf '%s\n' '## What to do' '' 'Free the dates.' '' '## How to tell it worked' '' "$PLACEHOLDER" \
+  > "$WORK/placeholder-body"
+refused "a body with the placeholder as its outcome" add --project "$R" --id no-packet --claim 'bare' \
+  --source s --body "$WORK/placeholder-body"
+said '## How to tell it worked' "a body's placeholder section was not named"
+printf '%s\n' '## What to do' '' '## How to tell it worked' '' 'The dates show open.' > "$WORK/empty-body"
+refused "a body with an empty What to do" add --project "$R" --id no-packet --claim 'bare' \
+  --source s --body "$WORK/empty-body"
+said '## What to do' "a body's empty section was not named"
+refused "a body that is not there" add --project "$R" --id no-packet --claim 'bare' \
+  --source s --body "$WORK/no-such-body"
+said 'cannot read' "an unreadable --body was not explained"
+printf '%s\n' '## What to do' '' 'Free the dates.' '' '## How to tell it worked' '' 'The dates show open.' \
+  > "$WORK/full-body"
+refused "a body together with --do" add --project "$R" --id no-packet --claim 'bare' \
+  --source s --body "$WORK/full-body" "${PK[@]}"
+said 'not both' "a body passed with --do was not refused as ambiguous"
+[ "$packet_before" = "$(cd "$R/pln" && find . -type f | sort | xargs shasum)" ] \
+  || fail "a refused add changed the to-do list"
+[ ! -e "$R/pln/items/no-packet.md" ] || fail "an add with no task packet was filed"
+
+# Checked before the lock: a list another live process holds still refuses a
+# body with no packet at once, rather than waiting on the lock and then
+# blaming it.
+mkdir "$R/pln/.lock"
+printf '%s\t%s\t%s\n' "$$" "$(hostname)" '2026-08-27T00:00:00Z' > "$R/pln/.lock/owner"
+refused "a bad body while the list is locked" add --project "$R" --id no-packet --claim 'bare' \
+  --source s --body - < "$WORK/half-body"
+said '## How to tell it worked' "a bad body under a held lock was not refused for its packet"
+didnt_say 'locked by' "a bad body waited on the lock before it was checked"
+rm -rf "$R/pln/.lock"
+
+ok "a body from stdin" add --project "$R" --id stdin-packet --claim 'from stdin' \
+  --source s --body - < "$WORK/full-body"
+[ "$(section_text "$R/pln/items/stdin-packet.md" '## How to tell it worked')" = 'The dates show open.' ] \
+  || fail "a body read from stdin did not land as written"
+ok "a body from a file" add --project "$R" --id file-packet --claim 'from a file' \
+  --source s --body "$WORK/full-body"
+[ "$(section_text "$R/pln/items/file-packet.md" '## What to do')" = 'Free the dates.' ] \
+  || fail "a body read from a file did not land as written"
 
 # Refusing rather than overwriting: an id is a path, and `mv` would take the
 # record with it.
-refused "filing a second item under an existing id" add --project "$R" \
+refused "filing a second item under an existing id" add --project "$R" "${PK[@]}" \
   --id cancel-releases-held-dates --claim 'a different claim' --source elsewhere
 said 'nothing was overwritten' "a refused add did not say the record was untouched"
 line_is "$detail" '# a cancelled booking never releases its held dates' \
@@ -480,7 +579,7 @@ line_is "$detail" '# a cancelled booking never releases its held dates' \
 # malformed detail file makes the index rebuild fail, so the write that did land
 # before it is the one under test.
 printf 'not a detail file\n' > "$R/pln/items/broken.md"
-refused "an add whose index rebuild fails" add --project "$R" \
+refused "an add whose index rebuild fails" add --project "$R" "${PK[@]}" \
   --id second-item --claim 'the second item' --source s
 [ -f "$R/pln/items/second-item.md" ] \
   || fail "add lost the detail file when the index write failed — the index is written first"
@@ -508,7 +607,7 @@ R="$WORK/order"
 new_repo "$R"
 add_item() { # add_item <id> <claim> [args...]
   local id="$1" claim="$2"; shift 2
-  ok "filing $id" add --project "$R" --id "$id" --claim "$claim" --source 'this run' "$@"
+  ok "filing $id" add --project "$R" "${PK[@]}" --id "$id" --claim "$claim" --source 'this run' "$@"
 }
 add_item urgent-old 'urgent, opened first' --urgent --group zulu --opened 2026-01-01
 add_item urgent-new 'urgent, opened later' --urgent --group alpha --opened 2026-06-06
@@ -598,7 +697,7 @@ said '_No open items._' "an empty index does not say it is empty"
 # ─── check: the refusal names what it collided with ───────────────────────────
 R="$WORK/overlap"
 new_repo "$R"
-mk() { ok "filing $1" add --project "$R" --id "$1" --claim "$1" --source s "${@:2}"; }
+mk() { ok "filing $1" add --project "$R" "${PK[@]}" --id "$1" --claim "$1" --source s "${@:2}"; }
 mk wide --touches 'app/bookings/'
 mk narrow --touches 'app/bookings/cancellation.rb' --distinct-from wide
 mk elsewhere --touches 'docs/guide.md'
@@ -640,7 +739,7 @@ said 'CHECK=clear' "an item refined with mark --touches is still reported unknow
 # ─── claim: one lock over the check and the record ────────────────────────────
 R="$WORK/claiming"
 new_repo "$R"
-ok "filing the contested item" add --project "$R" --id contested --claim 'the contested item' \
+ok "filing the contested item" add --project "$R" "${PK[@]}" --id contested --claim 'the contested item' \
   --source s --touches 'app/contested.rb'
 ok "warming the to-do list" list --project "$R"
 
@@ -676,7 +775,7 @@ said 'CLAIM=held' "a steal did not record the new holder"
 has "$R/pln/items/contested.md" 'claimed_by: run-c' "a steal did not rewrite the holder"
 
 # A claim that collides is refused and records nothing.
-ok "filing an overlapping item" add --project "$R" --id overlapping --claim 'overlapping work' \
+ok "filing an overlapping item" add --project "$R" "${PK[@]}" --id overlapping --claim 'overlapping work' \
   --source s --touches 'app/contested.rb' --distinct-from contested
 refused "claiming an item that collides with the held set" claim --project "$R" \
   --id overlapping --run run-d
@@ -691,7 +790,7 @@ hasnt "$R/pln/items/overlapping.md" 'claimed_by' "a refused claim recorded a hol
 # worktree it claimed from.
 R="$WORK/same-run"
 new_repo "$R"
-mkq() { ok "filing $1" add --project "$R" --id "$1" --claim "$1" --source s "${@:2}"; }
+mkq() { ok "filing $1" add --project "$R" "${PK[@]}" --id "$1" --claim "$1" --source s "${@:2}"; }
 mkq head --touches 'app/shared.rb'
 mkq tail --touches 'app/shared.rb' --distinct-from head
 mkq probe --touches 'app/shared.rb' --distinct-from head,tail
@@ -775,10 +874,10 @@ for tree in tree-one tree-two; do
   new_repo "$WORK/$tree"
   printf 'pln-todo: %s\n' "$QROOT" > "$WORK/$tree/CLAUDE.md"
 done
-ok "filing into the shared root from the first tree" add --project "$WORK/tree-one" \
+ok "filing into the shared root from the first tree" add --project "$WORK/tree-one" "${PK[@]}" \
   --id shared-head --claim 'shared head' --source s --touches 'app/shared.rb'
 is TODO_ROOT "$QROOT" "the declared root was not adopted from the first tree"
-ok "filing into the shared root from the second tree" add --project "$WORK/tree-two" \
+ok "filing into the shared root from the second tree" add --project "$WORK/tree-two" "${PK[@]}" \
   --id shared-tail --claim 'shared tail' --source s --touches 'app/shared.rb' --distinct-from shared-head
 is TODO_ROOT "$QROOT" "the two trees did not resolve to one to-do-list root"
 ok "claiming from the first tree" claim --project "$WORK/tree-one" --id shared-head --run 2026-08-31-x
@@ -802,7 +901,7 @@ has "$QROOT/items/shared-head.md" "claimed_in: $WORK/tree-one" \
 ok "re-claiming a held item from the worktree that holds it" claim \
   --project "$WORK/tree-one" --id shared-head --run 2026-08-31-x
 said 'CLAIM=held' "the holder was refused a re-claim in its own tree"
-ok "filing a disjoint item into the shared root" add --project "$WORK/tree-one" \
+ok "filing a disjoint item into the shared root" add --project "$WORK/tree-one" "${PK[@]}" \
   --id shared-solo --claim 'shared solo' --source s --touches 'app/solo.rb'
 ok "claiming the disjoint item from the first tree" claim \
   --project "$WORK/tree-one" --id shared-solo --run 2026-08-31-x
@@ -850,7 +949,7 @@ is DECLARED_TODO - "the root already in use was reported as a passed-over declar
 # that has just read the item fills the field the collision check depends on.
 P="$WORK/pickup"
 new_repo "$P"
-ok "filing an item with no write set" add --project "$P" --id vague-pickup \
+ok "filing an item with no write set" add --project "$P" "${PK[@]}" --id vague-pickup \
   --claim 'filed in one sentence' --source s
 refused "claiming an item that still declares no write set" claim \
   --project "$P" --id vague-pickup --run pick-1
@@ -865,7 +964,7 @@ has "$P/pln/items/vague-pickup.md" 'touches: [app/a.rb, app/b.rb]' \
 has "$P/pln/items/vague-pickup.md" 'holds: [port-block]' \
   "the claim did not write the declared resources to the record"
 # What was declared at pickup is what the next claim is checked against.
-ok "filing an overlapping second item" add --project "$P" --id vague-overlap \
+ok "filing an overlapping second item" add --project "$P" "${PK[@]}" --id vague-overlap \
   --claim 'overlaps the first' --source s --touches 'app/b.rb' --distinct-from vague-pickup
 refused "claiming an item that overlaps a set declared at pickup" claim \
   --project "$P" --id vague-overlap --run pick-2
@@ -889,7 +988,7 @@ line_is "$P/pln/TO-DO.md" \
 # completion the to-do list no longer backs, and an unheld record is marked by anyone.
 H="$WORK/holder-marking"
 new_repo "$H"
-ok "filing an item to be stolen" add --project "$H" --id contested-close \
+ok "filing an item to be stolen" add --project "$H" "${PK[@]}" --id contested-close \
   --claim 'an item two runs both want' --source s --touches 'app/c.rb'
 ok "marking an unheld record without naming a run" mark --project "$H" \
   --id contested-close --status ready
@@ -920,7 +1019,7 @@ has "$H/pln/items/contested-close.md" 'state: "[x]"' \
 # claimed items as untaken.
 L="$WORK/locking"
 new_repo "$L"
-ok "filing an item to read back" add --project "$L" --id locked-item \
+ok "filing an item to read back" add --project "$L" "${PK[@]}" --id locked-item \
   --claim 'an item to read under a lock' --source s --touches 'app/l.rb'
 ok "claiming it so the record has a holder" claim --project "$L" --id locked-item --run lock-run
 
@@ -959,7 +1058,7 @@ rm -rf "$L/pln/.lock"
 # ─── mark: the three markers, the flag, and the sub-item checklist ────────────
 R="$WORK/marking"
 new_repo "$R"
-ok "filing an item to mark" add --project "$R" --id partly --claim 'an item done in parts' --source s
+ok "filing an item to mark" add --project "$R" "${PK[@]}" --id partly --claim 'an item done in parts' --source s
 detail="$R/pln/items/partly.md"
 for state in '[ ]' '[-]' '[x]'; do
   ok "marking $state" mark --project "$R" --id "partly" --state "$state"
@@ -1023,7 +1122,7 @@ line_is "$detail" 'A paragraph a person wrote.' "mark rewrote body prose it did 
 # ─── archive: a record moves, and nothing is ever destroyed ───────────────────
 R="$WORK/archiving"
 new_repo "$R"
-ok "filing an item to finish" add --project "$R" --id finished --claim 'work that landed' --source s
+ok "filing an item to finish" add --project "$R" "${PK[@]}" --id finished --claim 'work that landed' --source s
 printf '\nEvidence a person wrote into the packet.\n' >> "$R/pln/items/finished.md"
 
 # `completed` is refused for a record nobody marked `[x]`: the marking and the
@@ -1059,7 +1158,7 @@ has "$month_index" '- [x] completed · work that landed → `finished.md` — co
 
 # A terminal state that is not a completion keeps the state it had: nothing
 # writes an [x] for work nobody verified.
-ok "filing an item finished elsewhere" add --project "$R" --id elsewhere-done \
+ok "filing an item finished elsewhere" add --project "$R" "${PK[@]}" --id elsewhere-done \
   --claim 'work that got done some other way' --source s
 ok "marking what actually landed" mark --project "$R" --id elsewhere-done --state '[-]'
 ok "archiving on the user's confirmation" archive --project "$R" --id elsewhere-done \
@@ -1071,7 +1170,7 @@ has "$month_index" 'resolved-elsewhere · work that got done some other way' \
 
 # Archiving refuses rather than overwriting an occupied destination — an
 # unguarded `mv` would destroy the record the archive exists to keep.
-ok "refiling under an archived id" add --project "$R" --id finished \
+ok "refiling under an archived id" add --project "$R" "${PK[@]}" --id finished \
   --claim 'the same work came back' --source s
 ok "marking the refiled item done" mark --project "$R" --id finished --state '[x]'
 refused "archiving over an existing record" archive --project "$R" --id finished \
@@ -1091,18 +1190,18 @@ hasnt "$WORK/err" 'pln-todo delete' "the usage text advertises a delete subcomma
 # ─── stale: candidates, and not one write ─────────────────────────────────────
 R="$WORK/staleness"
 new_repo "$R"
-PLN_TODO_DATE=2026-01-01 ok "filing an aged item" add --project "$R" --id aged \
+PLN_TODO_DATE=2026-01-01 ok "filing an aged item" add --project "$R" "${PK[@]}" --id aged \
   --claim 'filed long ago' --source s --touches 'a.rb'
-PLN_TODO_DATE=2026-01-01 ok "filing an item to abandon" add --project "$R" --id abandoned \
+PLN_TODO_DATE=2026-01-01 ok "filing an item to abandon" add --project "$R" "${PK[@]}" --id abandoned \
   --claim 'claimed and left' --source s --touches 'b.rb'
 PLN_TODO_DATE=2026-01-01 ok "abandoning a claim" claim --project "$R" --id abandoned --run gone-run
-ok "filing a finished item nobody archived" add --project "$R" --id done-not-archived \
+ok "filing a finished item nobody archived" add --project "$R" "${PK[@]}" --id done-not-archived \
   --claim 'marked done and left in the live to-do list' --source s
 ok "marking it done" mark --project "$R" --id done-not-archived --state '[x]'
-ok "filing a dropped item" add --project "$R" --id dropped-not-archived \
+ok "filing a dropped item" add --project "$R" "${PK[@]}" --id dropped-not-archived \
   --claim 'dropped and left in the live to-do list' --source s
 ok "dropping it" mark --project "$R" --id dropped-not-archived --status dropped
-ok "filing a fresh item" add --project "$R" --id fresh --claim 'filed today' --source s
+ok "filing a fresh item" add --project "$R" "${PK[@]}" --id fresh --claim 'filed today' --source s
 
 before="$(cd "$R/pln" && find . -type f | sort | xargs shasum)"
 ok "reporting staleness" stale --project "$R" --days 30
@@ -1132,14 +1231,14 @@ for tree in live-one live-two; do
   new_repo "$WORK/$tree"
   printf 'pln-todo: %s\n' "$LROOT" > "$WORK/$tree/CLAUDE.md"
 done
-ok "filing an item for the holder to take" add --project "$WORK/live-one" --id held-by-gone \
+ok "filing an item for the holder to take" add --project "$WORK/live-one" "${PK[@]}" --id held-by-gone \
   --claim 'taken by a run that never came back' --source s --touches 'api/shared.ts'
-ok "filing the item that will want the same path" add --project "$WORK/live-one" --id wants-same-path \
+ok "filing the item that will want the same path" add --project "$WORK/live-one" "${PK[@]}" --id wants-same-path \
   --claim 'needs the path the vanished run declared' --source s --touches 'api/shared.ts,api/own.ts' \
   --distinct-from held-by-gone
-ok "filing an item held by a tree that stays" add --project "$WORK/live-one" --id held-by-living \
+ok "filing an item held by a tree that stays" add --project "$WORK/live-one" "${PK[@]}" --id held-by-living \
   --claim 'taken by a run that is still going' --source s --touches 'api/living.ts'
-ok "filing the item that wants the living run's path" add --project "$WORK/live-one" --id wants-living-path \
+ok "filing the item that wants the living run's path" add --project "$WORK/live-one" "${PK[@]}" --id wants-living-path \
   --claim 'needs the path the live run declared' --source s --touches 'api/living.ts' \
   --distinct-from held-by-living
 ok "the second tree taking both items" claim --project "$WORK/live-two" --id held-by-gone --run 2026-08-27-two
@@ -1183,7 +1282,7 @@ didnt_say 'STOLEN_FROM' "a release on evidence was reported as a steal"
 # A wrong `--steal` is still refused when the holder is dead. The caller named a
 # holder this store does not have, and proceeding would confirm something false
 # rather than correct it.
-ok "filing another item for the vanished tree" add --project "$WORK/live-one" --id wrong-steal \
+ok "filing another item for the vanished tree" add --project "$WORK/live-one" "${PK[@]}" --id wrong-steal \
   --claim 'held by the vanished tree' --source s --touches 'api/wrong.ts'
 new_repo "$WORK/live-five"
 printf 'pln-todo: %s\n' "$LROOT" > "$WORK/live-five/CLAUDE.md"
@@ -1208,7 +1307,7 @@ said $'COLLISION\theld-by-living\tpath\tapi/living.ts' \
 # else's `--steal`. Everything else — interrupted, out of context, or simply an
 # item the run decided not to take — leaked the hold, because the only other call
 # shaped like "I am not working this" is `archive`, which removes the record.
-ok "filing an item to take and give back" add --project "$WORK/live-one" --id give-back \
+ok "filing an item to take and give back" add --project "$WORK/live-one" "${PK[@]}" --id give-back \
   --claim 'taken and handed back' --source s --touches 'api/give.ts'
 ok "taking it" claim --project "$WORK/live-one" --id give-back --run 2026-08-27-one
 ok "releasing one's own claim" release --project "$WORK/live-one" --id give-back --run 2026-08-27-one \
@@ -1246,7 +1345,7 @@ has "$LROOT/items/give-back.md" 'claimed_by: 2026-08-27-other' \
 
 # A dead holder's claim can be released without taking the item — the case where
 # you are tidying up after a run rather than picking up its work.
-ok "filing an item for the vanished tree to hold" add --project "$WORK/live-one" --id tidy-up \
+ok "filing an item for the vanished tree to hold" add --project "$WORK/live-one" "${PK[@]}" --id tidy-up \
   --claim 'held by a tree that is gone' --source s --touches 'api/tidy.ts'
 new_repo "$WORK/live-three"
 printf 'pln-todo: %s\n' "$LROOT" > "$WORK/live-three/CLAUDE.md"
@@ -1263,7 +1362,7 @@ hasnt "$LROOT/items/tidy-up.md" 'claimed_by:' "the vanished holder's claim was n
 # own claim on an item short of [x] says why, in the one rewrite that clears the
 # holder: the user's words, the question it leaves them, or what the item waits
 # on. Without one of those the release is refused and the record is untouched.
-ok "filing an item to leave partly done" add --project "$WORK/live-one" --id part-done \
+ok "filing an item to leave partly done" add --project "$WORK/live-one" "${PK[@]}" --id part-done \
   --claim 'started and not finished' --source s --touches 'api/part.ts'
 ok "taking it" claim --project "$WORK/live-one" --id part-done --run 2026-08-27-one
 ok "marking it partly done" mark --project "$WORK/live-one" --id part-done \
@@ -1295,7 +1394,7 @@ hasnt "$LROOT/items/part-done.md" 'claimed_in:' "the not-now release kept the wo
 has "$LROOT/items/part-done.md" 'state: "[-]"' "the not-now release changed the item's state"
 
 # A claim never started is refused the same way: [ ] is not done either.
-ok "filing an item to leave unstarted" add --project "$WORK/live-one" --id not-started \
+ok "filing an item to leave unstarted" add --project "$WORK/live-one" "${PK[@]}" --id not-started \
   --claim 'taken and never started' --source s --touches 'api/unstarted.ts'
 ok "taking it" claim --project "$WORK/live-one" --id not-started --run 2026-08-27-one
 refused "releasing one's own unstarted claim with nothing recorded" release \
@@ -1336,7 +1435,7 @@ hasnt "$LROOT/items/not-started.md" 'question:' \
   "a not-now release left the earlier release's question beside the user's words"
 
 # A finished item releases as it always did, with nothing to say.
-ok "filing an item to finish" add --project "$WORK/live-one" --id all-done \
+ok "filing an item to finish" add --project "$WORK/live-one" "${PK[@]}" --id all-done \
   --claim 'finished in the run' --source s --touches 'api/done.ts'
 ok "taking it" claim --project "$WORK/live-one" --id all-done --run 2026-08-27-one
 ok "marking it done" mark --project "$WORK/live-one" --id all-done --run 2026-08-27-one --state '[x]'
@@ -1348,7 +1447,7 @@ is RELEASE_WITH none "a bare release of a finished claim reported a reason"
 ok "recording not-now with mark" mark --project "$WORK/live-one" --id all-done \
   --not-now 'the user: its own session'
 has "$LROOT/items/all-done.md" 'not_now: the user: its own session' "mark did not write not_now"
-ok "filing an item to answer by mark" add --project "$WORK/live-one" --id answered-later \
+ok "filing an item to answer by mark" add --project "$WORK/live-one" "${PK[@]}" --id answered-later \
   --claim 'asked about and answered later' --source s --touches 'api/answered.ts'
 ok "taking it" claim --project "$WORK/live-one" --id answered-later --run 2026-08-27-one
 ok "releasing it with a question" release --project "$WORK/live-one" --id answered-later \
@@ -1362,7 +1461,7 @@ hasnt "$LROOT/items/answered-later.md" 'question:' "mark --not-now left the answ
 # A record predating `claimed_in` names no tree, so nothing here can tell whether
 # its run is still going. Absence of evidence is not evidence, and it keeps
 # refusing.
-ok "filing an item held under an older record shape" add --project "$WORK/live-one" --id old-shape \
+ok "filing an item held under an older record shape" add --project "$WORK/live-one" "${PK[@]}" --id old-shape \
   --claim 'claimed before the worktree was recorded' --source s --touches 'api/old.ts'
 ok "taking it" claim --project "$WORK/live-one" --id old-shape --run 2026-08-27-one
 LC_ALL=C sed '/^claimed_in:/d' "$LROOT/items/old-shape.md" > "$LROOT/items/old-shape.md.tmp"
@@ -1385,7 +1484,7 @@ said 'STOLEN_FROM=2026-08-27-one' "a record naming no worktree was not moved by 
 # path it contains nothing and nothing contains it, so it would be reported
 # parallel-safe against the whole store — making the honest placeholder strictly
 # more permissive than declaring nothing at all.
-ok "filing an item whose write set is recorded as unknown" add --project "$WORK/live-one" \
+ok "filing an item whose write set is recorded as unknown" add --project "$WORK/live-one" "${PK[@]}" \
   --id writes-unknown --claim 'write set not established' --source s --touches 'UNKNOWN'
 ok "checking an item whose write set is UNKNOWN" check --project "$WORK/live-one" \
   --id writes-unknown --against held-by-living
@@ -1413,7 +1512,7 @@ new_repo "$WORK/stale-one"
 printf 'pln-todo: %s\n' "$SROOT" > "$WORK/stale-one/CLAUDE.md"
 new_repo "$WORK/stale-two"
 printf 'pln-todo: %s\n' "$SROOT" > "$WORK/stale-two/CLAUDE.md"
-ok "filing an item claimed today" add --project "$WORK/stale-one" --id claimed-today \
+ok "filing an item claimed today" add --project "$WORK/stale-one" "${PK[@]}" --id claimed-today \
   --claim 'claimed today from a tree that vanishes' --source s --touches 'api/today.ts'
 ok "claiming it from the tree that vanishes" claim --project "$WORK/stale-two" --id claimed-today \
   --run 2026-08-27-vanishing
@@ -1440,9 +1539,9 @@ for tree in roll-one roll-two; do
   new_repo "$WORK/$tree"
   printf 'pln-todo: %s\n' "$RROOT" > "$WORK/$tree/CLAUDE.md"
 done
-ok "filing the item that will block" add --project "$WORK/roll-one" --id roll-blocker \
+ok "filing the item that will block" add --project "$WORK/roll-one" "${PK[@]}" --id roll-blocker \
   --claim 'holds the contested path' --source s --touches 'api/contested.ts'
-ok "filing the item that will be refused" add --project "$WORK/roll-one" --id roll-subject \
+ok "filing the item that will be refused" add --project "$WORK/roll-one" "${PK[@]}" --id roll-subject \
   --claim 'declares on the claim and is refused' --source s --touches 'api/own.ts' --holds 'own-lock'
 ok "the other tree taking the blocker" claim --project "$WORK/roll-two" --id roll-blocker --run 2026-08-27-live
 refused "declaring a colliding write set on a claim" claim --project "$WORK/roll-one" \
@@ -1466,7 +1565,7 @@ has "$RROOT/items/roll-subject.md" 'touches: [api/own.ts, api/second.ts]' \
 # does not hold it. Such a record has been seen in a live store. This covers what
 # is observable — that the remnant is named rather than passed over, and that the
 # helper can clear it.
-ok "filing an item to leave a remnant on" add --project "$WORK/roll-one" --id remnant \
+ok "filing an item to leave a remnant on" add --project "$WORK/roll-one" "${PK[@]}" --id remnant \
   --claim 'carries part of a holder' --source s --touches 'api/remnant.ts'
 ok "claiming it properly first" claim --project "$WORK/roll-one" --id remnant --run 2026-08-27-mine
 has "$RROOT/items/remnant.md" 'claimed_by: 2026-08-27-mine' "the claim did not record a holder"
@@ -1499,11 +1598,11 @@ new_repo "$R"
 ok "an empty list reports nothing waiting on the user" list --project "$R"
 is DECIDE_OPEN 0 "an empty list did not report its open-decision count"
 
-ok "filing a proposal" add --project "$R" --id swept-up --status proposed \
+ok "filing a proposal" add --project "$R" "${PK[@]}" --id swept-up --status proposed \
   --claim 'a sweep found a ledger nothing reads' --source 'rule-surface sweep'
-ok "filing a real blocker" add --project "$R" --id really-stuck --status decide \
+ok "filing a real blocker" add --project "$R" "${PK[@]}" --id really-stuck --status decide \
   --claim 'the run cannot pick which charge the refund clears' --source 'item 3'
-ok "filing ordinary work" add --project "$R" --id plain-work \
+ok "filing ordinary work" add --project "$R" "${PK[@]}" --id plain-work \
   --claim 'a test passes vacuously' --source s
 
 ok "the list separates the two" list --project "$R"
@@ -1517,7 +1616,7 @@ said 'decide · the run cannot pick which charge the refund clears' \
 # No ceiling and no refusal: a count is a symptom, and bounding it would bound
 # proposals, which are the thing there is no reason to lose.
 for n in 1 2 3 4 5 6 7 8; do
-  ok "filing proposal $n" add --project "$R" --id "p$n" --claim "proposal $n" \
+  ok "filing proposal $n" add --project "$R" "${PK[@]}" --id "p$n" --claim "proposal $n" \
     --source sweep --status proposed
 done
 ok "many proposals are not an error" list --project "$R"
@@ -1533,7 +1632,7 @@ said 'ready · the run cannot pick which charge the refund clears' \
   "the answered item did not take the status its shape now has"
 
 # A completed decision is not an open one either.
-ok "filing a second blocker" add --project "$R" --id stuck-again --status decide \
+ok "filing a second blocker" add --project "$R" "${PK[@]}" --id stuck-again --status decide \
   --claim 'still needs an answer' --source s
 ok "two items, one waiting" list --project "$R"
 is DECIDE_OPEN 1 "a newly filed blocker was not counted"
@@ -1542,7 +1641,7 @@ ok "a completed decision stops waiting" list --project "$R"
 is DECIDE_OPEN 0 "a completed decision was still counted as waiting"
 
 # The closed set is still closed.
-refused "filing an invented status" add --project "$R" --id invented --status someday \
+refused "filing an invented status" add --project "$R" "${PK[@]}" --id invented --status someday \
   --claim 'not a member of the set' --source s
 said 'ready, blocked, decide, proposed or dropped' \
   "the status error did not name the whole closed set"
@@ -1565,32 +1664,32 @@ refused "related with no to-do list" related --project "$R" --id rel-subject
 # So the items pointing at the subject go in before it, the ones it points at
 # after it, and the subject's write set is declared by `mark` once the
 # overlapping items are filed.
-ok "filing what depends on the subject" add --project "$R" --id rel-needs --claim 'waits on it' \
+ok "filing what depends on the subject" add --project "$R" "${PK[@]}" --id rel-needs --claim 'waits on it' \
   --source s --depends-on rel-subject
-printf '%s\n' '## What to do' '' 'Same work as `rel-subject`, other half.' > "$WORK/naming-body"
+printf '%s\n' '## What to do' '' 'Same work as `rel-subject`, other half.' '' '## How to tell it worked' '' 'Its check passes.' > "$WORK/naming-body"
 ok "filing what names the subject" add --project "$R" --id rel-namer --claim 'mentions it' \
   --source s --body "$WORK/naming-body"
-ok "filing a dropped dependant" add --project "$R" --id rel-dropped --claim 'given up' \
+ok "filing a dropped dependant" add --project "$R" "${PK[@]}" --id rel-dropped --claim 'given up' \
   --source s --depends-on rel-subject --status dropped
-printf '%s\n' '## What to do' '' 'Finish what rel-names-me started, then hand off.' > "$WORK/subject-body"
+printf '%s\n' '## What to do' '' 'Finish what rel-names-me started, then hand off.' '' '## How to tell it worked' '' 'Its check passes.' > "$WORK/subject-body"
 ok "filing the subject" add --project "$R" --id rel-subject --claim 'the subject' --source s \
   --group refunds --depends-on rel-dep --body "$WORK/subject-body"
-ok "filing what the subject depends on" add --project "$R" --id rel-dep --claim 'a prerequisite' --source s
-ok "filing what the subject names" add --project "$R" --id rel-names-me --claim 'named in the subject body' --source s
-ok "filing a narrower write set" add --project "$R" --id rel-inside --claim 'one file inside' \
+ok "filing what the subject depends on" add --project "$R" "${PK[@]}" --id rel-dep --claim 'a prerequisite' --source s
+ok "filing what the subject names" add --project "$R" "${PK[@]}" --id rel-names-me --claim 'named in the subject body' --source s
+ok "filing a narrower write set" add --project "$R" "${PK[@]}" --id rel-inside --claim 'one file inside' \
   --source s --touches 'app/bookings/cancel.rb'
-ok "filing a wider write set" add --project "$R" --id rel-around --claim 'the whole lib tree' \
+ok "filing a wider write set" add --project "$R" "${PK[@]}" --id rel-around --claim 'the whole lib tree' \
   --source s --touches 'lib/'
 ok "declaring the subject's write set" mark --project "$R" --id rel-subject --touches 'app/bookings/,lib/one.rb'
-ok "filing an unknown write set" add --project "$R" --id rel-unknown --claim 'nobody looked' \
+ok "filing an unknown write set" add --project "$R" "${PK[@]}" --id rel-unknown --claim 'nobody looked' \
   --source s --touches 'UNKNOWN,app/bookings/'
-ok "filing no write set" add --project "$R" --id rel-undeclared --claim 'nothing declared' --source s
-ok "filing a groupmate" add --project "$R" --id rel-group --claim 'same area' --source s --group refunds
-ok "filing a finished groupmate" add --project "$R" --id rel-finished --claim 'done already' \
+ok "filing no write set" add --project "$R" "${PK[@]}" --id rel-undeclared --claim 'nothing declared' --source s
+ok "filing a groupmate" add --project "$R" "${PK[@]}" --id rel-group --claim 'same area' --source s --group refunds
+ok "filing a finished groupmate" add --project "$R" "${PK[@]}" --id rel-finished --claim 'done already' \
   --source s --group refunds --state '[x]'
-ok "filing an id that only contains the subject's" add --project "$R" --id rel-subject-two \
+ok "filing an id that only contains the subject's" add --project "$R" "${PK[@]}" --id rel-subject-two \
   --claim 'a longer id' --source s
-ok "filing an unrelated item" add --project "$R" --id rel-alone --claim 'nothing shared' \
+ok "filing an unrelated item" add --project "$R" "${PK[@]}" --id rel-alone --claim 'nothing shared' \
   --source s --touches 'docs/' --distinct-from rel-subject
 line_is "$R/pln/items/rel-alone.md" '- Distinct from: rel-subject' \
   "add --distinct-from did not write its declaration under ## Related"
@@ -1666,11 +1765,11 @@ said 'limit must be a whole number' "a bad limit was not explained"
 # so it is only noted.
 R="$WORK/near"
 new_repo "$R"
-ok "filing the item others come near" add --project "$R" --id near-base \
+ok "filing the item others come near" add --project "$R" "${PK[@]}" --id near-base \
   --claim 'cancelled bookings release their dates' --source s --touches 'app/bookings/' --group refunds
 nb_before="$(cd "$R/pln" && find . -type f | sort | xargs shasum)"
 
-refused "filing an item that depends on a live one" add --project "$R" --id near-dep \
+refused "filing an item that depends on a live one" add --project "$R" "${PK[@]}" --id near-dep \
   --claim 'the host-side half' --source s --depends-on near-base
 [ "$Q_RC" = 3 ] || fail "a near-duplicate add exited $Q_RC, expected 3"
 said $'NEAR\tnear-base\tdepends-on\tcancelled bookings release their dates' \
@@ -1680,12 +1779,12 @@ said 'mark --id <that id> --run <run> --add-sub-item' "the refusal did not name 
 said '--distinct-from near-base' "the refusal did not name the distinct-from way forward with the ids to name"
 [ ! -e "$R/pln/items/near-dep.md" ] || fail "a refused add wrote its detail file"
 
-printf '%s\n' '## What to do' '' 'The other half of near-base.' > "$WORK/near-body"
+printf '%s\n' '## What to do' '' 'The other half of near-base.' '' '## How to tell it worked' '' 'Its check passes.' > "$WORK/near-body"
 refused "filing an item whose body names a live one" add --project "$R" --id near-names \
   --claim 'names it' --source s --body "$WORK/near-body"
 said $'NEAR\tnear-base\tnames\t' "a body naming a live item was not reported as NEAR"
 
-refused "filing an item that shares a write set" add --project "$R" --id near-touch \
+refused "filing an item that shares a write set" add --project "$R" "${PK[@]}" --id near-touch \
   --claim 'same files' --source s --touches 'app/bookings/cancel.rb'
 said $'NEAR\tnear-base\ttouches:app/bookings/cancel.rb\t' "a shared write set was not reported as NEAR"
 
@@ -1696,7 +1795,7 @@ nb_after="$(cd "$R/pln" && find . -type f | sort | xargs shasum)"
 
 # A group alone is noted and does not refuse; nor does a live item that names
 # the new one, which is not the new item's own declaration.
-ok "filing a groupmate" add --project "$R" --id near-group --claim 'same area' --source s --group refunds
+ok "filing a groupmate" add --project "$R" "${PK[@]}" --id near-group --claim 'same area' --source s --group refunds
 said 'NOTE=related to near-group, and not enough to refuse it: near-base (group:refunds)' \
   "a shared group was not noted"
 didnt_say 'NEAR' "a shared group alone was reported as NEAR"
@@ -1704,24 +1803,24 @@ didnt_say 'NEAR' "a shared group alone was reported as NEAR"
 # The task packet's own headings are the same in every record, so they name
 # nothing: a one-word id that one of them happens to contain — `first`, from
 # "What has to be true first" — is not named by every item filed after it.
-ok "filing a one-word id" add --project "$R" --id first --claim 'the first follow-up' --source s
-ok "filing a skeleton item after it" add --project "$R" --id plain-later --claim 'the second follow-up' --source s
+ok "filing a one-word id" add --project "$R" "${PK[@]}" --id first --claim 'the first follow-up' --source s
+ok "filing a skeleton item after it" add --project "$R" "${PK[@]}" --id plain-later --claim 'the second follow-up' --source s
 didnt_say 'NEAR' "a skeleton heading made an item near a one-word id"
 ok "what the skeleton item relates to" related --project "$R" --id plain-later
 didnt_say $'RELATED\tfirst\t' "a skeleton heading was read as naming a one-word id"
 # Nor does prose: a one-word id is named only as its detail-file path, in
 # backticks, or on a `Distinct from:` line. A hyphenated id still matches as a word.
-printf '%s\n' '## What to do' '' 'Do the first step, then the rest.' > "$WORK/prose-body"
+printf '%s\n' '## What to do' '' 'Do the first step, then the rest.' '' '## How to tell it worked' '' 'Its check passes.' > "$WORK/prose-body"
 ok "a body using a one-word id as a word" add --project "$R" --id prose-first --claim 'prose' \
   --source s --body "$WORK/prose-body"
 didnt_say 'NEAR' "a one-word id used as an ordinary word made an item near it"
 ok "what the prose item relates to" related --project "$R" --id first
 didnt_say $'RELATED\tprose-first\t' "a body using a one-word id as a word was reported as naming it"
-printf '%s\n' '## What to do' '' 'Finish what items/first.md left.' > "$WORK/path-body"
+printf '%s\n' '## What to do' '' 'Finish what items/first.md left.' '' '## How to tell it worked' '' 'Its check passes.' > "$WORK/path-body"
 refused "a body naming a one-word id by its path" add --project "$R" --id path-first --claim 'by path' \
   --source s --body "$WORK/path-body"
 said $'NEAR\tfirst\tnames\t' "a body naming a one-word id by its detail-file path was not near it"
-printf '%s\n' '## What to do' '' 'The rest of `first`.' > "$WORK/tick-body"
+printf '%s\n' '## What to do' '' 'The rest of `first`.' '' '## How to tell it worked' '' 'Its check passes.' > "$WORK/tick-body"
 refused "a body naming a one-word id in backticks" add --project "$R" --id tick-first --claim 'in backticks' \
   --source s --body "$WORK/tick-body"
 said $'NEAR\tfirst\tnames\t' "a body naming a one-word id in backticks was not near it"
@@ -1733,14 +1832,14 @@ said $'RELATED\tpath-first\tnamed-by,distinct\t' "a one-word id on a Distinct fr
 # Declaring the item distinct files it, and the declaration lands under
 # `## Related` — in the skeleton, at the end of a body's own section, and as a
 # section of its own in a body that has none.
-refused "a declaration that misses a NEAR id" add --project "$R" --id near-two \
+refused "a declaration that misses a NEAR id" add --project "$R" "${PK[@]}" --id near-two \
   --claim 'two neighbours' --source s --touches 'app/bookings/x.rb' --depends-on near-group \
   --distinct-from near-group
 said $'NEAR\tnear-base\ttouches:app/bookings/x.rb' "an undeclared NEAR id was not reported"
 didnt_say $'NEAR\tnear-group\t' "an id the filer declared distinct was still reported as NEAR"
 said '--distinct-from near-group,near-base' "the refusal did not name every id the declaration must cover"
 [ ! -e "$R/pln/items/near-two.md" ] || fail "an add whose declaration missed an id was filed"
-ok "a declaration that covers every NEAR id" add --project "$R" --id near-two \
+ok "a declaration that covers every NEAR id" add --project "$R" "${PK[@]}" --id near-two \
   --claim 'two neighbours' --source s --touches 'app/bookings/x.rb' --depends-on near-group \
   --distinct-from 'near-group, near-base'
 line_is "$R/pln/items/near-two.md" '- Distinct from: near-group, near-base' \
@@ -1752,19 +1851,19 @@ appears_before "$R/pln/items/near-two.md" '- Distinct from:' '## Sub-items' \
 ok "a declared item is reported as distinct" related --project "$R" --id near-two
 said $'RELATED\tnear-base\tnames,distinct' "a declared item was not reported as distinct"
 
-printf '%s\n' '## What to do' '' 'The other half of near-base.' '' '## Related' '' '- see the incident' '' '## Sub-items' > "$WORK/near-body"
+printf '%s\n' '## What to do' '' 'The other half of near-base.' '' '## How to tell it worked' '' 'Its check passes.' '' '## Related' '' '- see the incident' '' '## Sub-items' > "$WORK/near-body"
 ok "a body with its own Related section" add --project "$R" --id near-names \
   --claim 'names it' --source s --body "$WORK/near-body" --distinct-from near-base
 appears_before "$R/pln/items/near-names.md" '- see the incident' '- Distinct from: near-base' \
   "the declaration did not go at the end of the body's Related section"
 appears_before "$R/pln/items/near-names.md" '- Distinct from: near-base' '## Sub-items' \
   "the declaration landed past the body's Related section"
-printf '%s\n' '## What to do' '' 'Same files as near-base.' > "$WORK/near-body"
+printf '%s\n' '## What to do' '' 'Same files as near-base.' '' '## How to tell it worked' '' 'Its check passes.' > "$WORK/near-body"
 ok "a body with no Related section" add --project "$R" --id near-bare \
   --claim 'bare body' --source s --body "$WORK/near-body" --distinct-from near-base
 appears_before "$R/pln/items/near-bare.md" '## Related' '- Distinct from: near-base' \
   "a body with no Related section was not given one"
-refused "a declaration naming something that is not an id" add --project "$R" --id near-bad \
+refused "a declaration naming something that is not an id" add --project "$R" "${PK[@]}" --id near-bad \
   --claim 'bad' --source s --distinct-from 'Near Base'
 said 'distinct-from ids must be' "a malformed distinct-from id was not explained"
 
@@ -1774,7 +1873,7 @@ said 'distinct-from ids must be' "a malformed distinct-from id was not explained
 # sub-item is open, and an open one added to a `[x]` record makes it `[-]`.
 R="$WORK/subitems"
 new_repo "$R"
-ok "filing an item another run will hold" add --project "$R" --id held-work \
+ok "filing an item another run will hold" add --project "$R" "${PK[@]}" --id held-work \
   --claim 'held elsewhere' --source s --touches 'app/held.rb'
 ok "the other run taking it" claim --project "$R" --id held-work --run run-holder
 ok "a sub-item from a run that does not hold it" mark --project "$R" --id held-work --run run-other \
@@ -1817,7 +1916,7 @@ has "$R/pln/items/held-work.md" 'state: "[-]"' "an open sub-item left the record
 said 'NOTE=held-work was [x]; the open sub-item added to it makes it [-]' "the reopening was not reported"
 line_is "$R/pln/items/held-work.md" '- [ ] the refund email' "the reopening sub-item was not appended"
 
-ok "filing an item to archive" add --project "$R" --id to-archive --claim 'archive me' --source s
+ok "filing an item to archive" add --project "$R" "${PK[@]}" --id to-archive --claim 'archive me' --source s
 ok "a done item" mark --project "$R" --id to-archive --state '[x]'
 # A hand edit is the one way a done record gains an open line; the archive is
 # the last place it is caught.
@@ -1845,7 +1944,7 @@ ok "init with no tracker declared" init --project "$R"
 is TRACKER none "an undeclared tracker was reported as something"
 is TRACKER_QUESTION owed "the tracker question was not owed on a fresh list"
 hasnt "$WORK/out" 'TRACKER_PENDING=' "pending moves were reported with no tracker declared"
-ok "filing before any tracker is declared" add --project "$R" --id before-sync \
+ok "filing before any tracker is declared" add --project "$R" "${PK[@]}" --id before-sync \
   --claim 'filed before sync was on' --source s
 hasnt "$R/pln/items/before-sync.md" 'tracker_synced' "an item filed with no tracker was enrolled"
 
@@ -1859,12 +1958,12 @@ is TRACKER trello "the declared tracker was not reported"
 is TRACKER_QUESTION declared "a declared tracker still reported its question as open"
 is TRACKER_PENDING 0 "a list with nothing enrolled reported pending moves"
 
-ok "filing an urgent item under sync" add --project "$R" --id sync-a --urgent \
+ok "filing an urgent item under sync" add --project "$R" "${PK[@]}" --id sync-a --urgent \
   --claim 'first synced item' --source s
 has "$R/pln/items/sync-a.md" 'tracker_synced: none' "an item filed under sync was not enrolled"
 is TRACKER_PENDING 1 "a newly filed item was not reported as owed"
 has "$WORK/out" 'TRACKER_NEXT=' "an owed move did not say what to do next"
-ok "filing a second item" add --project "$R" --id sync-b --claim 'second synced item' --source s
+ok "filing a second item" add --project "$R" "${PK[@]}" --id sync-b --claim 'second synced item' --source s
 is TRACKER_PENDING 2 "two new items were not both owed"
 
 ok "listing the owed moves" tracker --project "$R"
@@ -1910,7 +2009,7 @@ ok "listing after the drop" tracker --project "$R"
 [ "$(pending_line sync-b)" = "card-b	backlog	closed	-" ] || fail "a dropped item was not owed a close ($(pending_line sync-b))"
 ok "recording the close" tracker --project "$R" --id sync-b --synced closed
 
-ok "filing an urgent item that ships before sync" add --project "$R" --id urgent-shipped --urgent \
+ok "filing an urgent item that ships before sync" add --project "$R" "${PK[@]}" --id urgent-shipped --urgent \
   --claim 'urgent work finished before its card existed' --source s
 ok "finishing it" mark --project "$R" --id urgent-shipped --state '[x]'
 ok "archiving it" archive --project "$R" --id urgent-shipped --disposition completed --evidence 'shipped'
@@ -1919,7 +2018,7 @@ ok "listing the archived urgent item" tracker --project "$R"
 ok "recording its card without a label" tracker --project "$R" --id urgent-shipped --synced done --ref card-u
 is TRACKER_PENDING 0 "an archived urgent item stayed pending over a label it does not need"
 
-ok "filing an item that is dropped before it is synced" add --project "$R" --id never-carded \
+ok "filing an item that is dropped before it is synced" add --project "$R" "${PK[@]}" --id never-carded \
   --claim 'dropped before any card' --source s
 ok "dropping it" archive --project "$R" --id never-carded --disposition dropped --evidence 'no'
 is TRACKER_PENDING 0 "an item with no card was owed a close"
@@ -1940,32 +2039,33 @@ said 'add --tracker-ref CARD' "the guide does not say how a run takes over an ex
 # A run that takes no to-do item files one for itself; when its request came
 # from a card the team already has, the item is enrolled on that card, so the
 # sync moves it rather than making a second one.
-ok "filing a run's own item on an existing card" add --project "$R" --id run-owned \
+ok "filing a run's own item on an existing card" add --project "$R" "${PK[@]}" --id run-owned \
   --claim 'work that began as a ticket' --source 'ticket T-1' --touches src/r --tracker-ref T-1
 has "$R/pln/items/run-owned.md" 'tracker_ref: T-1' "the existing card was not recorded"
 has "$R/pln/items/run-owned.md" 'tracker_synced: unknown' "a card of unknown status was recorded as synced somewhere"
 ok "claiming it before syncing" claim --project "$R" --id run-owned --run run-r
 ok "listing its move" tracker --project "$R"
 [ "$(pending_line run-owned)" = "T-1	unknown	in-progress	-" ] || fail "an existing card was not owed a move to in progress ($(pending_line run-owned))"
-refused "filing a second item on the same card" add --project "$R" --id run-owned-again \
+refused "filing a second item on the same card" add --project "$R" "${PK[@]}" --id run-owned-again \
   --claim 'the same ticket again' --source 'ticket T-1' --tracker-ref T-1
 is TRACKED_BY run-owned "the refusal did not name the item that already has the card"
 [ ! -e "$R/pln/items/run-owned-again.md" ] || fail "a refused filing still wrote its record"
-refused "a card id with a space" add --project "$R" --id spaced-ref \
+refused "a card id with a space" add --project "$R" "${PK[@]}" --id spaced-ref \
   --claim 'spaced' --source s --tracker-ref 'T 2'
+said 'with no spaces' "a card id with a space was refused for some other reason"
 ok "recording the move" tracker --project "$R" --id run-owned --synced in-progress
 
 # One person's opt-out, in their own pln config, never in the shared file.
 export PLN_STATE_DIR="$WORK/state"
 mkdir -p "$PLN_STATE_DIR"
 printf 'tracker_sync: off\n' > "$PLN_STATE_DIR/config.yaml"
-ok "filing with sync turned off personally" add --project "$R" --id opted-out \
+ok "filing with sync turned off personally" add --project "$R" "${PK[@]}" --id opted-out \
   --claim 'filed by someone who opted out' --source s
 is TRACKER off "a personal opt-out did not turn the tracker off"
 said 'tracker_sync off' "the opt-out was not reported"
 hasnt "$R/pln/items/opted-out.md" 'tracker_synced' "an opted-out filing was enrolled"
 hasnt "$WORK/out" 'TRACKER_PENDING=' "an opted-out call reported pending moves"
-refused "enrolling a card with sync turned off personally" add --project "$R" --id opted-out-card \
+refused "enrolling a card with sync turned off personally" add --project "$R" "${PK[@]}" --id opted-out-card \
   --claim 'opted out, with a card' --source s --tracker-ref T-9
 said 'TRACKER is off' "the refusal did not say sync is off"
 unset PLN_STATE_DIR

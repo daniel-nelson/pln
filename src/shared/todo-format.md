@@ -83,7 +83,7 @@ holds: [staging-deploy]
 - `touches`, `holds` — the files the item is expected to write, and the non-file resources it consumes for its duration. What counts as an overlap is below.
 - `not_now`, `question`, `waits_on` — why a claimed item short of `[x]` was given back: the user's own words, the question they now owe, or what it waits on. Written by `release`, and `not_now` by `mark --not-now`; each write clears the other two, so a record carries only its latest reason. See the outflow rules.
 
-**Four fields have to be filled: `id`, `state`, `status` and `source`.** Every other field may be left empty, so an item captured in one sentence in the middle of a run is still a valid item rather than a form to complete.
+**Four fields have to be filled: `id`, `state`, `status` and `source`.** Every other field may be left empty. The body is not optional: `add` refuses an item whose "What to do" and "How to tell it worked" carry nothing but the placeholder, because an item nobody can act on from its file alone is a note, not work.
 
 **`source` is a field and not a sentence in the body.** The failure this to-do list answers is a follow-up that existed only in a PR body and a review ledger, so an item's provenance has to outlive the run that found it — which a field does and a paragraph anyone may rewrite does not.
 
@@ -139,7 +139,7 @@ The comparison is pairwise against the set of items a run has declared, never a 
 
 **`release` gives an item back.** It clears `claimed_by`, `claimed_at` and `claimed_in`, leaves everything else exactly as it is but for the reason a claim short of `[x]` must carry (see the outflow rules), and the record reads afterwards like one nobody has taken. A run releases its own claim; a claim whose worktree is gone is released by whoever needs it, on that evidence and with `RELEASE_REASON=holder-gone` saying so. A holder that is still there is never released out from under — that is `claim --steal`, where displacing a live run is a decision somebody makes and the record carries. Releasing something unheld is a quiet no-op, so a close that hands back every id it took does not have to remember which ones it actually got. Without this a claim had two ends only, the run's own close or somebody else's steal, and every other way a run can stop leaked the hold: there was no call that meant "I am not working this", and the one call shaped like it, `archive`, removes the record instead.
 
-**Absent means unknown, and unknown collides with everything.** An item filed with no `touches` is never reported parallel-safe. It is also the cheapest kind of item to file — one sentence mid-run, no fields — and if an empty field read as "writes nothing", the cheapest capture would be the most permissive thing in the to-do list. `mark` fills the field in later, once someone has looked, so a run that takes an unknown item up says what it will write before it declares its scope.
+**Absent means unknown, and unknown collides with everything.** An item filed with no `touches` is never reported parallel-safe. It is also the commonest kind of item filed mid-run, before anyone has looked at what working it would write, and if an empty field read as "writes nothing", the cheapest capture would be the most permissive thing in the to-do list. `mark` fills the field in later, once someone has looked, so a run that takes an unknown item up says what it will write before it declares its scope.
 
 **`UNKNOWN` written into `touches` says exactly that and answers exactly the same.** It is the word `pln-scheduler` already uses for a write set nobody has established, where it means a lease that overlaps everything and keeps an unresolved target serial. Read as a path it would mean the opposite: it carries no separator, so it contains nothing and nothing contains it, and the item would come back parallel-safe against the whole to-do list. That would make writing down that you do not know strictly more permissive than writing nothing at all, which inverts the rule above. The refusal names it as an unknown write set rather than an absent one, because the two are fixed differently — one field to fill in, one placeholder to replace.
 
@@ -159,7 +159,7 @@ Work enters through four doors, and every one of them ends in the same call: `{{
 
 **What a live item already covers goes onto it, not beside it.** What is left of an id this run claimed goes in as `pln-todo mark --id <id> --run <run> --add-sub-item "<text>"` — a remainder only after that test's do-or-ask, its exit's artifact quoted in the line — and so does work any live item already covers, held or not. Only otherwise `add`. `add` holds the line itself: under the lock it asks `related`'s question of the item it is about to file, and a `--depends-on` on a live item, a body naming one, or a shared write set refuses it with a `NEAR<TAB><id><TAB><kinds><TAB><claim>` line each. Take one of the two ways the refusal names: the sub-item there, or, for work that is separate, `add` again with `--distinct-from` naming every `NEAR` id, which writes `- Distinct from: <ids>` under `## Related` and makes `related` report the pair as `distinct`. A shared group alone is a `NOTE=`, since groups are area labels.
 
-**A door files a complete item**: an `--id`, a `--status`, a `--source` and a claim. Everything else is optional.
+**A door files a complete item**: an `--id`, a `--status`, a `--source`, a claim, and the task packet's two required sections — `--do "<what to do>"` and `--done-when "<how to tell it worked>"`, or a `--body` that holds both under those headings. Everything else is optional.
 
 **1. The run spinoff — the sweep at either close.** At `{{PLN_CMD}}`'s Step 7 wrap-up and at whichever `{{PLN_PR_CMD}}` close hands the PR to the user, the outstanding sweep already assembles the candidates and the follow-up bar already decides which of them are filed. Each one that clears the bar is filed **before the closing message is drafted**, not after it, so that the message can be written from the to-do list rather than the to-do list from the message.
 
@@ -171,7 +171,7 @@ Work enters through four doors, and every one of them ends in the same call: `{{
 
 The doors differ only in what triggers them. What each one files and where it lands is the format above.
 
-**A migration accepted at the start of a run is not a fifth door.** What an agent lifts out of a to-do file this project's own instructions named is filed item by item through that same `add`, with `source` naming the file it came from. The file is read and never written — the to-do list starts beside it, not out of it.
+**A migration accepted at the start of a run is not a fifth door.** What an agent lifts out of a to-do file this project's own instructions named is filed item by item through that same `add`, with `source` naming the file it came from and `--do`/`--done-when` written from what the file says; where it says nothing about how to tell it worked, the agent states it. The file is read and never written — the to-do list starts beside it, not out of it.
 
 ### Outflow — what a run may change, and where finished work goes
 

@@ -474,7 +474,7 @@ todo_guards_pass() { # todo_guards_pass <dir> <description>
 d="$(todo_case committed)"
 todo_baseline "$d"
 "$TODO_BIN" init --project "$d/repo" >/dev/null
-"$TODO_BIN" add --project "$d/repo" --id first --claim 'the first follow-up' \
+"$TODO_BIN" add --project "$d/repo" --do 'do the work' --done-when 'the check passes' --id first --claim 'the first follow-up' \
   --source 'this run' >/dev/null
 hasnt "$d/plan/dirty.tsv" 'pln/TO-DO.md' 'the baseline snapshot listed the to-do-list index'
 # git itself sees the list as dirt, which is what makes the assertion below a
@@ -485,7 +485,7 @@ todo_guards_pass "$d" 'an untracked to-do list at the project root'
 git -C "$d/repo" add pln
 git -C "$d/repo" commit -qm 'commit the to-do list'
 todo_baseline "$d"
-"$TODO_BIN" add --project "$d/repo" --id second --claim 'the second follow-up' \
+"$TODO_BIN" add --project "$d/repo" --do 'do the work' --done-when 'the check passes' --id second --claim 'the second follow-up' \
   --source 'this run' >/dev/null
 [ -n "$(git -C "$d/repo" status --porcelain -- pln)" ] \
   || fail 'the tracked-list case did not actually dirty the list'
@@ -499,7 +499,7 @@ printf 'pln-todo: docs/todo\n' > "$d/repo/CLAUDE.md"
 git -C "$d/repo" add CLAUDE.md
 git -C "$d/repo" commit -qm 'declare the to-do-list location'
 todo_baseline "$d"
-"$TODO_BIN" add --project "$d/repo" --id declared-item --claim 'filed into the declared root' \
+"$TODO_BIN" add --project "$d/repo" --do 'do the work' --done-when 'the check passes' --id declared-item --claim 'filed into the declared root' \
   --source 'this run' > "$d/plan/add.out"
 has "$d/plan/add.out" "TODO_ROOT=$(cd "$d/repo" && pwd -P)/docs/todo" \
   'the declared root did not resolve where this case needs it'
@@ -511,7 +511,7 @@ todo_guards_pass "$d" 'a to-do list at a root the project instructions declared'
 d="$(todo_case commondir)"
 mkdir -p "$d/repo/.git/pln"
 todo_baseline "$d"
-"$TODO_BIN" add --project "$d/repo" --id in-common-dir --claim 'filed into the shared git dir' \
+"$TODO_BIN" add --project "$d/repo" --do 'do the work' --done-when 'the check passes' --id in-common-dir --claim 'filed into the shared git dir' \
   --source 'this run' > "$d/plan/add.out"
 has "$d/plan/add.out" 'RESOLVED_BY=common-dir' 'this case did not resolve to the shared git directory'
 todo_guards_pass "$d" 'a to-do list in the shared git directory'
@@ -523,7 +523,7 @@ printf 'pln-todo: %s\n' "$outside_root" > "$d/repo/CLAUDE.md"
 git -C "$d/repo" add CLAUDE.md
 git -C "$d/repo" commit -qm 'declare an external to-do list'
 todo_baseline "$d"
-"$TODO_BIN" add --project "$d/repo" --id outside --claim 'filed outside the repository' \
+"$TODO_BIN" add --project "$d/repo" --do 'do the work' --done-when 'the check passes' --id outside --claim 'filed outside the repository' \
   --source 'this run' > "$d/plan/add.out"
 has "$d/plan/add.out" "TODO_ROOT=$outside_root" 'this case did not resolve outside the repository'
 todo_guards_pass "$d" 'a to-do list outside the repository'

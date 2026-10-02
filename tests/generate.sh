@@ -1828,6 +1828,14 @@ has "$real_x/SKILL.md" 'Trigger explicitly via `$pln <task>`' \
 todo_marker='## The project to-do list'
 todo_sentence='Work that is found and not done now reaches the to-do list'
 door_pointer='is filed in the turn it is named'
+# The remainder test rides in the same fragment as the door sentence, so every
+# phase a door fires in runs it before filing, and the two closes that sweep
+# carry it too. It is stated once there and never in a router, which has no
+# bytes to spare for it.
+remainder_anchor="A remainder of this run's own work is not a follow-up, and it is never filed"
+# Beside it, the routing rule: what a live item already covers is a sub-item
+# there, and `add`'s NEAR refusal names the two ways forward.
+subitem_anchor='goes onto it as a sub-item, never beside it as a new item'
 for host_out in "$real_c" "$real_x"; do
   host_out="$(cd "$host_out" && pwd -P)"
   for rel in phases/pln/outline.md phases/pln/finish-ship.md phases/pln-pr/ship-watch.md; do
@@ -1847,9 +1855,38 @@ for host_out in "$real_c" "$real_x"; do
     phases/pln-pr/fix.md phases/pln-pr/blocker.md phases/pln-simplify/map-synthesize.md; do
     has "$host_out/$rel" "$door_pointer" \
       "$host_out/$rel cannot file a follow-up named in the turn it is named"
+    has "$host_out/$rel" "$remainder_anchor" \
+      "$host_out/$rel can file a remainder of its own run's work as a follow-up"
+    has "$host_out/$rel" "$subitem_anchor" \
+      "$host_out/$rel files what a live item already covers as a sibling item"
     has "$host_out/$rel" 'bin/pln-todo add' "$host_out/$rel names no helper call to file with"
+    has "$host_out/$rel" 'add` with `--do` and `--done-when`' \
+      "$host_out/$rel files without the task packet add requires"
     hasnt "$host_out/$rel" "$todo_marker" "$host_out/$rel duplicated the whole to-do-list format"
   done
+  for rel in phases/pln/finish-ship.md phases/pln-pr/ship-watch.md; do
+    has "$host_out/$rel" "$remainder_anchor" \
+      "$host_out/$rel sweeps a remainder of its own run's work into the to-do list"
+    has "$host_out/$rel" "$subitem_anchor" \
+      "$host_out/$rel sweeps what a live item already covers in as a sibling item"
+    has "$host_out/$rel" 'each first takes the remainder test above' \
+      "$host_out/$rel lets the outstanding sweep skip the remainder test"
+    has "$host_out/$rel" '`--do`/`--done-when`' "$host_out/$rel sweeps items in without a task packet"
+  done
+  # Picking up an item shows what it is tied to: at the outline when the request
+  # names ids, and before the approval message for an id first found later. A
+  # delegated run takes the strongly related ones, never one declared distinct.
+  for rel in phases/pln/outline.md phases/pln/review-approval.md; do
+    has "$host_out/$rel" "$host_out/bin/pln-todo related --id" \
+      "$host_out/$rel does not show the items related to a to-do item the run takes"
+    has "$host_out/$rel" 'Related, not taken:' "$host_out/$rel lost the related-items dashboard line"
+  done
+  has "$host_out/phases/pln/review-approval.md" 'filing again with `--distinct-from` naming every `NEAR` id' \
+    "$host_out/phases/pln/review-approval.md leaves the run's own tracker item refused as a near-duplicate"
+  has "$host_out/phases/pln/outline.md" 'and not `distinct`' \
+    "$host_out/phases/pln/outline.md lets delegated mode take an item declared distinct"
+  has "$host_out/phases/pln/implementation.md" 'every id but those on its `Related, not taken:` line' \
+    "$host_out/phases/pln/implementation.md claims the related items the run did not take"
   hasnt "$host_out/phases/pln-simplify/verify-record.md" "$todo_marker" \
     "the to-do-list format reached a phase no door fires in"
   # Not in any router, on any host. The 60000-byte ceiling above is the reason
@@ -1857,6 +1894,9 @@ for host_out in "$real_c" "$real_x"; do
   for router in SKILL.md pln-pr/SKILL.md pln-simplify/SKILL.md; do
     hasnt "$host_out/$router" "$todo_marker" "$host_out/$router carries the to-do-list format"
     hasnt "$host_out/$router" "$todo_sentence" "$host_out/$router carries the list's intake rules"
+    hasnt "$host_out/$router" "$remainder_anchor" "$host_out/$router carries the remainder test"
+    hasnt "$host_out/$router" "$subitem_anchor" "$host_out/$router carries the sub-item routing rule"
+    hasnt "$host_out/$router" 'pln-todo related' "$host_out/$router carries the related-items rule"
   done
   # The helper is named through the absolute output root baked in at generation
   # time, never through {{SKILL_DIR}}: on Codex that substitutes to $_PLN_DIR, a

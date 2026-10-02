@@ -44,7 +44,7 @@ Usage:
   pln-todo add --id ID --claim TEXT --source TEXT [--status ready|blocked|decide|proposed|dropped]
                [--state "[ ]"|"[-]"|"[x]"] [--urgent] [--group TEXT] [--opened YYYY-MM-DD]
                [--depends-on CSV] [--touches CSV] [--holds CSV] [--body FILE|-]
-               [--tracker-ref REF]
+               [--tracker-ref REF] [--distinct-from CSV]
   pln-todo list [--project DIR]
   pln-todo check --id ID [--against CSV] [--run TEXT]
   pln-todo related --id CSV [--limit N]
@@ -90,11 +90,25 @@ lists them. `pln-todo tracker --guide` says how to set up and sync.
 `add --tracker-ref` enrols an item on a card that already exists, and is
 refused, naming the item as TRACKED_BY, when a live item already has that card.
 
+`add` asks `related`'s question of the item it is about to file, under the
+lock: a --depends-on on a live item, a body naming one, or a shared write set
+refuses it (exit 3, nothing written) with NEAR<TAB>id<TAB>kinds<TAB>claim per
+item and NEAR_COUNT. File it as a sub-item there (`mark --add-sub-item`), or
+again with --distinct-from naming every NEAR id, which writes `- Distinct from:`
+under `## Related`. A shared group alone is a NOTE.
+
+`mark` on a record another run holds is refused (exit 3, HELD_BY) unless its
+only change is --add-sub-item with sub-item state [ ], which is intake.
+`mark --state "[x]"` and `archive --disposition completed` are refused (exit 3,
+OPEN_SUB_ITEM per line) while a [ ] or [-] line stands under `## Sub-items`; an
+open sub-item added to an [x] record makes it [-] in the same rewrite.
+
 `related` is read-only (no lock, no write, never creates a list). It prints
 RELATED<TAB>id<TAB>kinds<TAB>state<TAB>status<TAB>holder or -<TAB>claim for
 each live item related to the named ones, then RELATED_COUNT, RELATED_SHOWN and
 RELATED=none|items. Kinds, comma-joined: depends-on, depended-on-by, names,
-named-by (the id appears in the other's body), distinct (on a `Distinct from:`
+named-by (the id appears in the other's body; an id with no hyphen only as
+items/<id>.md or in backticks), distinct (on a `Distinct from:`
 line under `## Related`, either side), touches:<path> (both declare touches,
 neither UNKNOWN), and group:<g>, always last. Ranked dependency or name, then
 touches, then group, then id; one hop; the named ids, [x] and dropped items are
@@ -1176,7 +1190,12 @@ relation_facts() {
       return out
     }
     function idchar(c) { return c != "" && c ~ /[A-Za-z0-9_-]/ }
-    function names_id(s, id,   at, p, n) {
+    # A hyphenated id is specific enough to match as a word. A one-word id is
+    # not — `first` is also the first step of anything — so it is named only
+    # in a form that can mean nothing else: its detail-file path, in backticks,
+    # or on a `Distinct from:` line (dl).
+    function names_id(s, id, dl,   at, p, n) {
+      if (!dl && index(id, "-") == 0) return index(s, "items/" id ".md") > 0 || index(s, "`" id "`") > 0
       n = length(id); at = 0
       while ((p = index(substr(s, at + 1), id)) > 0) {
         p += at
@@ -1204,12 +1223,16 @@ relation_facts() {
     {
       if (claim == "" && $0 ~ /^# /) claim = trim(substr($0, 3))
       if ($0 ~ /^## /) section = trim(substr($0, 4))
-      if (section == "Related" && $0 ~ /^[-*]?[ \t]*Distinct from:/) {
+      dl = (section == "Related" && $0 ~ /^[-*]?[ \t]*Distinct from:/)
+      if (dl) {
         s = substr($0, index($0, ":") + 1)
         while (match(s, /[a-z0-9][a-z0-9-]*/)) { distinct = add(distinct, substr(s, RSTART, RLENGTH)); s = substr(s, RSTART + RLENGTH) }
       }
-      if (mine) { for (j = 1; j <= nev; j++) if (names_id($0, EV[j])) names = add(names, EV[j]) }
-      else { for (j = 1; j <= nsj; j++) if (names_id($0, SJ[j])) names = add(names, SJ[j]) }
+      # The task packet headings and placeholder are the same in every record,
+      # so they name nothing.
+      if ($0 ~ /^## / || $0 == "_Not recorded when this item was filed._") next
+      if (mine) { for (j = 1; j <= nev; j++) if (names_id($0, EV[j], dl)) names = add(names, EV[j]) }
+      else { for (j = 1; j <= nsj; j++) if (names_id($0, SJ[j], dl)) names = add(names, SJ[j]) }
     }
     END { flush() }
   ' "$@"
@@ -1409,6 +1432,17 @@ append_sub_item() {
     }
   ' "$file" > "$tmp"
   mv "$tmp" "$file"
+}
+
+# The open lines — `[ ]` or `[-]` — of the checklist under `## Sub-items`, the
+# one `--add-sub-item` writes, one per line. Nothing else in the body counts: a
+# task packet may hold a checklist of its own, and reading that as unfinished
+# work would refuse a close the record's own sub-items allow.
+open_sub_items() {
+  LC_ALL=C awk '
+    /^## / { inside = ($0 == "## Sub-items"); next }
+    inside && /^[ \t]*[-*] \[[ -]\]/ { sub(/^[ \t]+/, ""); print }
+  ' "$1"
 }
 
 # ---------------------------------------------------------------- the tracker
@@ -1658,7 +1692,7 @@ case "$command" in
 
   add)
     id=''; claim=''; source=''; status='ready'; state='[ ]'; urgent='false'
-    group=''; opened=''; depends=''; touches=''; holds=''; body=''; tracker_ref=''
+    group=''; opened=''; depends=''; touches=''; holds=''; body=''; tracker_ref=''; distinct=''
     while [ $# -gt 0 ]; do
       case "$1" in
         --project) project="${2:-}"; shift 2 ;;
@@ -1675,11 +1709,20 @@ case "$command" in
         --holds) holds="${2:-}"; shift 2 ;;
         --body) body="${2:-}"; shift 2 ;;
         --tracker-ref) tracker_ref="${2:-}"; [ -n "$tracker_ref" ] || usage; shift 2 ;;
+        --distinct-from) distinct="${2:-}"; [ -n "$distinct" ] || usage; shift 2 ;;
         --no-create) create_flag=0; shift ;;
         *) usage ;;
       esac
     done
     [ -n "$id" ] && [ -n "$claim" ] && [ -n "$source" ] || usage
+    distinct_ids=''
+    while IFS= read -r one; do
+      [ -n "$one" ] || continue
+      valid_id "$one" || fail "distinct-from ids must be lowercase letters, digits and hyphens: $one"
+      case ",$distinct_ids," in *",$one,"*) ;; *) distinct_ids="$distinct_ids${distinct_ids:+,}$one" ;; esac
+    done <<EOF
+$(csv_to_lines "$distinct")
+EOF
     valid_id "$id" || fail "id must be lowercase letters, digits and hyphens: $id"
     valid_state "$state" || fail "state must be '[ ]', '[-]' or '[x]': $state"
     valid_status "$status" || fail "status must be ready, blocked, decide, proposed or dropped: $status"
@@ -1746,10 +1789,69 @@ case "$command" in
         printf '## What to do\n\n_Not recorded when this item was filed._\n\n'
         printf '## What has to be true first\n\n_Not recorded when this item was filed._\n\n'
         printf '## How to tell it worked\n\n_Not recorded when this item was filed._\n\n'
-        printf '## Related\n\n- filed from: %s\n\n' "$source"
-        printf '## Sub-items\n'
+        printf '## Related\n\n- filed from: %s\n' "$source"
+        [ -z "$distinct_ids" ] || printf -- '- Distinct from: %s\n' "$(printf '%s' "$distinct_ids" | sed 's/,/, /g')"
+        printf '\n## Sub-items\n'
       fi
     } > "$tmp"
+    # A supplied body gets the declaration at the end of its own `## Related`,
+    # or a `## Related` of its own ahead of the sub-items when it has none.
+    if [ -n "$body" ] && [ -n "$distinct_ids" ]; then
+      tmp2="$(mktemp "$TODO_ROOT/$LIVE_DIR/.pln-todo-add.XXXXXX")"
+      LC_ALL=C awk -v line="- Distinct from: $(printf '%s' "$distinct_ids" | sed 's/,/, /g')" '
+        { lines[++n] = $0; if ($0 == "## Related" && !rel) rel = NR; if ($0 == "## Sub-items" && !si) si = NR }
+        END {
+          if (rel) {
+            last = rel
+            for (i = rel + 1; i <= n; i++) { if (lines[i] ~ /^## /) break; if (lines[i] != "") last = i }
+            for (i = 1; i <= last; i++) print lines[i]
+            if (last == rel) print ""
+            print line
+            for (i = last + 1; i <= n; i++) print lines[i]
+          } else if (si) {
+            for (i = 1; i < si; i++) print lines[i]
+            print "## Related"; print ""; print line; print ""
+            for (i = si; i <= n; i++) print lines[i]
+          } else {
+            while (n > 0 && lines[n] == "") n--
+            for (i = 1; i <= n; i++) print lines[i]
+            print ""; print "## Related"; print ""; print line
+          }
+        }
+      ' "$tmp" > "$tmp2"
+      mv "$tmp2" "$tmp"
+    fi
+    # What a live item already covers goes in there as a sub-item, not beside it
+    # as a sibling nobody will finish together with it. The draft is asked the
+    # same question `related` answers at pickup, under the lock, before it is
+    # filed: a dependency on a live item, a body naming one, or a shared write
+    # set refuses the add unless the filer has declared that item distinct. A
+    # shared group alone is an area label and is only noted.
+    near_rows="$(related_rows "$id" "$tmp")" || { rm -f "$tmp"; fail "cannot read the to-do list's detail files"; }
+    near_count=0; near_ids=''; weak=''
+    if [ -n "$near_rows" ]; then
+      while IFS="$(printf '\t')" read -r _rank rid rkinds _rstate _rstatus _rholder rclaim; do
+        strong="${rkinds%%,group:*}"
+        case "$strong" in group:*) strong='' ;; esac
+        case ",$strong," in *,distinct,*) continue ;; esac
+        case ",$strong," in
+          *,depends-on,* | *,names,* | *,touches:*)
+            near_count=$((near_count + 1))
+            near_ids="$near_ids${near_ids:+,}$rid"
+            printf 'NEAR\t%s\t%s\t%s\n' "$rid" "$rkinds" "$rclaim"
+            ;;
+          *) weak="$weak${weak:+; }$rid ($rkinds)" ;;
+        esac
+      done <<EOF
+$near_rows
+EOF
+    fi
+    if [ "$near_count" -gt 0 ]; then
+      rm -f "$tmp"
+      printf 'NEAR_COUNT=%s\n' "$near_count"
+      refuse "$id is near $near_count live item(s), listed as NEAR above; nothing was written. What a live item already covers goes in there: mark --id <that id> --run <run> --add-sub-item TEXT. Separate work is filed again with --distinct-from $distinct_ids${distinct_ids:+,}$near_ids, naming every NEAR id."
+    fi
+    [ -z "$weak" ] || note "related to $id, and not enough to refuse it: $weak"
     # The detail file is canonical, so it lands first: an interruption leaves an
     # orphan the next rebuild picks up, never a phantom index line.
     mv "$tmp" "$detail"
@@ -2182,20 +2284,54 @@ EOF
     # success nobody could reconcile. An unheld record is marked by anyone, as
     # before. A run that really did the work takes the item back first, which is
     # also how the run that stole it learns the steal was contested.
-    mark_holder="$(parse_detail "$detail")" || mark_holder=''
-    mark_holder_wt="$(printf '%s' "$mark_holder" | LC_ALL=C cut -f10)"
-    mark_holder="$(printf '%s' "$mark_holder" | LC_ALL=C cut -f7)"
-    if [ -n "$mark_holder" ] \
+    #
+    # One write is let through on a record someone else holds: a call whose only
+    # change is appending a `[ ]` sub-item. That is intake, not progress — it
+    # records no completion — and it is how what a held item already covers
+    # reaches that item rather than becoming a sibling nobody finishes with it.
+    mark_record="$(parse_detail "$detail")" || mark_record=''
+    mark_cur_state="$(printf '%s' "$mark_record" | LC_ALL=C cut -f2)"
+    mark_holder_wt="$(printf '%s' "$mark_record" | LC_ALL=C cut -f10)"
+    mark_holder="$(printf '%s' "$mark_record" | LC_ALL=C cut -f7)"
+    intake_only=0
+    if [ -n "$sub" ] && [ "$sub_state" = '[ ]' ] \
+      && [ -z "$set_state$set_status$set_urgent$set_source$set_not_now" ] \
+      && [ "$have_group$have_touches$have_holds$have_depends" = 0000 ]; then
+      intake_only=1
+    fi
+    if [ -n "$mark_holder" ] && [ "$intake_only" = 0 ] \
       && { [ "$mark_run" != "$mark_holder" ] || [ "$PROJECT_TOP" != "$mark_holder_wt" ]; }; then
       release_lock
       printf 'MARK=refused\nHELD_BY=%s\nHELD_IN=%s\n' "$mark_holder" "${mark_holder_wt:--}"
       if [ -n "$mark_holder_wt" ]; then mark_desc="$mark_holder in $mark_holder_wt"; else mark_desc="$mark_holder"; fi
       refuse "$id is held by $mark_desc; take it back with claim --steal $mark_holder before marking it"
     fi
+    # `[x]` and an open sub-item cannot stand in one record: the parent's marker
+    # is what its sub-items add up to, and an item reading done with work still
+    # listed under it is work nobody looks for again. So `[x]` is refused while
+    # one is open, and an open one appended to a `[x]` record makes it `[-]`.
+    sub_open=0
+    if [ -n "$sub" ] && [ "$sub_state" != '[x]' ]; then sub_open=1; fi
+    if [ "$set_state" = '[x]' ]; then
+      open_subs="$(open_sub_items "$detail")"
+      if [ "$sub_open" = 1 ]; then open_subs="$(printf '%s\n- %s %s' "$open_subs" "$sub_state" "$sub" | sed '/^$/d')"; fi
+      if [ -n "$open_subs" ]; then
+        release_lock
+        printf '%s\n' "$open_subs" | while IFS= read -r one; do printf 'OPEN_SUB_ITEM=%s\n' "$one"; done
+        refuse "$id still has open sub-items, listed as OPEN_SUB_ITEM above, so it is not [x]; nothing was written. Check each off in the detail file once it has landed, or mark the item [-]."
+      fi
+    elif [ -z "$set_state" ] && [ "$mark_cur_state" = '[x]' ] && [ "$sub_open" = 1 ]; then
+      set_state='[-]'
+      note "$id was [x]; the open sub-item added to it makes it [-]"
+    fi
     # The helper owns the frontmatter and the sub-item checklist it appends to,
     # and nothing else in the body. One `mark` is one rewrite: a call setting a
     # state and a write set together is one edit to the reader, and writing it as
     # eight leaves seven moments where the record says half of what was asked.
+    # The fields and the sub-item are written to a copy that replaces the record
+    # in a single rename, so no reader sees one without the other.
+    mark_work="$(mktemp "$TODO_ROOT/$LIVE_DIR/.pln-todo-mark.XXXXXX")"
+    cp "$detail" "$mark_work"
     {
       [ -z "$set_state" ] || printf 'set\tstate\t"%s"\n' "$set_state"
       [ -z "$set_status" ] || printf 'set\tstatus\t%s\n' "$set_status"
@@ -2206,8 +2342,9 @@ EOF
       [ "$have_touches" = 0 ] || printf 'set\ttouches\t%s\n' "$(csv_to_lines "$set_touches" | lines_to_yaml_list)"
       [ "$have_holds" = 0 ] || printf 'set\tholds\t%s\n' "$(csv_to_lines "$set_holds" | lines_to_yaml_list)"
       [ "$have_depends" = 0 ] || printf 'set\tdepends_on\t%s\n' "$(csv_to_lines "$set_depends" | lines_to_yaml_list)"
-    } | set_fields "$detail"
-    [ -z "$sub" ] || append_sub_item "$detail" "$sub" "$sub_state"
+    } | set_fields "$mark_work"
+    [ -z "$sub" ] || append_sub_item "$mark_work" "$sub" "$sub_state"
+    mv "$mark_work" "$detail"
     write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
     release_lock
     load_header
@@ -2251,14 +2388,23 @@ EOF
     resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
     detail="$(detail_path "$id")"
     [ -f "$detail" ] || fail "no such to-do item: $id"
+
+    # Read under the lock, so the state and the sub-items checked are the ones
+    # that are archived.
+    take_lock
     record="$(parse_detail "$detail")" || fail "cannot read $detail"
     state="$(printf '%s' "$record" | LC_ALL=C cut -f2)"
     claim="$(printf '%s' "$record" | LC_ALL=C cut -f9)"
     if [ "$disposition" = 'completed' ] && [ "$state" != '[x]' ]; then
       refuse "$id is $state, not [x]; nothing writes a completion nobody verified — mark it, or archive it as resolved-elsewhere"
     fi
-
-    take_lock
+    if [ "$disposition" = 'completed' ]; then
+      open_subs="$(open_sub_items "$detail")"
+      if [ -n "$open_subs" ]; then
+        printf '%s\n' "$open_subs" | while IFS= read -r one; do printf 'OPEN_SUB_ITEM=%s\n' "$one"; done
+        refuse "$id still has open sub-items, listed as OPEN_SUB_ITEM above, so it is not completed; nothing was archived. Finish them, or mark the item [-] and leave it live."
+      fi
+    fi
     dest_dir="$TODO_ROOT/$DONE_DIR/$month"
     dest="$dest_dir/$id.md"
     if [ -e "$dest" ] || [ -L "$dest" ]; then

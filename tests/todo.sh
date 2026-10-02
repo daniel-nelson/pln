@@ -600,7 +600,7 @@ R="$WORK/overlap"
 new_repo "$R"
 mk() { ok "filing $1" add --project "$R" --id "$1" --claim "$1" --source s "${@:2}"; }
 mk wide --touches 'app/bookings/'
-mk narrow --touches 'app/bookings/cancellation.rb'
+mk narrow --touches 'app/bookings/cancellation.rb' --distinct-from wide
 mk elsewhere --touches 'docs/guide.md'
 mk deploy-a --touches 'app/a.rb' --holds 'staging-deploy'
 mk deploy-b --touches 'app/b.rb' --holds 'staging-deploy,evals'
@@ -677,7 +677,7 @@ has "$R/pln/items/contested.md" 'claimed_by: run-c' "a steal did not rewrite the
 
 # A claim that collides is refused and records nothing.
 ok "filing an overlapping item" add --project "$R" --id overlapping --claim 'overlapping work' \
-  --source s --touches 'app/contested.rb'
+  --source s --touches 'app/contested.rb' --distinct-from contested
 refused "claiming an item that collides with the held set" claim --project "$R" \
   --id overlapping --run run-d
 said 'CHECK=refused' "a colliding claim did not report the collision"
@@ -693,11 +693,11 @@ R="$WORK/same-run"
 new_repo "$R"
 mkq() { ok "filing $1" add --project "$R" --id "$1" --claim "$1" --source s "${@:2}"; }
 mkq head --touches 'app/shared.rb'
-mkq tail --touches 'app/shared.rb'
-mkq probe --touches 'app/shared.rb'
-mkq stranger --touches 'app/shared.rb'
+mkq tail --touches 'app/shared.rb' --distinct-from head
+mkq probe --touches 'app/shared.rb' --distinct-from head,tail
+mkq stranger --touches 'app/shared.rb' --distinct-from head,tail,probe
 mkq both-a --touches 'app/both.rb' --holds 'staging-deploy'
-mkq both-b --touches 'app/both.rb' --holds 'staging-deploy'
+mkq both-b --touches 'app/both.rb' --holds 'staging-deploy' --distinct-from both-a
 
 ok "claiming the first item of the run" claim --project "$R" --id head --run plan-1
 said 'CLAIM=held' "the first claim of a run was not granted"
@@ -779,7 +779,7 @@ ok "filing into the shared root from the first tree" add --project "$WORK/tree-o
   --id shared-head --claim 'shared head' --source s --touches 'app/shared.rb'
 is TODO_ROOT "$QROOT" "the declared root was not adopted from the first tree"
 ok "filing into the shared root from the second tree" add --project "$WORK/tree-two" \
-  --id shared-tail --claim 'shared tail' --source s --touches 'app/shared.rb'
+  --id shared-tail --claim 'shared tail' --source s --touches 'app/shared.rb' --distinct-from shared-head
 is TODO_ROOT "$QROOT" "the two trees did not resolve to one to-do-list root"
 ok "claiming from the first tree" claim --project "$WORK/tree-one" --id shared-head --run 2026-08-31-x
 has "$QROOT/items/shared-head.md" "claimed_in: $WORK/tree-one" \
@@ -866,7 +866,7 @@ has "$P/pln/items/vague-pickup.md" 'holds: [port-block]' \
   "the claim did not write the declared resources to the record"
 # What was declared at pickup is what the next claim is checked against.
 ok "filing an overlapping second item" add --project "$P" --id vague-overlap \
-  --claim 'overlaps the first' --source s --touches 'app/b.rb'
+  --claim 'overlaps the first' --source s --touches 'app/b.rb' --distinct-from vague-pickup
 refused "claiming an item that overlaps a set declared at pickup" claim \
   --project "$P" --id vague-overlap --run pick-2
 said $'COLLISION\tvague-pickup\tpath\tapp/b.rb' \
@@ -1135,11 +1135,13 @@ done
 ok "filing an item for the holder to take" add --project "$WORK/live-one" --id held-by-gone \
   --claim 'taken by a run that never came back' --source s --touches 'api/shared.ts'
 ok "filing the item that will want the same path" add --project "$WORK/live-one" --id wants-same-path \
-  --claim 'needs the path the vanished run declared' --source s --touches 'api/shared.ts,api/own.ts'
+  --claim 'needs the path the vanished run declared' --source s --touches 'api/shared.ts,api/own.ts' \
+  --distinct-from held-by-gone
 ok "filing an item held by a tree that stays" add --project "$WORK/live-one" --id held-by-living \
   --claim 'taken by a run that is still going' --source s --touches 'api/living.ts'
 ok "filing the item that wants the living run's path" add --project "$WORK/live-one" --id wants-living-path \
-  --claim 'needs the path the live run declared' --source s --touches 'api/living.ts'
+  --claim 'needs the path the live run declared' --source s --touches 'api/living.ts' \
+  --distinct-from held-by-living
 ok "the second tree taking both items" claim --project "$WORK/live-two" --id held-by-gone --run 2026-08-27-two
 ok "the second tree taking the other item" claim --project "$WORK/live-two" --id held-by-living --run 2026-08-27-two
 
@@ -1557,36 +1559,41 @@ refused "related with no to-do list" related --project "$R" --id rel-subject
 [ "$Q_RC" = 3 ] || fail "related with no to-do list exited $Q_RC, expected 3"
 [ ! -e "$R/pln" ] || fail "related created a to-do list; it is a read"
 
-printf '%s\n' '## What to do' '' 'Finish what rel-names-me started, then hand off.' > "$WORK/subject-body"
-ok "filing the subject" add --project "$R" --id rel-subject --claim 'the subject' --source s \
-  --group refunds --depends-on rel-dep --touches 'app/bookings/,lib/one.rb' --body "$WORK/subject-body"
-ok "filing what the subject depends on" add --project "$R" --id rel-dep --claim 'a prerequisite' --source s
-ok "filing what the subject names" add --project "$R" --id rel-names-me --claim 'named in the subject body' --source s
+# Filed in the order `add`'s near-duplicate refusal allows: an item that
+# depends on, names or shares a write set with one already live is refused
+# unless declared distinct, which would put `distinct` on every relation below.
+# So the items pointing at the subject go in before it, the ones it points at
+# after it, and the subject's write set is declared by `mark` once the
+# overlapping items are filed.
 ok "filing what depends on the subject" add --project "$R" --id rel-needs --claim 'waits on it' \
   --source s --depends-on rel-subject
 printf '%s\n' '## What to do' '' 'Same work as `rel-subject`, other half.' > "$WORK/naming-body"
 ok "filing what names the subject" add --project "$R" --id rel-namer --claim 'mentions it' \
   --source s --body "$WORK/naming-body"
+ok "filing a dropped dependant" add --project "$R" --id rel-dropped --claim 'given up' \
+  --source s --depends-on rel-subject --status dropped
+printf '%s\n' '## What to do' '' 'Finish what rel-names-me started, then hand off.' > "$WORK/subject-body"
+ok "filing the subject" add --project "$R" --id rel-subject --claim 'the subject' --source s \
+  --group refunds --depends-on rel-dep --body "$WORK/subject-body"
+ok "filing what the subject depends on" add --project "$R" --id rel-dep --claim 'a prerequisite' --source s
+ok "filing what the subject names" add --project "$R" --id rel-names-me --claim 'named in the subject body' --source s
 ok "filing a narrower write set" add --project "$R" --id rel-inside --claim 'one file inside' \
   --source s --touches 'app/bookings/cancel.rb'
 ok "filing a wider write set" add --project "$R" --id rel-around --claim 'the whole lib tree' \
   --source s --touches 'lib/'
+ok "declaring the subject's write set" mark --project "$R" --id rel-subject --touches 'app/bookings/,lib/one.rb'
 ok "filing an unknown write set" add --project "$R" --id rel-unknown --claim 'nobody looked' \
   --source s --touches 'UNKNOWN,app/bookings/'
 ok "filing no write set" add --project "$R" --id rel-undeclared --claim 'nothing declared' --source s
 ok "filing a groupmate" add --project "$R" --id rel-group --claim 'same area' --source s --group refunds
 ok "filing a finished groupmate" add --project "$R" --id rel-finished --claim 'done already' \
   --source s --group refunds --state '[x]'
-ok "filing a dropped dependant" add --project "$R" --id rel-dropped --claim 'given up' \
-  --source s --depends-on rel-subject --status dropped
 ok "filing an id that only contains the subject's" add --project "$R" --id rel-subject-two \
   --claim 'a longer id' --source s
 ok "filing an unrelated item" add --project "$R" --id rel-alone --claim 'nothing shared' \
-  --source s --touches 'docs/'
-# `add --distinct-from` writes this line; written by hand here so the reading
-# side is pinned on its own.
-awk '{ print } /^- filed from:/ { print "- Distinct from: rel-subject" }' \
-  "$R/pln/items/rel-alone.md" > "$WORK/alone" && cat "$WORK/alone" > "$R/pln/items/rel-alone.md"
+  --source s --touches 'docs/' --distinct-from rel-subject
+line_is "$R/pln/items/rel-alone.md" '- Distinct from: rel-subject' \
+  "add --distinct-from did not write its declaration under ## Related"
 ok "claiming the groupmate" claim --project "$R" --id rel-group --run other-run --touches 'docs/faq.md'
 
 before="$(cd "$R/pln" && find . -type f | sort | xargs shasum)"
@@ -1650,6 +1657,178 @@ refused "an unknown id" related --project "$R" --id rel-subject,rel-nowhere
 said 'no such to-do item: rel-nowhere' "an unknown id was not named"
 refused "a limit that is not a number" related --project "$R" --id rel-subject --limit many
 said 'limit must be a whole number' "a bad limit was not explained"
+
+# ─── what a live item already covers goes in there, not beside it ────────────
+# `add` asks of the item it is about to file the question `related` answers at
+# pickup. A dependency on a live item, a body naming one, or a shared write set
+# refuses it, naming both ways forward; `--distinct-from` naming every such item
+# files it anyway and records the declaration. A shared group is an area label,
+# so it is only noted.
+R="$WORK/near"
+new_repo "$R"
+ok "filing the item others come near" add --project "$R" --id near-base \
+  --claim 'cancelled bookings release their dates' --source s --touches 'app/bookings/' --group refunds
+nb_before="$(cd "$R/pln" && find . -type f | sort | xargs shasum)"
+
+refused "filing an item that depends on a live one" add --project "$R" --id near-dep \
+  --claim 'the host-side half' --source s --depends-on near-base
+[ "$Q_RC" = 3 ] || fail "a near-duplicate add exited $Q_RC, expected 3"
+said $'NEAR\tnear-base\tdepends-on\tcancelled bookings release their dates' \
+  "a dependency on a live item was not reported as NEAR with its claim"
+said 'NEAR_COUNT=1' "the refusal did not count what it was near"
+said 'mark --id <that id> --run <run> --add-sub-item' "the refusal did not name the sub-item way forward"
+said '--distinct-from near-base' "the refusal did not name the distinct-from way forward with the ids to name"
+[ ! -e "$R/pln/items/near-dep.md" ] || fail "a refused add wrote its detail file"
+
+printf '%s\n' '## What to do' '' 'The other half of near-base.' > "$WORK/near-body"
+refused "filing an item whose body names a live one" add --project "$R" --id near-names \
+  --claim 'names it' --source s --body "$WORK/near-body"
+said $'NEAR\tnear-base\tnames\t' "a body naming a live item was not reported as NEAR"
+
+refused "filing an item that shares a write set" add --project "$R" --id near-touch \
+  --claim 'same files' --source s --touches 'app/bookings/cancel.rb'
+said $'NEAR\tnear-base\ttouches:app/bookings/cancel.rb\t' "a shared write set was not reported as NEAR"
+
+nb_after="$(cd "$R/pln" && find . -type f | sort | xargs shasum)"
+[ "$nb_before" = "$nb_after" ] || fail "a refused add changed the to-do list"
+[ -z "$(find "$R/pln/items" -name '.pln-todo-*')" ] || fail "a refused add left its draft behind"
+[ ! -e "$R/pln/.lock" ] || fail "a refused add left the lock behind"
+
+# A group alone is noted and does not refuse; nor does a live item that names
+# the new one, which is not the new item's own declaration.
+ok "filing a groupmate" add --project "$R" --id near-group --claim 'same area' --source s --group refunds
+said 'NOTE=related to near-group, and not enough to refuse it: near-base (group:refunds)' \
+  "a shared group was not noted"
+didnt_say 'NEAR' "a shared group alone was reported as NEAR"
+
+# The task packet's own headings are the same in every record, so they name
+# nothing: a one-word id that one of them happens to contain — `first`, from
+# "What has to be true first" — is not named by every item filed after it.
+ok "filing a one-word id" add --project "$R" --id first --claim 'the first follow-up' --source s
+ok "filing a skeleton item after it" add --project "$R" --id plain-later --claim 'the second follow-up' --source s
+didnt_say 'NEAR' "a skeleton heading made an item near a one-word id"
+ok "what the skeleton item relates to" related --project "$R" --id plain-later
+didnt_say $'RELATED\tfirst\t' "a skeleton heading was read as naming a one-word id"
+# Nor does prose: a one-word id is named only as its detail-file path, in
+# backticks, or on a `Distinct from:` line. A hyphenated id still matches as a word.
+printf '%s\n' '## What to do' '' 'Do the first step, then the rest.' > "$WORK/prose-body"
+ok "a body using a one-word id as a word" add --project "$R" --id prose-first --claim 'prose' \
+  --source s --body "$WORK/prose-body"
+didnt_say 'NEAR' "a one-word id used as an ordinary word made an item near it"
+ok "what the prose item relates to" related --project "$R" --id first
+didnt_say $'RELATED\tprose-first\t' "a body using a one-word id as a word was reported as naming it"
+printf '%s\n' '## What to do' '' 'Finish what items/first.md left.' > "$WORK/path-body"
+refused "a body naming a one-word id by its path" add --project "$R" --id path-first --claim 'by path' \
+  --source s --body "$WORK/path-body"
+said $'NEAR\tfirst\tnames\t' "a body naming a one-word id by its detail-file path was not near it"
+printf '%s\n' '## What to do' '' 'The rest of `first`.' > "$WORK/tick-body"
+refused "a body naming a one-word id in backticks" add --project "$R" --id tick-first --claim 'in backticks' \
+  --source s --body "$WORK/tick-body"
+said $'NEAR\tfirst\tnames\t' "a body naming a one-word id in backticks was not near it"
+ok "a one-word id declared distinct" add --project "$R" --id path-first --claim 'by path' \
+  --source s --body "$WORK/path-body" --distinct-from first
+ok "what the declared item relates to" related --project "$R" --id first
+said $'RELATED\tpath-first\tnamed-by,distinct\t' "a one-word id on a Distinct from: line was not reported"
+
+# Declaring the item distinct files it, and the declaration lands under
+# `## Related` — in the skeleton, at the end of a body's own section, and as a
+# section of its own in a body that has none.
+refused "a declaration that misses a NEAR id" add --project "$R" --id near-two \
+  --claim 'two neighbours' --source s --touches 'app/bookings/x.rb' --depends-on near-group \
+  --distinct-from near-group
+said $'NEAR\tnear-base\ttouches:app/bookings/x.rb' "an undeclared NEAR id was not reported"
+didnt_say $'NEAR\tnear-group\t' "an id the filer declared distinct was still reported as NEAR"
+said '--distinct-from near-group,near-base' "the refusal did not name every id the declaration must cover"
+[ ! -e "$R/pln/items/near-two.md" ] || fail "an add whose declaration missed an id was filed"
+ok "a declaration that covers every NEAR id" add --project "$R" --id near-two \
+  --claim 'two neighbours' --source s --touches 'app/bookings/x.rb' --depends-on near-group \
+  --distinct-from 'near-group, near-base'
+line_is "$R/pln/items/near-two.md" '- Distinct from: near-group, near-base' \
+  "the skeleton did not carry the declaration"
+appears_before "$R/pln/items/near-two.md" '- filed from: s' '- Distinct from:' \
+  "the declaration did not land under ## Related"
+appears_before "$R/pln/items/near-two.md" '- Distinct from:' '## Sub-items' \
+  "the declaration landed outside ## Related"
+ok "a declared item is reported as distinct" related --project "$R" --id near-two
+said $'RELATED\tnear-base\tnames,distinct' "a declared item was not reported as distinct"
+
+printf '%s\n' '## What to do' '' 'The other half of near-base.' '' '## Related' '' '- see the incident' '' '## Sub-items' > "$WORK/near-body"
+ok "a body with its own Related section" add --project "$R" --id near-names \
+  --claim 'names it' --source s --body "$WORK/near-body" --distinct-from near-base
+appears_before "$R/pln/items/near-names.md" '- see the incident' '- Distinct from: near-base' \
+  "the declaration did not go at the end of the body's Related section"
+appears_before "$R/pln/items/near-names.md" '- Distinct from: near-base' '## Sub-items' \
+  "the declaration landed past the body's Related section"
+printf '%s\n' '## What to do' '' 'Same files as near-base.' > "$WORK/near-body"
+ok "a body with no Related section" add --project "$R" --id near-bare \
+  --claim 'bare body' --source s --body "$WORK/near-body" --distinct-from near-base
+appears_before "$R/pln/items/near-bare.md" '## Related' '- Distinct from: near-base' \
+  "a body with no Related section was not given one"
+refused "a declaration naming something that is not an id" add --project "$R" --id near-bad \
+  --claim 'bad' --source s --distinct-from 'Near Base'
+said 'distinct-from ids must be' "a malformed distinct-from id was not explained"
+
+# ─── a sub-item is intake, and open work never reads as done ──────────────────
+# One `mark` passes the holder check on a record another run holds: appending a
+# `[ ]` sub-item, and nothing else. `[x]` cannot be set or archived while a
+# sub-item is open, and an open one added to a `[x]` record makes it `[-]`.
+R="$WORK/subitems"
+new_repo "$R"
+ok "filing an item another run will hold" add --project "$R" --id held-work \
+  --claim 'held elsewhere' --source s --touches 'app/held.rb'
+ok "the other run taking it" claim --project "$R" --id held-work --run run-holder
+ok "a sub-item from a run that does not hold it" mark --project "$R" --id held-work --run run-other \
+  --add-sub-item 'the guest-side half'
+line_is "$R/pln/items/held-work.md" '- [ ] the guest-side half' "an intake sub-item was not appended to a held record"
+has "$R/pln/items/held-work.md" 'claimed_by: run-holder' "an intake sub-item moved the holder"
+ok "a sub-item with no run at all" mark --project "$R" --id held-work --add-sub-item 'the host-side half'
+held_before="$(shasum "$R/pln/items/held-work.md")"
+refused "a state from a run that does not hold it" mark --project "$R" --id held-work --run run-other --state '[-]'
+said 'HELD_BY=run-holder' "a state mark on a held record was not refused with its holder"
+refused "a status from a run that does not hold it" mark --project "$R" --id held-work --run run-other --status blocked
+said 'HELD_BY=run-holder' "a status mark on a held record was not refused with its holder"
+refused "a finished sub-item from a run that does not hold it" mark --project "$R" --id held-work \
+  --run run-other --add-sub-item 'claimed done' --sub-item-state '[x]'
+said 'HELD_BY=run-holder' "a finished sub-item on a held record was not refused"
+refused "a partly-done sub-item from a run that does not hold it" mark --project "$R" --id held-work \
+  --run run-other --add-sub-item 'claimed partly' --sub-item-state '[-]'
+refused "a sub-item carrying a field change" mark --project "$R" --id held-work \
+  --run run-other --add-sub-item 'and a flag' --urgent true
+[ "$held_before" = "$(shasum "$R/pln/items/held-work.md")" ] || fail "a refused mark changed a held record"
+
+refused "the holder marking it done with a sub-item open" mark --project "$R" --id held-work \
+  --run run-holder --state '[x]'
+said 'OPEN_SUB_ITEM=- [ ] the guest-side half' "the refusal did not name the open sub-items"
+said 'OPEN_SUB_ITEM=- [ ] the host-side half' "the refusal did not name every open sub-item"
+said 'not [x]' "the refusal did not say why"
+[ "$held_before" = "$(shasum "$R/pln/items/held-work.md")" ] || fail "a refused [x] changed the record"
+refused "done in the same call that adds an open sub-item" mark --project "$R" --id held-work \
+  --run run-holder --state '[x]' --add-sub-item 'one more'
+said 'OPEN_SUB_ITEM=- [ ] one more' "the sub-item being added was not counted as open"
+sed -i.bak 's/^- \[ \] the guest-side half$/- [x] the guest-side half/; s/^- \[ \] the host-side half$/- [x] the host-side half/' \
+  "$R/pln/items/held-work.md" && rm -f "$R/pln/items/held-work.md.bak"
+ok "the holder marking it done once every sub-item is" mark --project "$R" --id held-work \
+  --run run-holder --state '[x]' --add-sub-item 'the receipt' --sub-item-state '[x]'
+has "$R/pln/items/held-work.md" 'state: "[x]"' "an item with every sub-item done was not marked [x]"
+
+ok "an open sub-item added to a done record" mark --project "$R" --id held-work --run run-other \
+  --add-sub-item 'the refund email'
+has "$R/pln/items/held-work.md" 'state: "[-]"' "an open sub-item left the record reading [x]"
+said 'NOTE=held-work was [x]; the open sub-item added to it makes it [-]' "the reopening was not reported"
+line_is "$R/pln/items/held-work.md" '- [ ] the refund email' "the reopening sub-item was not appended"
+
+ok "filing an item to archive" add --project "$R" --id to-archive --claim 'archive me' --source s
+ok "a done item" mark --project "$R" --id to-archive --state '[x]'
+# A hand edit is the one way a done record gains an open line; the archive is
+# the last place it is caught.
+printf '%s\n' '- [ ] the part nobody did' >> "$R/pln/items/to-archive.md"
+refused "archiving as completed with a sub-item open" archive --project "$R" --id to-archive \
+  --disposition completed --evidence 'commit abc'
+said 'OPEN_SUB_ITEM=- [ ] the part nobody did' "the archive refusal did not name the open sub-item"
+[ -f "$R/pln/items/to-archive.md" ] || fail "a refused archive moved the record"
+[ ! -e "$R/pln/.lock" ] || fail "a refused archive left the lock behind"
+ok "archiving it as dropped is not a completion" archive --project "$R" --id to-archive \
+  --disposition dropped --evidence 'the user dropped it'
 
 # ─── the ticket tracker ───────────────────────────────────────────────────────
 # pln never talks to a tracker, so what is under test is the bookkeeping an agent

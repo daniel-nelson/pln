@@ -1209,7 +1209,8 @@ said $'COLLISION\theld-by-living\tpath\tapi/living.ts' \
 ok "filing an item to take and give back" add --project "$WORK/live-one" --id give-back \
   --claim 'taken and handed back' --source s --touches 'api/give.ts'
 ok "taking it" claim --project "$WORK/live-one" --id give-back --run 2026-08-27-one
-ok "releasing one's own claim" release --project "$WORK/live-one" --id give-back --run 2026-08-27-one
+ok "releasing one's own claim" release --project "$WORK/live-one" --id give-back --run 2026-08-27-one \
+  --not-now 'the user: not in this run'
 is RELEASE released "a run could not release its own claim"
 is RELEASE_REASON own-claim "releasing one's own claim was attributed to something else"
 is WAS_HELD_BY 2026-08-27-one "the release did not name the holder it cleared"
@@ -1254,6 +1255,106 @@ ok "releasing a claim whose worktree is gone" release --project "$WORK/live-one"
 is RELEASE_REASON holder-gone "releasing a vanished holder's claim was attributed to the releasing run"
 is WAS_HELD_BY 2026-08-27-three "the release did not name the holder whose tree is gone"
 hasnt "$LROOT/items/tidy-up.md" 'claimed_by:' "the vanished holder's claim was not cleared"
+
+# ─── a claimed item ends done, or with the user's "not now" on record ─────────
+# Partly done stopped being a place a run can quietly stop. A run giving back its
+# own claim on an item short of [x] says why, in the one rewrite that clears the
+# holder: the user's words, the question it leaves them, or what the item waits
+# on. Without one of those the release is refused and the record is untouched.
+ok "filing an item to leave partly done" add --project "$WORK/live-one" --id part-done \
+  --claim 'started and not finished' --source s --touches 'api/part.ts'
+ok "taking it" claim --project "$WORK/live-one" --id part-done --run 2026-08-27-one
+ok "marking it partly done" mark --project "$WORK/live-one" --id part-done \
+  --run 2026-08-27-one --state '[-]'
+cp "$LROOT/items/part-done.md" "$WORK/part-done.before"
+refused "releasing one's own partly done claim with nothing recorded" release \
+  --project "$WORK/live-one" --id part-done --run 2026-08-27-one
+[ "$Q_RC" = 3 ] || fail "a bare release of a partly done claim exited $Q_RC, not 3"
+is RELEASE refused "a partly done claim was released with nothing recorded"
+said '--not-now' "the refusal did not name the user's not-now"
+said '--ask' "the refusal did not name the question route"
+said '--blocked' "the refusal did not name the blocked route"
+cmp -s "$WORK/part-done.before" "$LROOT/items/part-done.md" \
+  || fail "a refused release changed the record"
+refused "two reasons on one release" release --project "$WORK/live-one" --id part-done \
+  --run 2026-08-27-one --not-now 'a' --ask 'b'
+[ "$Q_RC" = 2 ] || fail "a release carrying two reasons exited $Q_RC, not 2"
+cmp -s "$WORK/part-done.before" "$LROOT/items/part-done.md" \
+  || fail "a release carrying two reasons changed the record"
+ok "releasing it with the user's not-now" release --project "$WORK/live-one" --id part-done \
+  --run 2026-08-27-one --not-now 'not this release, after the fee rules land'
+is RELEASE released "a partly done claim carrying the user's words was not released"
+is RELEASE_WITH not-now "the release did not say what it recorded"
+has "$LROOT/items/part-done.md" 'not_now: not this release, after the fee rules land' \
+  "the user's words were not written to the record"
+hasnt "$LROOT/items/part-done.md" 'claimed_by:' "the not-now release kept the holder"
+hasnt "$LROOT/items/part-done.md" 'claimed_at:' "the not-now release kept the claim date"
+hasnt "$LROOT/items/part-done.md" 'claimed_in:' "the not-now release kept the worktree"
+has "$LROOT/items/part-done.md" 'state: "[-]"' "the not-now release changed the item's state"
+
+# A claim never started is refused the same way: [ ] is not done either.
+ok "filing an item to leave unstarted" add --project "$WORK/live-one" --id not-started \
+  --claim 'taken and never started' --source s --touches 'api/unstarted.ts'
+ok "taking it" claim --project "$WORK/live-one" --id not-started --run 2026-08-27-one
+refused "releasing one's own unstarted claim with nothing recorded" release \
+  --project "$WORK/live-one" --id not-started --run 2026-08-27-one
+is RELEASE refused "an unstarted claim was released with nothing recorded"
+has "$LROOT/items/not-started.md" 'claimed_by: 2026-08-27-one' "a refused release cleared the holder"
+ok "releasing it with a question for the user" release --project "$WORK/live-one" \
+  --id not-started --run 2026-08-27-one --ask 'refund to the card or as credit?'
+is RELEASE_WITH ask "the question release did not say what it recorded"
+has "$LROOT/items/not-started.md" 'status: decide' "the question release did not set decide"
+has "$LROOT/items/not-started.md" 'question: refund to the card or as credit?' \
+  "the question was not written to the record"
+hasnt "$LROOT/items/not-started.md" 'claimed_by:' "the question release kept the holder"
+
+ok "taking it again" claim --project "$WORK/live-one" --id not-started --run 2026-08-27-one
+ok "releasing it as blocked" release --project "$WORK/live-one" --id not-started \
+  --run 2026-08-27-one --blocked 'the payments sandbox credential, refused on the refund call'
+is RELEASE_WITH blocked "the blocked release did not say what it recorded"
+has "$LROOT/items/not-started.md" 'status: blocked' "the blocked release did not set blocked"
+has "$LROOT/items/not-started.md" 'waits_on: the payments sandbox credential, refused on the refund call' \
+  "what the item waits on was not written to the record"
+hasnt "$LROOT/items/not-started.md" 'claimed_by:' "the blocked release kept the holder"
+hasnt "$LROOT/items/not-started.md" 'question:' \
+  "a blocked release left the earlier release's question beside its own reason"
+
+# A record carries the reason of its latest release only.
+ok "taking it once more" claim --project "$WORK/live-one" --id not-started --run 2026-08-27-one
+ok "releasing it with a question again" release --project "$WORK/live-one" \
+  --id not-started --run 2026-08-27-one --ask 'refund to the card or as credit?'
+hasnt "$LROOT/items/not-started.md" 'waits_on:' \
+  "a question release left the earlier release's wait beside its own reason"
+ok "taking it a last time" claim --project "$WORK/live-one" --id not-started --run 2026-08-27-one
+ok "releasing it with the user's not-now" release --project "$WORK/live-one" \
+  --id not-started --run 2026-08-27-one --not-now 'the user: after the fee rules land'
+has "$LROOT/items/not-started.md" 'not_now: the user: after the fee rules land' \
+  "the not-now release did not write the user's words"
+hasnt "$LROOT/items/not-started.md" 'question:' \
+  "a not-now release left the earlier release's question beside the user's words"
+
+# A finished item releases as it always did, with nothing to say.
+ok "filing an item to finish" add --project "$WORK/live-one" --id all-done \
+  --claim 'finished in the run' --source s --touches 'api/done.ts'
+ok "taking it" claim --project "$WORK/live-one" --id all-done --run 2026-08-27-one
+ok "marking it done" mark --project "$WORK/live-one" --id all-done --run 2026-08-27-one --state '[x]'
+ok "releasing a finished claim" release --project "$WORK/live-one" --id all-done --run 2026-08-27-one
+is RELEASE released "a finished claim was not released"
+is RELEASE_WITH none "a bare release of a finished claim reported a reason"
+
+# `mark --not-now` is how "not now" is recorded without a release.
+ok "recording not-now with mark" mark --project "$WORK/live-one" --id all-done \
+  --not-now 'the user: its own session'
+has "$LROOT/items/all-done.md" 'not_now: the user: its own session' "mark did not write not_now"
+ok "filing an item to answer by mark" add --project "$WORK/live-one" --id answered-later \
+  --claim 'asked about and answered later' --source s --touches 'api/answered.ts'
+ok "taking it" claim --project "$WORK/live-one" --id answered-later --run 2026-08-27-one
+ok "releasing it with a question" release --project "$WORK/live-one" --id answered-later \
+  --run 2026-08-27-one --ask 'now or after the release?'
+ok "recording the answer with mark" mark --project "$WORK/live-one" --id answered-later \
+  --status ready --not-now 'the user: after the release'
+has "$LROOT/items/answered-later.md" 'not_now: the user: after the release' "mark did not write not_now"
+hasnt "$LROOT/items/answered-later.md" 'question:' "mark --not-now left the answered question on the record"
 
 # ─── an unknown holder, and an unknown write set ──────────────────────────────
 # A record predating `claimed_in` names no tree, so nothing here can tell whether
@@ -1604,7 +1705,7 @@ ok "listing after the claim" tracker --project "$R"
 [ "$(pending_line sync-a)" = "card-a	backlog	in-progress	-" ] || fail "the claim's move was wrong ($(pending_line sync-a))"
 ok "recording the move" tracker --project "$R" --id sync-a --synced in-progress
 
-ok "releasing the claim" release --project "$R" --id sync-a --run run-t
+ok "releasing the claim" release --project "$R" --id sync-a --run run-t --not-now 'the user: later'
 is TRACKER_PENDING 1 "a released claim did not owe the card back to the backlog"
 ok "claiming it again" claim --project "$R" --id sync-a --run run-t --touches src/a
 is TRACKER_PENDING 0 "a re-claim before the move was made still owed one"

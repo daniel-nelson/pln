@@ -50,10 +50,10 @@ Usage:
   pln-todo related --id CSV [--limit N]
   pln-todo claim --id ID --run TEXT [--touches CSV] [--holds CSV]
                  [--against CSV] [--steal HOLDER]
-  pln-todo release --id ID --run TEXT
+  pln-todo release --id ID --run TEXT [--not-now TEXT | --ask TEXT | --blocked TEXT]
   pln-todo mark --id ID [--run TEXT] [--state S] [--status S] [--urgent true|false] [--group TEXT]
                 [--touches CSV] [--holds CSV] [--depends-on CSV] [--source TEXT]
-                [--add-sub-item TEXT] [--sub-item-state "[ ]"|"[-]"|"[x]"]
+                [--add-sub-item TEXT] [--sub-item-state "[ ]"|"[-]"|"[x]"] [--not-now TEXT]
   pln-todo archive --id ID --disposition completed|dropped|superseded|resolved-elsewhere
                    --evidence TEXT [--month YYYY-MM]
   pln-todo stale [--days N]
@@ -69,6 +69,12 @@ A claim is held by a run and the worktree it claimed from, together. `release`
 gives one back; a claim whose worktree is gone is released by whoever needs it,
 on that evidence alone, and reported when it happens. A holder that is still on
 disk is moved only by `claim --steal`, never released out from under it.
+A run's own claim on an item that is not [x] is refused (exit 3, record
+untouched) unless the release carries the reason, written in the same rewrite:
+--not-now (the user's words, field not_now), --ask (status decide, field
+question) or --blocked (status blocked, field waits_on), clearing the other two
+reason fields. RELEASE_WITH names it. `mark --not-now` records the user's words
+without a release, and clears question and waits_on.
 
 Exit codes: 0 done, 2 usage or failure, 3 refused (a collision, an occupied path,
 a live holder, no resolvable to-do list). Every subcommand resolves the to-do list
@@ -2025,18 +2031,24 @@ EOF
   # the item exactly as it is and clears the three holder fields, so it goes back
   # to being work anyone can pick up rather than work one dead run owns.
   release)
-    id=''; run=''
+    id=''; run=''; with='none'; with_text=''; withs=0
     while [ $# -gt 0 ]; do
       case "$1" in
         --project) project="${2:-}"; shift 2 ;;
         --id) id="${2:-}"; shift 2 ;;
         --run) run="${2:-}"; shift 2 ;;
+        --not-now) with='not-now'; with_text="${2:-}"; withs=$((withs + 1)); shift 2 ;;
+        --ask) with='ask'; with_text="${2:-}"; withs=$((withs + 1)); shift 2 ;;
+        --blocked) with='blocked'; with_text="${2:-}"; withs=$((withs + 1)); shift 2 ;;
         --no-create) create_flag=0; shift ;;
         *) usage ;;
       esac
     done
     [ -n "$id" ] && [ -n "$run" ] || usage
     single_line 'run' "$run"
+    [ "$withs" -le 1 ] || fail "release takes one of --not-now, --ask or --blocked, not $withs"
+    [ "$with" = 'none' ] || [ -n "$with_text" ] || fail "--$with needs its text"
+    single_line "$with" "$with_text"
     project_context "$project"
     resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
     load_header
@@ -2088,14 +2100,34 @@ EOF
       printf 'RELEASE=refused\nHELD_BY=%s\nHELD_IN=%s\n' "$holder" "${holder_wt:--}"
       refuse "$id is held by $held_desc, not by $run; a holder that is still there is moved with claim --steal $holder, never released out from under it"
     fi
+    # A run's own claim on an item short of [x] is the place a run used to stop
+    # quietly, leaving partial work that reads as somebody else's to finish. It is
+    # given back only with the reason on the record: the user's own "not now",
+    # the question they now owe, or what the item waits on. A holder that is gone
+    # never chose to stop, so its release stays unconditional.
+    holder_state="$(printf '%s' "$holder_rec" | LC_ALL=C cut -f2)"
+    if [ "$own" = 1 ] && [ "$holder_state" != '[x]' ] && [ "$with" = 'none' ]; then
+      release_lock
+      printf 'RELEASE=refused\nSTATE=%s\nHELD_BY=%s\n' "$holder_state" "$holder"
+      refuse "$id is $holder_state and held by $run; a claimed item ends [x], or is released with the user's words (--not-now TEXT), the question they now owe (--ask TEXT, sets decide) or what it waits on (--blocked TEXT, sets blocked); nothing was released"
+    fi
     # One rewrite, for the reason `claim` writes them in one: a record must never
-    # be readable carrying part of a holder.
-    printf 'del\tclaimed_by\ndel\tclaimed_at\ndel\tclaimed_in\n' | set_fields "$detail"
+    # be readable carrying part of a holder — nor a released one its reason.
+    {
+      printf 'del\tclaimed_by\ndel\tclaimed_at\ndel\tclaimed_in\n'
+      # A record carries the reason of its latest release only: an earlier
+      # question or wait left beside a new one reads as still owed.
+      case "$with" in
+        not-now) printf 'set\tnot_now\t%s\ndel\tquestion\ndel\twaits_on\n' "$with_text" ;;
+        ask) printf 'set\tstatus\tdecide\nset\tquestion\t%s\ndel\tnot_now\ndel\twaits_on\n' "$with_text" ;;
+        blocked) printf 'set\tstatus\tblocked\nset\twaits_on\t%s\ndel\tnot_now\ndel\tquestion\n' "$with_text" ;;
+      esac
+    } | set_fields "$detail"
     write_index "$TODO_ROOT" || fail "cannot write $TODO_ROOT/$INDEX_NAME"
     release_lock
     if [ "$own" = 1 ]; then reason='own-claim'; else reason='holder-gone'; fi
-    printf 'RELEASE=released\nRELEASED=%s\nRELEASE_REASON=%s\nWAS_HELD_BY=%s\nWAS_HELD_IN=%s\n' \
-      "$id" "$reason" "$holder" "${holder_wt:--}"
+    printf 'RELEASE=released\nRELEASED=%s\nRELEASE_REASON=%s\nRELEASE_WITH=%s\nWAS_HELD_BY=%s\nWAS_HELD_IN=%s\n' \
+      "$id" "$reason" "$with" "$holder" "${holder_wt:--}"
     line="$(index_line_for "$id")"
     [ -n "$line" ] || fail "the index was rebuilt without $id"
     printf 'INDEX_LINE=%s\n' "$line"
@@ -2105,7 +2137,7 @@ EOF
   mark)
     id=''; sub=''; sub_state='[ ]'; mark_run=''
     set_state=''; set_status=''; set_urgent=''; set_group=''
-    set_touches=''; set_holds=''; set_depends=''; set_source=''
+    set_touches=''; set_holds=''; set_depends=''; set_source=''; set_not_now=''
     have_group=0; have_touches=0; have_holds=0; have_depends=0
     while [ $# -gt 0 ]; do
       case "$1" in
@@ -2120,6 +2152,7 @@ EOF
         --holds) set_holds="${2:-}"; have_holds=1; shift 2 ;;
         --depends-on) set_depends="${2:-}"; have_depends=1; shift 2 ;;
         --source) set_source="${2:-}"; shift 2 ;;
+        --not-now) set_not_now="${2:-}"; shift 2 ;;
         --add-sub-item) sub="${2:-}"; shift 2 ;;
         --sub-item-state) sub_state="${2:-}"; shift 2 ;;
         --no-create) create_flag=0; shift ;;
@@ -2135,6 +2168,7 @@ EOF
     [ -z "$sub" ] || valid_state "$sub_state" || fail "sub-item state must be '[ ]', '[-]' or '[x]': $sub_state"
     single_line 'sub-item' "$sub"
     single_line 'group' "$set_group"
+    single_line 'not-now' "$set_not_now"
 
     project_context "$project"
     resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
@@ -2168,6 +2202,7 @@ EOF
       [ -z "$set_urgent" ] || printf 'set\turgent\t%s\n' "$set_urgent"
       [ "$have_group" = 0 ] || printf 'set\tgroup\t%s\n' "$set_group"
       [ -z "$set_source" ] || printf 'set\tsource\t%s\n' "$set_source"
+      [ -z "$set_not_now" ] || printf 'set\tnot_now\t%s\ndel\tquestion\ndel\twaits_on\n' "$set_not_now"
       [ "$have_touches" = 0 ] || printf 'set\ttouches\t%s\n' "$(csv_to_lines "$set_touches" | lines_to_yaml_list)"
       [ "$have_holds" = 0 ] || printf 'set\tholds\t%s\n' "$(csv_to_lines "$set_holds" | lines_to_yaml_list)"
       [ "$have_depends" = 0 ] || printf 'set\tdepends_on\t%s\n' "$(csv_to_lines "$set_depends" | lines_to_yaml_list)"

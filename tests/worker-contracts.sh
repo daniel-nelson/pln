@@ -145,6 +145,29 @@ has "$merge_contract" 'never edit, delete, recreate, or rename canonical `REVIEW
   'PR merge worker may publish the shared ledger directly'
 has "$merge_contract" 'staged candidate path/digest' \
   'PR merge result no longer binds its staged ledger candidate'
+has "$merge_contract" 'Post-fix verifier mode combines independent reading with clean ledger preparation' \
+  'post-fix repair sufficiency still requires an unconditional separate merger'
+has "$merge_contract" 'Empty findings alone cannot certify repair sufficiency' \
+  'post-fix verifier can certify repairs from an empty findings array'
+has "$merge_contract" 'preserve the canonical `Phase` cursor byte for byte' \
+  'post-fix verifier may invent a phase cursor instead of preserving coordinator state'
+has "$merge_contract" 'report assurance outcome in `Post-fix`' \
+  'PR assurance outcome can overwrite its phase router cursor'
+has "$merge_contract" 'Never admit, key, cluster or schedule your own new/reopened repair claim' \
+  'post-fix reader can independently admit its own new repair claim'
+has "$merge_contract" 'conflicting readers, unresolved owner/scope constraints, or unverifiable coverage/evidence' \
+  'post-fix clean route can bypass ambiguous evidence or owner constraints'
+has "$merge_contract" 'Return `reader_commit: none` for incomplete or failed reading' \
+  'post-fix failed reading can advance the settled anchor'
+has "$merge_contract" 'Record an adopted baseline restoration basis only from independent evidence' \
+  'consequential restoration can bypass approval without independent base evidence'
+has "$merge_contract" 'same inputs and persisted/external/public effects' \
+  'restoration evidence ignores changed inputs or consequential effects'
+has "$verification" 'mechanical execution' 'final verification has no source-free execution mode'
+has "$verification" 'independent plan-satisfaction assurance' \
+  'implement-only completion lost independent plan/source judgment'
+has "$verification" 'do not rerun matching passing commands' \
+  'plan-satisfaction assurance repeats exact command evidence'
 hasnt "$merge_contract" 'Write `REVIEW.md` before any fix' \
   'PR merge worker still directly publishes canonical REVIEW.md'
 
@@ -357,8 +380,10 @@ has "$preflight" '`PRIOR_FIXES:`' 'pre-flight envelope lost its PRIOR_FIXES bloc
 has "$REPO_DIR/src/workers/interview-research.md" 'So is `Facts:`' 'item research envelope lost its Facts field'
 has "$REPO_DIR/src/workers/interview-research.md" 'trace the value to the code that writes it' \
   'item research lets a repeat fix patch where a value is read'
-has "$REPO_DIR/src/workers/interview-research.md" 'consolidating a fact the item reads is not unrelated' \
-  'item research treats consolidating a fact the item reads as unrelated cleanup'
+has "$REPO_DIR/src/workers/interview-research.md" 'A broader consolidation is a scope choice' \
+  'item research automatically adds broader consolidation scope'
+has "$REPO_DIR/src/workers/interview-research.md" 'do not rederive settled facts solely because this worker is fresh' \
+  'item research repeats settled research on every fresh intake'
 has "$review" 'Check every item that reads or defines a fact in `## Domain facts`' \
   'plan review no longer checks items against domain-fact owners'
 has "$merge" 'A repair never decides what a domain fact means' \
@@ -587,11 +612,11 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln/review-approval.md" 'src/workers/plan-review-merge.md' "$host review phase does not reference review merge contract"
   has "$WORK/$host/phases/pln/implementation.md" 'src/workers/item-implementation.md' "$host implementation phase does not reference implementation contract"
   has "$WORK/$host/phases/pln/implementation.md" 'src/workers/execution-schedule.md' "$host implementation phase does not reference scheduling contract"
-  has "$WORK/$host/phases/pln/implementation.md" 'Compare every `Facts read` line with `## Domain facts`' \
+  has "$WORK/$host/phases/pln/implementation.md" 'Compare each `Facts read` owner declaration with the adopted `## Domain facts`' \
     "$host coordinator no longer checks the owner each domain fact is read through"
   has "$WORK/$host/phases/pln/outline.md" '## Domain facts' "$host plan skeleton lost its Domain facts section"
-  has "$WORK/$host/phases/pln/outline.md" 'becomes the first item' \
-    "$host outline no longer opens with the foundation item for an unowned fact"
+  has "$WORK/$host/phases/pln/outline.md" 'A `foundation` fact does not by itself add a consolidation item' \
+    "$host outline still automatically adopts unrequested foundation consolidation"
   has "$WORK/$host/phases/pln/outline.md" 'the checkpoint does not show it' \
     "$host outline shows the workers' Domain facts section to the user"
   has "$WORK/$host/phases/pln/interview.md" 'An approach that reads or defines a domain fact names its owner' \
@@ -604,15 +629,23 @@ for host in claude codex; do
     "$host fix phase lost the rebuild-or-adapt question"
   has "$WORK/$host/phases/pln-pr/fix.md" 'A timeout selects adapt, never rebuild' \
     "$host fix phase may rebuild on a timeout"
-  has "$WORK/$host/phases/pln/implementation.md" 'retained behavior' \
-    "$host coordinator no longer validates retained-behavior evidence"
-  has "$WORK/$host/phases/pln/implementation.md" 'adopted system-fit outcome' \
-    "$host coordinator no longer checks the bounded diff against adopted ownership"
-  has "$WORK/$host/phases/pln/implementation.md" 'that the two commands are the same, and that both exited zero' \
+  has "$WORK/$host/phases/pln/implementation.md" 'the implementing worker owns behavior proof' \
+    "$host implementation no longer assigns retained-behavior proof to the worker"
+  has "$WORK/$host/phases/pln/implementation.md" 'A checkpoint is mechanical recovery, not independent source judgment' \
+    "$host checkpoint still creates independent source judgment per item"
+  has "$WORK/$host/phases/pln/implementation.md" 'identical commands, comparable environment records, zero exits' \
     "$host implementation checkpoint lost equivalent pre/post behavior validation"
-  has "$WORK/$host/phases/pln/implementation.md" 'Do not run them again, yourself or through another worker' \
+  has "$WORK/$host/phases/pln/implementation.md" 'Do not repeat those runs or dispatch a source judge for every checkpoint' \
     "$host implementation checkpoint re-runs the worker's recorded pre/post runs"
   has "$WORK/$host/phases/pln/finish-ship.md" 'src/workers/final-verification.md' "$host finish phase does not reference verification contract"
+  has "$WORK/$host/phases/pln/implementation.md" 'A missing or contradicted acceptance proof, invalid identity, or unresolved acceptance doubt blocks' \
+    "$host mechanical checkpoint accepts missing acceptance proof or unresolved doubt"
+  has "$WORK/$host/phases/pln/implementation.md" 'Do not assign the final graph merely because an item is last' \
+    "$host last item still automatically repeats the final graph"
+  has "$WORK/$host/phases/pln/finish-ship.md" 'Verification: deferred to pln-pr' \
+    "$host PR handoff spends final verification before review and repairs"
+  has "$WORK/$host/phases/pln/finish-ship.md" 'independent plan-satisfaction assurance' \
+    "$host implement-only endpoint lost independent assurance"
   has "$WORK/$host/phases/pln-simplify/map-synthesize.md" 'src/workers/simplification-map.md' \
     "$host simplification phase does not reference its mapping contract"
   has "$WORK/$host/phases/pln-simplify/map-synthesize.md" 'src/workers/simplification-synthesis.md' \
@@ -798,7 +831,7 @@ for host in claude codex; do
     "$host later post-fix readers are not briefed with the exact repair range"
   has "$WORK/$host/phases/pln-pr/fix.md" 'diff-fingerprint --root <repository-root> --base <Settled candidate>' \
     "$host scoped repair diff has no mechanical identity"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'from the post-fix merge result, never at dispatch' \
+  has "$WORK/$host/phases/pln-pr/fix.md" 'from the published post-fix verifier or adjudicator result, never at dispatch' \
     "$host settled candidate can advance on a reader nobody counted"
   has "$WORK/$host/phases/pln-pr/fix.md" 'A failed or uncounted reader leaves `Settled candidate` where it was' \
     "$host a failed post-fix reader can advance the anchor past bytes nobody read"
@@ -821,6 +854,20 @@ for host in claude codex; do
     "$host post-fix merge still names no contract"
   has "$WORK/$host/phases/pln-pr/fix.md" 'Its assignment also carries' \
     "$host post-fix-only duties do not reach the merge worker"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'A clean reading replaces the unconditional second merger' \
+    "$host still mandates a separate merger for a clean post-fix verifier"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'post-fix: clean' \
+    "$host clean post-fix result has no coordinator-consumed outcome"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'require the staged `Phase` cursor to equal the canonical cursor at dispatch' \
+    "$host can publish an invented assurance outcome as its router cursor"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'post-fix: adjudication-required' \
+    "$host new post-fix findings have no separate-adjudication route"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'An empty findings array alone cannot certify a repair' \
+    "$host treats an empty post-fix array as proof of known repairs"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'Restoring adopted baseline behavior does not repeat its approval' \
+    "$host still repeats approval for independently proved adopted restoration"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'Missing, stale, ambiguous or contradicted evidence takes the ordinary gate' \
+    "$host restoration bypass accepts missing or contradictory evidence"
   # No per-round scheduling worker; the coordinator edits the merge's node
   # file mechanically when the dispatched set moves.
   hasnt "$WORK/$host/phases/pln-pr/fix.md" 'pr-fix-clusters' \
@@ -974,15 +1021,22 @@ for host in claude codex; do
     "$host Step 7 states the branch-caused exclusion without its consequence"
   has "$step7" 'What still forces a whole repeat is the tree changing or the command set changing; a refusal does neither' \
     "$host Step 7 no longer says what still forces the whole gauntlet to repeat"
-  # The one-agent rule and the fact that makes it safe sit eight lines apart, and
-  # the clause joining them is the whole of the edit that closed that gap. Three
-  # pins, because the fact and the rule can each survive while the connective
-  # between them is deleted — which is exactly the state the rule was written
-  # out of, a bare prohibition whose reason sits seven paragraphs away.
-  has "$step7" 'Step 7 spawns exactly one agent, and there is no adjudication worker' \
-    "$host Step 7 no longer says it spawns one agent and adjudicates nothing"
-  has "$step7" 'Evidence the coordinator already holds is never handed to a second agent to be judged' \
-    "$host Step 7 can hand evidence it already holds to a second agent"
+  # Sealed command execution is mechanical; actual failures still receive
+  # independent interpretation and code repairs return through source assurance.
+  has "$step7" 'A confirmed sealed graph can execute mechanically through the coordinator' \
+    "$host Step 7 still forces a fresh judgment executor for known commands"
+  has "$step7" 'failure or uncertain evidence gets the independent interpretation below' \
+    "$host Step 7 drops independent failure interpretation"
+  has "$step7" 'Preserve the recorded executor' \
+    "$host mechanical execution silently changes executor/access requirements"
+  has "$step7" 'return to the fix phase' \
+    "$host final-command code repairs can bypass independent source assurance"
+  has "$step7" 'passing tests alone cannot certify an edit made after review' \
+    "$host final-command code repairs substitute tests for source assurance"
+  has "$step7" 'bin/pln-gauntlet reuse --status' \
+    "$host Step 7 cannot import exact completed evidence across phases"
+  has "$step7" 'Only `REUSE=yes` settles this step' \
+    "$host Step 7 reuses a status without exact candidate/graph/environment checks"
   has "$step7" 'An exit status is bounded metadata, not a log' \
     "$host Step 7 lost the fact that lets one agent hold the context firewall"
   has "$step7" 'so the context firewall holds without a second agent between you and the result' \
@@ -1019,7 +1073,7 @@ for host in claude codex; do
   # contract addressed to another skill, and followed the wrong rule.
   has "$step7" 'This step carries its worker brief inline, below — there is no separate contract file for the final gauntlet.' \
     "$host Step 7 no longer declares its worker brief self-contained"
-  hasnt "$ship_watch" 'final-verification' \
+  hasnt "$ship_watch" 'src/workers/final-verification.md' \
     "$host ship-watch phase sends the final-gauntlet worker to the contract it must not read"
   # Scoped to the brief itself, not the file: ship-watch legitimately names a
   # host in its pln:only blocks, while the brief is the part a worker reads, and
@@ -1070,7 +1124,7 @@ for host in claude codex; do
       "$coordinator lost the incomplete-not-failed-not-destroyed outcome the shipped copy states"
     has "$coordinator" 'is not a verification result' \
       "$coordinator no longer says an environment refusal is not a verification result"
-    has "$coordinator" 'so the rerun is yours: run exactly that one command' \
+    has "$coordinator" 'run exactly that one command' \
       "$coordinator no longer gives the rerun to the coordinator that holds the access"
     has "$coordinator" 'which command was refused, the exact refusal, and what access the rerun was granted' \
       "$coordinator rerun no longer records all three facts"
@@ -1108,7 +1162,7 @@ for host in claude codex; do
   done
   # A refusal is not the failure either file already handled, and both of those
   # failure clauses stay exactly as consequential as they were for a real one.
-  has "$finish_step7" 'A command the environment refused reported nothing about the tree and is not a new item' \
+  has "$finish_step7" 'A command the environment refused reported nothing about the tree and is not itself a new item' \
     "$host /pln Step 7 turns a refusal into a new item the way it does a real failure"
   has "$verify_steps" 'delete only the named unpublished candidate ref' \
     "$host /pln-simplify no longer isolates a candidate that genuinely failed"
@@ -1398,6 +1452,45 @@ if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$merge_brief" \
 fi
 has "$WORK/verify-candidate.err" 'candidate fingerprint mismatch' \
   'candidate drift was not attributed'
+
+# Clean post-fix assurance starts from sealed repair evidence, before its own
+# raw-findings output exists. The existing inventory mode confines and hashes
+# those inputs, and pending reader metadata cannot claim successful coverage.
+printf 'repair-key: sample-boundary\npre: reproduced\npost: passed\n' \
+  > "$merge_repo/evidence/fix-result.txt"
+printf 'post-fix-red-team\tpending\tevidence/post-fix-red-team.json\n' \
+  > "$merge_repo/evidence/post-fix-readers.tsv"
+printf 'M\tordinary-source.txt\n' > "$merge_repo/evidence/post-fix-diff-files.txt"
+verifier_candidate="$("$REPO_DIR/bin/pln-assurance" fingerprint \
+  --root "$merge_repo" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" \
+  | awk -F= '$1 == "CANDIDATE_SHA256" { print $2 }')"
+verifier_brief="$WORK/post-fix-verifier.brief"
+"$REPO_DIR/bin/pln-build-review-brief" --mode pr-merge \
+  --contract "$REPO_DIR/src/workers/pr-review-merge.md" --root "$merge_repo" \
+  --candidate "$verifier_candidate" --commands "$merge_repo/commands.txt" \
+  --environment "$merge_repo/environment.txt" --ledger "$merge_repo/REVIEW.md" \
+  --diff-map "$merge_repo/evidence/post-fix-diff-files.txt" \
+  --reader-metadata "$merge_repo/evidence/post-fix-readers.tsv" \
+  --artifact repair-evidence "$merge_repo/evidence/fix-result.txt" \
+  --skill-root "$merge_repo/skills" --out "$verifier_brief" >/dev/null \
+  || fail 'post-fix verifier brief could not inventory known repair evidence'
+"$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$verifier_brief" \
+  | grep -q '^STATUS=verified$' || fail 'post-fix verifier input seals did not verify'
+[ ! -e "$merge_repo/evidence/post-fix-red-team.json" ] \
+  || fail 'post-fix verifier fixture accidentally requires its output before reading'
+has "$merge_contract" 'pending reader-metadata row' \
+  'post-fix verifier treats a planned reader as prior successful coverage'
+cp "$merge_repo/evidence/fix-result.txt" "$WORK/fix-result.backup"
+printf 'repair-key: substituted-boundary\npost: passed\n' \
+  > "$merge_repo/evidence/fix-result.txt"
+if "$REPO_DIR/bin/pln-build-review-brief" --verify-pr-merge "$verifier_brief" \
+  >"$WORK/verify-repair-proof.out" 2>"$WORK/verify-repair-proof.err"; then
+  fail 'post-fix verifier accepted replaced known repair evidence'
+fi
+has "$WORK/verify-repair-proof.err" 'ARTIFACT' \
+  'post-fix repair-evidence replacement was not rejected at the inventory boundary'
+cp "$WORK/fix-result.backup" "$merge_repo/evidence/fix-result.txt"
 
 # The post-fix merge reuses pr-merge mode unchanged: one red-team artifact, a
 # one-row reader table, the repair range's diff map, and no plan. It gets the

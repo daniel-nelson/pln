@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.121.0 — 2026-10-02
+
+### Changed
+
+- **Item checkpoints validate recovery and evidence, while independent assurance judges source.** Checkpoints retain leases, dirty preservation, acceptance doubts and exact proof without adding a substantive review before the scheduled review. Same-owner short dependency chains and mechanical corrections may continue an idle worker after each durable checkpoint; workers read their item, constraints and dependency evidence rather than unrelated plan details.
+- **Shipping runs the final graph after review and repairs settle.** Targeted and project-mandated development checks remain. Existing exact candidate/command/environment proof carries across the pln→pln-pr hand-off. Sealed file-first command execution does not require a fresh source judge; implement-only completion still receives independent plan-satisfaction assurance. Executable-source repairs after review return through assurance before verification and shipping.
+- **A clean post-fix verifier also prepares the staged ledger.** It independently checks known repair sufficiency and required coverage, with the existing canonical publication boundary. New or reopened findings, conflicting evidence and owner constraints still require a separate adjudicator; empty findings alone cannot close a repair.
+- **Scope follows the requested outcome.** Domain ownership research and necessary prerequisites remain, but foundation markers no longer automatically migrate every layer, and related ready tickets no longer join delegated scope merely through their names or dependency links. Settled research is reused until its source or premise changes.
+- **Already-adopted behavior restoration keeps its existing authorization.** The repair must independently match accepted base-reachable inputs and effects within owner constraints. New policy, consequential effects, structural retirement and live actions keep their decision gates.
+- **Ordinary upgrades wait outside adopted execution.** Adoption records the executing pln version, carried through PR hand-off and consumed by readiness. Routine available upgrades are deferred through the endpoint; necessary correctness/security updates, explicit update requests and external version drift remain visible recovery decisions. Other skills retain their own update rules.
+
+### Fixed
+
+- **Staging deletions or renames preserves working-tree verification identity.** Missing paths no longer change membership when their deletion reaches the index. Exact symlink target newlines are preserved. The new fingerprint representation invalidates old seals rather than reinterpreting them; actual bytes, paths, modes, link targets, commands and environment still invalidate evidence.
+
 ## 1.120.0 — 2026-10-02
 
 ### Fixed

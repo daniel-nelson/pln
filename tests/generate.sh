@@ -560,7 +560,7 @@ done < <(find "$real_c" -name '*.md' | grep -v slack)
 for f in "$real_c/SKILL.md" "$real_c/pln-pr/SKILL.md"; do
   has "$f" 'A running Agent is never stopped' "$f lets the coordinator stop a running Agent"
 done
-has "$real_c/phases/pln-pr/fix.md" 'stages only the leased paths, and commits the cluster' \
+has "$real_c/phases/pln-pr/fix.md" 'stages only explicit leased paths, and commits the cluster' \
   "the claude fix phase has no executable commit ownership"
 has "$real_x/phases/pln-pr/review.md" 'Start independent slots concurrently' \
   "the codex build does not use native concurrency for independent review slots"
@@ -830,7 +830,7 @@ has "$real_c/phases/pln/implementation.md" 'isolation: "worktree"' \
   'the Claude implementation phase lost native worktree isolation'
 has "$real_x/phases/pln/implementation.md" 'git worktree add --detach' \
   'the Codex implementation phase lost orchestrator-created worktrees'
-has "$real_c/phases/pln-pr/fix.md" 'coordinator validates the result and diff, stages only the leased paths' \
+has "$real_c/phases/pln-pr/fix.md" 'coordinator validates the envelope, lease/dirty-state preservation, exact evidence identity' \
   "the Claude fix phase lost coordinator commit ownership"
 has "$real_x/phases/pln-pr/review.md" 'Start independent slots concurrently' \
   "the Codex fix phase lost native concurrency semantics"
@@ -982,7 +982,7 @@ for host_out in "$real_c" "$real_x"; do
   # parallelizes it across jobs a single machine cannot match.
   has "$scope_file" 'Split what you find into static checks and the behavior suite' \
     "$scope_file lost the two-tier gauntlet split"
-  has "$ship_file" 'The static checks always run here. The behavior suite runs only under an exception' \
+  has "$ship_file" 'The static checks must be proved on the final candidate by exact reuse or execution here. The behavior suite runs only under an exception' \
     "$ship_file lets the final gauntlet run the behavior suite unconditionally"
   has "$ship_file" 'The behavior suite does not re-run here' \
     "$ship_file re-runs the behavior suite after a CI fix"
@@ -1344,13 +1344,13 @@ done
 for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementation.md"; do
   has "$f" 'becomes a node; it is not the coordinator' \
     "$f leaves a mid-run change request with no dispatch path"
-  has "$f" 'A one-line change is not an exception' \
+  has "$f" 'No change bypasses its durable record, one writer, or coordinator-owned git' \
     "$f lets the smallest request be the one done inline"
-  has "$f" 'exists only in the transcript' \
+  has "$f" 'append it to the manifest with its own write lease' \
     "$f does not say a typed-in change escapes the durable record"
 done
 for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
-  has "$f" 'becomes a cluster of its own' \
+  has "$f" 'becomes a durable cluster with its own lease and checkpoint' \
     "$f leaves a mid-run change request with no cluster path"
 done
 
@@ -1367,15 +1367,12 @@ for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
     "$f drops the cases where re-running is still required"
   has "$f" 'may not also certify that no deeper review was needed' \
     "$f lost why the post-fix reader is fresh"
-  # The phase inlines its briefs; a run that searches src/workers/ for this
-  # phase's contract finds nothing and pays a round trip for it.
-  has "$f" 'there is no separate contract file for a fix or a post-fix verifier' \
-    "$f leaves a run to hunt src/workers/ for a contract that is not there"
-  # The post-fix merge is the one exception, and it gets the first merge's
-  # prepared brief: a round that borrowed that contract without the brief spent
-  # minutes hunting for it and messaged the coordinator.
-  has "$f" 'The post-fix merge is the exception' \
-    "$f sends the post-fix merge to hunt for a contract"
+  # Fix briefs stay inline; clean post-fix assurance uses the shared merger
+  # contract and the same validated prepared inventory as initial admission.
+  has "$f" 'Post-fix assurance uses' \
+    "$f lost the post-fix assurance contract route"
+  has "$f" 'post-fix verifier mode' \
+    "$f does not distinguish clean verification from new-finding admission"
   has "$f" 'pln-build-review-brief" --mode pr-merge' \
     "$f post-fix merge gets no prepared brief"
   # Execution is linear since 1.60.0: no isolated worktree is assigned.
@@ -1403,23 +1400,38 @@ for f in "$real_c/phases/pln/implementation.md" "$real_x/phases/pln/implementati
   # it to the worker (3 min of a two-item run, 2026-09-30).
   has "$f" 'With three or fewer pending items, write `<plan-dir>/schedule-nodes.tsv` yourself' \
     "$f spawns a scheduling worker for a small plan"
-  has "$f" 'names a later item as something it depends on, sends the plan to the worker' \
+  has "$f" 'names a later dependency, or leaves a needed boundary unsettled sends the plan to the worker' \
     "$f orders a small plan against a dependency its text declares"
 done
 
-# Checks run once (2026-09-30: the implementer, a checkpoint validator and final
-# verification ran the same commands on the same tree). The last item runs the
-# final gauntlet; Step 7 reuses it only on the exact candidate it ran on.
+# Shipping's final graph belongs after independent review and repairs. An
+# implement-only endpoint retains final tests and independent source assurance.
 for host_dir in "$real_c" "$real_x"; do
-  has "$host_dir/phases/pln/implementation.md" 'The last item runs the final gauntlet' \
-    "$host_dir implementation does not hand the last item the final gauntlet"
+  has "$host_dir/phases/pln/implementation.md" 'Do not assign the final graph merely because an item is last' \
+    "$host_dir still runs shipping verification at the last item"
+  has "$host_dir/phases/pln/implementation.md" 'A checkpoint is mechanical recovery, not independent source judgment' \
+    "$host_dir retains duplicate substantive checkpoint review"
+  has "$host_dir/phases/pln/finish-ship.md" 'Verification: deferred to pln-pr' \
+    "$host_dir does not defer adopted PR verification"
   has "$host_dir/phases/pln/finish-ship.md" 'bin/pln-gauntlet reuse --status' \
-    "$host_dir final verification does not ask whether the last item's run covers the candidate"
-  has "$host_dir/phases/pln/finish-ship.md" 'Any other answer, and a run whose last item carried no gauntlet, continues below' \
-    "$host_dir final verification reuses a run the helper did not accept"
+    "$host_dir lost exact candidate verification reuse"
+  has "$host_dir/phases/pln/finish-ship.md" 'An endpoint that returns without a PR retains independent plan-satisfaction assurance' \
+    "$host_dir assumes an absent PR will supply assurance"
+  has "$host_dir/phases/pln-pr/fix.md" 'New findings or ambiguity require a separate adjudicator' \
+    "$host_dir lets a reader admit its own new repair claim"
+  has "$host_dir/SKILL.md" 'record ordinary `UPGRADE_AVAILABLE` as deferred' \
+    "$host_dir changes the adopted instruction version mid-run"
+  has "$host_dir/SKILL.md" 'If installed `VERSION` differs from the pin' \
+    "$host_dir silently mixes instruction releases"
+  has "$host_dir/phases/pln/outline.md" 'A shared name or dependency link does not add work' \
+    "$host_dir automatically adopts related tickets"
+  has "$host_dir/phases/pln/review-approval.md" 'never an item merely because it is related and ready' \
+    "$host_dir silently broadens scope at adoption"
 done
-has "$REPO_DIR/src/workers/item-implementation.md" 'When the assignment names a final gauntlet, run it last' \
-  'the item contract does not run a handed final gauntlet'
+has "$REPO_DIR/src/workers/item-implementation.md" 'unrelated items and settled research are not intake' \
+  'the implementation worker re-reads unrelated plan items'
+has "$REPO_DIR/src/workers/item-implementation.md" 'Any edit after recorded passing evidence requires applicable checks on the new source' \
+  'item continuation reuses stale proof'
 
 # Bookkeeping stays with the coordinator: the closing sweep, a version bump and
 # a version-only conflict each cost a worker 3.5-5.5 minutes on one run.
@@ -1875,7 +1887,7 @@ for host_out in "$real_c" "$real_x"; do
   done
   # Picking up an item shows what it is tied to: at the outline when the request
   # names ids, and before the approval message for an id first found later. A
-  # delegated run takes the strongly related ones, never one declared distinct.
+  # delegated run takes only requested work or an evidenced prerequisite.
   for rel in phases/pln/outline.md phases/pln/review-approval.md; do
     has "$host_out/$rel" "$host_out/bin/pln-todo related --id" \
       "$host_out/$rel does not show the items related to a to-do item the run takes"
@@ -1883,8 +1895,8 @@ for host_out in "$real_c" "$real_x"; do
   done
   has "$host_out/phases/pln/review-approval.md" 'filing again with `--distinct-from` naming every `NEAR` id' \
     "$host_out/phases/pln/review-approval.md leaves the run's own tracker item refused as a near-duplicate"
-  has "$host_out/phases/pln/outline.md" 'and not `distinct`' \
-    "$host_out/phases/pln/outline.md lets delegated mode take an item declared distinct"
+  has "$host_out/phases/pln/outline.md" 'A shared name or dependency link does not add work' \
+    "$host_out/phases/pln/outline.md lets related metadata expand adopted scope"
   has "$host_out/phases/pln/implementation.md" 'every id but those on its `Related, not taken:` line' \
     "$host_out/phases/pln/implementation.md claims the related items the run did not take"
   hasnt "$host_out/phases/pln-simplify/verify-record.md" "$todo_marker" \

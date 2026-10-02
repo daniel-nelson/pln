@@ -377,20 +377,28 @@ case "$command" in
     # untracked paths before tracked ones, so staging a file moved its record
     # and changed the hash over an identical set of records. `-u` collapses the
     # repeated entries an unmerged path gets, one per conflict stage.
-    printf 'FILES\0' > "$manifest"
+    # Absent paths have no working-tree record: staging a deletion removes its
+    # index entry without changing what ran. This domain tag also invalidates
+    # old gauntlet seals under the previous missing-record representation.
+    printf 'FILES-v2\0' > "$manifest"
     while IFS= read -r -d '' path; do
+      [ -e "$root/$path" ] || [ -L "$root/$path" ] || continue
       printf '%s\0' "$path" >> "$manifest"
       if [ -L "$root/$path" ]; then
         # git stores a symlink as its target string at mode 120000; hashing the
         # path itself follows the link and fails when the target is a directory.
-        blob="$(printf '%s' "$(readlink "$root/$path")" | git hash-object --stdin)"
+        # Preserve target newlines; command substitution otherwise strips them.
+        link_target="$(readlink -n "$root/$path" && printf '.')"
+        link_target="${link_target%.}"
+        blob="$(printf '%s' "$link_target" | git hash-object --stdin)"
         printf 'l\0%s\0' "$blob" >> "$manifest"
       elif [ -e "$root/$path" ]; then
         if [ -x "$root/$path" ]; then mode="x"; else mode="-"; fi
         blob="$(git -C "$root" hash-object --no-filters -- "$path")"
         printf '%s\0%s\0' "$mode" "$blob" >> "$manifest"
       else
-        printf 'missing\0missing\0' >> "$manifest"
+        echo "pln-assurance: path disappeared while fingerprinting: $path" >&2
+        exit 2
       fi
     done < <(git -C "$root" ls-files -z --cached --others --exclude-standard | LC_ALL=C sort -z -u)
 

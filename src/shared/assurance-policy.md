@@ -20,12 +20,14 @@ A repository may explicitly declare a self-hosting exception for the workflow th
 
 ### Exact candidate identity
 
-Gauntlet evidence belongs to one exact candidate: the current non-ignored tree, the ordered command graph, and the relevant environment. Write commands/dependencies/declared parallel groups/exclusive resources/tree modes to the command artifact, and write runtime/tool versions plus each command's assigned executor and required non-secret conditions to the environment artifact (never secret values), then run:
+Gauntlet evidence belongs to one exact candidate: the existing tracked and untracked non-ignored working-tree paths, their bytes/modes/link targets, the ordered command graph, and the relevant environment. Write commands/dependencies/declared parallel groups/exclusive resources/tree modes to the command artifact, and write runtime/tool versions plus each command's assigned executor and required non-secret conditions to the environment artifact (never secret values), then run:
 
 ```bash
 bin/pln-assurance fingerprint --root <repo> \
   --commands <commands-file> --environment <environment-file>
 ```
+
+Staging or committing identical working-tree bytes, including an already-absent deletion or rename, preserves identity. Fingerprints use a versioned representation; proof from an older representation must be rerun, never rebound by assertion.
 
 Persist all four hashes with the result. Reuse a green gauntlet result only when `TREE_SHA256`, `COMMAND_SHA256`, and `ENVIRONMENT_SHA256` all match; the graph and executor requirements participate through the latter two hashes. Any review fix, non-release-metadata edit, CI code fix, command-graph change, or relevant environment change creates a new candidate and invalidates the prior green result. Compute the fingerprint immediately before and after the gauntlet; a changed tree fails verification rather than blessing an untested state. The sole narrow reuse exception is a proven version/release-metadata-only correction after a green functional gauntlet: rerun only the repository's declared version/package validation and bind both trees plus that result. Any mixed byte, unproved path/hunk, graph change, or environment change invalidates functional evidence. Where the execution environment refused a command and exactly that command was rerun with the access it needed, the outcome is recorded as a **qualified pass** — green except the named command, which ran at elevated access, carrying both environment hashes — which is a disclosure of a result that was never uniform, not the reuse of a green this rule governs.
 

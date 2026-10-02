@@ -71,7 +71,7 @@ This file is the always-loaded coordinator contract. It deliberately contains ac
 
 ### Durable cursor
 
-Every new `PLAN.md` has a top-level `## Phase` section whose single value is one of `outline`, `interview`, `review-approval`, `implementation`, `blocker`, `finish-ship`, or `complete`. The cursor is authoritative only when it agrees with the durable dashboard, open-question state, item statuses, handoffs, Ship field, and Verification field.
+Every new `PLAN.md` has a top-level `## Phase` section whose cursor value is one of `outline`, `interview`, `review-approval`, `implementation`, `blocker`, `finish-ship`, or `complete`. The cursor is authoritative only when it agrees with the durable dashboard, open-question state, item statuses, handoffs, Ship field, and Verification field.
 
 At every boundary, complete every write owned by the old phase first. Then write the new cursor. Then read the mapped phase document in full before the phase's first action. In short: write durable state first, then advance `Phase`, then read the new phase file and act. Never act under a cursor that has merely been planned but not written. Persist a question in `Open questions` before sending it; persist a blocker in its handoff and item/dashboard state before switching to `blocker`.
 
@@ -95,7 +95,7 @@ For a legacy `PLAN.md` with no cursor, derive the most conservative compatible p
 - New run → `outline` after the skeleton has been created with `Phase: outline`.
 - Accepted outline → `interview` after outline edits are durable.
 - Resolved interview → `review-approval` after every item, question, and cross-item consequence is durable.
-- Adopted master plan → `implementation` after Ship/base adoption is durable.
+- Adopted master plan → `implementation` after Ship/base adoption and the executing `Skill version` pin are durable.
 - Implementation blocker → `blocker` after handoff and item state are durable; resolved blocker → `implementation` after the answer is in the plan.
 - Exhausted implementation list → `finish-ship` after every item outcome is durable.
 - Finished ship/watch or deliberate stop → `complete` after verification, follow-ups, and PR identity/outcome are durable.

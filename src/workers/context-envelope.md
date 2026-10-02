@@ -2,7 +2,7 @@
 
 This file is worker-owned runtime instruction. The coordinator may name this path but does not paste or load this contract into its own conversation.
 
-Write complete research notes to the assigned path beneath `<plan-dir>/evidence/`. Then write a concise plain-text envelope to the assigned result path. The result path must also be beneath the plan directory and must fit the byte budget in the assignment.
+Write complete research notes to the assigned evidence path beneath the assigned worker artifact root. Then write a concise plain-text envelope to the assigned result path beneath that same root, within the assignment's byte budget. The worker artifact root may differ from the coordinator's plan directory; use the assigned writable paths.
 
 The envelope has this exact top-level shape:
 

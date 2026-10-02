@@ -1,30 +1,23 @@
 ## Coordinator context firewall
 
-The coordinator owns conversation, durable decisions/cursors, blockers, and hand-off. Route every other read before running it.
+The coordinator owns conversation/state/blockers/hand-off. Route other reads before execution.
 
 ### Three context tiers
 
-- **Coordinator-direct:** known-stop coordination state or one exact fact; at most two exact operations, 40 lines, and 2 KiB combined, provably bounded before execution. Router/active-phase, root-instruction, `PLAN.md`, and `REVIEW.md` reads are coordination-state exceptions.
-- **Evidence:** a fresh `src/workers/evidence-collection.md` worker for mechanically closed facts beyond that budget. It returns facts, citations, counterevidence, and uncertainty only. `evidence_profile` inherits by default and uses economy only after opt-in.
-- **Judgment:** a fresh `judgment` worker for synthesis, scope/question changes, conflicting-record applicability, reversals, recommendations, architecture/API seams, concurrency/transactions, migrations/destructive lifecycle, security/privacy, external/AI/eval effects, and all review, verification, or merges.
+- **Coordinator-direct:** known-stop coordination state or one exact fact; at most two exact operations, 40 lines and 2 KiB combined, bounded before execution. Router/active-phase, root-instruction, `PLAN.md` and `REVIEW.md` reads are coordination-state exceptions.
+- **Evidence:** a fresh `src/workers/evidence-collection.md` worker for mechanically closed facts beyond that budget. Return facts, citations, counterevidence and uncertainty. `evidence_profile` inherits unless economy is opted in.
+- **Judgment:** fresh `judgment` for substantive synthesis, source review, scope/reversals, conflicting applicability, architecture/risk, failure interpretation and new repair admission. Clean post-fix verification may prepare its ledger under the fix phase's contract.
 
-Raw diffs, source neighborhoods, logs, decision corpora, reviewer output, and peer output never enter coordinator context. Write them to artifacts; read only fixed metadata or validated envelopes. Possibly unbounded commands redirect before execution—post-generation `head`/`tail` is not proof of boundedness.
+The coordinator mechanically checks leases/evidence/checkpoints and publishes records; this is not source assurance. It may execute trusted sealed graphs file-first, preserving dependencies/resources/executors/access/approvals. Consume bounded statuses; delegate failure/uncertainty judgment.
+
+Raw diffs, source, logs, corpora and reviewer/peer output never enter coordinator context. Redirect unbounded output before execution; a later `head`/`tail` does not prove boundedness.
 
 ### Escalation and retry
 
-A direct lookup needing an exploratory follow-up escalates immediately. Evidence writes `ESCALATE: frontier` for non-closure, conflict, applicability, or risk; dispatch judgment on its artifact paths.
-
-Missing, empty, malformed, out-of-root, oversized, or wrong-scope output gets one fresh same-tier retry. Then evidence escalates once to judgment; failed judgment fails closed. Unavailable opted-in economy falls back to inherited evidence with attribution. Never fall back inline.
+Exploratory direct follow-ups escalate. Evidence returns `ESCALATE: frontier` for non-closure/conflict/applicability/risk; judgment reads its artifacts. Invalid results get one fresh same-tier retry; confined format-only errors may continue the idle worker under a recorded assignment. Consume no rejected bytes. Evidence then escalates once; failed judgment fails closed. Unavailable opted-in economy falls back with attribution. Never fall back inline.
 
 ### File-first boundary and routing record
 
-For every worker crossing this boundary:
+Give contract/plan sections, scope/source, artifact paths, budget and routing, not pasted evidence. Workers write under the assigned root and return `RESULT_FILE=<absolute envelope path>`. Read through `bin/pln-read-envelope`, never raw artifacts after rejection. Require `src/workers/context-envelope.md` and citations. Missing facts get narrow follow-up; mechanical corrections may continue, independent judgment stays fresh.
 
-1. Give contract/plan paths, exact scope/source state, evidence/result paths, budget, and routing controls—not pasted evidence.
-2. Workers write beneath `<plan-dir>/evidence/` and return only `RESULT_FILE=<absolute envelope path>`.
-3. Read results only through `bin/pln-read-envelope`; never `cat` after failure or open raw artifacts.
-4. Accept only `src/workers/context-envelope.md` shape with durable citations; missing facts require a narrow follow-up worker.
-
-After every lookup/attempt, append `<plan-dir>/routing.tsv` with `{{SKILL_DIR}}/bin/pln-route-ledger`: scope, tier/reason, risk flags, requested/actual profile/model/effort, fallback/escalation, source state, status, and artifacts. It is local recovery state, not user-facing.
-
-Envelope ceilings remain 8192 bytes preflight and 4096 bytes per-item/follow-up.
+Append `<plan-dir>/routing.tsv` through `{{SKILL_DIR}}/bin/pln-route-ledger` after every lookup/attempt: scope, tier/reason, risk, requested/actual profile/model/effort, fallback/escalation, source, status and artifacts. Envelope ceilings remain 8192 bytes preflight and 4096 bytes per-item/follow-up.

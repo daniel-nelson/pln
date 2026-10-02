@@ -296,6 +296,64 @@ git -C "$FIXTURE" rm -q pending.txt
 git -C "$FIXTURE" commit -qm drop-pending
 [ "$(FP)" = "$first" ] || fail 'restoring the content did not restore the fingerprint'
 
+# Missing paths describe no working-tree bytes. Deletion and rename evidence
+# must survive staging/committing, while the actual removal or move invalidates.
+rm "$FIXTURE/source.txt"
+deleted_fp="$(FP)"
+[ "$deleted_fp" != "$first" ] || fail 'deleting a tracked file did not invalidate fingerprint'
+git -C "$FIXTURE" add -u -- source.txt
+[ "$(FP)" = "$deleted_fp" ] || fail 'staging an already-deleted file moved the fingerprint'
+git -C "$FIXTURE" commit -qm delete-source
+[ "$(FP)" = "$deleted_fp" ] || fail 'committing a deletion moved the fingerprint'
+printf 'one\n' > "$FIXTURE/source.txt"
+[ "$(FP)" = "$first" ] || fail 'restoring a deleted file did not restore its identity'
+git -C "$FIXTURE" add -- source.txt
+git -C "$FIXTURE" commit -qm restore-source
+mv "$FIXTURE/source.txt" "$FIXTURE/renamed
+source.txt"
+renamed_fp="$(FP)"
+[ "$renamed_fp" != "$first" ] || fail 'a real rename did not invalidate fingerprint'
+git -C "$FIXTURE" add -- source.txt 'renamed
+source.txt'
+[ "$(FP)" = "$renamed_fp" ] || fail 'staging a rename moved the fingerprint'
+git -C "$FIXTURE" commit -qm rename-source
+[ "$(FP)" = "$renamed_fp" ] || fail 'committing a rename moved the fingerprint'
+mv "$FIXTURE/renamed
+source.txt" "$FIXTURE/source.txt"
+git -C "$FIXTURE" add -- source.txt 'renamed
+source.txt'
+git -C "$FIXTURE" commit -qm restore-source-name
+[ "$(FP)" = "$first" ] || fail 'restoring a renamed file did not restore its identity'
+
+# Ignore rules exclude personal files, but explicitly tracked ignored files
+# remain in the candidate. A dangling symlink is present, unlike a missing path.
+printf 'ignored.txt\ntracked-ignored.txt\n' >> "$FIXTURE/.git/info/exclude"
+printf 'personal\n' > "$FIXTURE/ignored.txt"
+[ "$(FP)" = "$first" ] || fail 'an untracked ignored artifact invalidated fingerprint'
+printf 'covered\n' > "$FIXTURE/tracked-ignored.txt"
+git -C "$FIXTURE" add -f -- tracked-ignored.txt
+tracked_ignored_fp="$(FP)"
+[ "$tracked_ignored_fp" != "$first" ] || fail 'a tracked ignored file was omitted'
+printf 'changed\n' > "$FIXTURE/tracked-ignored.txt"
+[ "$(FP)" != "$tracked_ignored_fp" ] || fail 'a tracked ignored edit was omitted'
+git -C "$FIXTURE" rm -qf -- tracked-ignored.txt
+ln -s absent-target "$FIXTURE/dangling link"
+dangling_fp="$(FP)"
+[ "$dangling_fp" != "$first" ] || fail 'a dangling symlink was omitted'
+rm "$FIXTURE/dangling link"
+ln -s 'absent-target
+' "$FIXTURE/dangling link"
+[ "$(FP)" != "$dangling_fp" ] || fail 'a symlink target newline was omitted'
+rm "$FIXTURE/dangling link"
+ln -s absent-target "$FIXTURE/dangling link"
+git -C "$FIXTURE" add -- 'dangling link'
+git -C "$FIXTURE" commit -qm add-dangling-link
+rm "$FIXTURE/dangling link"
+[ "$(FP)" = "$first" ] || fail 'deleting a dangling symlink did not restore identity'
+git -C "$FIXTURE" add -u -- 'dangling link'
+[ "$(FP)" = "$first" ] || fail 'staging a dangling symlink deletion moved identity'
+git -C "$FIXTURE" commit -qm drop-dangling-link
+
 # One file was not enough to catch the next version of that bug. `git ls-files`
 # lists untracked paths before tracked ones, so staging a file whose name sorts
 # before, between or after the tracked names moved its record and changed the
@@ -442,6 +500,48 @@ has_line "$(reuse "$GAUNTLET_OUT/coordinator.status")" 'REUSE=no' 'a run that de
 grep -v '^CANDIDATE_SHA256=' "$GAUNTLET_OUT/reuse.status" > "$GAUNTLET_OUT/unsealed.status"
 has_line "$(reuse "$GAUNTLET_OUT/unsealed.status")" 'REASON=no-fingerprint' 'a status without a candidate was reused'
 has_line "$(reuse "$GAUNTLET_OUT/absent.status")" 'REASON=missing-status' 'a missing status was reused'
+
+# Changing the representation cannot reinterpret old seals as current proof.
+# With no missing paths the legacy algorithm differs only in its domain tag.
+sed 's/FILES-v2/FILES/' "$ASSURANCE" > "$GAUNTLET_OUT/legacy-assurance"
+legacy_identity="$(bash "$GAUNTLET_OUT/legacy-assurance" fingerprint --root "$FIXTURE" \
+  --commands "$GAUNTLET_OUT/legacy.commands" --environment "$GAUNTLET_OUT/environment.txt")"
+sed '/^TREE_SHA256=/d; /^COMMAND_SHA256=/d; /^ENVIRONMENT_SHA256=/d; /^CANDIDATE_SHA256=/d' \
+  "$GAUNTLET_OUT/reuse.status" > "$GAUNTLET_OUT/legacy-seal.status"
+printf '%s\n' "$legacy_identity" >> "$GAUNTLET_OUT/legacy-seal.status"
+has_line "$(reuse "$GAUNTLET_OUT/legacy-seal.status")" 'REASON=candidate-moved' \
+  'a seal from the old fingerprint representation was reused'
+
+# Actual passing gauntlet evidence survives index-only additions, deletions,
+# and renames, then the commit recording exactly those working-tree bytes.
+for operation in add delete rename; do
+  case "$operation" in
+    add) printf 'new\n' > "$FIXTURE/verification-new.txt" ;;
+    delete) cp "$FIXTURE/source.txt" "$GAUNTLET_OUT/source.saved"; rm "$FIXTURE/source.txt" ;;
+    rename) mv "$FIXTURE/source.txt" "$FIXTURE/moved source.txt" ;;
+  esac
+  "$GAUNTLET" run --root "$FIXTURE" --commands "$GAUNTLET_OUT/legacy.commands" \
+    --environment "$GAUNTLET_OUT/environment.txt" --logs "$GAUNTLET_OUT/$operation-logs" \
+    --status "$GAUNTLET_OUT/$operation.status"
+  case "$operation" in
+    add) git -C "$FIXTURE" add -- verification-new.txt ;;
+    delete) git -C "$FIXTURE" add -u -- source.txt ;;
+    rename) git -C "$FIXTURE" add -- source.txt 'moved source.txt' ;;
+  esac
+  has_line "$(reuse "$GAUNTLET_OUT/$operation.status")" 'REUSE=yes' \
+    "staging $operation invalidated passing gauntlet evidence"
+  git -C "$FIXTURE" commit -qm "record-$operation"
+  has_line "$(reuse "$GAUNTLET_OUT/$operation.status")" 'REUSE=yes' \
+    "committing $operation invalidated passing gauntlet evidence"
+  case "$operation" in
+    add) git -C "$FIXTURE" rm -q -- verification-new.txt ;;
+    delete) cp "$GAUNTLET_OUT/source.saved" "$FIXTURE/source.txt"; git -C "$FIXTURE" add -- source.txt ;;
+    rename) mv "$FIXTURE/moved source.txt" "$FIXTURE/source.txt"; git -C "$FIXTURE" add -- source.txt 'moved source.txt' ;;
+  esac
+  has_line "$(reuse "$GAUNTLET_OUT/$operation.status")" 'REUSE=no' \
+    "a real change after $operation did not invalidate gauntlet evidence"
+  git -C "$FIXTURE" commit -qm "restore-$operation"
+done
 
 # A tracked symlink to a directory must fingerprint (git hash-object on the
 # path follows the link and dies), and retargeting the link must invalidate.

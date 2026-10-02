@@ -154,6 +154,8 @@ Work enters through four doors, and every one of them ends in the same call: `{{
 
 **Adding never asks.** Filing is the run writing down what it found, not a decision the user has to be present for. No door pauses for permission, and none of them holds an item back for a better moment.
 
+**A remainder is not a follow-up.** What is left of the work this run was asked to do — a line its own change added, a step its acceptance criteria or a claimed item names, a regression it caused — is done in the run or asked, and reaches the to-do list only through one of the remainder test's three exits. The test, its exits and their artifacts are stated once, in the follow-up filing rule every phase with a door carries; run it before any `add`.
+
 **A door files a complete item**: an `--id`, a `--status`, a `--source` and a claim. Everything else is optional.
 
 **1. The run spinoff — the sweep at either close.** At `{{PLN_CMD}}`'s Step 7 wrap-up and at whichever `{{PLN_PR_CMD}}` close hands the PR to the user, the outstanding sweep already assembles the candidates and the follow-up bar already decides which of them are filed. Each one that clears the bar is filed **before the closing message is drafted**, not after it, so that the message can be written from the to-do list rather than the to-do list from the message.
@@ -170,7 +172,7 @@ The doors differ only in what triggers them. What each one files and where it la
 
 ### Outflow — what a run may change, and where finished work goes
 
-Intake is unguarded because filing costs nothing. Outflow is not: every rule below exists so that what the to-do list says was finished is something that actually was.
+Intake asks no one, because filing costs nothing once the remainder test has cleared the candidate. Outflow is not: every rule below exists so that what the to-do list says was finished is something that actually was.
 
 **A run declares its scope before it starts, and its write set with it.** It names the to-do items it is taking — one `pln-todo claim --id <id> --run <name> --touches <paths>` each, which records the write set, checks the collision and records the holder under a single lock, so a second run in this tree reads the item as taken rather than taking it too. `--touches` is where the field above actually gets filled: filing is deliberately cheap and files most items with nothing, and the claim is the first moment somebody has read the item and knows what working it will write. Declare it from that reading, `--holds` alongside it where a scarce resource is involved. A claim of an item that still declares nothing is refused and says so, because an unknown write set is what makes every later parallel-safety answer "cannot say". That declared set is the whole set this run may ever check off. An item outside it may be reported on, and never marked; the one write a run makes outside its declared set is the user-confirmed archive below, which checks nothing off. A refused claim is an item to drop from the run, not one to work anyway.
 

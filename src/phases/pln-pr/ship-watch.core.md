@@ -14,6 +14,8 @@ Write new tree/command/environment/candidate fingerprints after every fix, non-m
 
 <!-- pln:include assurance-policy -->
 
+<!-- pln:include followup-filing -->
+
 ### Step 6. Version and changelog (conditional — before the gauntlet)
 
 First refresh the already resolved base and run `bin/pln-assurance diff-fingerprint --root . --base "origin/$BASE"`. Compare its `DIFF_BASE` and `REVIEW_DIFF_SHA256` with the ledger-bound reviewed subject. A byte-identical reviewed diff preserves review even when the base ref moved. Any changed reviewed byte invalidates review and returns to the review phase before gauntlet dispatch or any version-only reuse decision. Never let “the base was refreshed” stand in for this comparison.
@@ -105,7 +107,7 @@ Ensure everything intended is committed (fixed files by name; the version/change
 The commits, the push and the `gh`/`glab` calls are the orchestrator's own work — a spawned agent has no network and no writable `.git`, so handing any of this to one produces a silent no-op. If the host asks you to approve a command that leaves the sandbox, ask the user for it rather than routing around it.
 <!-- pln:endonly -->
 
-Then assemble the PR body: what the branch does, then what's relevant to a reviewer — the final gauntlet result and the genuine follow-ups (Style's "Ending a message" bar), each one line. Drop the rest: a finding that got fixed needs no summary (the commit that fixed it is the record), and there is no "N findings, all fixed" tally. This is the same follow-up list the closing message uses — don't maintain a second one. Every `pre-existing` finding in `REVIEW.md` is on that list, marked as already on the base, and every `out-of-range` finding, marked as outside the range its post-fix round read: each was filed when its merge was published, so the sweep lists it and never files it again.
+Then assemble the PR body: what the branch does, then what's relevant to a reviewer — the final gauntlet result and the genuine follow-ups (Style's "Ending a message" bar), each one line. Drop the rest: a finding that got fixed needs no summary (the commit that fixed it is the record), and there is no "N findings, all fixed" tally. This is the same follow-up list the closing message uses — don't maintain a second one. Every `pre-existing` finding in `REVIEW.md` is on that list, marked as already on the base, and every `out-of-range` finding a ledger from an earlier release carries, marked as outside the range its post-fix round read: each was filed when its merge was published, so the sweep lists it and never files it again.
 
 Every `deferred` finding goes under a heading of its own instead of on that list: one line each, naming the owner constraint that ruled out every repair, quoted, or naming the consequential repair of a test-only finding. Production-reachable findings are not deferred merely because their repair adds state or an effect; the two-notice window in the blocker phase handles those. Each deferred finding was filed when its cluster checkpointed, so the sweep never files it again. The PR's draft/ready state does not change for it.
 

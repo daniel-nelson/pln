@@ -12,6 +12,8 @@ Persist verification results, follow-ups, the to-do-list close, Ship choice, PR 
 
 <!-- pln:include assurance-policy -->
 
+<!-- pln:include followup-filing -->
+
 ### Step 6. Deferred-item revisit
 
 After the last item completes, before final verification: walk back through any items marked ⏸ deferred (and any deferred sub-questions). For each, ask the user: "Revisit now, push to a future session, or drop?"

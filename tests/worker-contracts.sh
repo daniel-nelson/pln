@@ -544,11 +544,15 @@ has "$pr_merge" 'the files of both its `fix` and its `smaller_fix`' \
   'PR merge leases a cluster for only one of the repairs its worker may build'
 has "$pr_merge" 'row N is the Nth acted-on cluster' \
   'PR merge node rows cannot be mapped back to clusters'
-# A post-fix finding outside the scoped range that no in-range repair made
-# reachable is filed, never repaired, on the same path as a pre-existing one.
-has "$pr_merge" 'with status `out-of-range`' 'PR merge can repair a finding outside the scoped range'
-has "$pr_merge" "the envelope's \`out_of_range\` field" \
-  'PR merge envelope does not name out-of-range findings for filing'
+# 1.119.0: the scoped range bounds what a post-fix reader reads, not what is
+# repaired. A verified finding outside it is pre-existing when the base had it
+# and otherwise a remainder of this branch, repaired and never filed.
+has "$pr_merge" "the range bounds what that round's reader read, not what is repaired" \
+  'PR merge still treats the scoped range as a filing boundary'
+has "$pr_merge" 'a remainder of this branch'"'"'s own change that is repaired like an in-range finding and never filed' \
+  'PR merge can file a branch finding for lying outside the scoped range'
+hasnt "$pr_merge" "the envelope's \`out_of_range\` field" \
+  'PR merge envelope still names out-of-range findings for filing'
 
 # Even a reachable finding can carry a cathedral. The same run's proposed repair
 # for two dead fields on a persisted type was to validate every envelope against
@@ -696,7 +700,7 @@ for host in claude codex; do
     "$host closing message does not name deferred repairs"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" '`skipped`, `deferred` and `accepted` stay as they are' \
     "$host resume reopens a deferred or accepted finding"
-  has "$WORK/$host/phases/pln-pr/review.md" 'open/fixed/skipped/deferred/accepted/pre-existing/out-of-range status' \
+  has "$WORK/$host/phases/pln-pr/review.md" 'open/fixed/skipped/deferred/accepted/pre-existing status' \
     "$host ledger status vocabulary lacks deferred or accepted"
   has "$WORK/$host/phases/pln-pr/fix.md" 'an `accepted` one is the user'"'"'s decision' \
     "$host standing repair authority still covers a failure the user accepted"
@@ -757,7 +761,7 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln-pr/fix.md" 'Give each finding an `on_base`' \
     "$host post-fix red team no longer states base provenance"
   for phase in review fix; do
-    has "$WORK/$host/phases/pln-pr/$phase.md" "merge envelope's \`pre_existing\` and" \
+    has "$WORK/$host/phases/pln-pr/$phase.md" "merge envelope's \`pre_existing\` field once with" \
       "$host $phase phase no longer files the pre-existing findings its merge named"
   done
   has "$WORK/$host/phases/pln-pr/ship-watch.md" 'Every `pre-existing` finding' \
@@ -836,11 +840,13 @@ for host in claude codex; do
   has "$WORK/$host/phases/pln-pr/review.md" '<plan-dir>/fix-dirty-start.tsv' \
     "$host first merge has no dirty snapshot"
   for phase in review fix; do
-    has "$WORK/$host/phases/pln-pr/$phase.md" "\`out_of_range\` fields once with" \
-      "$host $phase phase does not file out-of-range findings"
+    hasnt "$WORK/$host/phases/pln-pr/$phase.md" '`out_of_range`' \
+      "$host $phase phase still files a branch finding for lying outside the scoped range"
   done
-  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'every `out-of-range` finding, marked as outside' \
-    "$host PR body drops findings filed as outside the scoped range"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'it is a remainder of this branch and is repaired' \
+    "$host post-fix merge files a branch finding outside the scoped range"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'every `out-of-range` finding a ledger from an earlier release carries' \
+    "$host PR body drops findings an earlier release filed as outside the scoped range"
   # Execution is linear since 1.60.0; the wave and worktree text stayed behind.
   for phase in fix blocker ship-watch; do
     for stale in 'isolated wave' 'isolated sibling' 'isolated disjoint' 'per cluster with `isolation' \

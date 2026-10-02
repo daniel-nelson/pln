@@ -1828,6 +1828,11 @@ has "$real_x/SKILL.md" 'Trigger explicitly via `$pln <task>`' \
 todo_marker='## The project to-do list'
 todo_sentence='Work that is found and not done now reaches the to-do list'
 door_pointer='is filed in the turn it is named'
+# The remainder test rides in the same fragment as the door sentence, so every
+# phase a door fires in runs it before filing, and the two closes that sweep
+# carry it too. It is stated once there and never in a router, which has no
+# bytes to spare for it.
+remainder_anchor="A remainder of this run's own work is not a follow-up, and it is never filed"
 for host_out in "$real_c" "$real_x"; do
   host_out="$(cd "$host_out" && pwd -P)"
   for rel in phases/pln/outline.md phases/pln/finish-ship.md phases/pln-pr/ship-watch.md; do
@@ -1847,8 +1852,16 @@ for host_out in "$real_c" "$real_x"; do
     phases/pln-pr/fix.md phases/pln-pr/blocker.md phases/pln-simplify/map-synthesize.md; do
     has "$host_out/$rel" "$door_pointer" \
       "$host_out/$rel cannot file a follow-up named in the turn it is named"
+    has "$host_out/$rel" "$remainder_anchor" \
+      "$host_out/$rel can file a remainder of its own run's work as a follow-up"
     has "$host_out/$rel" 'bin/pln-todo add' "$host_out/$rel names no helper call to file with"
     hasnt "$host_out/$rel" "$todo_marker" "$host_out/$rel duplicated the whole to-do-list format"
+  done
+  for rel in phases/pln/finish-ship.md phases/pln-pr/ship-watch.md; do
+    has "$host_out/$rel" "$remainder_anchor" \
+      "$host_out/$rel sweeps a remainder of its own run's work into the to-do list"
+    has "$host_out/$rel" 'each first takes the remainder test above' \
+      "$host_out/$rel lets the outstanding sweep skip the remainder test"
   done
   hasnt "$host_out/phases/pln-simplify/verify-record.md" "$todo_marker" \
     "the to-do-list format reached a phase no door fires in"
@@ -1857,6 +1870,7 @@ for host_out in "$real_c" "$real_x"; do
   for router in SKILL.md pln-pr/SKILL.md pln-simplify/SKILL.md; do
     hasnt "$host_out/$router" "$todo_marker" "$host_out/$router carries the to-do-list format"
     hasnt "$host_out/$router" "$todo_sentence" "$host_out/$router carries the list's intake rules"
+    hasnt "$host_out/$router" "$remainder_anchor" "$host_out/$router carries the remainder test"
   done
   # The helper is named through the absolute output root baked in at generation
   # time, never through {{SKILL_DIR}}: on Codex that substitutes to $_PLN_DIR, a

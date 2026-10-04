@@ -452,6 +452,10 @@ pr_merge="$REPO_DIR/src/workers/pr-review-merge.md"
 has "$pr_merge" 'raw artifact paths' 'PR merge worker no longer owns raw review artifacts'
 has "$pr_merge" '`verified`, `unverified`, or `disproved`' 'PR merge worker retained self-scored confidence'
 has "$pr_merge" '4096-byte budget' 'PR merge worker lost its bounded coordinator result'
+# `pln-scheduler park` moves a cluster past every edge into it, which is safe
+# only because no cluster's repair needs another cluster's in place.
+has "$pr_merge" 'Findings whose repairs need each other in place share a cluster' \
+  'PR merge worker no longer keeps dependent repairs together, so parking a cluster could strand one'
 has "$pr_merge" 'Findings without `structural_evidence` remain valid' \
   'PR merge worker broke legacy finding artifacts'
 has "$pr_merge" 'role-tagged owners, analogues, and direct consumers' \

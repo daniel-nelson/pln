@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.123.0 — 2026-10-04
+
+### Changed
+
+- **A fix that needs your answer no longer holds up the rest of the round.** `/pln-pr` used to stop every fix cluster as soon as one cluster needed a decision. The other clusters waited until you answered, even when they were queued behind it only because they edit the same files. A cluster that stops for a question and has left nothing in the working tree is now parked. The fix phase runs every other cluster first, and asks the question once nothing else can run. A cluster that left partial edits behind still holds the tree and asks straight away. A fix worker now checks the whole cluster for a decision before editing anything, so a cluster that needs one stops with the tree untouched. One run sent its question for the first of eight clusters and then stopped while its user was away. The other seven, which needed nothing from the user, did not run.
+- **`pln-scheduler park`** moves a pending or blocked node behind every unfinished one, after checking that the tree matches its starting snapshot and that no other node holds it. `ready` names a parked node as `PARKED` once nothing else can run, and parked nodes come back one at a time in the order they were parked.
+
 ## 1.122.0 — 2026-10-02
 
 ### Fixed

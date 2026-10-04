@@ -33,6 +33,7 @@ Usage:
   pln-scheduler checkpoint --manifest FILE --item N --result PATH --commit HASH|none --actual-profile PROFILE --actual-model MODEL --actual-effort EFFORT
   pln-scheduler integrate --manifest FILE --item N --commit HASH|none
   pln-scheduler block --manifest FILE --item N --handoff PATH
+  pln-scheduler park --manifest FILE --item N --repo DIR --snapshot FILE
   pln-scheduler wait --manifest FILE --item N
   pln-scheduler interrupt --manifest FILE --item N
   pln-scheduler set-handle --manifest FILE --item N --handle TEXT
@@ -165,7 +166,7 @@ verify_manifest() {
     {
       if (NF != 19 || $1 !~ /^[1-9][0-9]*$/ || seen[$1]++) exit 13
       if ($10 != "judgment") exit 14
-      if ($15 !~ /^(pending|running|checkpointed|integrated|blocked|waiting|interrupted|failed)$/) exit 15
+      if ($15 !~ /^(pending|running|checkpointed|integrated|blocked|parked|waiting|interrupted|failed)$/) exit 15
       count++
     }
     END {
@@ -184,12 +185,17 @@ verify_manifest() {
 # predecessor is the `checkpointed` holder — releasing that node is what
 # `ready` exists for. `claim` calls this with hold_filter=0 so its own
 # dependency gate is unchanged and a withheld node stays claimable.
+#
+# A `parked` node is printed as PARKED rather than READY. `park` made it depend
+# on every node that was unfinished when it stopped, so it is ready only once
+# nothing else can run, and what it needs next is its question answered, not a
+# dispatch.
 ready_rows() {
   awk -F '\t' -v OFS='\t' -v hold_filter="${2:-0}" '
     $1 ~ /^[1-9][0-9]*$/ { n++; id[n]=$1; deps[n]=$2; cohort[n]=$4; context[n]=$5; wave[n]=$7; execution[n]=$8; status[$1]=$15 }
     END {
       for (i=1;i<=n;i++) {
-        if (status[id[i]] !~ /^(pending|waiting|interrupted)$/) continue
+        if (status[id[i]] !~ /^(pending|waiting|interrupted|parked)$/) continue
         ok=1
         if (deps[i] != "-") {
           c=split(deps[i],a,","); for (k=1;k<=c;k++) {
@@ -215,7 +221,7 @@ ready_rows() {
         # with hold_filter=0 and still needs to answer about any node it is
         # asked about, not merely the next one.
         if (ok) {
-          print "READY",id[i],wave[i],execution[i],context[i]
+          print (status[id[i]] == "parked" ? "PARKED" : "READY"),id[i],wave[i],execution[i],context[i]
           if (hold_filter == 1) exit 0
         }
       }
@@ -254,7 +260,7 @@ manifest_update() {
     $1 == item && NF == 19 {
       found=1
       if (mode == "claim") {
-        if ($15 !~ /^(pending|waiting|blocked|interrupted)$/) exit 21
+        if ($15 !~ /^(pending|waiting|blocked|parked|interrupted)$/) exit 21
         $14=a1; $9=a2; $15="running"
       } else if (mode == "checkpoint") {
         if ($15 != "running") exit 22
@@ -282,6 +288,48 @@ manifest_update() {
     fail "invalid $mode transition for item $item"
   fi
   mv "$tmp" "$manifest"
+}
+
+# Succeeds when every dirty path outside the allowed items' leases is exactly
+# what the snapshot recorded. `-` allows no item, so it proves the tree holds
+# nothing the snapshot did not.
+dirty_unchanged() {
+  local repo="$1" snapshot="$2" manifest="$3" allow_items="$4" current rc
+  current="$(mktemp "${TMPDIR:-/tmp}/pln-current-dirty.XXXXXX")"
+  snapshot_tree "$repo" "$current"
+  set +e
+  awk -F '\t' -v manifest="$manifest" -v allow="$allow_items" '
+    function path_allowed(path,    i,l) {
+      for (i in lease) {
+        l=i
+        if (path == l || index(path,l "/") == 1 || index(l,path "/") == 1) return 1
+      }
+      return 0
+    }
+    BEGIN {
+      if (allow != "-") { n=split(allow,a,","); for (i=1;i<=n;i++) allowed_item[a[i]]=1 }
+      while ((getline line < manifest) > 0) {
+        split(line,m,"\t")
+        if (allowed_item[m[1]]) {
+          if (m[3] == "UNKNOWN") { print "pln-scheduler: cannot validate dirty state against an unknown lease" > "/dev/stderr"; exit 3 }
+          c=split(m[3],ls,","); for (j=1;j<=c;j++) lease[ls[j]]=1
+        }
+      }
+      close(manifest)
+    }
+    FNR == NR { if (FNR > 1) before[$1]=$2; next }
+    FNR > 1 { after[$1]=$2 }
+    END {
+      if (exit_code) exit exit_code
+      for (p in before) if (!path_allowed(p) && (!(p in after) || after[p] != before[p])) bad=1
+      for (p in after) if (!path_allowed(p) && (!(p in before) || before[p] != after[p])) bad=1
+      if (bad) exit 4
+    }
+  ' "$snapshot" "$current"
+  rc=$?
+  set -e
+  rm -f "$current"
+  return "$rc"
 }
 
 command="${1:-}"
@@ -571,6 +619,12 @@ case "$command" in
         if [ "$handle" = "-" ]; then recovery="fresh-worker"; else recovery="continue-handle"; fi
         next="$(recover_claim_next "$manifest" "$item" "$handle" "$worktree")"
         ;;
+      parked)
+        # Parked from `blocked`, the idle worker that asked is still the one to
+        # answer; parked from `pending`, no worker ever ran and a fresh one starts.
+        if [ "$handle" = "-" ]; then recovery="ask-then-fresh-worker"; else recovery="ask-then-continue-handle"; fi
+        next="once ready prints PARKED for it and its question is answered, $(recover_claim_next "$manifest" "$item" "$handle" "$worktree")"
+        ;;
       running) fail "running item has conflicting recovery state; interrupt or reconcile it first" ;;
       checkpointed)
         recovery="integrate"
@@ -619,44 +673,86 @@ case "$command" in
       --manifest) manifest="${2:-}"; shift 2 ;; --allow-items) allow_items="${2:-}"; shift 2 ;; *) usage ;; esac; done
     for value in "$repo" "$snapshot" "$manifest" "$allow_items"; do [ -n "$value" ] || usage; done
     verify_manifest "$manifest"
-    current="$(mktemp "${TMPDIR:-/tmp}/pln-current-dirty.XXXXXX")"
-    trap 'rm -f "$current"' EXIT
-    snapshot_tree "$repo" "$current"
-    if ! awk -F '\t' -v manifest="$manifest" -v allow="$allow_items" '
-      function path_allowed(path,    i,l) {
-        for (i in lease) {
-          l=i
-          if (path == l || index(path,l "/") == 1 || index(l,path "/") == 1) return 1
-        }
-        return 0
-      }
-      BEGIN {
-        if (allow != "-") { n=split(allow,a,","); for (i=1;i<=n;i++) allowed_item[a[i]]=1 }
-        while ((getline line < manifest) > 0) {
-          split(line,m,"\t")
-          if (allowed_item[m[1]]) {
-            if (m[3] == "UNKNOWN") { print "pln-scheduler: cannot validate dirty state against an unknown lease" > "/dev/stderr"; exit 3 }
-            c=split(m[3],ls,","); for (j=1;j<=c;j++) lease[ls[j]]=1
-          }
-        }
-        close(manifest)
-      }
-      FNR == NR { if (FNR > 1) before[$1]=$2; next }
-      FNR > 1 { after[$1]=$2 }
-      END {
-        if (exit_code) exit exit_code
-        for (p in before) if (!path_allowed(p) && (!(p in after) || after[p] != before[p])) bad=1
-        for (p in after) if (!path_allowed(p) && (!(p in before) || before[p] != after[p])) bad=1
-        if (bad) exit 4
-      }
-    ' "$snapshot" "$current"; then
-      rm -f "$current"
-      trap - EXIT
-      fail "user-owned dirty state changed outside allowed leases"
-    fi
-    rm -f "$current"
-    trap - EXIT
+    dirty_unchanged "$repo" "$snapshot" "$manifest" "$allow_items" \
+      || fail "user-owned dirty state changed outside allowed leases"
     printf 'DIRTY_STATE=unchanged\n'
+    ;;
+
+  park)
+    manifest=""; item=""; repo=""; snapshot=""
+    while [ $# -gt 0 ]; do case "$1" in
+      --manifest) manifest="${2:-}"; shift 2 ;; --item) item="${2:-}"; shift 2 ;;
+      --repo) repo="${2:-}"; shift 2 ;; --snapshot) snapshot="${2:-}"; shift 2 ;; *) usage ;; esac; done
+    for value in "$manifest" "$item" "$repo" "$snapshot"; do [ -n "$value" ] || usage; done
+    verify_manifest "$manifest"
+    status="$(awk -F '\t' -v item="$item" '$1 == item && NF == 19 { print $15 }' "$manifest")"
+    [ -n "$status" ] || fail "unknown item: $item"
+    case "$status" in
+      pending | blocked) ;;
+      *) fail "only a pending or blocked item can be parked; item $item is $status" ;;
+    esac
+    holder="$(awk -F '\t' -v item="$item" '$1 ~ /^[1-9][0-9]*$/ && $1 != item &&
+      $15 ~ /^(running|blocked|interrupted|checkpointed)$/ { print $1 " (" $15 ")"; exit }' "$manifest")"
+    [ -z "$holder" ] || fail "item $holder holds the working tree; nothing can be parked behind it"
+    # The proof that parking is safe: the tree holds nothing the snapshot did
+    # not, so the parked item left no partial work for a later item to build on
+    # or a later commit to sweep up.
+    dirty_unchanged "$repo" "$snapshot" "$manifest" - \
+      || fail "item $item left work in the tree; it holds the tree until its question is answered"
+    tmp="$(mktemp "$(dirname "$manifest")/.pln-manifest.XXXXXX")"
+    if ! awk -F '\t' -v OFS='\t' -v item="$item" '
+      function without(s, drop,    a,n,k,out) {
+        if (s == "-") return s
+        n=split(s,a,","); out=""
+        for (k=1;k<=n;k++) if (!(a[k] in drop)) out=(out == "" ? a[k] : out "," a[k])
+        return out == "" ? "-" : out
+      }
+      function with(s, add,    a,n,k,have,out,x) {
+        out=(s == "-" ? "" : s)
+        if (s != "-") { n=split(s,a,","); for (k=1;k<=n;k++) have[a[k]]=1 }
+        for (x=1;x<=add_n;x++) if (!(add[x] in have)) out=(out == "" ? add[x] : out "," add[x])
+        return out == "" ? "-" : out
+      }
+      { line[NR]=$0 }
+      $1 ~ /^[1-9][0-9]*$/ && NF == 19 {
+        n++; row[n]=NR; id[n]=$1; cohort[n]=$4; context[n]=$5; status[n]=$15
+        if ($19 + 0 > maxorder) maxorder=$19 + 0
+        if ($1 == item) at=n
+      }
+      END {
+        if (!at) exit 1
+        # The item and the reuse continuations chained behind it move together:
+        # a continuation is the same surface changed again, by the same worker.
+        chain[id[at]]=1; chain_n=1; chain_id[1]=id[at]
+        for (i=at+1; i<=n && cohort[at] != "-" && cohort[i] == cohort[at] && context[i] == "reuse"; i++) {
+          chain[id[i]]=1; chain_id[++chain_n]=id[i]
+        }
+        for (i=1;i<=n;i++) if (!(id[i] in chain) && status[i] != "integrated") add[++add_n]=id[i]
+        for (i=1;i<=n;i++) {
+          split(line[row[i]],f,"\t")
+          if (id[i] in chain) {
+            f[2]=with(f[2],add)
+            for (k=1;k<=chain_n;k++) if (chain_id[k] == id[i]) f[19]=maxorder + k
+            if (id[i] == item) f[15]="parked"
+          } else {
+            f[2]=without(f[2],chain)
+          }
+          out=f[1]; for (k=2;k<=19;k++) out=out OFS f[k]
+          line[row[i]]=out
+        }
+        for (r=1;r<=NR;r++) print line[r]
+        after=""; for (x=1;x<=add_n;x++) after=(after == "" ? add[x] : after "," add[x])
+        print (after == "" ? "-" : after) > "/dev/stderr"
+      }
+    ' "$manifest" > "$tmp" 2>"$tmp.after"; then
+      rm -f "$tmp" "$tmp.after"
+      fail "could not park item $item"
+    fi
+    after="$(cat "$tmp.after")"
+    rm -f "$tmp.after"
+    mv "$tmp" "$manifest"
+    verify_manifest "$manifest"
+    printf 'ITEM=%s\nSTATUS=parked\nRUNS_AFTER=%s\n' "$item" "$after"
     ;;
 
   verify)

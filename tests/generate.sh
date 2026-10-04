@@ -2105,6 +2105,26 @@ for root in "$real_c" "$real_x"; do
     "$review lets merge workers write canonical REVIEW.md"
   has "$fix" 'stale publication means reread and reconcile' \
     "$fix may overwrite a newer fix checkpoint"
+  # A cluster waiting on the user is parked and the round runs on. Observed: a
+  # blocked first cluster held seven more for as long as the user was away.
+  has "$fix" 'pln-scheduler park --manifest <plan-dir>/fix-manifest.tsv' \
+    "$fix lost the park call that lets a round run past a waiting cluster"
+  has "$fix" 'When `ready` prints `PARKED <n>`, nothing else can run without an answer' \
+    "$fix no longer holds a parked cluster's question until nothing else can run"
+  has "$fix" 'Check every finding in the cluster against this before editing any of them' \
+    "$fix lets a fix worker stop mid-cluster with partial work that cannot be parked"
+  has "$fix" '`PARKED` names a question now owed, never a dispatch' \
+    "$fix dispatch mechanics could dispatch a parked cluster without its answer"
+  has "$fix" 'only a refused park stops new dispatch' \
+    "$fix invoke mechanics still stop the round on every blocked cluster"
+  hasnt "$fix" 'A blocked cluster stops new dispatch' \
+    "$fix still stops the round on every blocked cluster"
+  has "$blocker" 'Dispatch nothing new while its question is open' \
+    "$blocker lost the dispatch freeze while a question is open"
+  hasnt "$blocker" 'Freeze new dispatch; clusters run one at a time' \
+    "$blocker still freezes a round that a parked cluster no longer holds"
+  has "$root/pln-pr/SKILL.md" '(`ready` prints `PARKED`, or its park was refused)' \
+    "$root /pln-pr router enters the blocker phase before the round has run"
   has "$ship" 'before the next external action' \
     "$ship may repeat a PR/CI action before its identity is published"
   hasnt "$review" '**Write `REVIEW.md`**' \

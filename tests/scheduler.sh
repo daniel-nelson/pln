@@ -416,6 +416,143 @@ has "$hold_ready" $'READY\t2\t' \
 hasnt "$hold_ready" $'READY\t3\t' \
   'ready reported an unrelated original node while a checkpoint still held the tree'
 
+# ─── `park`: a node waiting on the user does not hold the round ──────────────
+# Observed: a /pln-pr fix round whose first cluster stopped for a decision. The
+# other seven were chained behind it only because they edited the same spec and
+# doc, and a blocked node holds the tree, so they sat untouched while the user
+# was away. A node that stopped with nothing in the tree is parked instead: it
+# moves behind everything unfinished, and `ready` names it PARKED once nothing
+# else can run.
+park_repo="$WORK/park-repo"
+git -C "$WORK" init -q park-repo
+git -C "$park_repo" config user.email test@example.com
+git -C "$park_repo" config user.name Test
+printf 'base\n' > "$park_repo/base.txt"
+git -C "$park_repo" add base.txt
+git -C "$park_repo" commit -qm base
+printf 'the user was here\n' > "$park_repo/user-notes.txt"
+"$SCHEDULER" snapshot --repo "$park_repo" --out "$WORK/plan/park-dirty.tsv" >/dev/null
+cat > "$WORK/plan/park-nodes.tsv" <<'EOF'
+ITEM	DEPS	LEASES	COHORT	CONTEXT	DIRTY_STATE
+1	-	svc/persist.ts,spec/decide.spec.ts	-	fresh	clean
+2	1	svc/world.ts,spec/decide.spec.ts	-	fresh	clean
+3	1,2	svc/model.ts,spec/decide.spec.ts	-	fresh	clean
+4	3	svc/windows.ts	-	fresh	clean
+EOF
+park_manifest="$WORK/plan/park-manifest.tsv"
+park_out="$WORK/park.out"
+build_park() { # build_park <nodes>
+  "$SCHEDULER" build --root "$WORK/plan" --nodes "$1" \
+    --manifest "$park_manifest" --source-root "$park_repo" --source-head head \
+    --dirty-snapshot "$WORK/plan/park-dirty.tsv" --repo-mode git >/dev/null
+}
+park() { # park <item> — the call a coordinator makes, against this fixture's tree
+  "$SCHEDULER" park --manifest "$park_manifest" --item "$1" \
+    --repo "$park_repo" --snapshot "$WORK/plan/park-dirty.tsv"
+}
+run_node() { # run_node <item> — claim, checkpoint and integrate one node
+  "$SCHEDULER" claim --manifest "$park_manifest" --item "$1" \
+    --handle "agent-$1" --worktree "$park_repo" >/dev/null
+  "$SCHEDULER" checkpoint --manifest "$park_manifest" --item "$1" \
+    --result "results/item-$1.txt" --commit none --actual-profile judgment \
+    --actual-model frontier --actual-effort high >/dev/null
+  "$SCHEDULER" integrate --manifest "$park_manifest" --item "$1" --commit none >/dev/null \
+    || fail "item $1 could not integrate after parking reordered the round"
+}
+ready_is() { # ready_is <expected first line> <message>
+  "$SCHEDULER" ready --manifest "$park_manifest" > "$WORK/park-ready.out"
+  [ "$(head -1 "$WORK/park-ready.out")" = "$1" ] || fail "$2 (got: $(head -1 "$WORK/park-ready.out"))"
+}
+
+build_park "$WORK/plan/park-nodes.tsv"
+"$SCHEDULER" claim --manifest "$park_manifest" --item 1 \
+  --handle agent-1 --worktree "$park_repo" >/dev/null
+if park 1 >"$park_out" 2>&1; then fail 'park accepted a running node'; fi
+has "$park_out" 'only a pending or blocked item can be parked' 'park refused a running node without saying why'
+"$SCHEDULER" block --manifest "$park_manifest" --item 1 --handoff handoffs/item-1.md >/dev/null
+ready_is '' 'a blocked node stopped holding the tree before it was parked'
+
+# Partial work holds the tree. Parking past it would let the next node build on
+# bytes nobody reviewed and the next commit sweep them up.
+mkdir -p "$park_repo/svc"
+printf 'half a repair\n' > "$park_repo/svc/persist.ts"
+cp "$park_manifest" "$WORK/plan/park-before.tsv"
+if park 1 >"$park_out" 2>&1; then fail 'park moved a node past the partial work it left in the tree'; fi
+has "$park_out" 'item 1 left work in the tree' 'a refused park did not name the partial work'
+cmp -s "$park_manifest" "$WORK/plan/park-before.tsv" || fail 'a refused park rewrote the manifest'
+rm -rf "$park_repo/svc"
+
+park 1 > "$park_out"
+has "$park_out" 'STATUS=parked' 'a clean blocked node was not parked'
+has "$park_out" 'RUNS_AFTER=2,3,4' 'park did not name the nodes that now run first'
+has "$park_manifest" $'1\t2,3,4\tsvc/persist.ts,spec/decide.spec.ts\t' \
+  'the parked node did not move behind every unfinished node'
+has "$park_manifest" $'\tagent-1\tparked\thandoffs/item-1.md\t-\t-\t5' \
+  'the parked node lost its worker or handoff, or kept its place in integration order'
+has "$park_manifest" $'2\t-\tsvc/world.ts,' 'a node chained behind the parked one by a shared file still waited on it'
+has "$park_manifest" $'3\t2\tsvc/model.ts,' 'park dropped an edge that did not involve the parked node'
+ready_is $'READY\t2\t2\toriginal\tfresh' 'the round did not continue past the parked node'
+if "$SCHEDULER" claim --manifest "$park_manifest" --item 1 --handle agent-1 \
+  --worktree "$park_repo" >"$park_out" 2>&1; then
+  fail 'a parked node was claimable while the rest of the round could still run'
+fi
+run_node 2
+run_node 3
+ready_is $'READY\t4\t4\toriginal\tfresh' 'the round stopped before its last unparked node'
+if "$SCHEDULER" finish-check --manifest "$park_manifest" >"$park_out" 2>/dev/null; then
+  fail 'the finish gate passed with a node still parked'
+fi
+run_node 4
+ready_is $'PARKED\t1\t1\toriginal\tfresh' 'ready did not hand the parked node back once nothing else could run'
+"$SCHEDULER" recover --manifest "$park_manifest" --item 1 > "$park_out"
+has "$park_out" 'RECOVERY=ask-then-continue-handle' 'recover did not say a parked node needs its answer first'
+has "$park_out" '--handle agent-1 ' 'recover did not keep the worker that asked'
+run_node 1
+"$SCHEDULER" finish-check --manifest "$park_manifest" >/dev/null \
+  || fail 'a round whose parked node was answered and integrated did not finish'
+
+# Two parked nodes come back one at a time, in the order they were parked. A
+# needs-a-decision cluster is parked before any worker starts, from `pending`.
+build_park "$WORK/plan/park-nodes.tsv"
+park 1 > "$park_out"
+has "$park_out" 'RUNS_AFTER=2,3,4' 'a pending node was not parked behind the round'
+"$SCHEDULER" claim --manifest "$park_manifest" --item 2 \
+  --handle agent-2 --worktree "$park_repo" >/dev/null
+if park 3 >"$park_out" 2>&1; then fail 'park ran while another node held the tree'; fi
+has "$park_out" 'item 2 (running) holds the working tree' 'park did not name the node holding the tree'
+"$SCHEDULER" block --manifest "$park_manifest" --item 2 --handoff handoffs/item-2.md >/dev/null
+park 2 > "$park_out"
+has "$park_out" 'RUNS_AFTER=1,3,4' 'the second park did not wait on the first'
+has "$park_manifest" $'1\t3,4\t' 'the first parked node still waited on the second'
+ready_is $'READY\t3\t3\toriginal\tfresh' 'the round did not continue past two parked nodes'
+run_node 3
+run_node 4
+ready_is $'PARKED\t1\t1\toriginal\tfresh' 'the first parked node did not come back first'
+grep -q $'^PARKED\t2' "$WORK/park-ready.out" && fail 'ready handed back two parked nodes at once'
+"$SCHEDULER" recover --manifest "$park_manifest" --item 1 > "$park_out"
+has "$park_out" 'RECOVERY=ask-then-fresh-worker' 'a node parked before dispatch claimed a worker it never had'
+run_node 1
+ready_is $'PARKED\t2\t2\toriginal\tfresh' 'the second parked node did not come back after the first'
+run_node 2
+
+# A reuse continuation is the same surface changed again by the same worker, so
+# it moves with the node it continues instead of running ahead of it.
+cat > "$WORK/plan/park-chain.tsv" <<'EOF'
+ITEM	DEPS	LEASES	COHORT	CONTEXT	DIRTY_STATE
+1	-	c/a	chain	fresh	clean
+2	1	c/b	chain	reuse	clean
+3	-	c/c	-	fresh	clean
+EOF
+build_park "$WORK/plan/park-chain.tsv"
+park 1 > "$park_out"
+has "$park_out" 'RUNS_AFTER=3' 'a reuse continuation was left to run ahead of the node it continues'
+has "$park_manifest" $'2\t1,3\tc/b\tchain\treuse\t' 'the continuation did not stay behind its parked predecessor'
+ready_is $'READY\t3\t3\toriginal\tfresh' 'the unrelated node did not run first'
+run_node 3
+ready_is $'PARKED\t1\t1\toriginal\tfresh' 'the parked head of the chain did not come back'
+run_node 1
+ready_is $'READY\t2\t2\toriginal\treuse' 'the continuation did not follow its answered predecessor'
+
 # ─── pln's own to-do list is not the user's uncommitted work ──────────────────
 # A door that files mid-run writes an untracked detail file and rewrites a
 # possibly-tracked index. Both trip the guards that protect user-owned bytes, so

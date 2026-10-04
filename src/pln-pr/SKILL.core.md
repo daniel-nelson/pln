@@ -69,7 +69,7 @@ For a legacy ledger without `Phase`, derive and persist the most conservative co
 - No ledger → `scope-baseline`; write the State skeleton before durable scope work.
 - Trusted, fingerprinted scope/baseline → `review` after its commands and results are recorded.
 - Review merged → `fix` when acted-on findings remain, otherwise `ship-watch`.
-- Fix decision or worker blocker → `blocker` after its question/handoff is recorded; resolved blocker → `fix` after its answer is durable.
+- Fix decision or worker blocker → `blocker` after its question/handoff is recorded and nothing else can run (`ready` prints `PARKED`, or its park was refused); resolved blocker → `fix` after its answer is durable.
 - Findings resolved and post-fix checks recorded → `ship-watch`.
 - Final gauntlet plus PR/CI outcome or deliberate stop recorded → `complete`.
 

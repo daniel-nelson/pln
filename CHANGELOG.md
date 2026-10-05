@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.123.0 — 2026-10-05
+
+### Changed
+
+- **`/pln-pr` decides a consequential repair it has already picked, instead of waiting for an answer.** Since 1.100.0 it asked, reminded you after five minutes, and built its pick after five more. On Claude Code in auto mode the permission check refused the timer that would build past the unanswered question. The run then stopped with nothing built while its user was away. The question was one the user did not consider important, and they had told the run to keep working. The run now records its pick, notifies you with the alternative, and builds it at once. A reply that picks the other repair switches it, and the run rebuilds if the first one already landed. The PR body and closing message list each repair the run chose and the one it passed over. A rebuild-or-adapt question still defaults to adapt. A question with no selected repair, or one an owner constraint blocks, still waits for your answer. `bin/pln-decision-window` is removed.
+
 ## 1.122.0 — 2026-10-02
 
 ### Fixed

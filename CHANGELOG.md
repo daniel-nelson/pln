@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.123.0 — 2026-10-05
+
+### Fixed
+
+- **`/pln-pr`'s ten-minute repair window now starts with a question you can see.** One run wrote its question into `REVIEW.md` and sent a notification saying the repair "needs your call" and would proceed in ten minutes. It then told the user the question was "open above", though no message had carried it. The host's permission check refused the timer that would build past it, and the run stopped with nothing built while its user was away. The window now starts only after the complete question has been sent as a message. A notification or ledger entry no longer counts as the question. The question and its notifications state the run's pick and the time it starts building, with the other options offered as switches, rather than asking for a call only the user can make. A wait the host refuses is never treated as a timeout. The PR body and closing message list each repair built after an unanswered window, with the one passed over. Whether a permission check allows the reworded window is untested: a refusal still leaves the question open.
+
 ## 1.122.0 — 2026-10-02
 
 ### Fixed

@@ -701,6 +701,19 @@ for host in claude codex; do
     "$host reminder is silent"
   has "$WORK/$host/phases/pln-pr/blocker.md" 'a reminder that was never sent must be sent' \
     "$host interrupted window can proceed without the second notice"
+  # Observed: the question lived only in REVIEW.md and a notification saying
+  # the repair needed the user's call, the chat said it was "open above", and
+  # the host's permission check refused the timer that would build past it.
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'The question is a message the user can read, sent before the clock starts' \
+    "$host window can start its clock on a question no message carried"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'A notification, a ledger entry or a pointer to either is not the question' \
+    "$host window accepts a notification or ledger entry as the question"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'never that the repair needs the user'"'"'s call' \
+    "$host window words its own pick as a call only the user can make"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'a wait the host refused' \
+    "$host window can treat a refused wait as a timeout"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'built under `Decision: standing timeout authorization` goes under a heading of its own' \
+    "$host PR body does not list repairs built on a timeout"
   has "$WORK/$host/phases/pln-pr/blocker.md" 'A timeout never lifts an owner constraint' \
     "$host timer can override an explicit owner constraint"
   has "$WORK/$host/phases/pln-pr/fix.md" 'A `reached_by: test-only` finding whose only available repair' \

@@ -627,8 +627,8 @@ for host in claude codex; do
     "$host reviewers may mark a disagreeing second answer as an arrangement"
   has "$WORK/$host/phases/pln-pr/fix.md" 'rebuild-or-adapt question' \
     "$host fix phase lost the rebuild-or-adapt question"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'The run'"'"'s own choice is adapt, never rebuild' \
-    "$host fix phase may rebuild without the user's word"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'A timeout selects adapt, never rebuild' \
+    "$host fix phase may rebuild on a timeout"
   has "$WORK/$host/phases/pln/implementation.md" 'the implementing worker owns behavior proof' \
     "$host implementation no longer assigns retained-behavior proof to the worker"
   has "$WORK/$host/phases/pln/implementation.md" 'A checkpoint is mechanical recovery, not independent source judgment' \
@@ -683,29 +683,39 @@ for host in claude codex; do
     "$host fix worker honours any rejection reason, so it never builds the smaller repair"
   has "$WORK/$host/phases/pln-pr/fix.md" 'a persisted-state write or state transition, a call with an external effect' \
     "$host fix worker can build new stateful or consequential behavior without asking"
-  # Consequential production repairs are decided and reported, never waited
-  # on: a timer that proceeds past an unanswered question was refused by a host
-  # permission check and stranded a run. Owner constraints still bind.
+  # Consequential production repairs ask once, remind once, then continue on
+  # the recorded selected repair if no answer arrived. Owner constraints bind.
   has "$WORK/$host/phases/pln-pr/fix.md" 'Do this regardless of `branch_purpose` or CI status' \
     "$host still defers an ordinary reachable consequential repair"
   has "$WORK/$host/phases/pln-pr/fix.md" 'before editing or writing its spec' \
     "$host worker can edit before the consequential-repair question"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'coordinator'"'"'s recorded user answer or the run'"'"'s choice' \
-    "$host worker repeats the same blocker after the run decided"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'coordinator'"'"'s recorded user answer or timeout authorization' \
+    "$host worker repeats the same blocker after a timed answer"
   has "$WORK/$host/phases/pln-pr/fix.md" 'For needs-a-decision findings, select and record the repair' \
     "$host design decisions still wait indefinitely without a selected fallback"
-  has "$WORK/$host/phases/pln-pr/blocker.md" 'Ask nothing and wait for nothing' \
-    "$host blocker phase waits on a repair the run already selected"
-  has "$WORK/$host/phases/pln-pr/blocker.md" 'continue the idle worker, or its fresh recovery, with that recorded decision' \
-    "$host blocker phase records a choice and never builds it"
-  has "$WORK/$host/phases/pln-pr/blocker.md" 'naming the choice, the alternative, and that a reply switches it' \
-    "$host the user is not told what the run chose or how to switch it"
-  has "$WORK/$host/phases/pln-pr/blocker.md" 'The run'"'"'s own choice never lifts an owner constraint' \
-    "$host the run's choice can override an explicit owner constraint"
-  hasnt "$WORK/$host/phases/pln-pr/blocker.md" 'pln-decision-window' \
-    "$host blocker phase still arms a timer that proceeds past an unanswered question"
-  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'naming the repair built and the one passed over, so the user can switch it' \
-    "$host PR body does not list the repairs the run chose"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'pln-decision-window --asked-at' \
+    "$host blocker phase lost the durable two-notice timer"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 're-check for a reply' \
+    "$host timer can override an answer that arrived at its deadline"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'fire enabled notifications again' \
+    "$host reminder is silent"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'a reminder that was never sent must be sent' \
+    "$host interrupted window can proceed without the second notice"
+  # Observed: the question lived only in REVIEW.md and a notification saying
+  # the repair needed the user's call, the chat said it was "open above", and
+  # the host's permission check refused the timer that would build past it.
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'The question is a message the user can read, sent before the clock starts' \
+    "$host window can start its clock on a question no message carried"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'A notification, a ledger entry or a pointer to either is not the question' \
+    "$host window accepts a notification or ledger entry as the question"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'never that the repair needs the user'"'"'s call' \
+    "$host window words its own pick as a call only the user can make"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'a wait the host refused' \
+    "$host window can treat a refused wait as a timeout"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'built under `Decision: standing timeout authorization` goes under a heading of its own' \
+    "$host PR body does not list repairs built on a timeout"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'A timeout never lifts an owner constraint' \
+    "$host timer can override an explicit owner constraint"
   has "$WORK/$host/phases/pln-pr/fix.md" 'A `reached_by: test-only` finding whose only available repair' \
     "$host a test-only finding can spend a user decision through the new-behavior stop"
   has "$WORK/$host/phases/pln-pr/fix.md" 'If no repair is left to build because of the owner'"'"'s recorded constraints' \
@@ -728,8 +738,8 @@ for host in claude codex; do
     "$host standing repair authority still covers a deferred finding"
   has "$WORK/$host/phases/pln-pr/fix.md" 'except for a finding you are leaving unbuilt, which gets no spec' \
     "$host a deferred finding can leave a red spec behind"
-  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'a consequential repair is decided and reported like any production-reachable finding' \
-    "$host a CI fix cluster lost the decided consequential repair"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'a consequential repair takes the same two-notice window' \
+    "$host a CI fix cluster lost the timed consequential-repair question"
   has "$WORK/$host/phases/pln-pr/ship-watch.md" 'Every `deferred` finding goes under a heading of its own' \
     "$host PR body does not name deferred repairs"
   has "$WORK/$host/phases/pln-pr/ship-watch.md" 'the message'"'"'s one closing line is `HEADS-UP:` naming them' \

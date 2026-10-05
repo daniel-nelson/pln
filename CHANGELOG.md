@@ -2,9 +2,9 @@
 
 ## 1.123.0 — 2026-10-05
 
-### Changed
+### Fixed
 
-- **`/pln-pr` decides a consequential repair it has already picked, instead of waiting for an answer.** Since 1.100.0 it asked, reminded you after five minutes, and built its pick after five more. On Claude Code in auto mode the permission check refused the timer that would build past the unanswered question. The run then stopped with nothing built while its user was away. The question was one the user did not consider important, and they had told the run to keep working. The run now records its pick, notifies you with the alternative, and builds it at once. A reply that picks the other repair switches it, and the run rebuilds if the first one already landed. The PR body and closing message list each repair the run chose and the one it passed over. A rebuild-or-adapt question still defaults to adapt. A question with no selected repair, or one an owner constraint blocks, still waits for your answer. `bin/pln-decision-window` is removed.
+- **`/pln-pr`'s ten-minute repair window now starts with a question you can see.** One run wrote its question into `REVIEW.md` and sent a notification saying the repair "needs your call" and would proceed in ten minutes. It then told the user the question was "open above", though no message had carried it. The host's permission check refused the timer that would build past it, and the run stopped with nothing built while its user was away. The window now starts only after the complete question has been sent as a message. A notification or ledger entry no longer counts as the question. The question and its notifications state the run's pick and the time it starts building, with the other options offered as switches, rather than asking for a call only the user can make. A wait the host refuses is never treated as a timeout. The PR body and closing message list each repair built after an unanswered window, with the one passed over. Whether a permission check allows the reworded window is untested: a refusal still leaves the question open.
 
 ## 1.122.0 — 2026-10-02
 

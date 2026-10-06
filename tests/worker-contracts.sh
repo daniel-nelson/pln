@@ -701,6 +701,16 @@ for host in claude codex; do
     "$host reminder is silent"
   has "$WORK/$host/phases/pln-pr/blocker.md" 'a reminder that was never sent must be sent' \
     "$host interrupted window can proceed without the second notice"
+  # Observed: a user who had already replied to the question kept asking
+  # follow-ups, and every answer restarted the window with a new deadline.
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'The user'"'"'s first reply ends the window for this question, whether or not it answers it' \
+    "$host window keeps a timer running after the user has replied"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'No later turn restarts the window for this question, including after an interruption' \
+    "$host window can restart for a question the user already replied to"
+  hasnt "$WORK/$host/phases/pln-pr/blocker.md" 'restart the window' \
+    "$host a follow-up from the user still restarts the window"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'any reply ends the timer for that question' \
+    "$host fix phase still describes a timer that outlives a reply"
   # Observed: the question lived only in REVIEW.md and a notification saying
   # the repair needed the user's call, the chat said it was "open above", and
   # the host's permission check refused the timer that would build past it.

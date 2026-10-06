@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.124.0 — 2026-10-05
+
+### Fixed
+
+- **Replying to a `/pln-pr` repair question stops its timer.** The ten-minute window exists so an unanswered question does not idle a run while its user is away. One run kept it going while its user was plainly there: they replied "I'm here" twice and then asked three follow-up questions about the finding, and every answer restarted the window and ended with the time the run would build its pick without them. Now the user's first reply ends the window for that question, whatever the reply says. The run answers each follow-up, asks the question again with its recommendation but no deadline, and waits for the answer. The closed window is recorded in the ledger, so an interrupted run does not restart the timer for that question either. A later, different question still gets its own window.
+
 ## 1.123.0 — 2026-10-05
 
 ### Fixed

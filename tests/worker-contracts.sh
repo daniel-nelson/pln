@@ -726,6 +726,20 @@ for host in claude codex; do
     "$host PR body does not list repairs built on a timeout"
   has "$WORK/$host/phases/pln-pr/blocker.md" 'A timeout never lifts an owner constraint' \
     "$host timer can override an explicit owner constraint"
+  # A run that is away must not stop on a question with one real answer, nor
+  # wait on a timeout the host will refuse to act on.
+  has "$WORK/$host/phases/pln-pr/fix.md" 'goes to the blocker phase only when there is a fork' \
+    "$host fix phase asks about a repair with only one real option"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'adapt is the only repair' \
+    "$host fix phase asks rebuild-or-adapt when rebuild is not a real option"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'state the branch itself introduces that nothing outside the branch has acted on' \
+    "$host fix worker blocks on a repair to the branch's own unsent state"
+  has "$WORK/$host/phases/pln-pr/blocker.md" 'A host that refuses to act on the timeout ends the finding'"'"'s wait' \
+    "$host blocker phase retries or idles after the host refuses a timeout continuation"
+  has "$WORK/$host/phases/pln-pr/ship-watch.md" 'the host refused to act on the timeout' \
+    "$host PR body does not disclose a finding deferred on a refused timeout"
+  has "$WORK/$host/phases/pln-pr/review.md" 'narrow it yourself and carry on' \
+    "$host review phase stops an unattended run on an oversized skill catalog"
   has "$WORK/$host/phases/pln-pr/fix.md" 'A `reached_by: test-only` finding whose only available repair' \
     "$host a test-only finding can spend a user decision through the new-behavior stop"
   has "$WORK/$host/phases/pln-pr/fix.md" 'If no repair is left to build because of the owner'"'"'s recorded constraints' \

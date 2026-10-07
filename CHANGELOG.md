@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.125.0 — 2026-10-07
+
+### Fixed
+
+- **`/pln-pr` no longer stops an unattended run on a repair with one real answer.** One overnight run stopped three times in the fix phase and the user woke to no PR. A `second_answer: yes` finding always asked rebuild-or-adapt, though rebuild meant reverting the commits that three other items built on, and so most of the branch. A repair that rewrote a send-intent row the branch itself created, which nothing had sent, blocked as a "persisted-state write". The ten-minute window's timeout was then refused by the host. Now:
+  - A finding goes to the blocker phase only when there is a fork. If every other repair leaves the finding's consequence in place, contradicts a recorded owner constraint or user decision, or reverts commits that later commits build on, the run builds the selected repair and lists the one it passed over in the PR body.
+  - Rebuild is offered only when it is a real option. Otherwise adapt is built without asking.
+  - Writing to state the branch itself introduces, which nothing outside the branch has acted on, no longer counts as a consequential surface. External effects, public exports and writes to existing state still do.
+  - If the host refuses to act on a timeout (Claude Code's auto mode refuses it as `[Auto-Mode Bypass]`), the finding is deferred with its selected repair and the refusal named. The run goes on to ship instead of retrying or idling, and the PR lists it.
+- **A skill catalog too large for the review brief no longer stops the run.** The default skill root fails the helper's 512-file bound on any machine whose catalog ships per-host copies of its skills (gstack holds over a thousand `SKILL.md` files), and the brief's size cap would fail it next. The run now passes this skill's directory and each skill the project's instructions mandate, rather than stopping for the user.
+- **A plan whose dependencies point at a higher-numbered item is scheduled in execution order,** with the node-to-item map kept in the plan's cross-item notes. One run improvised exactly this when the scheduler rejected the plan's own numbering.
+
 ## 1.124.0 — 2026-10-05
 
 ### Fixed

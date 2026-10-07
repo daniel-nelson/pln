@@ -9,6 +9,8 @@
   - Rebuild is offered only when it is a real option. Otherwise adapt is built without asking.
   - Writing to state the branch itself introduces, which nothing outside the branch has acted on, no longer counts as a consequential surface. External effects, public exports and writes to existing state still do.
   - If the host refuses to act on a timeout (Claude Code's auto mode refuses it as `[Auto-Mode Bypass]`), the finding is deferred with its selected repair and the refusal named. The run goes on to ship instead of retrying or idling, and the PR lists it.
+- **A skill catalog too large for the review brief no longer stops the run.** The default skill root fails the helper's 512-file bound on any machine whose catalog ships per-host copies of its skills (gstack holds over a thousand `SKILL.md` files), and the brief's size cap would fail it next. The run now passes this skill's directory and each skill the project's instructions mandate, rather than stopping for the user.
+- **A plan whose dependencies point at a higher-numbered item is scheduled in execution order,** with the node-to-item map kept in the plan's cross-item notes. One run improvised exactly this when the scheduler rejected the plan's own numbering.
 
 ## 1.124.0 — 2026-10-05
 

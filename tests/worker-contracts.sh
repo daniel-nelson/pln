@@ -738,6 +738,8 @@ for host in claude codex; do
     "$host blocker phase retries or idles after the host refuses a timeout continuation"
   has "$WORK/$host/phases/pln-pr/ship-watch.md" 'the host refused to act on the timeout' \
     "$host PR body does not disclose a finding deferred on a refused timeout"
+  has "$WORK/$host/phases/pln-pr/review.md" 'narrow it yourself and carry on' \
+    "$host review phase stops an unattended run on an oversized skill catalog"
   has "$WORK/$host/phases/pln-pr/fix.md" 'A `reached_by: test-only` finding whose only available repair' \
     "$host a test-only finding can spend a user decision through the new-behavior stop"
   has "$WORK/$host/phases/pln-pr/fix.md" 'If no repair is left to build because of the owner'"'"'s recorded constraints' \

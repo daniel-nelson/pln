@@ -20,6 +20,8 @@ While the window is open, use `{{OUTPUT_ROOT}}/bin/pln-decision-window --asked-a
 
 Observed: a run wrote its question into `REVIEW.md`, notified that the repair needed the user's call and would proceed in ten minutes, and told the user the question was open above when no message had carried it. The host's permission check then refused the timer that would build past it, and the run stopped with nothing built while its user was away. A refused wait authorizes nothing by another route; the question stays open.
 
+**A host that refuses to act on the timeout ends the finding's wait.** Some hosts read acting on a timeout as acting without the user's approval, and refuse the continuation after `Decision: standing timeout authorization` is published (Claude Code's auto mode refuses it as `[Auto-Mode Bypass]` and says not to pursue the outcome another way). Observed: a run sat through two full ten-minute windows before learning that, and every further question would have done the same. The refusal is final for that finding. Do not retry the continuation, route it through another tool or agent, or open a new window for it. Publish the finding `deferred` with its selected repair, the alternatives and the refusal, file it once as the fix phase's deferral route does, and carry on: finish the other clusters and go on to ship so the user returns to a PR rather than a stopped run. Windows that never reach a timeout are unaffected, and so is a user who answers.
+
 An explicit owner constraint, a missing or changed candidate, or a question with no selected repair does not acquire timeout authorization. A timeout never lifts an owner constraint. Handle these through the ordinary answer and recovery path above.
 
 <!-- pln:include followup-filing -->

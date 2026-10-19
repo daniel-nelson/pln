@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# pln-compact-check — Claude Code UserPromptSubmit hook, declared in the claude
+# build's /pln frontmatter. Prints a recovery instruction, once, on the first
+# user prompt after a compaction that followed pln's last load; prints nothing
+# otherwise. Always exits 0: it must never block or delay a prompt.
+#
+# Why a hook: after a compaction Claude Code carries the router forward cut to
+# its first 5,000 tokens, and the recovery line at the top of that copy is
+# rarely acted on — a model answering "c" to an interview question works from
+# the copy it has. Hook output lands beside the user's message instead.
+#
+# Why this event: a skill's frontmatter SessionStart(compact) and PostCompact
+# hooks register but never fire (Claude Code 2.1.303); UserPromptSubmit does.
+# It fires on every prompt for the rest of the session, so the work per prompt
+# is two fixed-string greps over the transcript.
+#
+# Stdin: the hook's JSON input; only `transcript_path` is read. The transcript
+# format is Claude Code's and undocumented: if the boundary or heading strings
+# stop matching, the hook goes silent and the router's own recovery line is
+# what remains.
+#
+# State: the last announced boundary's line number, per transcript, under
+# `${TMPDIR:-/tmp}/pln-compact-<uid>`, a directory refused unless it is private
+# to this user. With no state it stays silent rather than repeating itself.
+set -u
+
+BOUNDARY='"subtype":"compact_boundary"'
+# The router's title. It appears in the transcript wherever the full router
+# entered context: a Skill invocation or a Read of SKILL.md. tests/generate.sh
+# holds it equal to the generated heading.
+HEADING='# pln — personal planning workflow'
+
+root="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)" || exit 0
+input="$(cat 2>/dev/null)" || exit 0
+transcript="$(printf '%s' "$input" | sed -n 's/.*"transcript_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+[ -n "$transcript" ] && [ -f "$transcript" ] || exit 0
+
+last_boundary="$(grep -n -F -- "$BOUNDARY" "$transcript" 2>/dev/null | tail -n 1 | cut -d: -f1)"
+[ -n "$last_boundary" ] || exit 0
+# Only a user-side record counts as a load: the copy re-attached after a
+# compaction is an attachment record, request snapshots are their own type, and
+# the summary is a user record flagged as one.
+last_load="$(grep -n -F -- "$HEADING" "$transcript" 2>/dev/null \
+  | grep -F '"type":"user"' | grep -v -F '"isCompactSummary":true' \
+  | tail -n 1 | cut -d: -f1)"
+[ -n "$last_load" ] && [ "$last_boundary" -gt "$last_load" ] || exit 0
+
+uid="$(id -u 2>/dev/null)" || exit 0
+case "$uid" in '' | *[!0-9]*) exit 0 ;; esac
+parent="${TMPDIR:-/tmp}"
+parent="${parent%/}"
+dir="$parent/pln-compact-$uid"
+if [ ! -e "$dir" ] && [ ! -L "$dir" ]; then
+  mkdir -m 700 "$dir" 2>/dev/null || exit 0
+fi
+[ ! -L "$dir" ] && [ -d "$dir" ] && [ -O "$dir" ] || exit 0
+case "$(LC_ALL=C ls -ldn "$dir" 2>/dev/null)" in d???------*) ;; *) exit 0 ;; esac
+state="$dir/$(printf '%s' "$transcript" | cksum | awk '{ print $1 "-" $2 }')"
+[ "$(cat "$state" 2>/dev/null)" != "$last_boundary" ] || exit 0
+{ printf '%s\n' "$last_boundary" > "$state"; } 2>/dev/null || exit 0
+
+cat <<EOF
+pln: this conversation compacted after pln was loaded, so your copy of the pln router is cut off. If a pln run is still in progress, do these before acting on the user's message:
+1. Read $root/SKILL.md with the Read tool, the whole file — not grep, sed or a line range.
+2. Read the phase document the plan's cursor names.
+3. Restart the readiness sweep with a fresh update challenge.
+4. If your last message before the compaction asked the user a question and their message does not answer it, ask it again in full: they may no longer be able to see it.
+EOF
+exit 0

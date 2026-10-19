@@ -752,6 +752,32 @@ done
 # /pln-update is tracked rather than generated, and ships to users all the same.
 spec_check "$REPO_DIR/pln-update/SKILL.md" pln-update "the tracked /pln-update skill"
 
+# ─── The post-compaction hook ────────────────────────────────────────────────
+# The recovery line above is text, and after a compaction it is rarely acted
+# on. The claude /pln build also declares a frontmatter UserPromptSubmit hook,
+# bin/pln-compact-check, whose output lands beside the user's next message. It
+# is the only frontmatter hook event found to fire after a compaction; a
+# skill's SessionStart(compact) and PostCompact hooks register and never run
+# (Claude Code 2.1.303). Codex has no skill hooks, and the field is Claude
+# Code's, not the spec's, so the codex build must not carry it.
+fm_of() { awk 'NR==1 { next } $0 == "---" { exit } { print }' "$1"; }
+hook_root="$(cd "$real_c" && pwd -P)"
+fm_of "$real_c/SKILL.md" | grep -qxF '  UserPromptSubmit:' \
+  || fail "the claude /pln frontmatter declares no UserPromptSubmit hook"
+fm_of "$real_c/SKILL.md" | grep -qF "command: '\"$hook_root/bin/pln-compact-check\"'" \
+  || fail "the claude /pln hook does not run the absolute, quoted bin/pln-compact-check"
+fm_of "$real_x/SKILL.md" | grep -q '^hooks:' \
+  && fail "the codex /pln frontmatter carries a hooks field"
+for f in "$real_c/pln-pr/SKILL.md" "$real_x/pln-pr/SKILL.md"; do
+  fm_of "$f" | grep -q '^hooks:' && fail "$f carries a hooks field; only /pln declares one"
+done
+# The hook recognizes a router load in the transcript by its title, so the two
+# cannot drift apart.
+hook_heading="$(sed -n "s/^HEADING='\(.*\)'$/\1/p" "$REPO_DIR/bin/pln-compact-check")"
+[ -n "$hook_heading" ] || fail "bin/pln-compact-check declares no HEADING"
+grep -qxF -- "$hook_heading" "$real_c/SKILL.md" \
+  || fail "bin/pln-compact-check looks for '$hook_heading', which is not a line of the claude /pln router"
+
 # The public skills are routers. Every detailed phase is generated one level
 # below phases/, carries only its host's mechanics, and is addressed by the
 # absolute output root baked into the router at generation time.

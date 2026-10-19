@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.126.0 — 2026-10-19
+
+### Fixed
+
+- **After a compaction, Claude Code is now told to re-read `/pln` beside your next message.** After a compaction, Claude Code keeps only the router's first 5,000 tokens. Until now, recovery relied on a line at the top of that cut-off copy, and it was rarely followed. In one user's transcripts, 41 compactions carried a cut-off router, and the whole router was re-read without prompting after only 5 of them. Eight times the user's next message was a bare interview answer such as `c`, and none of those runs re-read it in full. Three times the user could no longer see the question they had been asked. The Claude build of `/pln` now declares a `UserPromptSubmit` hook in its frontmatter, `bin/pln-compact-check`. On the first message after a compaction that followed pln's last load, the hook adds a short instruction beside that message:
+  - Read the whole `SKILL.md`, not a grep or a line range.
+  - Read the phase document the cursor names, and restart the readiness sweep.
+  - Ask the pending question again in full if the message does not answer it.
+
+  The hook says nothing otherwise, and never blocks a prompt.
+  - It does not cover a compaction in the middle of a turn with no message from you in between; the recovery line still does.
+  - It reads Claude Code's transcript, whose format is undocumented, and goes silent if that format changes.
+  - It stays registered for the rest of the session, so the instruction applies only while a pln run is in progress.
+  - Codex is unchanged, since Codex skills have no hooks.
+  - `hooks` is a Claude Code frontmatter field, not one the Agent Skills spec lists.
+  - A skill's `SessionStart(compact)` and `PostCompact` hooks were tried first. On Claude Code 2.1.303 they register but never fire.
+
 ## 1.125.0 — 2026-10-07
 
 ### Fixed

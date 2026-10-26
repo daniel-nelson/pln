@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.127.0 — 2026-10-26
+
+### Fixed
+
+- **A change to CI or tool configuration is now checked against the tool before pln designs anything.** One run spent almost four hours closing bypasses in a hand-written CI job that re-checked a package manager's release-age setting. Research named the job as the owner, every interview option made the job stronger, and three review rounds kept finding new ways around it. One search, run only after the user asked, showed that the package manager enforces the setting at install and that no other project keeps such a job. This applies when an item or review finding touches a CI workflow, the configuration of a package manager, build, linter, formatter or test runner, or a script that checks one of those:
+  - Item research finds out what the tool already does about the concern and how projects using it normally handle it. It reads the tool's documentation on the web where the worker can reach it, and otherwise the installed README, docs, CHANGELOG or `--help`. Every claim names its source, and a practice it could not source is reported as `none found`, never recalled from memory.
+  - If the tool already enforces the concern, or no project keeps a mechanism like the repository's, the existing-owner route is the tool's own behavior, and removing the repository's mechanism is compared with the other routes.
+  - The interview then offers that route as the floor option, with its source, whenever the approach keeps or adds the repository's own mechanism instead.
+  - `/pln-pr` reviewers answer `fix` and `smaller_fix` the same way. If the tool already does what a hand-written mechanism checks, `smaller_fix` is removing the mechanism, and its holes are reported as one finding rather than one per bypass.
+  - A Codex worker with no network uses the installed documentation.
+
 ## 1.126.0 — 2026-10-19
 
 ### Fixed

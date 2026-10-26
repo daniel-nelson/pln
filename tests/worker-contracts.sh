@@ -412,6 +412,18 @@ has "$interview" 'localized correction inside an established owner' \
   'item research applies the heavy system-fit comparison to local corrections'
 has "$interview" 'specific acceptance criterion or invariant' \
   'item research permits unsupported claims of distinctness'
+# A toolchain item is checked against the tool's own behavior and common
+# practice first, so removing a hand-written mechanism can reach the options.
+has "$interview" 'A toolchain item is checked against the tool before the repository' \
+  'item research no longer checks toolchain items against the tool itself'
+has "$interview" 'never one recalled from memory' \
+  'item research may cite toolchain practice it never read'
+has "$REPO_DIR/src/phases/pln/interview.core.md" 'that route is the floor, with its source on its line' \
+  'the interview no longer offers the tool-owned route as a toolchain floor'
+has "$REPO_DIR/src/phases/pln-pr/review.core.md" 'In the toolchain, answer against the tool' \
+  'PR reviewers no longer answer toolchain findings against the tool'
+has "$REPO_DIR/src/phases/pln-pr/review.core.md" 'rather than one finding per way around it' \
+  'PR reviewers may file each bypass of a redundant mechanism separately'
 # Interleavings (races, at-least-once delivery, retries) are found in the
 # interview, where accepting or preventing each consequence is still cheap.
 has "$interview" '`Interleavings:` is a field' \

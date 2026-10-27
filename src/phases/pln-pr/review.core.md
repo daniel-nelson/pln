@@ -26,6 +26,10 @@ Every reviewer this skill spawns is the same model as the orchestrator spawning 
 
 <!-- pln:include peer-sandbox-remedy -->
 
+<!-- pln:only claude -->
+<!-- pln:include peer-host-denial -->
+<!-- pln:endonly -->
+
 ### Step 3. Risk-calibrated review roster
 
 **Mark the round's start before its first reader.** Run `date -u > "<plan-dir>/evidence/pr-review.round-start"` before dispatching the broad reviewer; the merge skip below counts only artifacts newer than it.

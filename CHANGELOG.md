@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.128.0 — 2026-10-27
+
+### Fixed
+
+- **When Claude Code's auto mode blocks the send to the peer, `/pln` and `/pln-pr` now give you the permission rule that fixes it.** In one Claude Code session in auto mode, two sends to Codex went through. The third was denied as `[Data Exfiltration]` by auto mode's classifier, a separate safety model that cannot see pln's consent settings, and the retry after the user wrote "Send to Codex" was denied too. The run then guessed at the cause and twice offered a `!` command, which cannot run from a phone. Now, on Claude Code:
+  - A denial is reported as Claude Code's own check, not as a pln policy or a ruling on your consent. The run does not retry or reshape the command.
+  - The run gives you the exact line to add to `permissions.allow` in `~/.claude/settings.json`: `"Bash(<install path>/bin/pln-peer *)"`. Claude Code checks allow rules before the classifier, so with that rule the send never reaches it. pln does not edit your settings itself, and auto mode would refuse it as self-modification anyway.
+  - `pln-peer` is run by its absolute path as a single command, with no variable in front of it, no `;`, `&&` or `|` chain and no redirect, so that rule matches the call.
+  - The review then goes on without the peer, as for any other failed send, and the notice at the next stop names the denial and the rule.
+- A run may now report the peer as blocked when the host itself denied the call, as well as when `pln-peer` printed a `STATUS=` line saying so.
+
 ## 1.127.0 — 2026-10-26
 
 ### Fixed

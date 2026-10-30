@@ -1141,9 +1141,9 @@ for host in claude codex; do
     "$host exact late-skip trace still becomes an implicit draft"
   has "$ship_watch" 'adding `--draft` only for `keep-draft` or `policy-draft`' \
     "$host ready PR path can still receive --draft"
-  has "$ship_watch" 'A new ready PR offers optional CI watching but never starts it unprompted' \
-    "$host ready PR path still enters mandatory CI watch"
-  has "$ship_watch" 'an update to an already-open PR never touches its draft/ready state' \
+  has "$ship_watch" '**Step 9 runs for every PR this run created or updated.**' \
+    "$host ready PR path closes before its CI is watched"
+  has "$ship_watch" 'An update to an already-open PR never touches its draft/ready state' \
     "$host existing PR disposition can be rewritten"
   # The same refusal rule is coordinator text in three skills now, and
   # bin/pln-generate resolves pln:include only in src/**/*.core.md, so none of

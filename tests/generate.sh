@@ -1036,16 +1036,20 @@ for host_out in "$real_c" "$real_x"; do
     "$ship_file exact review-none ready-PR trace still enters draft watch"
   has "$ship_file" 'adding `--draft` only for `keep-draft` or `policy-draft`' \
     "$ship_file can add --draft to a plain ready request"
-  has "$ship_file" 'A new ready PR offers optional CI watching but never starts it unprompted' \
-    "$ship_file starts CI watch for a ready handoff"
+  has "$ship_file" '**Step 9 runs for every PR this run created or updated.**' \
+    "$ship_file lets a PR close before its CI is watched"
+  has "$ship_file" '`gh pr checks "$BRANCH" --watch --fail-fast --interval 60`' \
+    "$ship_file lost the once-a-minute background CI watch"
+  hasnt "$ship_file" 'ci_duration' \
+    "$ship_file still schedules the watch from a recorded CI duration"
   # An empty check list means "no CI here" only for a PR that could merge. A
   # conflicting one may report the same empty list because the forge cannot build
   # the merge commit its checks run against, so the mergeability question has to
   # be asked first or the no-CI rule marks a conflicting PR ready and calls it
   # shipped. Order is the whole guard, so the test pins the order.
-  has "$ship_file" 'Not mergeable — leave it in draft' \
+  has "$ship_file" 'Not mergeable — stop, and never mark it ready' \
     "$ship_file lost the mergeability guard before the no-CI shortcut"
-  mergeable_at="$(grep -n 'Not mergeable — leave it in draft' "$ship_file" | head -1 | cut -d: -f1)"
+  mergeable_at="$(grep -n 'Not mergeable — stop, and never mark it ready' "$ship_file" | head -1 | cut -d: -f1)"
   nocifirst_at="$(grep -n 'No CI configured — undraft immediately' "$ship_file" | head -1 | cut -d: -f1)"
   [ -n "$mergeable_at" ] && [ -n "$nocifirst_at" ] \
     || fail "$ship_file is missing one of the mergeability/no-CI rules"
@@ -1064,8 +1068,8 @@ for host_out in "$real_c" "$real_x"; do
     "$ship_file stops a PR on a local failure without asking whether it is about the code"
   has "$ship_file" 'The owner can open the PR without the local checks' \
     "$ship_file re-runs local checks after the owner said to open the PR"
-  has "$ship_file" 'It also runs for any PR this run created or updated whose `Local verification` is not `passed`' \
-    "$ship_file opens an unverified PR without watching its CI"
+  has "$ship_file" 'This step runs after Step 8 created or updated a PR on a known host' \
+    "$ship_file opens a PR without watching its CI"
   has "$scope_file" 'Local verification' \
     "$scope_file does not list Local verification among the ledger's state"
   review_file="$host_out/phases/pln/review-approval.md"

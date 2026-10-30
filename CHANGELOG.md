@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.129.0 — 2026-10-30
+
+### Changed
+
+- **`/pln-pr` watches CI on every PR it opens or updates, not only drafts.** A plain request to put up a PR has opened a ready PR since 1.95.0, and a ready PR only *offered* to watch CI. In practice the run handed the PR back and stopped, and the owner found failed checks hours later when they came to review it. Step 9 now runs for every PR on a known host: ready or draft, new or already open. Red checks go through the same classify-and-fix loop drafts always had, and the run closes only on green, on its three-round stop, or on a conflict. Draft/ready state works as before: only a brand-new `policy-draft` PR is marked ready, and an already-open PR keeps the state it had.
+- **The watch polls once a minute from the push.** It used to wait about half of a recorded per-repository CI duration (`ci_duration_<repo>`) before the first check. Now it runs `gh pr checks --watch --fail-fast --interval 60` in the background, adding `--required` when any check is required, with an equivalent once-a-minute `glab` loop on GitLab. The background loop costs the run nothing while it waits, and a lint job that fails in its first minute is seen within a minute. The recorded duration had no other reader, so it is no longer written. A forge's empty check list right after a push is asked again a minute later before it counts as "no CI".
+
 ## 1.128.0 — 2026-10-27
 
 ### Fixed

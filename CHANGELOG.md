@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.130.0 — 2026-10-30
+
+### Added
+
+- **The `/pln` interview shows a diagram when an item changes a data model or a flow between components.** When an item adds or changes tables and their relationships, or a sequence of calls between components or services, the run writes a self-contained HTML page with a Mermaid diagram into the plan directory. The question about that item carries the page's absolute path, so you can click it open in a browser. The page is rewritten when an answer changes what it shows, and it is listed under the item's Artifacts in `PLAN.md`.
+
 ## 1.129.0 — 2026-10-30
 
 ### Changed

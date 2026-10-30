@@ -885,6 +885,14 @@ for host_out in "$real_c" "$real_x"; do
   has "$outline_file" 'src/workers/preflight-research.md' "$outline_file does not mandate a pre-flight research worker"
   has "$outline_file" '8192-byte ceiling' "$outline_file lost the pre-flight envelope budget"
   has "$interview_file" 'src/workers/interview-research.md' "$interview_file does not mandate per-item research"
+  # 1.130.0: visuals in the interview, and a rendered page of the whole plan
+  # whose path sits directly above the gate's adopt prompt.
+  has "$interview_file" 'visual-<N>-<slug>.html' "$interview_file lost its visuals beside a question"
+  has "$review_file_peer" 'src/workers/plan-page.md' "$review_file_peer no longer renders the plan page at the gate"
+  has "$review_file_peer" 'the line directly above the prompt is `Whole plan:' \
+    "$review_file_peer moved the plan page link away from the adopt prompt"
+  has "$review_file_peer" 'more than three active items or the interview wrote a `visual-*.html`' \
+    "$review_file_peer renders the plan page at every gate"
   # The all-items-first shape, in the words that replaced the ambiguous
   # "Before the first proposal for every active item".
   has "$interview_file" 'Every active item is researched before the walk begins' \

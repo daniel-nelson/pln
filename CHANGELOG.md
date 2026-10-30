@@ -4,7 +4,8 @@
 
 ### Added
 
-- **The `/pln` interview shows a diagram when an item changes a data model or a flow between components.** When an item adds or changes tables and their relationships, or a sequence of calls between components or services, the run writes a self-contained HTML page with a Mermaid diagram into the plan directory. The question about that item carries the page's absolute path, so you can click it open in a browser. The page is rewritten when an answer changes what it shows, and it is listed under the item's Artifacts in `PLAN.md`.
+- **The `/pln` approval gate links a page of the whole plan.** Before the gate is shown, a fresh worker renders `PLAN.md` as a self-contained HTML page in the plan directory: one section per item under its dashboard number, with its decisions, acceptance criteria, dependencies and open findings, plus diagrams of the data model, flows and item order where they help. The page's path is the line directly above the adopt prompt, so you can click it open. The chat message is unchanged otherwise, and you still answer there. The page is rebuilt each time the gate is shown again after a change. The worker renders it so the coordinator's context never holds the HTML. If the page can't be built, the gate says so and is shown anyway.
+- **Interview questions can come with a visual.** When an item adds or changes tables and how they relate, or a flow of calls between components, the question carries a diagram. Elsewhere the interview may add one whenever a picture is faster than text: options side by side with their tradeoffs, a mockup of each UI option, a before and after. Each visual is a self-contained HTML file in the plan directory (Mermaid for diagrams, plain HTML and CSS for mockups), and the question gives its absolute path. The question and options still appear in chat.
 
 ## 1.129.0 — 2026-10-30
 

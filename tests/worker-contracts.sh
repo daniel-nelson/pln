@@ -14,7 +14,7 @@ hasnt() { grep -qF -- "$2" "$1" && fail "$3"; return 0; }
 
 for name in context-envelope evidence-collection preflight-research interview-research assurance-classification plan-review \
   plan-review-merge pr-review-merge execution-schedule item-implementation final-verification \
-  simplification-map simplification-synthesis behavior-preservation; do
+  simplification-map simplification-synthesis behavior-preservation plan-page; do
   file="$REPO_DIR/src/workers/$name.md"
   [ -s "$file" ] || fail "missing or empty worker contract: $file"
   has "$file" 'WORKER_ONLY_SENTINEL_' "$file has no worker-only sentinel"
@@ -35,6 +35,12 @@ has "$review" 'added, reused, retained, consolidated, replaced, and retired' \
   'broad review lost qualitative surface-state mapping'
 has "$review" 'current owners, closest analogues, and sibling items' \
   'broad review no longer compares parallel planned surfaces'
+
+page="$REPO_DIR/src/workers/plan-page.md"
+has "$page" 'RESULT_FILE=' 'plan page worker no longer returns a result pointer'
+has "$page" 'dashboard number and title' 'plan page no longer keys items by the numbers the user replies with'
+has "$page" 'Add no claim the plan does not make' 'plan page may say more than the plan'
+has "$page" 'Do not edit `PLAN.md`' 'plan page worker may edit the plan'
 
 merge="$REPO_DIR/src/workers/plan-review-merge.md"
 has "$merge" 'Reject, repair, or flag' 'merge contract lost its classification rubric'

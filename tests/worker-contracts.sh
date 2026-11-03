@@ -971,6 +971,12 @@ for host in claude codex; do
     "$host fix worker can rewrite a test the review read to make it pass"
   has "$WORK/$host/phases/pln-pr/fix.md" 'A fix fails when `git diff --name-status <Settled candidate> <candidate commit>` shows it modifying, deleting or renaming a test file' \
     "$host second pass does not check that a fix left the reviewed tests alone"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'except a race finding on the branch'"'"'s own code, which is held for the user rather than filed' \
+    "$host fix phase files an unfixed test-only race instead of holding the PR"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'A race finding is the exception: left unbuilt for that reason, it is held, not deferred or filed' \
+    "$host coordinator defers and files a test-only race left unbuilt"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'unless it is a race finding, which you name as held' \
+    "$host fix worker names a test-only race left unbuilt as deferred"
   has "$WORK/$host/phases/pln-pr/fix.md" 'adds no new lock, queue, table, background job or retry loop' \
     "$host fix worker can build a lock or queue for a race finding"
   # 1.92.0 recorded a fingerprint here; a digest no git command resolves would

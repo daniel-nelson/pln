@@ -7,7 +7,7 @@
 - **(c) The run was asked for it.** It is a step — run, verify, backfill, roll out, remove a temporary gate — that a plan item's acceptance criteria name, or that a claimed to-do item's "What to do" or "How to tell it worked" names. Quote that line; a line you cannot quote is no match.
 - **(d) This run broke it.** A reproduction passes on `SOURCE_HEAD` (in `{{PLN_PR_CMD}}`, on the merge base) and fails on the current tree. Outside git, (d) does not apply.
 
-The test is line-level: a defect already on a line this run did not add, in a file it touched, is not a remainder and is filed as before.
+The test is line-level: a defect already on a line this run did not add, in a file it touched, is not a remainder. In `{{PLN_CMD}}`, a small, certain one inside a function this run changes is still fixed in this run, in a commit of its own: it becomes an item of its own — once implementation has begun, a new node by the mid-run-request route. Anywhere else, and in `{{PLN_PR_CMD}}`, it is filed as before.
 
 **A remainder is done in this run, or asked.** In `{{PLN_CMD}}` it becomes a new node by the mid-run-request route; in `{{PLN_PR_CMD}}` the fix phase repairs it; what cannot be done goes to the blocker phase. Delegated and auto mode do it rather than ask. It reaches the to-do list only through one of three exits, with the exit's artifact quoted in the item's body:
 

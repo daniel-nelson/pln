@@ -218,7 +218,7 @@ Per-item detail sections carry:
 
 - Status.
 - Intent, constraints, and acceptance criteria — what "done" means, not how each line gets written.
-- Decisions — each a *what* + *why*, tagged with its authority or its reversibility, and flagged if low-confidence (the flag is what puts it on the Step 4 gate's "worth a look" line). Recorded as overridable-when-reversible context, never as imperative steps. The ones the user made are marked as theirs — originated where they raised the substance, selected where they picked from options the agent wrote — and written in their words. See "How a decision is recorded" in Step 3.
+- Decisions — each a *what* + *why*, tagged with its authority or its reversibility, and flagged if low-confidence (the flag is what puts it on the Step 4 gate's "worth a look" line). One that adds visible behavior has a quote as its authority — the Request line, a user decision or a repository mandate, under Step 3's check of whether each thing an item builds belongs in it at all — because a codebase pattern settles how, never whether. Recorded as overridable-when-reversible context, never as imperative steps. The ones the user made are marked as theirs — originated where they raised the substance, selected where they picked from options the agent wrote — and written in their words. See "How a decision is recorded" in Step 3.
 - Commit hash if any.
 - **Review findings** — what the plan-review merge worker corrected in this section, and what it flagged for the user instead.
 - Discoveries (mid-item findings worth recording).

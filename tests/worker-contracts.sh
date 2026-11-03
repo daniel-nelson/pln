@@ -54,8 +54,27 @@ has "$merge" 'strictly dominant internal correction' \
   'merge contract turns clear-winner internal repairs into user gates'
 has "$merge" 'visible behavior, scope, cost, risk appetite, irreversible or external state, or work outside' \
   'merge contract lost the canonical material-fork boundary'
+# 1.131.0: what asked for a change is the user's words or a repository rule,
+# never text the run wrote. An agent-written acceptance criterion quoted as
+# `requested_by` let a run's own scope ask for itself, and "may still be
+# repaired" let an unrequested finding grow the plan anyway.
+has "$review" 'from one of three places: the Pre-flight `Request:` line' \
+  'plan review no longer limits requested_by to the user or a mandate'
+has "$review" 'and any other plan text the run wrote never qualify' \
+  'plan review lets agent-written plan text satisfy requested_by'
+hasnt "$review" 'owner goal' 'plan review still accepts an agent-written owner goal as a request'
+has "$merge" 'A quote from anywhere else' 'merge accepts a requested_by quote from agent-written text'
+has "$merge" 'is never repaired, since a repair would build what nobody asked for' \
+  'merge may repair an unrequested finding'
+hasnt "$merge" 'may still be repaired' 'merge still repairs unrequested findings'
+has "$merge" 'An outcome only agent-written text records is not one to restore' \
+  'merge repairs toward an outcome only the agent wrote'
+has "$merge" 'with no quoted source behind it is an addition, and the repair removes it' \
+  'merge has no outcome for a defect resting on agent-written text'
 
 implementation="$REPO_DIR/src/workers/item-implementation.md"
+has "$implementation" "stays out of this item's change, even inside a function you are changing" \
+  'implementation worker folds a pre-existing bug into its item commit'
 scheduling="$REPO_DIR/src/workers/execution-schedule.md"
 envelope="$REPO_DIR/src/workers/context-envelope.md"
 has "$envelope" 'REQUESTED_PROFILE:' 'result envelopes do not attribute the requested profile'
@@ -1027,6 +1046,29 @@ for host in claude codex; do
     "$host an asked reversal is repeated at the gate"
   has "$WORK/$host/phases/pln/interview.md" "An answer that changes an item's approach dispatches a fresh item-mode worker" \
     "$host interview keeps research written for an approach an answer replaced"
+  # 1.131.0: an element nobody asked for is left out, not decided and disclosed.
+  has "$WORK/$host/phases/pln/interview.md" 'belongs in it at all before any choice about it goes through the filter' \
+    "$host interview routes an element without asking whether it belongs"
+  has "$WORK/$host/phases/pln/interview.md" 'Left out, nobody asked: <element>' \
+    "$host interview has no record for an element it leaves out"
+  has "$WORK/$host/phases/pln/interview.md" 'a pattern says how, never whether' \
+    "$host interview lets a codebase pattern justify adding scope"
+  has "$WORK/$host/phases/pln/interview.md" 'The interleavings rule below is the mandate for a prevention it takes without asking' \
+    "$host interview's scope check contradicts the interleavings rule's automatic preventions"
+  has "$WORK/$host/phases/pln/interview.md" "it was never this item's to build: leave it out" \
+    "$host interview still decides and discloses a mechanism nobody asked for"
+  has "$WORK/$host/phases/pln/interview.md" 'that element is an addition under the check at the head of step 3' \
+    "$host interleavings drop rule is not tied to the scope check"
+  has "$WORK/$host/phases/pln/outline.md" 'a codebase pattern settles how, never whether' \
+    "$host item template lets a decision add behavior on a pattern's authority"
+  for phase in pln/interview pln/implementation; do
+    has "$WORK/$host/phases/$phase.md" 'a small, certain one inside a function this run changes is still fixed in this run, in a commit of its own' \
+      "$host $phase files a small certain bug inside a function the run changes"
+  done
+  has "$WORK/$host/phases/pln/implementation.md" 'a small, certain bug the follow-up rule above keeps in this run becomes a new node' \
+    "$host implementation has no route for a small certain bug kept in the run"
+  has "$WORK/$host/phases/pln-pr/review.md" 'it is filed as before.' \
+    "$host /pln-pr no longer files a pre-existing defect"
   has "$WORK/$host/phases/pln/review-approval.md" "record a \`Decision (user, selected)\` pair whose option line is that entry's line" \
     "$host a gate override of a taken prevention has no recorded form"
   has "$WORK/$host/phases/pln/review-approval.md" 'entry that opens with what has to happen and how common it is' \

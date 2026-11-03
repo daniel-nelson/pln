@@ -596,6 +596,12 @@ has "$pr_merge" 'any other `**Decision (agent` entry' \
 # finding is held and the PR stays a draft.
 has "$pr_merge" 'adds no new lock, queue, table, background job or retry loop' \
   'PR merge lets a race finding build a lock, queue or retry loop'
+has "$pr_merge" 'whether or not its `reached_by` survived the check above' \
+  'PR merge skips a test-only race instead of holding the PR for the user'
+hasnt "$pr_merge" 'when it is test-only, record it `skipped`' \
+  'PR merge still skips an unfixed test-only race'
+has "$pr_merge" 'A race the base already had takes the `on_base` route and is filed, not held' \
+  'PR merge holds the PR over a race already on the base'
 has "$pr_merge" 'A `held` finding waits for the user' \
   'PR merge has no status for a threat left to the user'
 has "$pr_merge" "the envelope's \`held\` field" \

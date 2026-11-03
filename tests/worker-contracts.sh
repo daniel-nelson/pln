@@ -436,8 +436,26 @@ has "$interview" '`Interleavings:` is a field' \
   'item research no longer always reports interleavings'
 has "$interview" 'whose delivery is at-least-once' \
   'item research no longer counts at-least-once delivery as an interleaving'
-has "$interview" 'A second request to the same endpoint does not count by itself' \
+# 1.131.0: the same request twice at once from one client is a common hazard
+# where the project takes client requests (the owner: mobile clients send
+# simultaneous duplicates all the time); a read-only or same-value handler is
+# not, so a web item is not reported wholesale.
+hasnt "$interview" 'A second request to the same endpoint does not count by itself' \
+  'item research still excludes a same-client duplicate request'
+has "$interview" 'the same request arriving twice at once from one client is common' \
+  'item research does not count a same-client duplicate request as a common interleaving'
+has "$interview" 'A handler that only reads, or writes the same value however often it runs, is not one' \
   'item research reports every web item as an interleaving'
+# Each path's origin is what the interview reads to drop an unrequested element
+# or leave a hazard the change does not reach; the residual is what the gate shows.
+has "$interview" '`HEAD <file:line>` where the source state the assignment names already has it, or `adds <element>`' \
+  'item research no longer records where each interleaving path comes from'
+has "$interview" "preferring one the project's own tools already offer" \
+  "item research no longer prefers the project's own simplest prevention"
+has "$interview" 'what it still leaves possible (or `nothing`) beside the complete prevention and what that one adds' \
+  'item research no longer weighs the simple prevention against the complete one'
+has "$interview" 'paths with their origins, ordering, consequence, likelihood evidence, and prevention with what it adds and what it leaves possible' \
+  'the Interleavings field no longer carries origins and what the prevention leaves possible'
 has "$interview" 'Two consequences are two entries' \
   'item research merges distinct consequences into one interleaving'
 # Deliberate behavior the code documents is inventoried before any approach
@@ -981,6 +999,16 @@ for host in claude codex; do
     "$host interview does not consume the research envelope's interleavings"
   has "$WORK/$host/phases/pln/interview.md" 'a stated exception to the durable-surface rule above' \
     "$host a taken prevention is not reconciled with the durable-surface ask rule"
+  has "$WORK/$host/phases/pln/interview.md" 'leave the element out rather than guard it' \
+    "$host interview guards a hazard that only an unrequested element creates"
+  has "$WORK/$host/phases/pln/interview.md" 'the requested change does not reach the hazard: it gets no question either, and is filed' \
+    "$host interview prevents a hazard on main the requested change does not reach"
+  has "$WORK/$host/phases/pln/interview.md" 'opens no interleaving of its own' \
+    "$host interview takes without asking a prevention that creates its own hazard"
+  has "$WORK/$host/phases/pln/interview.md" '`**Decision (agent).**` entry that opens with what has to happen and how common it is' \
+    "$host a taken prevention leaves no record of its trigger for /pln-pr to read"
+  has "$WORK/$host/phases/pln/interview.md" 'the prevention, and what it still leaves possible' \
+    "$host a taken prevention's record omits what it leaves possible"
   has "$WORK/$host/phases/pln/interview.md" 'with accepting it as the floor option' \
     "$host an interleaving question has no accept floor"
   has "$WORK/$host/phases/pln/interview.md" "The accept option's own line names the consequence, the surface and the likelihood basis" \
@@ -1001,6 +1029,12 @@ for host in claude codex; do
     "$host interview keeps research written for an approach an answer replaced"
   has "$WORK/$host/phases/pln/review-approval.md" "record a \`Decision (user, selected)\` pair whose option line is that entry's line" \
     "$host a gate override of a taken prevention has no recorded form"
+  has "$WORK/$host/phases/pln/review-approval.md" 'entry that opens with what has to happen and how common it is' \
+    "$host a taken prevention's gate notice does not lead with its trigger"
+  has "$WORK/$host/phases/pln/review-approval.md" 'and what the prevention still leaves possible' \
+    "$host a taken prevention's gate notice hides what it leaves possible"
+  has "$WORK/$host/phases/pln/review-approval.md" 'Where the strike gives no reason, the walk asks why, once' \
+    "$host a gate strike is recorded without asking why"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Possibly unbounded metadata' "$host PR scope phase lost file-first metadata collection"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'PR disposition: ready' \
     "$host plain PR request no longer records ready disposition"

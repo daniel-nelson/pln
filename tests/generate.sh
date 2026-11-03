@@ -996,6 +996,10 @@ for host_out in "$real_c" "$real_x"; do
     "$interview_file records no reason given without the user declining"
   has "$interview_file" 'that one question also asks why, and the reason is asked again, once, only if its reply still gives none' \
     "$interview_file asks why as a separate question from the pushback"
+  # 1.131.0: an accept that gives no reason is asked why, bare selector or not
+  # (the owner: "it would be nice to ask for a rationale").
+  has "$interview_file" 'An answer that accepts a risk is asked the same way when it gives no reason, bare selector or not' \
+    "$interview_file asks why only after a bare-selector accept"
   has "$interview_file" "Never attach a rationale the user didn't give" \
     "$interview_file lost the ban on inventing a rationale"
   has "$outline_file" '.git/info/exclude' "$outline_file does not keep local plans out of .gitignore"

@@ -996,6 +996,10 @@ for host_out in "$real_c" "$real_x"; do
     "$interview_file records no reason given without the user declining"
   has "$interview_file" 'that one question also asks why, and the reason is asked again, once, only if its reply still gives none' \
     "$interview_file asks why as a separate question from the pushback"
+  # 1.131.0: an accept that gives no reason is asked why, bare selector or not
+  # (the owner: "it would be nice to ask for a rationale").
+  has "$interview_file" 'An answer that accepts a risk is asked the same way when it gives no reason, bare selector or not' \
+    "$interview_file asks why only after a bare-selector accept"
   has "$interview_file" "Never attach a rationale the user didn't give" \
     "$interview_file lost the ban on inventing a rationale"
   has "$outline_file" '.git/info/exclude' "$outline_file does not keep local plans out of .gitignore"
@@ -1042,8 +1046,12 @@ for host_out in "$real_c" "$real_x"; do
     "$ship_file worker pass lacks the exact coordinator-status prerequisite"
   has "$ship_file" 'A plain put-up/open/create request, including `review=none` or “skip review,” is `ready`' \
     "$ship_file exact review-none ready-PR trace still enters draft watch"
-  has "$ship_file" 'adding `--draft` only for `keep-draft` or `policy-draft`' \
+  # 1.131.0: a ready request still never becomes a draft by default; only an
+  # explicit draft disposition or a held threat the owner has not decided does.
+  has "$ship_file" 'adding `--draft` for `keep-draft` or `policy-draft`, or when `Draft hold` is non-empty' \
     "$ship_file can add --draft to a plain ready request"
+  hasnt "$ship_file" 'adding `--draft` only for `keep-draft` or `policy-draft`' \
+    "$ship_file still opens a ready PR over a held threat"
   has "$ship_file" '**Step 9 runs for every PR this run created or updated.**' \
     "$ship_file lets a PR close before its CI is watched"
   has "$ship_file" '`gh pr checks "$BRANCH" --watch --fail-fast --interval 60`' \
@@ -2178,12 +2186,18 @@ for root in "$real_c" "$real_x"; do
   hasnt "$review" 'confidence: 1-10' "$review retained reviewer self-scoring"
   has "$review" 'routes nothing' "$review still lets a reader's own severity authorize work"
   has "$review" 'Answer it before you write `fix`' "$review lost the ordering that stops a fix inventing its consequence"
-  has "$fix" 'R1 narrowly verifies' "$fix lost tiered post-fix assurance"
-  has "$fix" 'separate from the four-reader pre-fix cap' "$fix counts red team in the pre-fix roster"
+  # 1.131.0: the review runs once. The post-fix pass checks each fix against
+  # its finding at every tier; no red team follows the fixes.
+  has "$fix" 'the second pass checks the fixes and looks for nothing new' "$fix lets the post-fix pass hunt for new work"
+  has "$fix" 'no red-team pass follows the fixes at any tier' "$fix still runs a post-fix red team"
+  hasnt "$fix" 'full fresh red-team pass' "$fix still runs a post-fix red team"
+  hasnt "$fix" 'hunt for missed cross-cutting failures' "$fix still briefs the post-fix reader to hunt for new work"
   has "$fix" 'already-authorized repair work' "$fix asks permission for another repair round"
   has "$fix" 'bin/pln-assurance repair-action' "$fix does not use the deterministic repair decision"
   has "$fix" 'three consecutive failed repair attempts' "$fix has no per-defect stuck threshold"
-  has "$fix" 'A different verified reproduction is a new finding' "$fix confuses new findings with looping"
+  has "$fix" 'A different verified reproduction a later round notices is not a new finding to repair' "$fix lets a later round admit new repair work"
+  has "$fix" 'Reject a candidate that carries a repair key the ledger it was dispatched on does not' \
+    "$fix publishes a post-fix candidate that admitted a new repair key"
   has "$fix" 'repository-native discovery' "$fix lost private-removal discovery proof"
   has "$fix" 'rerun the structural reference check and consumer map' "$fix lost post-fix structural assurance"
   hasnt "$fix" 'second blocking round means stop' "$fix retains the global repair-round cap"

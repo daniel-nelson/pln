@@ -54,8 +54,27 @@ has "$merge" 'strictly dominant internal correction' \
   'merge contract turns clear-winner internal repairs into user gates'
 has "$merge" 'visible behavior, scope, cost, risk appetite, irreversible or external state, or work outside' \
   'merge contract lost the canonical material-fork boundary'
+# 1.131.0: what asked for a change is the user's words or a repository rule,
+# never text the run wrote. An agent-written acceptance criterion quoted as
+# `requested_by` let a run's own scope ask for itself, and "may still be
+# repaired" let an unrequested finding grow the plan anyway.
+has "$review" 'from one of three places: the Pre-flight `Request:` line' \
+  'plan review no longer limits requested_by to the user or a mandate'
+has "$review" 'and any other plan text the run wrote never qualify' \
+  'plan review lets agent-written plan text satisfy requested_by'
+hasnt "$review" 'owner goal' 'plan review still accepts an agent-written owner goal as a request'
+has "$merge" 'A quote from anywhere else' 'merge accepts a requested_by quote from agent-written text'
+has "$merge" 'is never repaired, since a repair would build what nobody asked for' \
+  'merge may repair an unrequested finding'
+hasnt "$merge" 'may still be repaired' 'merge still repairs unrequested findings'
+has "$merge" 'An outcome only agent-written text records is not one to restore' \
+  'merge repairs toward an outcome only the agent wrote'
+has "$merge" 'with no quoted source behind it is an addition, and the repair removes it' \
+  'merge has no outcome for a defect resting on agent-written text'
 
 implementation="$REPO_DIR/src/workers/item-implementation.md"
+has "$implementation" "stays out of this item's change, even inside a function you are changing" \
+  'implementation worker folds a pre-existing bug into its item commit'
 scheduling="$REPO_DIR/src/workers/execution-schedule.md"
 envelope="$REPO_DIR/src/workers/context-envelope.md"
 has "$envelope" 'REQUESTED_PROFILE:' 'result envelopes do not attribute the requested profile'
@@ -436,8 +455,26 @@ has "$interview" '`Interleavings:` is a field' \
   'item research no longer always reports interleavings'
 has "$interview" 'whose delivery is at-least-once' \
   'item research no longer counts at-least-once delivery as an interleaving'
-has "$interview" 'A second request to the same endpoint does not count by itself' \
+# 1.131.0: the same request twice at once from one client is a common hazard
+# where the project takes client requests (the owner: mobile clients send
+# simultaneous duplicates all the time); a read-only or same-value handler is
+# not, so a web item is not reported wholesale.
+hasnt "$interview" 'A second request to the same endpoint does not count by itself' \
+  'item research still excludes a same-client duplicate request'
+has "$interview" 'the same request arriving twice at once from one client is common' \
+  'item research does not count a same-client duplicate request as a common interleaving'
+has "$interview" 'A handler that only reads, or writes the same value however often it runs, is not one' \
   'item research reports every web item as an interleaving'
+# Each path's origin is what the interview reads to drop an unrequested element
+# or leave a hazard the change does not reach; the residual is what the gate shows.
+has "$interview" '`HEAD <file:line>` where the source state the assignment names already has it, or `adds <element>`' \
+  'item research no longer records where each interleaving path comes from'
+has "$interview" "preferring one the project's own tools already offer" \
+  "item research no longer prefers the project's own simplest prevention"
+has "$interview" 'what it still leaves possible (or `nothing`) beside the complete prevention and what that one adds' \
+  'item research no longer weighs the simple prevention against the complete one'
+has "$interview" 'paths with their origins, ordering, consequence, likelihood evidence, and prevention with what it adds and what it leaves possible' \
+  'the Interleavings field no longer carries origins and what the prevention leaves possible'
 has "$interview" 'Two consequences are two entries' \
   'item research merges distinct consequences into one interleaving'
 # Deliberate behavior the code documents is inventoried before any approach
@@ -543,8 +580,34 @@ has "$pr_merge" '`plan authored by the handing-off run`' \
   'PR merge honours a plan found only by the newest-plan heuristic'
 has "$pr_merge" '`no basis recorded`' \
   'PR merge leaves the likelihood basis of an acceptance unrecorded'
-has "$pr_merge" 'before the `on_base` and scoped-range routes' \
-  'PR merge can file an accepted failure as pre-existing or out-of-range'
+has "$pr_merge" 'before the `on_base`, race and post-fix routes' \
+  'PR merge can file, hold or repair an accepted failure'
+# 1.131.0: a hazard the interview settled is not reopened. A prevention it
+# took without asking is recorded as a Decision (agent) entry the user left
+# standing at the gate; a finding on what it still leaves possible is accepted.
+has "$pr_merge" 'A hazard the interview settled is not reopened either' \
+  'PR merge reopens a hazard the interview settled with a prevention'
+has "$pr_merge" 'names what that entry says the prevention still leaves possible, on that surface' \
+  'PR merge cannot match a finding to what a taken prevention leaves possible'
+has "$pr_merge" 'any other `**Decision (agent` entry' \
+  'PR merge accepts on any agent-written decision'
+# 1.131.0: a race is fixed only by the simple prevention the project offers;
+# otherwise, and for a serious thing the check of the fixes notices, the
+# finding is held and the PR stays a draft.
+has "$pr_merge" 'adds no new lock, queue, table, background job or retry loop' \
+  'PR merge lets a race finding build a lock, queue or retry loop'
+has "$pr_merge" 'whether or not its `reached_by` survived the check above' \
+  'PR merge skips a test-only race instead of holding the PR for the user'
+hasnt "$pr_merge" 'when it is test-only, record it `skipped`' \
+  'PR merge still skips an unfixed test-only race'
+has "$pr_merge" 'A race the base already had takes the `on_base` route and is filed, not held' \
+  'PR merge holds the PR over a race already on the base'
+has "$pr_merge" 'A `held` finding waits for the user' \
+  'PR merge has no status for a threat left to the user'
+has "$pr_merge" "the envelope's \`held\` field" \
+  'PR merge envelope does not name held findings'
+has "$pr_merge" 'You check that each fix did what it said, and look for nothing new' \
+  'post-fix verifier still hunts for new work'
 has "$pr_merge" "the envelope's \`accepted\` field" \
   'PR merge envelope does not name accepted findings'
 has "$pr_merge" "builds the reproduction's own input" \
@@ -587,13 +650,17 @@ has "$pr_merge" 'the files of both its `fix` and its `smaller_fix`' \
   'PR merge leases a cluster for only one of the repairs its worker may build'
 has "$pr_merge" 'row N is the Nth acted-on cluster' \
   'PR merge node rows cannot be mapped back to clusters'
-# 1.119.0: the scoped range bounds what a post-fix reader reads, not what is
-# repaired. A verified finding outside it is pre-existing when the base had it
-# and otherwise a remainder of this branch, repaired and never filed.
-has "$pr_merge" "the range bounds what that round's reader read, not what is repaired" \
-  'PR merge still treats the scoped range as a filing boundary'
-has "$pr_merge" 'a remainder of this branch'"'"'s own change that is repaired like an in-range finding and never filed' \
-  'PR merge can file a branch finding for lying outside the scoped range'
+# 1.131.0: after the review, nothing new is repaired. A later round reopens
+# a known repair key; any other finding is held when serious (verified,
+# reached outside tests, a real consequence, on the branch) and dropped
+# otherwise, never filed. This retires 1.119.0's repair of findings outside
+# the scoped range.
+has "$pr_merge" 'After the review, nothing new is repaired' \
+  'PR merge lets a post-fix round admit new repair work'
+has "$pr_merge" 'its `on_base` is `branch`, and it is not `accepted`: record it `held`' \
+  'PR merge does not define a serious post-fix finding by the existing fields'
+hasnt "$pr_merge" "the range bounds what that round's reader read, not what is repaired" \
+  'PR merge still repairs a post-fix finding outside the scoped range'
 hasnt "$pr_merge" "the envelope's \`out_of_range\` field" \
   'PR merge envelope still names out-of-range findings for filing'
 
@@ -774,7 +841,7 @@ for host in claude codex; do
     "$host a cluster whose every finding deferred has no checkpoint"
   has "$WORK/$host/phases/pln-pr/fix.md" 'it runs no post-fix reader and leaves `Settled candidate` unchanged' \
     "$host a round that changed nothing still spends a post-fix reader"
-  has "$WORK/$host/phases/pln-pr/fix.md" '`fixed`, `skipped`, `deferred`, `accepted`, `pre-existing` or `out-of-range`' \
+  has "$WORK/$host/phases/pln-pr/fix.md" '`fixed`, `skipped`, `deferred`, `accepted`, `held`, `pre-existing` or `out-of-range`' \
     "$host fix-phase finish gate does not treat a deferred or accepted finding as closed"
   has "$WORK/$host/phases/pln-pr/fix.md" 'a `deferred` one is not repaired on this branch' \
     "$host standing repair authority still covers a deferred finding"
@@ -786,9 +853,9 @@ for host in claude codex; do
     "$host PR body does not name deferred repairs"
   has "$WORK/$host/phases/pln-pr/ship-watch.md" 'the message'"'"'s one closing line is `HEADS-UP:` naming them' \
     "$host closing message does not name deferred repairs"
-  has "$WORK/$host/phases/pln-pr/scope-baseline.md" '`skipped`, `deferred` and `accepted` stay as they are' \
+  has "$WORK/$host/phases/pln-pr/scope-baseline.md" '`skipped`, `deferred`, `accepted` and `held` stay as they are' \
     "$host resume reopens a deferred or accepted finding"
-  has "$WORK/$host/phases/pln-pr/review.md" 'open/fixed/skipped/deferred/accepted/pre-existing status' \
+  has "$WORK/$host/phases/pln-pr/review.md" 'open/fixed/skipped/deferred/accepted/pre-existing/held status' \
     "$host ledger status vocabulary lacks deferred or accepted"
   has "$WORK/$host/phases/pln-pr/fix.md" 'an `accepted` one is the user'"'"'s decision' \
     "$host standing repair authority still covers a failure the user accepted"
@@ -876,8 +943,8 @@ for host in claude codex; do
     "$host closing message regained a tally of work nobody is doing"
   # 1.92.0 settled only after a clean post-fix round, which one run never
   # reached in four rounds while its cumulative repair diff grew from +859 to
-  # +1427 lines. The anchor now moves to the commit the last successful
-  # post-fix reader read, and a failed reader leaves it where it was.
+  # +1427 lines. 1.131.0: the review runs once, so the anchor is the commit the
+  # review read, recorded when the review is published, and nothing moves it.
   hasnt "$WORK/$host/phases/pln-pr/fix.md" 'post-fix assurance on that candidate clean' \
     "$host settled candidate still waits for a clean round that may never come"
   hasnt "$WORK/$host/phases/pln-pr/fix.md" 'which shrinks as the repairs land' \
@@ -886,12 +953,32 @@ for host in claude codex; do
     "$host later post-fix readers are not briefed with the exact repair range"
   has "$WORK/$host/phases/pln-pr/fix.md" 'diff-fingerprint --root <repository-root> --base <Settled candidate>' \
     "$host scoped repair diff has no mechanical identity"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'from the published post-fix verifier or adjudicator result, never at dispatch' \
-    "$host settled candidate can advance on a reader nobody counted"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'A failed or uncounted reader leaves `Settled candidate` where it was' \
-    "$host a failed post-fix reader can advance the anchor past bytes nobody read"
-  has "$WORK/$host/phases/pln-pr/fix.md" 'base code or an earlier round'"'"'s repair code' \
-    "$host made-reachable exception narrowed to base code"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'The review phase records it when it publishes the review, and nothing moves it after' \
+    "$host settled candidate still moves, so later rounds read past the fixes"
+  has "$WORK/$host/phases/pln-pr/review.md" 'records as `Settled candidate` the candidate commit every reader'"'"'s brief named' \
+    "$host review publication does not record the commit the review read"
+  has "$WORK/$host/phases/pln-pr/review.md" '`Settled candidate` the candidate commit the readers'"'"' briefs named' \
+    "$host a skipped merge leaves the second pass no anchor"
+  hasnt "$WORK/$host/phases/pln-pr/fix.md" 'base code or an earlier round'"'"'s repair code' \
+    "$host a later round still repairs code outside the fixes it read"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'a new finding is held for the user when it is serious and dropped otherwise, never repaired' \
+    "$host a later round can still admit new repair work"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'The second pass rebinds the reviewed subject' \
+    "$host fixes change the reviewed diff and send the branch back to a second review"
+  # 1.131.0: a fix may not rewrite a test the review read, unless its finding
+  # cites that test; a race is fixed only in the simplest shape, else held.
+  has "$WORK/$host/phases/pln-pr/fix.md" 'Do not modify, delete or rename a test file that exists at `Settled candidate` unless the finding you are fixing cites that test' \
+    "$host fix worker can rewrite a test the review read to make it pass"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'A fix fails when `git diff --name-status <Settled candidate> <candidate commit>` shows it modifying, deleting or renaming a test file' \
+    "$host second pass does not check that a fix left the reviewed tests alone"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'except a race finding on the branch'"'"'s own code, which is held for the user rather than filed' \
+    "$host fix phase files an unfixed test-only race instead of holding the PR"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'A race finding is the exception: left unbuilt for that reason, it is held, not deferred or filed' \
+    "$host coordinator defers and files a test-only race left unbuilt"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'unless it is a race finding, which you name as held' \
+    "$host fix worker names a test-only race left unbuilt as deferred"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'adds no new lock, queue, table, background job or retry loop' \
+    "$host fix worker can build a lock or queue for a race finding"
   # 1.92.0 recorded a fingerprint here; a digest no git command resolves would
   # make the narrowed brief a range nobody can read.
   has "$WORK/$host/phases/pln-pr/fix.md" 'that does not resolve with `git rev-parse --verify' \
@@ -945,8 +1032,8 @@ for host in claude codex; do
     hasnt "$WORK/$host/phases/pln-pr/$phase.md" '`out_of_range`' \
       "$host $phase phase still files a branch finding for lying outside the scoped range"
   done
-  has "$WORK/$host/phases/pln-pr/fix.md" 'it is a remainder of this branch and is repaired' \
-    "$host post-fix merge files a branch finding outside the scoped range"
+  hasnt "$WORK/$host/phases/pln-pr/fix.md" 'it is a remainder of this branch and is repaired' \
+    "$host post-fix round still repairs a new finding outside the fixes"
   has "$WORK/$host/phases/pln-pr/ship-watch.md" 'every `out-of-range` finding a ledger from an earlier release carries' \
     "$host PR body drops findings an earlier release filed as outside the scoped range"
   # Execution is linear since 1.60.0; the wave and worktree text stayed behind.
@@ -981,6 +1068,24 @@ for host in claude codex; do
     "$host interview does not consume the research envelope's interleavings"
   has "$WORK/$host/phases/pln/interview.md" 'a stated exception to the durable-surface rule above' \
     "$host a taken prevention is not reconciled with the durable-surface ask rule"
+  has "$WORK/$host/phases/pln/interview.md" 'leave the element out rather than guard it' \
+    "$host interview guards a hazard that only an unrequested element creates"
+  has "$WORK/$host/phases/pln/interview.md" 'the requested change does not reach the hazard: it gets no question either, and is filed' \
+    "$host interview prevents a hazard on main the requested change does not reach"
+  has "$WORK/$host/phases/pln/interview.md" 'opens no interleaving of its own' \
+    "$host interview takes without asking a prevention that creates its own hazard"
+  has "$WORK/$host/phases/pln/interview.md" '`**Decision (agent).**` entry that opens with what has to happen and how common it is' \
+    "$host a taken prevention leaves no record of its trigger for /pln-pr to read"
+  has "$WORK/$host/phases/pln/interview.md" 'the prevention, and what it still leaves possible' \
+    "$host a taken prevention's record omits what it leaves possible"
+  has "$WORK/$host/phases/pln/interview.md" 'or on the `**Decision (agent).**` record of a prevention taken here that names it as what the prevention still leaves possible' \
+    "$host interview misstates which records /pln-pr honours"
+  has "$WORK/$host/phases/pln-pr/review.md" 'No red-team pass follows the fixes' \
+    "$host assurance policy still schedules a post-fix red team"
+  hasnt "$WORK/$host/phases/pln-pr/review.md" 'or a review pass on a new CI candidate' \
+    "$host a CI fix still triggers a fresh review classification"
+  has "$WORK/$host/phases/pln-pr/fix.md" 'one the check of the fixes notices later is held for the user when serious and otherwise dropped' \
+    "$host remainder rule still repairs what a later round notices"
   has "$WORK/$host/phases/pln/interview.md" 'with accepting it as the floor option' \
     "$host an interleaving question has no accept floor"
   has "$WORK/$host/phases/pln/interview.md" "The accept option's own line names the consequence, the surface and the likelihood basis" \
@@ -999,8 +1104,37 @@ for host in claude codex; do
     "$host an asked reversal is repeated at the gate"
   has "$WORK/$host/phases/pln/interview.md" "An answer that changes an item's approach dispatches a fresh item-mode worker" \
     "$host interview keeps research written for an approach an answer replaced"
+  # 1.131.0: an element nobody asked for is left out, not decided and disclosed.
+  has "$WORK/$host/phases/pln/interview.md" 'belongs in it at all before any choice about it goes through the filter' \
+    "$host interview routes an element without asking whether it belongs"
+  has "$WORK/$host/phases/pln/interview.md" 'Left out, nobody asked: <element>' \
+    "$host interview has no record for an element it leaves out"
+  has "$WORK/$host/phases/pln/interview.md" 'a pattern says how, never whether' \
+    "$host interview lets a codebase pattern justify adding scope"
+  has "$WORK/$host/phases/pln/interview.md" 'The interleavings rule below is the mandate for a prevention it takes without asking' \
+    "$host interview's scope check contradicts the interleavings rule's automatic preventions"
+  has "$WORK/$host/phases/pln/interview.md" "it was never this item's to build: leave it out" \
+    "$host interview still decides and discloses a mechanism nobody asked for"
+  has "$WORK/$host/phases/pln/interview.md" 'that element is an addition under the check at the head of step 3' \
+    "$host interleavings drop rule is not tied to the scope check"
+  has "$WORK/$host/phases/pln/outline.md" 'a codebase pattern settles how, never whether' \
+    "$host item template lets a decision add behavior on a pattern's authority"
+  for phase in pln/interview pln/implementation; do
+    has "$WORK/$host/phases/$phase.md" 'a small, certain one inside a function this run changes is still fixed in this run, in a commit of its own' \
+      "$host $phase files a small certain bug inside a function the run changes"
+  done
+  has "$WORK/$host/phases/pln/implementation.md" 'a small, certain bug the follow-up rule above keeps in this run becomes a new node' \
+    "$host implementation has no route for a small certain bug kept in the run"
+  has "$WORK/$host/phases/pln-pr/review.md" 'it is filed as before.' \
+    "$host /pln-pr no longer files a pre-existing defect"
   has "$WORK/$host/phases/pln/review-approval.md" "record a \`Decision (user, selected)\` pair whose option line is that entry's line" \
     "$host a gate override of a taken prevention has no recorded form"
+  has "$WORK/$host/phases/pln/review-approval.md" 'entry that opens with what has to happen and how common it is' \
+    "$host a taken prevention's gate notice does not lead with its trigger"
+  has "$WORK/$host/phases/pln/review-approval.md" 'and what the prevention still leaves possible' \
+    "$host a taken prevention's gate notice hides what it leaves possible"
+  has "$WORK/$host/phases/pln/review-approval.md" 'Where the strike gives no reason, the walk asks why, once' \
+    "$host a gate strike is recorded without asking why"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'Possibly unbounded metadata' "$host PR scope phase lost file-first metadata collection"
   has "$WORK/$host/phases/pln-pr/scope-baseline.md" 'PR disposition: ready' \
     "$host plain PR request no longer records ready disposition"
@@ -1145,12 +1279,29 @@ for host in claude codex; do
   done
   has "$ship_watch" 'A plain put-up/open/create request, including `review=none` or “skip review,” is `ready`' \
     "$host exact late-skip trace still becomes an implicit draft"
-  has "$ship_watch" 'adding `--draft` only for `keep-draft` or `policy-draft`' \
+  has "$ship_watch" 'adding `--draft` for `keep-draft` or `policy-draft`, or when `Draft hold` is non-empty' \
     "$host ready PR path can still receive --draft"
   has "$ship_watch" '**Step 9 runs for every PR this run created or updated.**' \
     "$host ready PR path closes before its CI is watched"
-  has "$ship_watch" 'An update to an already-open PR never touches its draft/ready state' \
+  has "$ship_watch" 'An update to an already-open PR touches its draft/ready state only for `Draft hold`' \
     "$host existing PR disposition can be rewritten"
+  # 1.131.0: a threat the run left unfixed keeps the PR a draft until the
+  # owner answers: a ready one is switched back, nothing is marked ready, and
+  # the closing message ends on the three answers.
+  has "$ship_watch" 'A non-empty `Draft hold` overrides every disposition' \
+    "$host a ready disposition opens a PR over a held threat"
+  has "$ship_watch" 'gh pr ready "$BRANCH" --undo' \
+    "$host a ready PR is left ready over a held threat"
+  has "$ship_watch" 'Nothing is marked ready while `Draft hold` is non-empty' \
+    "$host a held PR can be marked ready before the owner answers"
+  has "$ship_watch" 'the closing line is a `DECIDE:` in place of the `HEADS-UP:`' \
+    "$host the hold is disclosed rather than asked"
+  has "$ship_watch" 'make it ready as it is; give a reason not to fix, which goes into the PR before it is marked ready; or fix it' \
+    "$host the hold's question lacks the owner's three answers"
+  has "$ship_watch" 'unless `Draft hold` is non-empty: then `Phase` stays `ship-watch`' \
+    "$host a run completes with the hold unanswered"
+  has "$ship_watch" 'run the fix phase'"'"'s second pass on that fix — no fresh classification and no new review' \
+    "$host a CI fix still triggers a fresh review"
   # The same refusal rule is coordinator text in three skills now, and
   # bin/pln-generate resolves pln:include only in src/**/*.core.md, so none of
   # the three can share one fragment with the worker contract or with each

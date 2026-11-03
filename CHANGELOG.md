@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.131.0 — 2026-11-03
+
+### Changed
+
+- **`/pln-pr` reviews once.** In runs over an hour, the median spent 39% of its agent time in `/pln-pr` against 18% implementing, mostly in post-fix rounds repairing the previous round's repairs. Now the review's readers run once and their findings are fixed. A second pass then reads only the fixes (`git diff <Settled candidate> <candidate>`, where `Settled candidate` is now the commit the review read and nothing moves it) and checks that each fix did what it said. It looks for nothing new:
+  - No red-team pass follows the fixes at any tier, and a CI fix gets the same check of the fix, not a fresh review.
+  - A post-fix result that carries a repair key the review did not admit is rejected. A key can still come from a CI fix, a final-gauntlet repair or a change you ask for.
+  - Something new the second pass notices is never fixed. A serious one (verified, reached outside tests, a real consequence, on the branch) holds the PR as a draft; the rest is dropped, not filed.
+  - A fix that leaves its reproduction failing, or that modifies or deletes a test the review read without its finding citing that test, is redone. The three-attempts-per-defect stop still ends that, and there is still no cap on rounds.
+  - After the second pass, the reviewed diff is rebound to the fixed branch, so the reconciliation before the PR no longer sends a fixed branch back to review.
+- **A race finding is fixed only by the simple prevention the project's own tools offer**, one that adds no new lock, queue, table, background job or retry loop. Any other race finding is not fixed and holds the PR as a draft.
+- **A PR with a threat the run left unfixed stays a draft until you decide.** This applies even when you asked for a ready PR. A ready PR is switched back to a draft, with a comment saying why. The PR body opens with the held findings, and the closing message lists them last and asks whether to make the PR ready as it is, add your reason for not fixing to the PR and then make it ready, or fix it. Nothing is marked ready before you answer.
+- **`/pln-pr` no longer reopens a hazard the interview settled.** A finding about what a prevention the interview took still leaves possible, on the same surface, is treated as accepted, the same way a risk you accepted is.
+- **The interview lists each hazard with its trigger, its simple fix and what that fix still leaves possible.** The same request arriving twice at once from one client now counts as a common hazard wherever a project takes client requests. Each path is tagged as already on main or added by the plan. A hazard that exists only because of something nobody asked for drops that thing rather than guarding it. A hazard already on main that the change doesn't touch is filed, not fixed. A simple, near-complete prevention, such as a unique key with create-or-update, is still taken without a question, and the approval gate shows it in one line. Any answer that accepts a risk is asked why, bare selector or not.
+- **Scope the agent adds needs your words or a repository rule.** Before any choice in an item is routed, the interview checks that each thing the item builds is asked for: a quote from your request, a decision you made, a repository mandate, or a source document you wrote and settled. It also passes if it is how something quoted happens, or a correction to the run's own code. Anything else is left out with one line, not decided and disclosed. Plan review's `requested_by` accepts only those sources, and the plan-review merge never repairs a finding nobody asked for. In `/pln`, a small, certain bug inside a function the run changes is fixed as its own item and commit; elsewhere it is filed as before.
+
 ## 1.130.0 — 2026-10-30
 
 ### Added

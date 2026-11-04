@@ -141,9 +141,9 @@ Routing:
 
 The tell that the filter is miscalibrated: the user answers an interview question with "sure", "your call", "whatever's easiest" — or, worse, "I don't understand any of this." That indifference means the question was decide-and-disclose, not ask. Indifferent answers cluster on the choices an implementer should have owned.
 
-**The tell that fires before the question goes out: you have a preference.** If you can say which option you would take, you have already applied one of the two tests above and got an answer — an authority you can name, or a consequence you can bound — and the choice is in the decide-and-disclose lane by this section's own rules. Ask only where you genuinely cannot say. See Style's "A recommendation is a statement, not a question" for the shape it takes instead; this is where the routing decision is made.
+**The tell that fires before the question goes out: you have a preference.** If you can say which option you would take, you have already applied one of the two tests above and got an answer — an authority you can name, or a consequence you can bound — and the choice is in the decide-and-disclose lane by this section's own rules. Ask only where you genuinely cannot say. See Style's "Say which option you would take" for the shape it takes instead; this is where the routing decision is made.
 
-**Except where the approach you prefer adds durable surface** — a new owner, data concept, service, workflow, public interface, compatibility path, or a further release (the interview's system-fit gate carries the list). A preference does not route that out of Ask: being cite-backed decides how the options are framed, never whether they are shown. Read it off the approach, not off how large it feels. A localized correction inside an established owner is untouched, and *Theirs* below still rules out this run's own apparatus.
+**Except where the approach you prefer adds durable surface** — a new owner, data concept, service, workflow, public interface, compatibility path, or a further release (the interview's system-fit gate carries the list). A preference does not route that out of Ask: being cite-backed decides how the options are framed, never whether they are shown, and the question says which you would take. Read it off the approach, not off how large it feels. A localized correction inside an established owner is untouched, and *Theirs* below still rules out this run's own apparatus.
 
 ### The fork test — what spends the user's attention
 
@@ -162,7 +162,7 @@ Everything else is the work. Make the least-scope repair that restores what the 
 
 **Two tells, in both directions.** Too generous: **the user ratifies** — a question or finding answered with "yes, add it", a bare selector, or "sure" had one answer, and the round trip bought nothing. Too tight: the user meets something at implementation and asks why it was decided that way.
 
-**A call that clears the test is said where it is made**, not saved for the gate. The gate carries a decision and its rationale but never the option that lost, so a fork disclosed only there has already vanished by the time the user reads it. One line in the flow — what you are doing, what you are not, and the fact that decides it — requiring no reply (see Style's "A recommendation is a statement, not a question"). It is also repeated at the gate with a number: the flow line lands mid-interview inside a message about something else, and a line read past is not a decision ratified.
+**A call that clears the test is said where it is made**, not saved for the gate. The gate carries a decision and its rationale but never the option that lost, so a fork disclosed only there has already vanished by the time the user reads it. One line in the flow — what you are doing, what you are not, and the fact that decides it — requiring no reply (see Style's "Say which option you would take"). It is also repeated at the gate with a number: the flow line lands mid-interview inside a message about something else, and a line read past is not a decision ratified.
 
 ### One filter, two surfaces
 

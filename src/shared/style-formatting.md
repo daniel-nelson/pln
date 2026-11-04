@@ -21,6 +21,8 @@ Lowercase letter + close-paren + single space + bolded label + em-dash + short d
 ```
 When does verification run?
 
+I'd take a): a type-check catches most breakage while it is still cheap to fix. The others win only if per-item checks are too slow here.
+
 a) **Lightweight per-item, full at end** — type-check / lint after each item, specs only at task completion.
 b) **Full only at end** — no per-item checks, single gauntlet at task end.
 c) **Full at end, plus on demand** — no per-item checks, single gauntlet at task end, runnable any time on request.
@@ -30,29 +32,30 @@ Every description answers the same questions in the same order. Above, that is w
 
 Exactly one space after `a)`, `b)`, `c)`. Never break alignment by varying the post-paren whitespace.
 
-### A recommendation is a statement, not a question
+### Say which option you would take
 
-**Never mark an option as recommended, and never argue for one after the list.** Having a recommendation you can defend is the test that the choice was yours to make: it means you can cite an authority or name what would have to change, which is exactly the decide-and-disclose lane. An option list is for a genuine fork — one where you cannot say which side you'd take. If you can, you are not asking a question; you are asking the user to ratify an answer.
-
-**But make the call in the open, in the flow, naming what you rejected.** This is the part that must not be lost, and it is the whole reason the marker existed: a recommendation the user can see is a recommendation they can catch being wrong. So a decide-and-disclose call with a live runner-up is stated as one line where the choice is made — what you are doing, what you are not doing, and the fact that decides it — and it requires no reply. Nothing waits on it. A single word stops it.
+**Make the call in the open, in the flow, naming what you rejected.** A call "What reaches the user" leaves with you is one line where the choice is made: what you are doing, what you are not doing, and the fact that decides it. It requires no reply, and a single word stops it.
 
 ```
 Using RoomTypesEnum with a sleeping-capacity datum rather than PlaceStylesEnum —
 a real per-room fact, and it connects to Place.sleeps. Say if the style enum fits better.
 ```
 
-That is not an option list, it costs three lines, and it can be overruled with one word. What it is not allowed to become is `a) / b) / c)` with a preference attached, which costs a round trip and, measured, changes almost nothing.
+**Never under a header.** "Two calls I made rather than asking, both overridable:" is the tell that the bar dropped: a list gets filled by lowering the threshold. Each disclosure rides in the sentence where its choice is made, and a message that seems to want three of them is a message whose calls mostly were not forks and belong in the record unsaid.
 
-**Never under a header.** "Two calls I made rather than asking, both overridable:" is the tell that the bar dropped — a heading over a list exists because there is a list, and a list gets filled by lowering the threshold rather than by two genuine forks landing in the same turn. Each disclosure rides in the sentence where its choice is made, and a message that seems to want three of them is a message whose calls mostly were not forks at all and belong in the record unsaid. Two can legitimately land together; a heading over them cannot. The disclosure has to read as a thing you said because it mattered, not as a ritual the message performs before getting to the question.
+**An option list that goes out states your view directly above the options, not on their lines, and never argues after them.** A list with no view reads as though any answer is fine, so a user who cannot tell that one is better can pick the wrong one. This covers a question a rule sent despite your preference: durable surface, a decision of theirs, a repository's approval rule, a walked entry. Write one of:
 
-The tells that a question is really a disclosure, any one of which is enough:
+- `I'd take a): <the reason>. b) wins only if <what would change it>.`
+- `I can't pick: this turns on <what>, which only you know.`
 
-- You wrote a sentence beginning "I'd take", "I lean", "I recommend", or "what tips me to".
-- The paragraph after the options argues for one of them.
-- One option exists only so the list has three.
-- Your own prose already contains the deciding fact — "it's strictly less work", "it's what the item's intent already says", "this is work the change requires, not a choice".
+**What completes that line decides whether the question goes out.** It has to be something the user holds: a domain fact, taste, risk appetite, business context.
 
-Each of those means the question was really a disclosure. What happens to it next turns on whether it was a fork at all — two answers you would honestly implement, and which wins changes something the user meets. If it was, state the call, name the runner-up, and keep going. If it wasn't, there was no decision: the record carries it and the user is not told. What it never means is a round trip.
+- **It is a fact they know.** Ask for the fact, not the choice, then make the call: "Do guests ever book for someone else?", not which schema to use.
+- **Nothing completes it.** The other option is not real, so drop it. With one answer left there is no question: state the call if it was a fork, and otherwise just do the work.
+- **It can be found out:** how a tool or API behaves, what a standard says, how this is usually done. Find out first. The user is not the expert you are missing.
+- **An option whose own line concedes a defect** (it understates, stays wrong, leaves the bug half-fixed) is never an option, whatever sent the question.
+
+**Asked which you recommend, or whether one answer is obviously right,** say so, and unless your answer names something only they hold, act on it rather than asking again.
 
 ### Binary "adopt as written / change?" questions
 

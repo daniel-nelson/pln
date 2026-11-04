@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.132.0 — 2026-11-04
+
+### Changed
+
+- **A question now says which option the agent would take.** Since 1.29.0 the agent has been told never to favor an option in a list, on the theory that a preference means there is no question. That theory still routes most choices, and those are still decided without asking. But some questions go out anyway: a design that adds durable surface, a walked gate entry, a repository's approval rule. Those arrived looking neutral with the agent's view stripped out, so a user who could not tell that one answer was better could pick the worse one. In the last six weeks about 15 questions in real runs drew replies like "which do you recommend?", "is there an obviously correct answer?" or "if you are not an expert, become one". On one, the user only found out the agent favored a visible results list by asking for the tradeoffs against a dropdown that hides results until opened. Now every list has one line above the options:
+  - `I'd take a): <the reason>. b) wins only if <what would change it>.`, or `I can't pick: this turns on <what>, which only you know.`
+  - The options themselves stay neutral, because the decision record copies them, and arguing after the list is still not allowed.
+- **That line decides whether the question goes out.** What completes it has to be something the user holds: a domain fact, taste, risk appetite or business context. If it is a fact they know, the agent asks for the fact rather than the choice and then makes the call. If nothing completes it, the other option is dropped. If it could be looked up, the agent looks it up first, and in the interview that sends the research worker back with the question. In one run that research replaced both options the user had been offered.
+- **A walked gate entry no longer invents an alternative.** The walk said an entry always has another answer to letter, so a corrected fact produced an option to keep a record the agent knew was wrong. A correction that lands on a user's decision now asks whether the decision still stands. One that lands on no decision of theirs and changes nothing in the build is applied, with one line saying so.
+- **Asked for a recommendation, the agent gives it and proceeds** unless its answer names something only the user holds. It used to answer and then show the same list again.
+- **Known risk: if overbuilding rises after this release, check this change first.** Users took the marked option in 68 of 71 lettered answers before 1.29.0 removed the marker, so a stated pick for an overbuilt design pulls harder than a neutral list.
+
 ## 1.131.0 — 2026-11-03
 
 ### Changed

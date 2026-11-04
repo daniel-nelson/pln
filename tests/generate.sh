@@ -917,6 +917,7 @@ for host_out in "$real_c" "$real_x"; do
     has "$g" 'b) wins only if <what would change it>' "$g lost the view line naming what would change it"
     has "$g" "I can't pick: this turns on <what>, which only you know" "$g lost the line for a question the agent cannot call"
     has "$g" 'The user is not the expert you are missing' "$g lost the rule to find out before asking"
+    has "$g" 'Ask for the fact, not the choice' "$g asks for a choice where the user only holds a fact"
     has "$g" 'never argues after them' "$g lets the agent argue for an option after the list"
     hasnt "$g" 'Never mark an option as recommended' "$g brought back the ban on stating a view"
     hasnt "$g" 'A recommendation is a statement, not a question' "$g still names the retired section"

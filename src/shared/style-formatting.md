@@ -50,6 +50,7 @@ a real per-room fact, and it connects to Place.sleeps. Say if the style enum fit
 
 **What completes that line decides whether the question goes out.** It has to be something the user holds: a domain fact, taste, risk appetite, business context.
 
+- **It is a fact they know.** Ask for the fact, not the choice, then make the call: "Do guests ever book for someone else?", not which schema to use.
 - **Nothing completes it.** The other option is not real, so drop it. With one answer left there is no question: state the call if it was a fork, and otherwise just do the work.
 - **It can be found out:** how a tool or API behaves, what a standard says, how this is usually done. Find out first. The user is not the expert you are missing.
 - **An option whose own line concedes a defect** (it understates, stays wrong, leaves the bug half-fixed) is never an option, whatever sent the question.

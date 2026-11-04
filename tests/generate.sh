@@ -904,17 +904,29 @@ for host_out in "$real_c" "$real_x"; do
       hasnt "$g" "$gone" "$g still carries the removed check against earlier plans: $gone"
     done
   done
-  # 1.99.0 fixed two stale lines: a pointer to a section deleted in fb58d26,
-  # and Codex's voice rule naming a recommendation that style-formatting
-  # forbids. The voice fragment reaches /pln-pr's router too.
+  # 1.99.0 fixed a stale pointer to a section deleted in fb58d26.
   hasnt "$f" 'Why a user decision is never moved' \
     "$f still points at a section that no longer exists"
   has "$f" 'It outranks the two tests above.' \
     "$f lost the rule that an override landing on a user decision outranks the fork tests"
+  # 1.132.0: a question that reaches the user says which option the agent would
+  # take. Banning that left the user unable to tell a real choice from one with a
+  # clearly better answer. Both routers carry it, because Style is shared.
   for g in "$f" "$host_out/pln-pr/SKILL.md"; do
-    hasnt "$g" 'moves the recommendation' \
-      "$g's voice rule still names a recommendation, which style-formatting forbids"
+    has "$g" '### Say which option you would take' "$g lost the rule that a question states the agent's view"
+    has "$g" 'b) wins only if <what would change it>' "$g lost the view line naming what would change it"
+    has "$g" "I can't pick: this turns on <what>, which only you know" "$g lost the line for a question the agent cannot call"
+    has "$g" 'The user is not the expert you are missing' "$g lost the rule to find out before asking"
+    has "$g" 'never argues after them' "$g lets the agent argue for an option after the list"
+    hasnt "$g" 'Never mark an option as recommended' "$g brought back the ban on stating a view"
+    hasnt "$g" 'A recommendation is a statement, not a question' "$g still names the retired section"
   done
+  has "$host_out/phases/pln/interview.md" 'is researched before it is asked' \
+    "$host_out interview asks about what research could settle"
+  has "$host_out/phases/pln/review-approval.md" 'is not an alternative' \
+    "$host_out walk may letter a record known to be wrong as an alternative"
+  has "$host_out/phases/pln/review-approval.md" 'ask whether the decision still stands' \
+    "$host_out walk no longer asks whether a corrected decision stands"
   # The one rule the check introduced that outlived it.
   has "$interview_file" 'Nor is a decision already reflected in the codebase changed silently, whoever made it' \
     "$interview_file lost the rule that a decision already in the codebase is not reversed silently"

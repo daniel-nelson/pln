@@ -1178,6 +1178,27 @@ for f in "$real_c/SKILL.md" "$real_x/SKILL.md" "$real_c/pln-pr/SKILL.md" "$real_
   has "$f" '### Conversational voice' "$f lost the host voice fragment inside Style"
   has "$f" '### Echoing recorded decisions' "$f lost the shared formatting rules"
   has "$f" 'never an action not yet taken' "$f lost the shared forward-tense rule"
+  has "$f" '### Saying the user decided something' "$f lost the rule for attributing a decision to the user"
+  has "$f" 'only with a quote in the same sentence' "$f lets an attribution go out with no quote"
+  has "$f" 'Adopting a plan chose no entry in it.' "$f treats a plan adoption as choosing each entry"
+  has "$f" 'the words on screen, the value, the action' "$f lets a decision be named by a category word"
+done
+
+# A build check accepts a selected option's line as what the user asked for, so
+# a part the agent wrote into every option has to be barred from that door, and
+# an adopted entry has to stay the agent's.
+for host_out in "$real_c" "$real_x"; do
+  g_i="$host_out/phases/pln/interview.md"
+  g_r="$host_out/phases/pln/review-approval.md"
+  has "$g_i" 'An answer decides only what another answer on offer would have left out.' \
+    "$g_i counts a part every option shared as chosen"
+  has "$g_i" 'less anything every option on its list shared' \
+    "$g_i lets a shared option clause stand as the quote that asks for a build"
+  has "$g_i" 'A reply about something else picks nothing.' \
+    "$g_i records a selection from a reply that picked nothing"
+  has "$g_r" 'marked `(I mentioned this earlier)`' "$g_r lost the marker that says who said it"
+  hasnt "$g_r" 'marked as already-said' "$g_r brought back the marker that reads as the user's words"
+  has "$g_r" 'is never later cited as the user' "$g_r lets adoption turn an agent decision into the user's"
 done
 
 for host_out in "$real_c" "$real_x"; do

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.133.0 — 2026-11-05
+
+### Changed
+
+- **An agent that says you decided something now shows you what you said.** A week of transcripts turned up agents saying "you chose X" where the user could not recognize X, for three different reasons: the agent had chosen it and folded it into the question, the option list did not hold what the user wanted, or the sentence named a category ("a new label") and not the thing itself. "You chose", "you decided", "your rule" and "as you said" now need a quote in the same sentence: what you typed and, when that is only a letter, the option line it picked. With nothing to quote, the agent writes "I went with". This applies to `/pln` and `/pln-pr`.
+- **A decision is named by what you will see or what will happen:** the words on screen, the value, the action. "Label", "state" and "rule" could mean anything, so they no longer stand in for it, in option lines either.
+- **An answer decides only what another answer on offer would have left out.** A part written into every option was never chosen, and it no longer counts as something you asked for when the plan checks whether a thing belongs in the build. Before the question goes out, a part with visible behavior gets an option that leaves it out, or a quote, or it comes out of the options. A reply that answers part of a message decides that part, and a reply about something else picks nothing.
+- **Adopting a plan chooses none of its entries.** A `Decision (agent)` that stands stays the agent's. A gate entry the agent had mentioned earlier is now marked `(I mentioned this earlier)`, because "already said" read as something the user had said.
+
 ## 1.132.0 — 2026-11-04
 
 ### Changed

@@ -79,9 +79,16 @@ The visual distinction must be obvious at a glance. Don't mix styles within a si
 
 Before asking the next question, echo back what was just recorded in **one short line**. Lets the user catch a misrecorded answer immediately. The line carries the answer and nothing else: not why it was chosen, not what it changes, not a lead-in to the next question.
 
-**Never as a message of its own.** The echo rides on the front of the next question and nowhere else. A turn whose whole content is "Recorded: entry 21 adopted." spends a round trip telling the user what they just typed; in one reviewed session twenty-eight of them went out, several under thirty characters. When there is no next question — the item is finished, the walk is over — the echo is dropped, not sent alone.
+**Never as a message of its own.** The echo rides on the front of the next question and nowhere else. A turn whose whole content is "Recorded: entry 21 adopted." spends a round trip telling the user what they just typed. When there is no next question — the item is finished, the walk is over — the echo is dropped, not sent alone.
 
-Examples:
+### Saying the user decided something
 
-- *"Recorded: mix-conditional question style, and never AskUserQuestion."*
-- *"Recorded: lightweight checks per item, full gauntlet at the end."*
+Write "you chose", "you decided", "your rule" or "as you said" only with a quote in the same sentence: what they typed and, when that is only a letter, the option line it picked. With nothing to quote, or for a `Decision (agent)`, write "I went with". Adopting a plan chose no entry in it.
+
+Say what was decided as what someone will see or what will happen: the words on screen, the value, the action. "Label", "state" and "rule" could mean anything, in an option line too.
+
+Not `you chose a new status label`, but:
+
+```
+You answered "(b)" to "**Flag for review** — the cancel action marks the payment for a person to refund", so the booking will show "Refund pending".
+```

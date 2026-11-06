@@ -32,6 +32,10 @@ OLD_DECLARED_KEY='pln-queue'
 # item should be in and which one the tracker last confirmed, and the agent makes
 # the moves with whatever tool its session has — see `pln-todo tracker --guide`.
 TRACKER_KEY='pln-tracker'
+# The paths a repository says every change writes, such as a version file:
+# `pln-shared-paths: VERSION, CHANGELOG.md`. Declaring one honestly would make any
+# two runs collide, so an overlap on it is never a refusal or a relation.
+SHARED_KEY='pln-shared-paths'
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 fail() { echo "pln-todo: $*" >&2; exit 2; }
@@ -53,7 +57,8 @@ Usage:
                  [--against CSV] [--steal HOLDER]
   pln-todo release --id ID --run TEXT [--not-now TEXT | --ask TEXT | --blocked TEXT]
   pln-todo mark --id ID [--run TEXT] [--state S] [--status S] [--urgent true|false] [--group TEXT]
-                [--touches CSV] [--holds CSV] [--depends-on CSV] [--source TEXT]
+                [--touches CSV | --touches-from-diff BASE] [--holds CSV] [--depends-on CSV]
+                [--source TEXT]
                 [--add-sub-item TEXT] [--sub-item-state "[ ]"|"[-]"|"[x]"] [--not-now TEXT]
   pln-todo archive --id ID --disposition completed|dropped|superseded|resolved-elsewhere
                    --evidence TEXT [--month YYYY-MM]
@@ -108,6 +113,23 @@ only change is --add-sub-item with sub-item state [ ], which is intake.
 `mark --state "[x]"` and `archive --disposition completed` are refused (exit 3,
 OPEN_SUB_ITEM per line) while a [ ] or [-] line stands under `## Sub-items`; an
 open sub-item added to an [x] record makes it [-] in the same rewrite.
+
+`mark --touches-from-diff BASE` replaces the record's touches with the paths the
+commits since BASE's merge-base with HEAD changed, renames as both paths, and
+prints TOUCHES_FROM_DIFF=replaced with TOUCHES_COUNT. Uncommitted work is not
+counted. With no changed path it prints =empty, and with a path a CSV list cannot
+hold it prints =unrepresentable, and the declared touches stand either way; the
+rest of the mark still lands. BASE not a commit, or no git work tree, exits 2
+with nothing written. --touches and --touches-from-diff are exclusive.
+
+`pln-shared-paths: <CSV>` in the project's CLAUDE.md or AGENTS.md names paths
+every change writes. An overlap at or beneath one prints SHARED<TAB>id<TAB>path
+rather than COLLISION, and is not a `touches:` relation or a NEAR.
+
+A run re-claiming an item it already holds, from the worktree that holds it, is
+not decided again: it prints CHECK=own-hold and stays held, unless the call
+declares a different write set or resource, names --against, or the item's write
+set is empty or UNKNOWN. `check --run` answers the same way.
 
 `related` is read-only (no lock, no write, never creates a list). It prints
 RELATED<TAB>id<TAB>kinds<TAB>state<TAB>status<TAB>holder or -<TAB>claim for
@@ -263,6 +285,42 @@ project_context() {
   scan_project_context "$1"
   check_declarations
   load_tracker
+  load_shared_paths
+}
+
+# One line, the first file holding it winning, the way every declaration here
+# reads. The value is read by its own pattern rather than `declared_for_key`'s,
+# because that one stops at a backtick and a list is naturally written as
+# `VERSION`, `CHANGELOG.md`.
+SHARED_PATHS=''
+load_shared_paths() {
+  local file line
+  SHARED_PATHS=''
+  for file in "$PROJECT_TOP/CLAUDE.md" "$PROJECT_TOP/AGENTS.md"; do
+    [ -f "$file" ] || continue
+    line="$(LC_ALL=C sed -n -E \
+      "s/^[[:space:]]*(-[[:space:]]+)?\`?${SHARED_KEY}:\`?[[:space:]]+(.+)\$/\\2/p" \
+      "$file" 2>/dev/null | head -1 || true)"
+    [ -n "$line" ] || continue
+    SHARED_PATHS="$(csv_to_lines "$(printf '%s' "$line" | tr -d '`')" \
+      | sed -e 's#^\./##' -e 's#/*$##' | grep -v '^$' || true)"
+    return 0
+  done
+  return 0
+}
+
+# At or beneath a declared path. Asked only of a pair that already overlaps, and
+# of each side: a holder's `api/` against `api/package.json` is passed over
+# because the file is shared, while `api/` against `api/src/x` still collides.
+path_is_shared() {
+  local s
+  [ -n "$SHARED_PATHS" ] || return 1
+  while IFS= read -r s; do
+    if [ "$1" = "$s" ] || [ "${1#"$s"/}" != "$1" ]; then return 0; fi
+  done <<EOF
+$SHARED_PATHS
+EOF
+  return 1
 }
 
 # The team's declaration, then the person's own opt-out. Only a declaration turns
@@ -1089,6 +1147,8 @@ overlap_report() {
         if paths_overlap "$x" "$y"; then
           if [ "$exempt" = 1 ]; then
             printf 'EXEMPT\t%s\tpath\t%s\n' "$b" "$x"
+          elif path_is_shared "$x" || path_is_shared "$y"; then
+            printf 'SHARED\t%s\tpath\t%s\n' "$b" "$x"
           else
             printf 'COLLISION\t%s\tpath\t%s\n' "$b" "$x"
             hit=1
@@ -1120,6 +1180,21 @@ EOF
   fi
   [ "$hit" = 0 ] || return 1
   return 0
+}
+
+# Whether this run, from this worktree, already holds an item whose write set is
+# known. Such a claim was decided when it was taken, and it is not decided again:
+# `--touches-from-diff` can legitimately add a path another holder has, and without
+# this the holder's own re-claim would then be refused while it still held the item,
+# which is two runs each refused on account of the other. An unknown write set is
+# not excused, because that refusal is about the item, not about anyone beside it.
+holds_it_already() {
+  local id="$1" run="$2" wt="$3" rec cur
+  rec="$(parse_detail "$(detail_path "$id")")" || return 1
+  [ -n "$run" ] && [ "$(printf '%s' "$rec" | LC_ALL=C cut -f7)" = "$run" ] || return 1
+  [ "$(printf '%s' "$rec" | LC_ALL=C cut -f10)" = "$wt" ] || return 1
+  cur="$(detail_list "$(detail_path "$id")" touches)"
+  [ -n "$cur" ] && ! declares_unknown "$cur"
 }
 
 claimed_ids() {
@@ -1287,7 +1362,7 @@ related_touches() {
     rb="$b,"
     while [ -n "$rb" ]; do
       y="${rb%%,*}"; rb="${rb#*,}"; y="${y%/}"
-      if paths_overlap "$x" "$y"; then
+      if paths_overlap "$x" "$y" && ! path_is_shared "$x" && ! path_is_shared "$y"; then
         case ",$RELATED_TOUCHES," in
           *",touches:$x,"*) ;;
           *) RELATED_TOUCHES="$RELATED_TOUCHES${RELATED_TOUCHES:+,}touches:$x" ;;
@@ -1363,6 +1438,36 @@ EOF
   done <<EOF | LC_ALL=C sort -t"$(printf '\t')" -k1,1 -k2,2
 $facts
 EOF
+}
+
+# ---------------------------------------------------------- what actually landed
+
+# A claim's `touches` is a forecast made before the work, and a forecast has every
+# reason to run wide: nothing charges the run that declares a directory, while the
+# run refused on it is someone else. Once commits exist the forecast can be replaced
+# by a fact, which needs no judgment about how wide is too wide. Two-dot from the
+# merge base so a BASE the branch has since been rebased over does not count the
+# upstream's files. Git quotes a name holding a control character, and a comma or
+# bracket would split the CSV list: neither can be stored, so the declared set stands.
+FROM_DIFF_RESULT=''
+FROM_DIFF_LINES=''
+touches_from_diff() {
+  local base="$1" sha mb
+  [ "$IN_WORKTREE" = 1 ] || fail "--touches-from-diff needs a git work tree, and $PROJECT_DIR is not in one; nothing was written"
+  sha="$(git_clean -C "$PROJECT_TOP" rev-parse --verify --quiet "$base^{commit}" 2>/dev/null || true)"
+  [ -n "$sha" ] || fail "--touches-from-diff: $base is not a commit here; nothing was written"
+  mb="$(git_clean -C "$PROJECT_TOP" merge-base "$sha" HEAD 2>/dev/null || true)"
+  [ -n "$mb" ] || fail "--touches-from-diff: $base shares no history with HEAD; nothing was written"
+  FROM_DIFF_LINES="$(git_clean -C "$PROJECT_TOP" -c core.quotepath=off diff --name-only --no-renames "$mb" HEAD)" \
+    || fail "--touches-from-diff: git diff failed from $base; nothing was written"
+  # A `case` and not `grep -q`, which under `pipefail` can report SIGPIPE on a
+  # long diff and invert the answer; see `declares_unknown`.
+  case "$FROM_DIFF_LINES" in
+    '') FROM_DIFF_RESULT='empty' ;;
+    '"'* | *$'\n"'* | *,* | *\[* | *\]*) FROM_DIFF_RESULT='unrepresentable' ;;
+    *) FROM_DIFF_RESULT='replaced' ;;
+  esac
+  return 0
 }
 
 # ------------------------------------------------------------------ frontmatter
@@ -1999,7 +2104,11 @@ EOF
     # `claim` exists and why a refusal here is not an error. Advisory is allowed
     # to be conservative, never to disagree: without `--run` this reports every
     # overlap, and `--run R` sees exactly what `claim --run R` would see.
-    run_check "$id" "$against" "$run" "$PROJECT_TOP" || true
+    if [ -z "$against" ] && holds_it_already "$id" "$run" "$PROJECT_TOP"; then
+      printf 'CHECK=own-hold\n'
+    else
+      run_check "$id" "$against" "$run" "$PROJECT_TOP" || true
+    fi
     ;;
 
   related)
@@ -2140,10 +2249,26 @@ EOF
           "$(csv_to_lines "$claim_holds" | lines_to_yaml_list)"
       } | set_fields "$detail"
     fi
-    set +e
-    check_out="$(run_check "$id" "$against" "$run" "$PROJECT_TOP")"
-    check_rc=$?
-    set -e
+    # Restating the write set a run already holds declares nothing new, so it is
+    # not a new decision either; changing it is, and is checked like any claim.
+    same_declaration=1
+    if [ "$have_claim_touches" = 1 ] \
+      && [ "$(csv_to_lines "$claim_touches" | lines_to_yaml_list)" != "$prior_touches" ]; then
+      same_declaration=0
+    fi
+    if [ "$have_claim_holds" = 1 ] \
+      && [ "$(csv_to_lines "$claim_holds" | lines_to_yaml_list)" != "$prior_holds" ]; then
+      same_declaration=0
+    fi
+    if [ "$same_declaration" = 1 ] && [ -z "$against" ] && holds_it_already "$id" "$run" "$PROJECT_TOP"; then
+      check_out='CHECK=own-hold'
+      check_rc=0
+    else
+      set +e
+      check_out="$(run_check "$id" "$against" "$run" "$PROJECT_TOP")"
+      check_rc=$?
+      set -e
+    fi
     printf '%s\n' "$check_out"
     if [ "$check_rc" != 0 ]; then
       printf 'CLAIM=refused\n'
@@ -2300,6 +2425,7 @@ EOF
     id=''; sub=''; sub_state='[ ]'; mark_run=''
     set_state=''; set_status=''; set_urgent=''; set_group=''
     set_touches=''; set_holds=''; set_depends=''; set_source=''; set_not_now=''
+    from_diff=''; have_from_diff=0
     have_group=0; have_touches=0; have_holds=0; have_depends=0
     while [ $# -gt 0 ]; do
       case "$1" in
@@ -2311,6 +2437,7 @@ EOF
         --urgent) set_urgent="${2:-}"; shift 2 ;;
         --group) set_group="${2:-}"; have_group=1; shift 2 ;;
         --touches) set_touches="${2:-}"; have_touches=1; shift 2 ;;
+        --touches-from-diff) from_diff="${2:-}"; have_from_diff=1; shift 2 ;;
         --holds) set_holds="${2:-}"; have_holds=1; shift 2 ;;
         --depends-on) set_depends="${2:-}"; have_depends=1; shift 2 ;;
         --source) set_source="${2:-}"; shift 2 ;;
@@ -2322,6 +2449,8 @@ EOF
       esac
     done
     [ -n "$id" ] || usage
+    if [ "$have_touches$have_from_diff" = 11 ]; then fail "--touches and --touches-from-diff are exclusive"; fi
+    if [ "$have_from_diff" = 1 ] && [ -z "$from_diff" ]; then fail "--touches-from-diff needs a commit"; fi
     [ -z "$set_state" ] || valid_state "$set_state" || fail "state must be '[ ]', '[-]' or '[x]': $set_state"
     [ -z "$set_status" ] || valid_status "$set_status" || fail "status must be ready, blocked, decide, proposed or dropped: $set_status"
     if [ -n "$set_urgent" ]; then
@@ -2336,6 +2465,7 @@ EOF
     resolve_root "$create_flag" '' || refuse "no to-do list could be resolved under $PROJECT_DIR"
     detail="$(detail_path "$id")"
     [ -f "$detail" ] || fail "no such to-do item: $id"
+    [ "$have_from_diff" = 0 ] || touches_from_diff "$from_diff"
     take_lock
     # Marking is how a run records what it finished, so it may not be done to a
     # record someone else is holding: `claim --steal` moves a holder without
@@ -2356,7 +2486,7 @@ EOF
     intake_only=0
     if [ -n "$sub" ] && [ "$sub_state" = '[ ]' ] \
       && [ -z "$set_state$set_status$set_urgent$set_source$set_not_now" ] \
-      && [ "$have_group$have_touches$have_holds$have_depends" = 0000 ]; then
+      && [ "$have_group$have_touches$have_from_diff$have_holds$have_depends" = 00000 ]; then
       intake_only=1
     fi
     if [ -n "$mark_holder" ] && [ "$intake_only" = 0 ] \
@@ -2400,6 +2530,7 @@ EOF
       [ -z "$set_source" ] || printf 'set\tsource\t%s\n' "$set_source"
       [ -z "$set_not_now" ] || printf 'set\tnot_now\t%s\ndel\tquestion\ndel\twaits_on\n' "$set_not_now"
       [ "$have_touches" = 0 ] || printf 'set\ttouches\t%s\n' "$(csv_to_lines "$set_touches" | lines_to_yaml_list)"
+      [ "$FROM_DIFF_RESULT" != 'replaced' ] || printf 'set\ttouches\t%s\n' "$(printf '%s\n' "$FROM_DIFF_LINES" | lines_to_yaml_list)"
       [ "$have_holds" = 0 ] || printf 'set\tholds\t%s\n' "$(csv_to_lines "$set_holds" | lines_to_yaml_list)"
       [ "$have_depends" = 0 ] || printf 'set\tdepends_on\t%s\n' "$(csv_to_lines "$set_depends" | lines_to_yaml_list)"
     } | set_fields "$mark_work"
@@ -2413,6 +2544,10 @@ EOF
     line="$(index_line_for "$id")"
     [ -n "$line" ] || fail "the index was rebuilt without $id"
     printf 'INDEX_LINE=%s\n' "$line"
+    if [ "$have_from_diff" = 1 ]; then
+      printf 'TOUCHES_FROM_DIFF=%s\n' "$FROM_DIFF_RESULT"
+      printf 'TOUCHES_COUNT=%s\n' "$(detail_list "$detail" touches | LC_ALL=C grep -c . || true)"
+    fi
     report_tracker
     ;;
 

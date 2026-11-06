@@ -1979,6 +1979,10 @@ for host_out in "$real_c" "$real_x"; do
     "$host_out/phases/pln/outline.md lets related metadata expand adopted scope"
   has "$host_out/phases/pln/implementation.md" 'every id but those on its `Related, not taken:` line' \
     "$host_out/phases/pln/implementation.md claims the related items the run did not take"
+  has "$host_out/phases/pln/implementation.md" '`--touches-from-diff <the source HEAD recorded in step 1>`' \
+    "$host_out/phases/pln/implementation.md leaves a claim's forecast standing after its work has landed"
+  has "$host_out/phases/pln/implementation.md" '`pln-shared-paths: <path>`' \
+    "$host_out/phases/pln/implementation.md does not say how a refusal on a file every change writes is lifted"
   hasnt "$host_out/phases/pln-simplify/verify-record.md" "$todo_marker" \
     "the to-do-list format reached a phase no door fires in"
   # Not in any router, on any host. The 60000-byte ceiling above is the reason

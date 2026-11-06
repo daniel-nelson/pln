@@ -2166,6 +2166,64 @@ refused "marking from a diff outside git" mark --project "$N" --id plain --touch
 [ "$Q_RC" = 2 ] || fail "--touches-from-diff outside git exited $Q_RC, not 2"
 said 'needs a git work tree' "the failure outside git did not say why"
 
+# ─── a claim already held is not decided again ────────────────────────────────
+# Narrowing can add a path another holder has, and each holder's re-claim must not
+# then be refused on account of the other while both still hold.
+QROOT="$WORK/own-hold-root"
+for tree in own-a own-b; do
+  new_repo "$WORK/$tree"
+  printf 'pln-todo: %s\n' "$QROOT" > "$WORK/$tree/CLAUDE.md"
+done
+OA="$WORK/own-a"; OB="$WORK/own-b"
+BA="$(git -C "$OA" rev-parse HEAD)"
+ok "filing A's item" add --project "$OA" "${PK[@]}" --id own-item-a --claim a --source s --touches 'lib/a.rb'
+ok "filing B's item" add --project "$OB" "${PK[@]}" --id own-item-b --claim b --source s --touches 'app/b.rb'
+ok "A claims" claim --project "$OA" --id own-item-a --run run-a
+ok "B claims" claim --project "$OB" --id own-item-b --run run-b
+mkdir -p "$OA/app"
+printf 'x\n' > "$OA/app/b.rb"
+git -C "$OA" add app/b.rb
+git -C "$OA" commit -qm 'writes what B declared'
+ok "A narrows onto B's path" mark --project "$OA" --id own-item-a --run run-a --touches-from-diff "$BA"
+has "$QROOT/items/own-item-a.md" 'touches: [app/b.rb]' "the narrowing did not add the undeclared path"
+
+ok "B asking about its own held item" check --project "$OB" --id own-item-b --run run-b
+is CHECK own-hold "check --run disagreed with claim --run about a held item"
+ok "B re-claiming what it holds" claim --project "$OB" --id own-item-b --run run-b
+is CHECK own-hold "a holder's re-claim was decided again"
+is CLAIM held "a holder's re-claim was refused"
+didnt_say 'COLLISION' "a holder's re-claim printed a collision"
+ok "A re-claiming what it holds" claim --project "$OA" --id own-item-a --run run-a
+is CLAIM held "the other holder's re-claim was refused"
+ok "B restating the write set it holds" claim --project "$OB" --id own-item-b --run run-b --touches 'app/b.rb'
+is CHECK own-hold "restating a held write set was treated as a new declaration"
+
+cp "$QROOT/items/own-item-b.md" "$WORK/own-b.before"
+refused "B declaring a different write set onto A's path" claim --project "$OB" --id own-item-b --run run-b \
+  --touches 'app/b.rb,app/c.rb,app/'
+said $'COLLISION\town-item-a\tpath' "a new declaration on a held item was not checked"
+cmp -s "$QROOT/items/own-item-b.md" "$WORK/own-b.before" || fail "a refused new declaration changed the held record"
+refused "B naming --against" claim --project "$OB" --id own-item-b --run run-b --against own-item-a
+said 'CLAIM=refused' "--against was not honored verbatim on a held item"
+ok "B asking through --against" check --project "$OB" --id own-item-b --run run-b --against own-item-a
+said 'CHECK=refused' "check --against was not honored verbatim on a held item"
+ok "asking without naming a run" check --project "$OB" --id own-item-b
+said 'CHECK=refused' "check without --run stopped reporting the overlap"
+
+ok "filing a third run's item" add --project "$OA" "${PK[@]}" --id own-item-c --claim c --source s \
+  --touches 'app/b.rb' --distinct-from own-item-a,own-item-b
+refused "a third run claiming a path both hold" claim --project "$OA" --id own-item-c --run run-c
+said $'COLLISION\town-item-a\tpath\tapp/b.rb' "a third run was not refused on a held path"
+refused "the same run string from another worktree" claim --project "$OA" --id own-item-b --run run-b
+said 'CLAIM=refused' "a run string from another worktree counted as the holder"
+
+ok "clearing a held item's write set" mark --project "$OB" --id own-item-b --run run-b --touches ''
+refused "re-claiming a held item whose write set is empty" claim --project "$OB" --id own-item-b --run run-b
+said 'own-item-b declares no touches' "an empty write set was excused by holding the item"
+ok "marking a held item's write set unknown" mark --project "$OB" --id own-item-b --run run-b --touches 'UNKNOWN'
+refused "re-claiming a held item whose write set is unknown" claim --project "$OB" --id own-item-b --run run-b
+said 'own-item-b declares an unknown write set' "an unknown write set was excused by holding the item"
+
 # ─── a path every change writes is the repository's to declare ────────────────
 R="$WORK/shared"
 new_repo "$R"

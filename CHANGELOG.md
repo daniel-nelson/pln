@@ -4,7 +4,8 @@
 
 ### Changed
 
-- **A claim no longer keeps blocking other runs on files it never changed.** A run declares what it expects to write before the work starts, and declaring a whole directory cost it nothing while refusing everyone else inside that directory. At the checkpoint of the last plan item carrying a to-do item, the run now replaces that declaration with the files its commits changed, using `pln-todo mark --touches-from-diff <base>`. A file it wrote without declaring gets added too.
+- **A claim shrinks to the files its commits changed once its work lands.** A run declares what it expects to write before the work starts, and declaring a whole directory cost it nothing while refusing everyone else inside that directory. At the checkpoint of the last plan item carrying a to-do item, the run now replaces that declaration with the files its commits changed, using `pln-todo mark --touches-from-diff <base>`. A file it wrote without declaring gets added too. Until that checkpoint the declaration still refuses other runs as before.
+- **A run re-claiming an item it already holds is no longer refused.** Because that step can add a file another run also holds, each run could otherwise be refused on account of the other. Declaring a different write set is still checked.
 
 ### Added
 

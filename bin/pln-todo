@@ -126,6 +126,11 @@ with nothing written. --touches and --touches-from-diff are exclusive.
 every change writes. An overlap at or beneath one prints SHARED<TAB>id<TAB>path
 rather than COLLISION, and is not a `touches:` relation or a NEAR.
 
+A run re-claiming an item it already holds, from the worktree that holds it, is
+not decided again: it prints CHECK=own-hold and stays held, unless the call
+declares a different write set or resource, names --against, or the item's write
+set is empty or UNKNOWN. `check --run` answers the same way.
+
 `related` is read-only (no lock, no write, never creates a list). It prints
 RELATED<TAB>id<TAB>kinds<TAB>state<TAB>status<TAB>holder or -<TAB>claim for
 each live item related to the named ones, then RELATED_COUNT, RELATED_SHOWN and
@@ -1177,6 +1182,21 @@ EOF
   return 0
 }
 
+# Whether this run, from this worktree, already holds an item whose write set is
+# known. Such a claim was decided when it was taken, and it is not decided again:
+# `--touches-from-diff` can legitimately add a path another holder has, and without
+# this the holder's own re-claim would then be refused while it still held the item,
+# which is two runs each refused on account of the other. An unknown write set is
+# not excused, because that refusal is about the item, not about anyone beside it.
+holds_it_already() {
+  local id="$1" run="$2" wt="$3" rec cur
+  rec="$(parse_detail "$(detail_path "$id")")" || return 1
+  [ -n "$run" ] && [ "$(printf '%s' "$rec" | LC_ALL=C cut -f7)" = "$run" ] || return 1
+  [ "$(printf '%s' "$rec" | LC_ALL=C cut -f10)" = "$wt" ] || return 1
+  cur="$(detail_list "$(detail_path "$id")" touches)"
+  [ -n "$cur" ] && ! declares_unknown "$cur"
+}
+
 claimed_ids() {
   live_records | LC_ALL=C awk -F '\t' '$7 != "" { print $1 }'
 }
@@ -2084,7 +2104,11 @@ EOF
     # `claim` exists and why a refusal here is not an error. Advisory is allowed
     # to be conservative, never to disagree: without `--run` this reports every
     # overlap, and `--run R` sees exactly what `claim --run R` would see.
-    run_check "$id" "$against" "$run" "$PROJECT_TOP" || true
+    if [ -z "$against" ] && holds_it_already "$id" "$run" "$PROJECT_TOP"; then
+      printf 'CHECK=own-hold\n'
+    else
+      run_check "$id" "$against" "$run" "$PROJECT_TOP" || true
+    fi
     ;;
 
   related)
@@ -2225,10 +2249,26 @@ EOF
           "$(csv_to_lines "$claim_holds" | lines_to_yaml_list)"
       } | set_fields "$detail"
     fi
-    set +e
-    check_out="$(run_check "$id" "$against" "$run" "$PROJECT_TOP")"
-    check_rc=$?
-    set -e
+    # Restating the write set a run already holds declares nothing new, so it is
+    # not a new decision either; changing it is, and is checked like any claim.
+    same_declaration=1
+    if [ "$have_claim_touches" = 1 ] \
+      && [ "$(csv_to_lines "$claim_touches" | lines_to_yaml_list)" != "$prior_touches" ]; then
+      same_declaration=0
+    fi
+    if [ "$have_claim_holds" = 1 ] \
+      && [ "$(csv_to_lines "$claim_holds" | lines_to_yaml_list)" != "$prior_holds" ]; then
+      same_declaration=0
+    fi
+    if [ "$same_declaration" = 1 ] && [ -z "$against" ] && holds_it_already "$id" "$run" "$PROJECT_TOP"; then
+      check_out='CHECK=own-hold'
+      check_rc=0
+    else
+      set +e
+      check_out="$(run_check "$id" "$against" "$run" "$PROJECT_TOP")"
+      check_rc=$?
+      set -e
+    fi
     printf '%s\n' "$check_out"
     if [ "$check_rc" != 0 ]; then
       printf 'CLAIM=refused\n'

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.134.0 — 2026-11-06
+
+### Changed
+
+- **A claim no longer keeps blocking other runs on files it never changed.** A run declares what it expects to write before the work starts, and declaring a whole directory cost it nothing while refusing everyone else inside that directory. At the checkpoint of the last plan item carrying a to-do item, the run now replaces that declaration with the files its commits changed, using `pln-todo mark --touches-from-diff <base>`. A file it wrote without declaring gets added too.
+
+### Added
+
+- **A repository can name the files every change writes.** With `pln-shared-paths: VERSION, CHANGELOG.md` on a line of its own in `CLAUDE.md` or `AGENTS.md`, two runs that both bump the version no longer refuse each other. Those paths also stop counting as a reason two to-do items are related. This is opt-in, so a repository without the line behaves as before. When a run is refused on a file like this, it gives you the line to add and does not add it itself.
+
 ## 1.133.0 — 2026-11-05
 
 ### Changed

@@ -2075,6 +2075,149 @@ ok "init with the tracker declared off" init --project "$R"
 is TRACKER off "a tracker declared off was reported on"
 is TRACKER_QUESTION declared "a tracker declared off left the question open"
 
+# ─── a claim's forecast is replaced by what landed ────────────────────────────
+R="$WORK/landed"
+new_repo "$R"
+ok "init for the landed-write-set tests" init --project "$R"
+B="$(git -C "$R" rev-parse HEAD)"
+ok "filing a wide forecast" add --project "$R" "${PK[@]}" --id forecast --claim forecast --source s \
+  --touches 'app/,spec/services/'
+ok "claiming the wide forecast" claim --project "$R" --id forecast --run run-a
+ok "filing a neighbor in the forecast's directory" add --project "$R" "${PK[@]}" --id neighbor --claim neighbor \
+  --source s --touches 'spec/services/billing_spec.rb' --distinct-from forecast
+ok "checking the neighbor before anything landed" check --project "$R" --id neighbor --run run-b
+said 'CHECK=refused' "the wide forecast did not refuse its neighbor before the narrowing"
+
+# Nothing committed yet: an empty answer would read as an unknown write set and
+# collide with everything, so the forecast stands and the rest of the mark lands.
+cp "$R/pln/items/forecast.md" "$WORK/forecast.before"
+ok "marking from an empty diff" mark --project "$R" --id forecast --run run-a --state '[-]' --touches-from-diff "$B"
+is TOUCHES_FROM_DIFF empty "an empty diff was not reported"
+has "$R/pln/items/forecast.md" 'touches: [app/, spec/services/]' "an empty diff erased the forecast"
+has "$R/pln/items/forecast.md" 'state: "[-]"' "an empty diff dropped the rest of the mark"
+
+mkdir -p "$R/app" "$R/spec/services" "$R/spec/evals"
+printf 'x\n' > "$R/app/one.rb"
+printf 'x\n' > "$R/app/gone.rb"
+printf 'x\n' > "$R/spec/services/one_spec.rb"
+git -C "$R" add app spec
+git -C "$R" commit -qm 'seed'
+B="$(git -C "$R" rev-parse HEAD)"
+ok "marking before this base's work" mark --project "$R" --id forecast --run run-a --touches 'app/,spec/services/'
+printf 'y\n' > "$R/app/one.rb"
+printf 'y\n' > "$R/spec/services/one_spec.rb"
+printf 'y\n' > "$R/spec/evals/helper.rb"
+git -C "$R" mv app/gone.rb app/moved.rb
+printf 'uncommitted\n' > "$R/app/uncommitted.rb"
+git -C "$R" add app/one.rb app/moved.rb spec
+git -C "$R" commit -qm 'work'
+
+cp "$R/pln/items/forecast.md" "$WORK/forecast.before"
+refused "marking from a diff under another run's name" mark --project "$R" --id forecast --run run-b --touches-from-diff "$B"
+[ "$Q_RC" = 3 ] || fail "a foreign run's --touches-from-diff exited $Q_RC, not 3"
+cmp -s "$R/pln/items/forecast.md" "$WORK/forecast.before" || fail "a refused --touches-from-diff changed the record"
+refused "marking from something that is not a commit" mark --project "$R" --id forecast --run run-a --touches-from-diff no-such-ref
+[ "$Q_RC" = 2 ] || fail "a bad base exited $Q_RC, not 2"
+said 'no-such-ref is not a commit' "a bad base was not named"
+refused "both write-set flags at once" mark --project "$R" --id forecast --run run-a --touches x --touches-from-diff "$B"
+[ "$Q_RC" = 2 ] || fail "two write-set flags exited $Q_RC, not 2"
+cmp -s "$R/pln/items/forecast.md" "$WORK/forecast.before" || fail "a failed --touches-from-diff changed the record"
+
+ok "marking from the diff" mark --project "$R" --id forecast --run run-a --touches-from-diff "$B"
+is TOUCHES_FROM_DIFF replaced "the diff was not reported as replacing the forecast"
+is TOUCHES_COUNT 5 "the wrong number of paths landed"
+has "$R/pln/items/forecast.md" \
+  'touches: [app/gone.rb, app/moved.rb, app/one.rb, spec/evals/helper.rb, spec/services/one_spec.rb]' \
+  "touches is not exactly what the commits changed, rename sides and undeclared write included"
+hasnt "$R/pln/items/forecast.md" 'uncommitted.rb' "uncommitted work reached the write set"
+has "$R/pln/items/forecast.md" 'claimed_by: run-a' "narrowing the write set dropped the holder"
+ok "claiming the neighbor once the forecast is narrowed" claim --project "$R" --id neighbor --run run-b
+is CLAIM held "the neighbor was still refused on a path nothing changed"
+
+ok "filing an item that writes a landed path" add --project "$R" "${PK[@]}" --id real-overlap --claim real-overlap \
+  --source s --touches 'app/one.rb' --distinct-from forecast
+ok "checking against a path that really landed" check --project "$R" --id real-overlap --run run-b
+said $'COLLISION\tforecast\tpath\tapp/one.rb' "a path that really landed stopped colliding"
+
+# A base the branch has been rebased over: only the branch's own paths count.
+git -C "$R" checkout -q -b upstream "$B"
+printf 'z\n' > "$R/upstream.txt"
+git -C "$R" add upstream.txt
+git -C "$R" commit -qm 'upstream'
+git -C "$R" checkout -q -
+ok "marking from a base that moved on" mark --project "$R" --id forecast --run run-a --touches-from-diff upstream
+is TOUCHES_FROM_DIFF replaced "a moved base did not replace the forecast"
+hasnt "$R/pln/items/forecast.md" 'upstream.txt' "a moved base counted the upstream's files"
+
+# A name the CSV list cannot hold leaves the declaration standing.
+printf 'x\n' > "$R/a,b.txt"
+git -C "$R" add 'a,b.txt'
+git -C "$R" commit -qm 'comma'
+cp "$R/pln/items/forecast.md" "$WORK/forecast.before"
+ok "marking from a diff holding a comma" mark --project "$R" --id forecast --run run-a --touches-from-diff "$B"
+is TOUCHES_FROM_DIFF unrepresentable "a comma in a path was not reported"
+cmp -s "$R/pln/items/forecast.md" "$WORK/forecast.before" || fail "an unrepresentable diff changed the write set"
+
+N="$WORK/landed-no-git"
+mkdir -p "$N"
+ok "init outside git" init --project "$N"
+ok "filing outside git" add --project "$N" "${PK[@]}" --id plain --claim plain --source s
+refused "marking from a diff outside git" mark --project "$N" --id plain --touches-from-diff HEAD
+[ "$Q_RC" = 2 ] || fail "--touches-from-diff outside git exited $Q_RC, not 2"
+said 'needs a git work tree' "the failure outside git did not say why"
+
+# ─── a path every change writes is the repository's to declare ────────────────
+R="$WORK/shared"
+new_repo "$R"
+ok "init for the shared-path tests" init --project "$R"
+mks() { ok "filing $1" add --project "$R" "${PK[@]}" --id "$1" --claim "$1" --source s "${@:2}"; }
+mks bump-a --touches 'VERSION,app/a.rb'
+refused "filing a second item on the version file with nothing declared" add --project "$R" "${PK[@]}" \
+  --id bump-b --claim bump-b --source s --touches 'VERSION,app/b.rb'
+said $'NEAR\tbump-a\ttouches:VERSION' "an undeclared version file was not a relation"
+mks bump-b --touches 'VERSION,app/b.rb' --distinct-from bump-a
+ok "checking two bumps with nothing declared" check --project "$R" --id bump-b --against bump-a
+said $'COLLISION\tbump-a\tpath\tVERSION' "with nothing declared a version file stopped colliding"
+
+printf '# Project\n\npln-shared-paths: VERSION, `docs/CHANGELOG.md`, ./changes/\n' > "$R/CLAUDE.md"
+ok "checking two bumps once declared" check --project "$R" --id bump-b --against bump-a
+said 'CHECK=clear' "a declared path still refused"
+said $'SHARED\tbump-a\tpath\tVERSION' "a passed-over overlap was not printed"
+didnt_say 'COLLISION' "a declared path still printed a collision"
+ok "claiming on a declared path" claim --project "$R" --id bump-a --run run-a
+ok "claiming the other bump beside it" claim --project "$R" --id bump-b --run run-b
+is CLAIM held "a declared path refused a claim"
+ok "asking what the bumps are related to" related --project "$R" --id bump-a
+didnt_say $'\tbump-b\ttouches:' "a declared path still counted as a relation"
+mks bump-c --touches 'VERSION,app/c.rb'
+said 'INDEX_LINE=' "a declared path alone refused an add as near"
+
+# Only the declared path is passed over, and a holder's directory still claims
+# everything else beneath it.
+mks whole-docs --touches 'docs/' --distinct-from bump-c
+mks log-only --touches 'docs/CHANGELOG.md'
+mks guide --touches 'docs/guide.md' --distinct-from whole-docs
+ok "a declared file under a holder's directory" check --project "$R" --id log-only --against whole-docs
+said 'CHECK=clear' "a declared file under a directory was refused"
+ok "another file under a holder's directory" check --project "$R" --id guide --against whole-docs
+said $'COLLISION\twhole-docs\tpath\tdocs/guide.md' "a declaration opened the rest of the directory"
+mks fragment-a --touches 'changes/one.md'
+mks fragment-b --touches 'changes/one.md'
+ok "beneath a declared directory" check --project "$R" --id fragment-b --against fragment-a
+said 'CHECK=clear' "a path beneath a declared directory was refused"
+
+# Holds name resources, not paths, and a declaration says nothing about them.
+mks slot-a --touches 'VERSION' --holds 'VERSION'
+mks slot-b --touches 'VERSION' --holds 'VERSION'
+ok "a shared resource token" check --project "$R" --id slot-b --against slot-a
+said $'COLLISION\tslot-a\tresource\tVERSION' "a shared-paths line released a holds token"
+
+rm "$R/CLAUDE.md"
+printf -- '- pln-shared-paths: app/a.rb\n' > "$R/AGENTS.md"
+mks agents-a --touches 'app/a.rb' --distinct-from bump-a
+ok "a declaration in AGENTS.md" check --project "$R" --id agents-a --against bump-a
+said $'SHARED\tbump-a\tpath\tapp/a.rb' "a declaration in AGENTS.md was not read"
+
 # ─── the scratch tree is the only thing that was written ──────────────────────
 [ ! -e "$HOME/.pln" ] || fail "the helper wrote to the developer's pln state directory"
 

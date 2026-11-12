@@ -239,7 +239,7 @@ fi
 # A host that spawns commands without the user's shell profile sees a bare
 # `PATH`, and the peer CLI is commonly installed somewhere only that profile
 # adds — Claude Code's own installer puts `claude` in `~/.local/bin`. Rung 2
-# then finds nothing, the R3 adversarial slot silently falls back to a
+# then finds nothing, the adversarial slot silently falls back to a
 # same-model substitute, and the loss of model-family independence is recorded
 # only in the plan file nobody re-reads. So look in the CLIs' own documented
 # install locations before concluding no peer exists. These are the installers'

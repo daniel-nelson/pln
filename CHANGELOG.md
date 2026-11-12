@@ -4,7 +4,12 @@
 
 ### Changed
 
-- **`/pln-pr` no longer rates a change's risk when you have already said how much review to run.** The risk rating only picks which reviewers run. When you ask for broad review or for no review, there was nothing left for it to pick, but it still ran a classifier beside the reviewer and reported what it would have chosen. In the two weeks before this release it rated 56 of 64 changes at the deepest setting. Now broad review runs the one reviewer and nothing else, and skipping review runs nothing. Full review, and a run where nobody has said yet, still rate the risk, because that decides the roster and whether to ask you.
+- **Nothing rates a change's risk any more. Every review runs in full unless you say otherwise.** A classifier used to rate each plan and branch and pick the reviewers from that rating. In the two weeks before this release it put 56 of 64 changes at its highest setting, usually citing about seven risk areas, so it cost a worker and a wait on every run and still chose the full set of reviewers almost every time. It is gone, and lowering the review is now your call alone:
+  - `/pln-pr` always runs its full set of reviewers: the broad reviewer, up to two specialists for the areas of the change where a mistake would cost most, and an adversarial reviewer (a second model where you have one). Saying "broad review" (`review=broad`) keeps only the broad reviewer. Saying "skip the review" (`review=none`) runs none.
+  - `/pln-pr` no longer stops to ask how much review to run when nobody said. It runs the full set.
+  - `/pln`'s plan review always adds the second model's reading when you have one and have consented to sending it. Turning plan review off still turns it off.
+  - When you lower the review, no warning follows about what a rating would have chosen.
+- **`pln-assurance roster` no longer takes `--risk`, and `pln-assurance classify` is removed.**
 
 ## 1.134.0 — 2026-11-06
 

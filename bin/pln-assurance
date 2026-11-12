@@ -1,23 +1,17 @@
 #!/usr/bin/env bash
-# pln-assurance — deterministic assurance tier, roster, repair progress, and candidate identity.
+# pln-assurance — deterministic review roster, repair progress, and candidate identity.
 set -euo pipefail
 
 usage() {
   cat >&2 <<'USAGE'
 Usage:
-  pln-assurance classify --signals CSV --substantive-files N --non-generated-lines N
-      signals (R1) routine
-              (R2) dependencies builds configuration generators public-contracts
-                   missing-coverage multiple-subsystems
-              (R3) authentication trust secrets privacy production-data money
-                   external-effects destructive-migrations concurrency transactions
-                   iac ci-security compatibility ai-safety eval-safety
-                   critical-conflict unknown
-              any other token classifies R3 as unknown:<token>
-  pln-assurance roster --risk R1|R2|R3 --areas CSV --adversary peer|local [--surface pr|plan]
-      --surface plan (a plan's pre-adoption review) is the broad reader, plus
-      the peer adversarial slot at R3 when a peer may run; specialists and a
-      same-model adversarial substitute read the code, at PR review, instead.
+  pln-assurance roster --areas CSV --adversary peer|local [--surface pr|plan]
+      --surface pr (the default) is the broad reader, up to two risk-area
+      readers from --areas (empty for none), and the adversarial slot, filled
+      by the peer or a same-model substitute. --surface plan is the broad
+      reader plus the peer adversarial slot when a peer may run; specialists
+      and a same-model substitute read the code, at PR review, instead.
+      Nothing classifies risk: lowering review depth is the person's call.
   pln-assurance merge-skip --roles CSV --since FILE [--form plan|pr] --artifact ROLE=PATH [--artifact ROLE=PATH ...]
       prints SKIP_MERGE=yes only when every role in the round's roster (broad
       among them) has an artifact newer than FILE, the round's start marker,
@@ -68,76 +62,32 @@ command="${1:-}"
 shift
 
 case "$command" in
-  classify)
-    signals=""
-    files=""
-    lines=""
-    while [ $# -gt 0 ]; do
-      case "$1" in
-        --signals) signals="${2:-}"; shift 2 ;;
-        --substantive-files) files="${2:-}"; shift 2 ;;
-        --non-generated-lines) lines="${2:-}"; shift 2 ;;
-        *) usage ;;
-      esac
-    done
-    [ -n "$signals" ] && whole_number "$files" && whole_number "$lines" || usage
-
-    risk="R1"
-    reason="routine"
-    IFS=',' read -r -a signal_list <<< "$signals"
-    for raw in "${signal_list[@]}"; do
-      signal="$(printf '%s' "$raw" | tr '[:upper:]_' '[:lower:]-')"
-      case "$signal" in
-        '' | routine) ;;
-        dependencies | builds | configuration | generators | public-contracts | public-contract | missing-coverage | multiple-subsystems)
-          if [ "$risk" = "R1" ]; then risk="R2"; reason="$signal"; fi
-          ;;
-        authentication | auth | trust | secrets | privacy | production-data | money | external-effects | destructive-migrations | destructive-migration | concurrency | transactions | iac | ci-security | compatibility | ai-safety | eval-safety | critical-conflict | unresolved-critical-conflict | unknown)
-          risk="R3"; reason="$signal"
-          ;;
-        *)
-          risk="R3"; reason="unknown:$signal"
-          ;;
-      esac
-    done
-    if [ "$risk" = "R1" ] && { [ "$files" -gt 10 ] || [ "$lines" -gt 500 ]; }; then
-      risk="R2"
-      reason="provisional-size-threshold"
-    fi
-    printf 'RISK=%s\nREASON=%s\n' "$risk" "$reason"
-    ;;
-
   roster)
-    risk=""
     areas=""
     adversary=""
     surface="pr"
     while [ $# -gt 0 ]; do
       case "$1" in
-        --risk) risk="${2:-}"; shift 2 ;;
         --areas) areas="${2:-}"; shift 2 ;;
         --adversary) adversary="${2:-}"; shift 2 ;;
         --surface) surface="${2:-}"; shift 2 ;;
         *) usage ;;
       esac
     done
-    case "$risk" in R1 | R2 | R3) ;; *) usage ;; esac
     case "$adversary" in peer | local) ;; *) usage ;; esac
     case "$surface" in pr | plan) ;; *) usage ;; esac
 
-    printf 'RISK=%s\n' "$risk"
     printf 'SLOT\tbroad\tsame-model\n'
     if [ "$surface" = "plan" ]; then
-      # A plan review reads prose. Its tier still decides whether the peer's
-      # independent read runs; the specialists run once, on the code.
-      if [ "$risk" = "R3" ] && [ "$adversary" = "peer" ]; then
+      # A plan review reads prose: the specialists run once, on the code.
+      if [ "$adversary" = "peer" ]; then
         printf 'SLOT\tadversarial\tpeer\n'
       fi
-    elif [ "$risk" = "R2" ] || [ "$risk" = "R3" ]; then
+    else
       IFS=',' read -r -a area_list <<< "$areas"
       declared="|"
       count=0
-      for raw in "${area_list[@]}"; do
+      for raw in ${area_list[@]+"${area_list[@]}"}; do
         area="$(printf '%s' "$raw" | tr '[:upper:]_ ' '[:lower:]--')"
         [ -n "$area" ] || continue
         case "$declared" in *"|$area|"*) continue ;; esac
@@ -147,7 +97,7 @@ case "$command" in
         [ "$count" -eq 2 ] && break
       done
     fi
-    if [ "$surface" = "pr" ] && [ "$risk" = "R3" ]; then
+    if [ "$surface" = "pr" ]; then
       if [ "$adversary" = "peer" ]; then
         printf 'SLOT\tadversarial\tpeer\n'
       else

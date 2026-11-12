@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.135.0 — 2026-11-12
+
+### Changed
+
+- **`/pln-pr` no longer rates a change's risk when you have already said how much review to run.** The risk rating only picks which reviewers run. When you ask for broad review or for no review, there was nothing left for it to pick, but it still ran a classifier beside the reviewer and reported what it would have chosen. In the two weeks before this release it rated 56 of 64 changes at the deepest setting. Now broad review runs the one reviewer and nothing else, and skipping review runs nothing. Full review, and a run where nobody has said yet, still rate the risk, because that decides the roster and whether to ask you.
+
 ## 1.134.0 — 2026-11-06
 
 ### Changed

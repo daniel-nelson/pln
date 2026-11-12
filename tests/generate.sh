@@ -1149,6 +1149,15 @@ for host_out in "$real_c" "$real_x"; do
     "$pr_scope_file kept the frontend flag nothing reads"
   has "$pr_scope_file" 'leave `Risk tier` empty' \
     "$pr_scope_file classifies before review even when the depth is already known"
+  # A human-set broad or none depth leaves the tier nothing to decide, so no
+  # classifier runs: 56 of 64 classifications in two weeks of real runs came
+  # back at the deepest setting, and under broad the result only fed a warning.
+  has "$pr_scope_file" 'record `Risk tier: unclassified (review depth <depth>)`' \
+    "$pr_scope_file classifies risk under a depth a human already set"
+  has "$pr_review_file" 'Under `broad`, nothing is classified and no roster is validated' \
+    "$pr_review_file runs the classifier beside a broad-only review"
+  hasnt "$pr_review_file" 'those follow the tier, not the depth' \
+    "$pr_review_file still ties fixes to a tier a broad review never computes"
   has "$pr_review_file" 'An empty `Risk tier` in this phase is scope-baseline handing classification over' \
     "$pr_review_file treats an empty tier in the review phase as a missing baseline"
   has "$pr_review_file" 'the broad slot is the reader already running, never a second one' \

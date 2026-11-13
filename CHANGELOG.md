@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.136.0 — 2026-11-13
+
+### Changed
+
+- **A fix that only edits comments or documentation is made, not filed.** When `/pln` or `/pln-pr` finds a problem it did not cause and fixing it changes only comment or documentation text, ten lines or fewer, it now makes the fix in the same run. Before, `/pln-pr` filed every problem already on the base branch as a to-do item, however small, and one review filed a two-line `@returns` correction that way. A string the program prints or returns does not count as documentation. Every other problem already on the base branch is still filed, as before.
+- **Every to-do item now has to clear the follow-up bar, wherever it was found.** The bar is that the claim is true, the work is not done, and someone will need to act on it or decide about it later. Only the closing sweep used to apply it. Things a worker noticed, review findings and CI failures went in without it. In four weeks, agents filed about a hundred items nobody had asked for. A trivial nit, a "checked, it's fine" note and a someday-maybe with no concrete trigger are now dropped wherever they turn up.
+- **A failing test or eval that the run did not cause is filed with its file in `--touches`.** A second sighting of the same failure then shows up as a near-duplicate of the first item instead of becoming a new one. One spec's intermittent failure had been filed three times in one day.
+
 ## 1.135.0 — 2026-11-12
 
 ### Changed

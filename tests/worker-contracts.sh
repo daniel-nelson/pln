@@ -524,6 +524,13 @@ has "$pr_merge" 'stays `deferred` under that key' \
   'PR merge reopens a finding the fix phase deferred and filed'
 has "$pr_merge" 'is settled before any route below' \
   'PR merge can refile a deferred finding as pre-existing or out-of-range'
+# 1.136.0: the one pre-existing finding that is repaired, not filed — a fix
+# that edits only comment or documentation text, ten lines or fewer. A review
+# filed a two-line @returns correction as a to-do item.
+has "$pr_merge" 'A second exception keeps a small correction from becoming a to-do item' \
+  'PR merge files a documentation-only pre-existing fix instead of making it'
+has "$pr_merge" 'changes ten lines or fewer is recorded `open`' \
+  'PR merge lost the bound on the documentation-only exception'
 has "$pr_merge" "Record every verified \`branch\` finding's \`branch_purpose\`" \
   'PR merge does not record which findings are the branch purpose'
 has "$pr_merge" 'An absent field reads as `none`' \
@@ -1092,8 +1099,12 @@ for host in claude codex; do
   done
   has "$WORK/$host/phases/pln/implementation.md" 'a small, certain bug the follow-up rule above keeps in this run becomes a new node' \
     "$host implementation has no route for a small certain bug kept in the run"
-  has "$WORK/$host/phases/pln-pr/review.md" 'it is filed as before.' \
+  has "$WORK/$host/phases/pln-pr/review.md" 'Anything else that is not a remainder is filed' \
     "$host /pln-pr no longer files a pre-existing defect"
+  for phase in pln/implementation pln-pr/review; do
+    has "$WORK/$host/phases/$phase.md" 'So is a fix that edits only comment or documentation text and changes ten lines or fewer, in any file' \
+      "$host $phase files a documentation-only fix instead of making it"
+  done
   has "$WORK/$host/phases/pln/review-approval.md" "record a \`Decision (user, selected)\` pair whose option line is that entry's line" \
     "$host a gate override of a taken prevention has no recorded form"
   has "$WORK/$host/phases/pln/review-approval.md" 'entry that opens with what has to happen and how common it is' \

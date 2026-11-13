@@ -183,7 +183,7 @@ The doors differ only in what triggers them. What each one files and where it la
 
 ### Outflow — what a run may change, and where finished work goes
 
-Intake asks no one, because filing costs nothing once the remainder test has cleared the candidate. Outflow is not: every rule below exists so that what the to-do list says was finished is something that actually was.
+Intake asks no one once the remainder test and the follow-up bar have cleared the candidate. That does not make filing free: every item is a line someone reads at each close and triages later, which is why both tests come first. Outflow is stricter: every rule below exists so that what the to-do list says was finished is something that actually was.
 
 **A run sees what an item is tied to before it takes it.** `pln-todo related --id <ids>` lists the live items that depend on, are depended on by, name, are named by, share a write set or a group with the ones named, and `{{PLN_CMD}}` shows them before its scope is settled, so one piece of a split task is not taken alone.
 

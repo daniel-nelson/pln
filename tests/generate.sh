@@ -1928,6 +1928,11 @@ remainder_anchor="A remainder of this run's own work is not a follow-up, and it 
 # Beside it, the routing rule: what a live item already covers is a sub-item
 # there, and `add`'s NEAR refusal names the two ways forward.
 subitem_anchor='goes onto it as a sub-item, never beside it as a new item'
+# 1.136.0: the follow-up bar runs wherever a candidate is filed, not only at the
+# closing sweep, and a failing test that is not the run's names its file so a
+# repeat sighting meets the first item as a NEAR line instead of a new item.
+bar_anchor='Filing also takes the follow-up bar, at every door'
+flake_anchor='is filed with `--touches` naming its file'
 for host_out in "$real_c" "$real_x"; do
   host_out="$(cd "$host_out" && pwd -P)"
   for rel in phases/pln/outline.md phases/pln/finish-ship.md phases/pln-pr/ship-watch.md; do
@@ -1951,6 +1956,9 @@ for host_out in "$real_c" "$real_x"; do
       "$host_out/$rel can file a remainder of its own run's work as a follow-up"
     has "$host_out/$rel" "$subitem_anchor" \
       "$host_out/$rel files what a live item already covers as a sibling item"
+    has "$host_out/$rel" "$bar_anchor" "$host_out/$rel files a candidate without the follow-up bar"
+    has "$host_out/$rel" "$flake_anchor" \
+      "$host_out/$rel files a failing test without its file, so repeat sightings become new items"
     has "$host_out/$rel" 'bin/pln-todo add' "$host_out/$rel names no helper call to file with"
     has "$host_out/$rel" 'add` with `--do` and `--done-when`' \
       "$host_out/$rel files without the task packet add requires"
@@ -1961,6 +1969,7 @@ for host_out in "$real_c" "$real_x"; do
       "$host_out/$rel sweeps a remainder of its own run's work into the to-do list"
     has "$host_out/$rel" "$subitem_anchor" \
       "$host_out/$rel sweeps what a live item already covers in as a sibling item"
+    has "$host_out/$rel" "$bar_anchor" "$host_out/$rel sweeps a candidate in without the follow-up bar"
     has "$host_out/$rel" 'each first takes the remainder test above' \
       "$host_out/$rel lets the outstanding sweep skip the remainder test"
     has "$host_out/$rel" '`--do`/`--done-when`' "$host_out/$rel sweeps items in without a task packet"
@@ -1992,6 +2001,7 @@ for host_out in "$real_c" "$real_x"; do
     hasnt "$host_out/$router" "$todo_sentence" "$host_out/$router carries the list's intake rules"
     hasnt "$host_out/$router" "$remainder_anchor" "$host_out/$router carries the remainder test"
     hasnt "$host_out/$router" "$subitem_anchor" "$host_out/$router carries the sub-item routing rule"
+    hasnt "$host_out/$router" "$bar_anchor" "$host_out/$router carries the filing bar"
     hasnt "$host_out/$router" 'pln-todo related' "$host_out/$router carries the related-items rule"
   done
   # The helper is named through the absolute output root baked in at generation

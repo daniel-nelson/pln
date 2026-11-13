@@ -10,6 +10,7 @@
   - `/pln`'s plan review always adds the second model's reading when you have one and have consented to sending it. Turning plan review off still turns it off.
   - When you lower the review, no warning follows about what a rating would have chosen.
 - **`pln-assurance roster` no longer takes `--risk`, and `pln-assurance classify` is removed.**
+- **The eval corpus no longer asks a model to rate risk.** Its three R1/R2/R3 cases are replaced by three on the new rule: run the full set when nobody named a depth, keep a broad review broad when the user asked for one, and fill the adversarial slot with the same model when no second model is permitted. The `r3-recall` floor is renamed `critical-recall` (`CRITICAL_TOTAL`/`CRITICAL_CORRECT` in `bin/pln-eval` output), and the corpus is re-sealed.
 
 ## 1.134.0 — 2026-11-06
 

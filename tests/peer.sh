@@ -222,7 +222,7 @@ expect 3 none none 3 "no peer on the machine"
 
 # A host that spawns without the user's shell profile sees a bare PATH, and the
 # peer CLI commonly sits somewhere only that profile adds. The install-location
-# leg finds it there; without it the R3 adversarial slot silently substitutes.
+# leg finds it there; without it the adversarial slot silently substitutes.
 cfg peer_consent true
 cfg peer_egress consent
 mkdir -p "$FAKE_HOME/.local/bin"

@@ -1102,20 +1102,14 @@ for host_out in "$real_c" "$real_x"; do
   has "$scope_file" 'Local verification' \
     "$scope_file does not list Local verification among the ledger's state"
   review_file="$host_out/phases/pln/review-approval.md"
-  # A bounded re-review bounds its roster too: the tier is a property of the
-  # plan, but a round's readers come from what the rewritten items carry.
+  # A bounded re-review bounds its roster too: a round's readers come from what
+  # the rewritten items carry.
   has "$review_file" 'The roster is bounded by the same change the items are' \
-    "$review_file lets a one-item rewrite re-run the whole tier roster"
+    "$review_file lets a one-item rewrite re-run the whole roster"
   has "$review_file" 'The broad reader always runs' \
     "$review_file lost the reader a bounded re-review always keeps"
-  has "$review_file" 'never on the tier or on the first pass' \
-    "$review_file lets a bounded roster shrink the tier or the first review pass"
-  # Classification belongs to the first pass; a bounded round re-classifies only
-  # for a signal the first pass did not record, and leans toward re-classifying.
-  has "$review_file" 'A bounded round (Re-review after a rewrite, below) dispatches no classification' \
-    "$review_file re-classifies a plan's risk on every bounded round"
-  has "$review_file" 'where you cannot tell, re-classify' \
-    "$review_file lost the fail-toward-re-classifying rule for a bounded round"
+  has "$review_file" 'never on the first pass' \
+    "$review_file lets a bounded roster shrink the first review pass"
   # An all-empty round skips the merge only on the helper's roster-aware verdict,
   # and the coordinator then writes the round's record the merge would have.
   has "$review_file" 'merge-skip --roles' \
@@ -1126,11 +1120,12 @@ for host_out in "$real_c" "$real_x"; do
     "$review_file leaves a skipped bounded round's superseded findings standing"
   has "$review_file" 'the skipped empty round above is the one record you write' \
     "$review_file lost the one exception to the merge worker owning PLAN.md edits"
-  # The classifier starts beside the broad reviewer, which every tier's roster
-  # holds; the roster that follows dispatches everything but that reader, and
-  # the broad reviewer is joined before the merge.
-  has "$review_file" 'spawn the classifier and the broad reviewer together' \
-    "$review_file makes the broad plan reviewer wait for risk classification"
+  # Nothing classifies a plan's risk: lowering review is the person's call. The
+  # broad reviewer waits on nothing; the roster dispatches everything but it.
+  hasnt "$review_file" 'assurance-classification' \
+    "$review_file still runs a risk classifier"
+  has "$review_file" 'which waits on nothing' \
+    "$review_file makes the broad plan reviewer wait for something"
   has "$review_file" 'its broad slot is the reader already running' \
     "$review_file lets the validated roster spawn a second broad plan reviewer"
   has "$review_file" 'never a second broad' \
@@ -1147,10 +1142,17 @@ for host_out in "$real_c" "$real_x"; do
     "$pr_scope_file kept the status evidence worker"
   hasnt "$pr_scope_file" 'frontend flag' \
     "$pr_scope_file kept the frontend flag nothing reads"
-  has "$pr_scope_file" 'leave `Risk tier` empty' \
-    "$pr_scope_file classifies before review even when the depth is already known"
-  has "$pr_review_file" 'An empty `Risk tier` in this phase is scope-baseline handing classification over' \
-    "$pr_review_file treats an empty tier in the review phase as a missing baseline"
+  # Nothing classifies a change's risk, and nothing asks for a depth: 56 of 64
+  # classifications in two weeks of real runs came back at the deepest setting.
+  # An unset depth is full; lowering it is the person's call.
+  for f in "$pr_scope_file" "$pr_review_file"; do
+    hasnt "$f" 'assurance-classification' "$f still runs a risk classifier"
+    hasnt "$f" 'Risk tier' "$f still records a risk tier"
+  done
+  has "$pr_scope_file" 'record `full` and do not ask' \
+    "$pr_scope_file asks for a review depth nobody set"
+  has "$pr_review_file" 'Under `broad`, no roster is validated' \
+    "$pr_review_file builds a roster for a broad-only review"
   has "$pr_review_file" 'the broad slot is the reader already running, never a second one' \
     "$pr_review_file lets the roster spawn a second broad PR reviewer"
   has "$pr_review_file" 'never a second broad' \
@@ -1435,7 +1437,7 @@ for f in "$real_c/phases/pln-pr/fix.md" "$real_x/phases/pln-pr/fix.md"; do
 done
 
 # ─── the post-fix verifier judges rather than re-executes ────────────────────
-# A trivial R3 follow-up still gets a fresh reader — the coordinator validated
+# A trivial follow-up still gets a fresh reader — the coordinator validated
 # the fix and may not certify its own triviality. But a fresh reader that
 # rebuilds its context to re-run tests the fix worker ran minutes earlier spends
 # its whole cost before reaching the judgment. Observed: 3.6 min on a two-file
@@ -1568,18 +1570,16 @@ for f in "$real_c/phases/pln/review-approval.md" "$real_c/phases/pln-pr/review.m
     "$f lost the portable not-authenticated explanation"
 done
 
-# ─── the broad reviewer starts with the classifier, on each host's own terms ──
-# Codex holds a finished child's slot until it is freed, so the classifier's
-# slot is freed before the specialists spawn; Claude joins a named background
-# Agent beside the roster's Workflow.
+# ─── the broad reviewer starts first, on each host's own terms ──────────────
+# Claude joins a named background Agent beside the roster's Workflow.
 for f in "$real_x/phases/pln/review-approval.md" "$real_x/phases/pln-pr/review.md"; do
-  has "$f" "free" "$f never frees a finished child's slot"
   hasnt "$f" 'named background `Agent`' "the codex build carries Claude's broad-reviewer handle"
+  hasnt "$f" 'assurance-classification' "$f still runs a risk classifier"
 done
-has "$real_x/phases/pln/review-approval.md" 'When the classifier returns, free its slot' \
-  'the codex plan review keeps the finished classifier in a reader slot'
-has "$real_x/phases/pln-pr/review.md" "free the finished classifier's slot first" \
-  'the codex PR review keeps the finished classifier in a reader slot'
+has "$real_x/phases/pln/review-approval.md" 'The broad reviewer first' \
+  'the codex plan review does not start the broad reviewer first'
+has "$real_x/phases/pln-pr/review.md" 'Step 3 started the broad reviewer first' \
+  'the codex PR review does not start the broad reviewer first'
 for f in "$real_c/phases/pln/review-approval.md" "$real_c/phases/pln-pr/review.md"; do
   has "$f" 'named background `Agent`' "$f does not hold the early broad reviewer as its own Agent"
 done
@@ -2155,8 +2155,9 @@ for f in "$real_c/phases/pln/review-approval.md" "$real_x/phases/pln/review-appr
   has "$f" 'Never open raw findings in this context' "$f may read raw findings inline"
   has "$f" 'A finding on a user-made decision is protected from repair' \
     "$f lost coordinator-facing user-decision protection"
-  has "$f" 'pln-assurance classify' "$f lost semantic assurance classification"
-  has "$f" 'at most four pre-fix readers' "$f lost the R3 reader cap"
+  hasnt "$f" 'pln-assurance classify' "$f still classifies risk"
+  has "$f" 'Nothing rates a change' "$f lost the rule that lowering review is the person's call"
+  has "$f" 'at most four pre-fix readers' "$f lost the PR reader cap"
   has "$f" 'peer_egress' "$f lost the separate peer-egress policy"
   has "$f" 'without asking again' "$f does not explain that consent is a standing policy"
   hasnt "$f" '### Rejected' "$f embeds worker-only rejection detail"
@@ -2199,8 +2200,8 @@ for root in "$real_c" "$real_x"; do
     "$fix host mechanics still publish checkpoints directly"
   hasnt "$ship" 'write it into `REVIEW.md`' \
     "$ship host mechanics still publish CI findings directly"
-  has "$review" '### Step 3. Risk-calibrated review roster' "$review lost semantic assurance tiers"
-  has "$review" 'at most four pre-fix readers' "$review lost the R3 pre-fix cap"
+  has "$review" '### Step 3. Review roster' "$review lost the review roster step"
+  has "$review" 'at most four pre-fix readers' "$review lost the pre-fix cap"
   has "$review" '"verified"|"unverified"' "$review lost evidence-state findings"
   has "$review" 'structural_evidence?' "$review lost backward-compatible structural evidence"
   has "$review" 'direct callers or consumers' "$review lost changed-responsibility consumer traversal"
@@ -2225,9 +2226,9 @@ for root in "$real_c" "$real_x"; do
   has "$review" 'routes nothing' "$review still lets a reader's own severity authorize work"
   has "$review" 'Answer it before you write `fix`' "$review lost the ordering that stops a fix inventing its consequence"
   # 1.131.0: the review runs once. The post-fix pass checks each fix against
-  # its finding at every tier; no red team follows the fixes.
+  # its finding; no red team follows the fixes.
   has "$fix" 'the second pass checks the fixes and looks for nothing new' "$fix lets the post-fix pass hunt for new work"
-  has "$fix" 'no red-team pass follows the fixes at any tier' "$fix still runs a post-fix red team"
+  has "$fix" 'no red-team pass follows the fixes' "$fix still runs a post-fix red team"
   hasnt "$fix" 'full fresh red-team pass' "$fix still runs a post-fix red team"
   hasnt "$fix" 'hunt for missed cross-cutting failures' "$fix still briefs the post-fix reader to hunt for new work"
   has "$fix" 'already-authorized repair work' "$fix asks permission for another repair round"

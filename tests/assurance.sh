@@ -34,55 +34,44 @@ if "$DECISION_WINDOW" --asked-at 1000 --now 999 >/dev/null 2>&1; then
   fail 'decision window accepted a clock before the question'
 fi
 
-# Semantic signals decide the floor. Numeric size can raise R1 to R2 but can
-# never lower an R3 change.
-out="$($ASSURANCE classify --signals routine --substantive-files 2 --non-generated-lines 18)"
-has_line "$out" 'RISK=R1' 'routine work did not classify as R1'
-
-out="$($ASSURANCE classify --signals routine --substantive-files 11 --non-generated-lines 18)"
-has_line "$out" 'RISK=R2' 'file threshold did not raise routine work to R2'
-
-out="$($ASSURANCE classify --signals auth --substantive-files 1 --non-generated-lines 1)"
-has_line "$out" 'RISK=R3' 'tiny authentication change was lowered by line count'
-
-out="$($ASSURANCE classify --signals unknown --substantive-files 0 --non-generated-lines 0)"
-has_line "$out" 'RISK=R3' 'unknown risk did not fail closed to R3'
-
-if "$ASSURANCE" classify --signals routine,auth --substantive-files nope --non-generated-lines 1 >/dev/null 2>&1; then
-  fail 'non-numeric substantive-file count was accepted'
+# Nothing classifies risk: lowering review depth is the person's call. The
+# classify subcommand is gone and roster takes no tier.
+if "$ASSURANCE" classify --signals routine --substantive-files 1 --non-generated-lines 1 >/dev/null 2>&1; then
+  fail 'pln-assurance still classifies risk'
+fi
+if "$ASSURANCE" roster --risk R3 --areas security --adversary peer >/dev/null 2>&1; then
+  fail 'roster still accepts a risk tier'
 fi
 
-# R3 has exactly one broad slot, at most two risk-specific slots, and one
-# adversarial slot. A peer substitutes in that slot rather than adding a fifth.
-out="$($ASSURANCE roster --risk R3 --areas security,data,compatibility --adversary peer)"
-has_line "$out" $'SLOT\tbroad\tsame-model' 'R3 roster lost the broad reader'
-has_line "$out" $'SLOT\trisk-security\tsame-model' 'R3 roster lost first risk reader'
-has_line "$out" $'SLOT\trisk-data\tsame-model' 'R3 roster lost second risk reader'
+# The PR roster has exactly one broad slot, at most two risk-area slots, and
+# one adversarial slot. A peer substitutes in that slot rather than adding a fifth.
+out="$($ASSURANCE roster --areas security,data,compatibility --adversary peer)"
+has_line "$out" $'SLOT\tbroad\tsame-model' 'PR roster lost the broad reader'
+has_line "$out" $'SLOT\trisk-security\tsame-model' 'PR roster lost first risk reader'
+has_line "$out" $'SLOT\trisk-data\tsame-model' 'PR roster lost second risk reader'
 has_line "$out" $'SLOT\tadversarial\tpeer' 'peer did not fill the adversarial slot'
-[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 4 ] || fail 'R3 pre-fix roster exceeded four slots'
+[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 4 ] || fail 'PR pre-fix roster exceeded four slots'
 
-out="$($ASSURANCE roster --risk R3 --areas security --adversary local)"
+out="$($ASSURANCE roster --areas security --adversary local)"
 has_line "$out" $'SLOT\tadversarial\tsame-model' 'local adversarial substitute was not attributed'
+[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 3 ] || fail 'one named area did not give a three-slot roster'
 
-out="$($ASSURANCE roster --risk R2 --areas data,testing,security --adversary local)"
-[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 3 ] || fail 'R2 roster did not cap specialists at two'
-
-out="$($ASSURANCE roster --risk R1 --areas security --adversary peer)"
-[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 1 ] || fail 'R1 roster was not broad-only'
-
-# A plan's pre-adoption review is the broad reader plus, at R3, the peer's
-# independent read; specialists and a same-model substitute wait for the code.
-out="$($ASSURANCE roster --surface plan --risk R3 --areas security,data --adversary peer)"
+# No named area is broad plus the adversarial slot, under bash 3.2's set -u too.
+out="$(/bin/bash "$ASSURANCE" roster --areas '' --adversary local)"
 [ "$(printf '%s\n' "$out" | grep '^SLOT' | cut -f2 | paste -sd, -)" = 'broad,adversarial' ] \
-  || fail 'R3 plan roster was not broad plus the peer'
-has_line "$out" $'SLOT\tadversarial\tpeer' 'R3 plan roster did not attribute the peer'
-out="$($ASSURANCE roster --surface plan --risk R3 --areas security,data --adversary local)"
-[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 1 ] || fail 'R3 plan roster without a peer was not broad-only'
-out="$($ASSURANCE roster --surface plan --risk R2 --areas data,testing --adversary peer)"
-[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 1 ] || fail 'R2 plan roster ran a specialist'
-out="$($ASSURANCE roster --surface pr --risk R3 --areas security,data --adversary peer)"
-[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 4 ] || fail 'explicit PR surface lost the full R3 roster'
-if "$ASSURANCE" roster --surface code --risk R1 --areas - --adversary local >/dev/null 2>&1; then
+  || fail 'a PR roster with no named area was not broad plus the adversarial slot'
+
+# A plan's pre-adoption review is the broad reader plus the peer's independent
+# read; specialists and a same-model substitute wait for the code.
+out="$($ASSURANCE roster --surface plan --areas security,data --adversary peer)"
+[ "$(printf '%s\n' "$out" | grep '^SLOT' | cut -f2 | paste -sd, -)" = 'broad,adversarial' ] \
+  || fail 'plan roster was not broad plus the peer'
+has_line "$out" $'SLOT\tadversarial\tpeer' 'plan roster did not attribute the peer'
+out="$($ASSURANCE roster --surface plan --areas security,data --adversary local)"
+[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 1 ] || fail 'plan roster without a peer was not broad-only'
+out="$($ASSURANCE roster --surface pr --areas security,data --adversary peer)"
+[ "$(printf '%s\n' "$out" | grep -c '^SLOT')" -eq 4 ] || fail 'explicit PR surface lost the full roster'
+if "$ASSURANCE" roster --surface code --areas - --adversary local >/dev/null 2>&1; then
   fail 'roster accepted an unknown --surface'
 fi
 

@@ -12,7 +12,7 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 has() { grep -qF -- "$2" "$1" || fail "$3"; }
 hasnt() { grep -qF -- "$2" "$1" && fail "$3"; return 0; }
 
-for name in context-envelope evidence-collection preflight-research interview-research assurance-classification plan-review \
+for name in context-envelope evidence-collection preflight-research interview-research plan-review \
   plan-review-merge pr-review-merge execution-schedule item-implementation final-verification \
   simplification-map simplification-synthesis behavior-preservation plan-page; do
   file="$REPO_DIR/src/workers/$name.md"
@@ -256,46 +256,13 @@ has "$policy" 'the outcome is recorded as a **qualified pass**' \
   'assurance policy lost the qualified-pass outcome for a rerun refused command'
 has "$policy" 'not the reuse of a green this rule governs' \
   'assurance policy no longer separates a qualified pass from reusing a green under a matching seal'
-has "$policy" 'A bounded plan re-review reuses the recorded tier' \
-  'assurance policy re-classifies every bounded plan re-review'
-has "$policy" 'it starts beside the broad reviewer' \
-  'assurance policy makes every reader wait for risk classification'
+hasnt "$policy" 'assurance-classification' \
+  'assurance policy still dispatches a risk classifier'
+has "$policy" 'lowering it is their call, never pln' \
+  "assurance policy lost the rule that lowering review is the person's call"
+[ ! -e "$REPO_DIR/src/workers/assurance-classification.md" ] \
+  || fail 'the retired risk-classification worker contract came back'
 
-
-assurance="$REPO_DIR/src/workers/assurance-classification.md"
-has "$assurance" 'Classify meaning, not line count' 'assurance worker regressed to size-only risk'
-has "$assurance" 'Unknown or conflicting risk' 'assurance worker no longer fails closed'
-has "$assurance" 'SPECIALIST_AREAS=' 'assurance worker lost deterministic roster inputs'
-has "$assurance" 'pln-assurance diff-stats' 'assurance worker recounts the diff the helper already totalled'
-
-# The signal vocabulary lives in a case statement in bin/pln-assurance. A worker
-# told only to "return the signals accepted by" that helper had to go find it:
-# one real run grepped the whole skill, read 260 lines of the script, and then
-# read two past runs' evidence files to recover the spellings — about two minutes
-# of a five-minute classification, on every run. The contract and --help now
-# carry the list, so all three copies are held to the binary that accepts them.
-ASSURANCE_BIN="$REPO_DIR/bin/pln-assurance"
-contract_signals="$(sed -n 's/^- Raises to R\([23]\): //p;s/^- Routine: //p' "$assurance" | tr -d '`' | tr ' ' '\n' | grep -v '^$')"
-[ -n "$contract_signals" ] || fail 'assurance contract no longer spells out the accepted signal tokens'
-for token in $contract_signals; do
-  out="$("$ASSURANCE_BIN" classify --signals "$token" --substantive-files 1 --non-generated-lines 1)"
-  case "$out" in
-    *"REASON=unknown:$token"*) fail "assurance contract documents '$token', which bin/pln-assurance does not accept" ;;
-  esac
-  grep -qF -- "$token" "$WORK/assurance-help.txt" 2>/dev/null || {
-    "$ASSURANCE_BIN" > "$WORK/assurance-help.txt" 2>&1 || true
-    grep -qF -- "$token" "$WORK/assurance-help.txt" || fail "pln-assurance --help omits the accepted signal '$token'"
-  }
-done
-# And nothing the helper accepts may go undocumented. Aliases of a documented
-# spelling are the deliberate exception: one canonical token per concept.
-aliases='auth public-contract destructive-migration unresolved-critical-conflict'
-accepted="$(grep -E '^        [a-z][a-z |-]*\)$' "$ASSURANCE_BIN" | tr '|)' '\n\n' | sed 's/[^a-z-]//g' | grep -v '^$')"
-[ -n "$accepted" ] || fail 'could not read the accepted signal set out of bin/pln-assurance'
-for token in $accepted; do
-  case " $aliases " in *" $token "*) continue ;; esac
-  grep -qF -- "$token" "$assurance" || fail "bin/pln-assurance accepts '$token' but the worker contract never names it"
-done
 has "$verification" 'Do not fix a failure inline' 'verification contract may hide a failed gate'
 
 simplify_map="$REPO_DIR/src/workers/simplification-map.md"
@@ -1300,7 +1267,7 @@ for host in claude codex; do
     "$host the hold's question lacks the owner's three answers"
   has "$ship_watch" 'unless `Draft hold` is non-empty: then `Phase` stays `ship-watch`' \
     "$host a run completes with the hold unanswered"
-  has "$ship_watch" 'run the fix phase'"'"'s second pass on that fix — no fresh classification and no new review' \
+  has "$ship_watch" 'run the fix phase'"'"'s second pass on that fix — no new review' \
     "$host a CI fix still triggers a fresh review"
   # The same refusal rule is coordinator text in three skills now, and
   # bin/pln-generate resolves pln:include only in src/**/*.core.md, so none of

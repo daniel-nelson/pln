@@ -237,7 +237,7 @@ grep -q '^CONTRACT_SHA256=' "$WORK/live-frontier-regression/metadata.env" \
   || fail 'frontier regression live metadata lost runtime-contract attribution'
 
 # Required scenario families remain present in the sanitized corpus.
-for category in outline phases cursor routing scheduler blockers assurance-r1 assurance-r2 assurance-r3 exact-tree pr-resume pr-ci peer r3-recall review-precision; do
+for category in outline phases cursor routing scheduler blockers review-depth adversarial-slot exact-tree pr-resume pr-ci peer critical-recall review-precision; do
   awk -F '\t' -v category="$category" 'NR>1 && $4==category {found=1} END {exit !found}' \
     "$REPO_DIR/evals/corpus/behavior.tsv" || fail "corpus lost $category coverage"
 done

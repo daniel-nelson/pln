@@ -355,13 +355,13 @@ score() {
     BEGIN { while ((getline line < actual) > 0) { split(line,a,"\t"); got[a[1],a[2]]=a[3] } }
     { ok=(got[$1,$2] == $3 ? 1 : 0); print $0 "\t" ok }
   ' "$expected" > "$joined"
-  local assertions correct hard_total hard_ok objective_total objective_ok r3_total r3_ok review_total review_ok economy_fact_total economy_fact_ok escalation_total escalation_ok citation_total citation_ok prohibited floors
+  local assertions correct hard_total hard_ok objective_total objective_ok critical_total critical_ok review_total review_ok economy_fact_total economy_fact_ok escalation_total escalation_ok citation_total citation_ok prohibited floors
   assertions="$(wc -l < "$joined" | tr -d ' ')"
   correct="$(awk -F '\t' '$5 == 1 {n++} END {print n+0}' "$joined")"
   metric() { awk -F '\t' -v tag="$1" 'index(","$4",", ","tag",") {t++; if ($5==1) ok++} END {print t+0 " " ok+0}' "$joined"; }
   read -r hard_total hard_ok <<<"$(metric hard)"
   read -r objective_total objective_ok <<<"$(metric objective)"
-  read -r r3_total r3_ok <<<"$(metric r3-recall)"
+  read -r critical_total critical_ok <<<"$(metric critical-recall)"
   read -r review_total review_ok <<<"$(metric review-seeded)"
   read -r economy_fact_total economy_fact_ok <<<"$(metric economy-fact)"
   read -r escalation_total escalation_ok <<<"$(metric economy-escalation)"
@@ -375,7 +375,7 @@ score() {
   [ "$hard_ok" -eq "$hard_total" ] || floors=fail
   if [ "$profile" = frontier ]; then
     pct_at_least "$objective_ok" "$objective_total" 95 || floors=fail
-    [ "$r3_ok" -eq "$r3_total" ] || floors=fail
+    [ "$critical_ok" -eq "$critical_total" ] || floors=fail
     pct_at_least "$review_ok" "$review_total" 90 || floors=fail
   else
     pct_at_least "$economy_fact_ok" "$economy_fact_total" 98 || floors=fail
@@ -387,7 +387,7 @@ score() {
     printf 'STATUS=%s\nPROFILE=%s\nSPLIT=%s\nFIXTURE_SHA256=%s\n' "$floors" "$profile" "$split" "$(fixture_hash)"
     printf 'CASES_ELIGIBLE=%s\nCASES_BOUNDARY=%s\n' "$(class_count "$split" eligible)" "$(class_count "$split" boundary)"
     printf 'ASSERTIONS=%s\nCORRECT=%s\nHARD_TOTAL=%s\nHARD_CORRECT=%s\nOBJECTIVE_TOTAL=%s\nOBJECTIVE_CORRECT=%s\n' "$assertions" "$correct" "$hard_total" "$hard_ok" "$objective_total" "$objective_ok"
-    printf 'R3_TOTAL=%s\nR3_CORRECT=%s\nREVIEW_TOTAL=%s\nREVIEW_CORRECT=%s\n' "$r3_total" "$r3_ok" "$review_total" "$review_ok"
+    printf 'CRITICAL_TOTAL=%s\nCRITICAL_CORRECT=%s\nREVIEW_TOTAL=%s\nREVIEW_CORRECT=%s\n' "$critical_total" "$critical_ok" "$review_total" "$review_ok"
     printf 'ECONOMY_FACT_TOTAL=%s\nECONOMY_FACT_CORRECT=%s\nESCALATION_TOTAL=%s\nESCALATION_CORRECT=%s\nCITATION_TOTAL=%s\nCITATION_CORRECT=%s\nPROHIBITED_JUDGMENT_OUTPUTS=%s\n' "$economy_fact_total" "$economy_fact_ok" "$escalation_total" "$escalation_ok" "$citation_total" "$citation_ok" "$prohibited"
   } > "$out"
   rm -f "$expected" "$actual" "$joined"

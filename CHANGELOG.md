@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.135.0 — 2026-11-12
+
+### Changed
+
+- **Nothing rates a change's risk any more. Every review runs in full unless you say otherwise.** A classifier used to rate each plan and branch and pick the reviewers from that rating. In the two weeks before this release it put 56 of 64 changes at its highest setting, usually citing about seven risk areas, so it cost a worker and a wait on every run and still chose the full set of reviewers almost every time. It is gone, and lowering the review is now your call alone:
+  - `/pln-pr` always runs its full set of reviewers: the broad reviewer, up to two specialists for the areas of the change where a mistake would cost most, and an adversarial reviewer (a second model where you have one). Saying "broad review" (`review=broad`) keeps only the broad reviewer. Saying "skip the review" (`review=none`) runs none.
+  - `/pln-pr` no longer stops to ask how much review to run when nobody said. It runs the full set.
+  - `/pln`'s plan review always adds the second model's reading when you have one and have consented to sending it. Turning plan review off still turns it off.
+  - When you lower the review, no warning follows about what a rating would have chosen.
+- **`pln-assurance roster` no longer takes `--risk`, and `pln-assurance classify` is removed.**
+- **The eval corpus no longer asks a model to rate risk.** Its three R1/R2/R3 cases are replaced by three on the new rule: run the full set when nobody named a depth, keep a broad review broad when the user asked for one, and fill the adversarial slot with the same model when no second model is permitted. The `r3-recall` floor is renamed `critical-recall` (`CRITICAL_TOTAL`/`CRITICAL_CORRECT` in `bin/pln-eval` output), and the corpus is re-sealed.
+
 ## 1.134.0 — 2026-11-06
 
 ### Changed

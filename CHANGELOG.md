@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.137.0 — 2026-11-14
+
+### Changed
+
+- **The recommended answer is always `a)`.** `/pln` and `/pln-pr` now put their recommendation first before assigning letters, including when a follow-up changes the recommendation. Previously the guidance required a recommendation above the options but left their order open, so the recommended answer could be `b)` and a habitual `a)` reply could choose something else. A named alternative to "as written" follows the same ordering rule.
+
 ## 1.136.0 — 2026-11-13
 
 ### Changed

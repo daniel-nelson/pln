@@ -16,7 +16,7 @@ The skill discovers verification commands by:
 
 ### Discrete option choices
 
-Lowercase letter + close-paren + single space + bolded label + em-dash + short description. Use this style whenever the user must pick one of N alternatives.
+Use lowercase letters: `a) **Label** — short description`, whenever the user must pick an alternative. Put the recommended option first, as `a)`, including when a follow-up changes the recommendation.
 
 ```
 When does verification run?
@@ -59,7 +59,7 @@ a real per-room fact, and it connects to Place.sleeps. Say if the style enum fit
 
 ### Binary "adopt as written / change?" questions
 
-Plain prose, no letters. e.g., "Adopt this as written, or change it?" Only while the message names no alternative: once it names one anywhere, it is an option message with "as written" as `a)`.
+Plain prose, no letters: "Adopt this as written, or change it?" Once the message names an alternative anywhere, use lettered options, with the recommendation first.
 
 ### The example option
 

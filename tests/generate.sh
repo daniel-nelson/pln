@@ -914,6 +914,11 @@ for host_out in "$real_c" "$real_x"; do
   # clearly better answer. Both routers carry it, because Style is shared.
   for g in "$f" "$host_out/pln-pr/SKILL.md"; do
     has "$g" '### Say which option you would take' "$g lost the rule that a question states the agent's view"
+    # 1.137.0: the recommendation has a stable position, including after a
+    # follow-up changes the pick and when "as written" is another option.
+    has "$g" 'Put the recommended option first, as `a)`' "$g lets the recommended answer move away from a)"
+    has "$g" 'including when a follow-up changes the recommendation' "$g keeps stale letters after a recommendation changes"
+    hasnt "$g" 'with "as written" as `a)`' "$g forces as-written ahead of a recommended change"
     has "$g" 'b) wins only if <what would change it>' "$g lost the view line naming what would change it"
     has "$g" "I can't pick: this turns on <what>, which only you know" "$g lost the line for a question the agent cannot call"
     has "$g" 'The user is not the expert you are missing' "$g lost the rule to find out before asking"

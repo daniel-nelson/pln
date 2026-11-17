@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.138.0 — 2026-11-16
+
+### Fixed
+
+- **A check that a live operation is safe is a step someone runs, not code that blocks the operation.** Observed on a Codex `/pln` run that made a production database console read-only. Plan review found a real defect: the rollout removed the old database login before the services stopped using it, which would have cut them off. The repair split the rollout into two phases, with a step to confirm every service had switched logins before the old grant was removed. The implementation worker then built that step as a validator: every later infrastructure deploy refused to run without an evidence bundle captured in the last ten minutes. The user never asked for this and never saw it as a choice. Three follow-up PRs went to fixing the validator, and a day went to collecting its evidence: browser automation, a manual UI check, and deleting an old CI run that blocked collection.
+
+  Earlier scope fixes (1.87.0, 1.131.0) all ask whether the user asked for something, and this passed that check honestly. The repair fixed a real defect, so it counted as a correction, and nothing limited how large a correction could grow. Three rules now say the same thing at each place the gate got through. Code that makes a deploy, apply, migration or release stop until evidence has been captured or a check passes is a *refusal*, and only the user's words or a repository mandate can ask for one. In the interview, "keeps a case that works on the source state working" admits an order of steps or a change to code, never a refusal. A plan-review merge's strictly dominant correction may reorder or add steps; where only a refusal would close a finding, it flags the refusal for the user. An implementation worker meets "verify before" by writing the step where the operator will read it, or by running it, never by building a refusal.
+
 ## 1.137.0 — 2026-11-14
 
 ### Changed

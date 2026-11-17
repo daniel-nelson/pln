@@ -75,6 +75,15 @@ has "$merge" 'with no quoted source behind it is an addition, and the repair rem
 implementation="$REPO_DIR/src/workers/item-implementation.md"
 has "$implementation" "stays out of this item's change, even inside a function you are changing" \
   'implementation worker folds a pre-existing bug into its item commit'
+# 1.138.0: a check that a live operation is safe is a step someone runs, not
+# code that refuses the operation. A rollout's "confirm before removing" step
+# became a validator every later infrastructure deploy had to satisfy.
+has "$implementation" 'It is never met by a refusal' \
+  'implementation worker may turn a verify step into code that refuses an operation'
+has "$implementation" 'Build a refusal only where the item quotes' \
+  'implementation worker may build a refusal nobody asked for'
+has "$merge" 'It never adds a refusal' \
+  'plan-review merge may add a refusal as a strictly dominant correction'
 scheduling="$REPO_DIR/src/workers/execution-schedule.md"
 envelope="$REPO_DIR/src/workers/context-envelope.md"
 has "$envelope" 'REQUESTED_PROFILE:' 'result envelopes do not attribute the requested profile'
@@ -1085,6 +1094,8 @@ for host in claude codex; do
     "$host interview has no record for an element it leaves out"
   has "$WORK/$host/phases/pln/interview.md" 'a pattern says how, never whether' \
     "$host interview lets a codebase pattern justify adding scope"
+  has "$WORK/$host/phases/pln/interview.md" 'That last clause admits an order of steps or a change to code, never a refusal' \
+    "$host interview lets keeping a case working admit a refusal nobody asked for"
   has "$WORK/$host/phases/pln/interview.md" 'The interleavings rule below is the mandate for a prevention it takes without asking' \
     "$host interview's scope check contradicts the interleavings rule's automatic preventions"
   has "$WORK/$host/phases/pln/interview.md" "it was never this item's to build: leave it out" \

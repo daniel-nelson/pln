@@ -933,6 +933,15 @@ for host_out in "$real_c" "$real_x"; do
     "$host_out walk may letter a record known to be wrong as an alternative"
   has "$host_out/phases/pln/review-approval.md" 'ask whether the decision still stands' \
     "$host_out walk no longer asks whether a corrected decision stands"
+  # 1.139.0: 1.137.0 put the recommendation at a) in Style but left the walk
+  # pinning a) to the entry as written, so a walk recommending the reviewer's
+  # change offered it as b).
+  hasnt "$host_out/phases/pln/review-approval.md" '`a)` is the entry as written' \
+    "$host_out walk pins a) to the entry as written instead of the recommendation"
+  hasnt "$host_out/phases/pln/review-approval.md" '`a)` it stands with the corrected fact' \
+    "$host_out walk pins a) to a corrected decision standing instead of the recommendation"
+  has "$host_out/phases/pln/review-approval.md" 'even when that is not the entry as written' \
+    "$host_out walk lost the rule that its recommended option comes first"
   # The one rule the check introduced that outlived it.
   has "$interview_file" 'Nor is a decision already reflected in the codebase changed silently, whoever made it' \
     "$interview_file lost the rule that a decision already in the codebase is not reversed silently"

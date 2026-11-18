@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.139.0 — 2026-11-18
+
+### Fixed
+
+- **Walking the flagged entries puts the recommendation at `a)` too.** 1.137.0 made the recommended option `a)` in Style, but the plan-approval walk still said "`a)` is the entry as written", so a walk that recommended the reviewer's change offered it as `b)`. Observed twice in one `/pln` run, on the two flagged entries it walked. The walk now letters its options with the recommended one first, including when that is the change rather than the entry as written, and so does its "does your decision still stand" question.
+
 ## 1.138.0 — 2026-11-16
 
 ### Fixed
